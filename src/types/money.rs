@@ -85,12 +85,12 @@ impl Price {
     }
 
     pub fn compatible_with(&self, symbol: Option<&str>) -> Result<()> {
-        if let (Some(a), Some(b)) = (self.symbol.as_deref(), symbol) {
-            if a != b {
-                return Err(Error::validation(format!(
-                    "price symbol mismatch: value is for {a}, destination is {b}"
-                )));
-            }
+        if let (Some(a), Some(b)) = (self.symbol.as_deref(), symbol)
+            && a != b
+        {
+            return Err(Error::validation(format!(
+                "price symbol mismatch: value is for {a}, destination is {b}"
+            )));
         }
         Ok(())
     }
@@ -116,11 +116,6 @@ impl Quantity {
     ) -> Result<Self> {
         if scaled < 0 {
             return Err(Error::validation("scaled must be non-negative"));
-        }
-        if let Some(s) = scale {
-            if (s as i32) < 0 {
-                return Err(Error::validation("scale must be non-negative"));
-            }
         }
         Ok(Self {
             scaled: QtyScaled::new(scaled),
@@ -187,26 +182,26 @@ impl Quantity {
                 self.domain
             )));
         }
-        if let (Some(a), Some(b)) = (self.scale, scale) {
-            if a != b {
-                return Err(Error::validation(format!(
-                    "quantity scale mismatch: value scale is {a}, destination is {b}"
-                )));
-            }
+        if let (Some(a), Some(b)) = (self.scale, scale)
+            && a != b
+        {
+            return Err(Error::validation(format!(
+                "quantity scale mismatch: value scale is {a}, destination is {b}"
+            )));
         }
-        if let (Some(a), Some(b)) = (self.symbol.as_deref(), symbol) {
-            if a != b {
-                return Err(Error::validation(format!(
-                    "quantity symbol mismatch: value is for {a}, destination is {b}"
-                )));
-            }
+        if let (Some(a), Some(b)) = (self.symbol.as_deref(), symbol)
+            && a != b
+        {
+            return Err(Error::validation(format!(
+                "quantity symbol mismatch: value is for {a}, destination is {b}"
+            )));
         }
-        if let (Some(a), Some(b)) = (self.symbol_id, symbol_id) {
-            if a != b {
-                return Err(Error::validation(format!(
-                    "quantity symbol_id mismatch: value is for {a}, destination is {b}"
-                )));
-            }
+        if let (Some(a), Some(b)) = (self.symbol_id, symbol_id)
+            && a != b
+        {
+            return Err(Error::validation(format!(
+                "quantity symbol_id mismatch: value is for {a}, destination is {b}"
+            )));
         }
         Ok(())
     }

@@ -5,7 +5,6 @@ edition = "2024"
 rust-version = "1.88"
 description = "Official Rust SDK for Polyester APIs."
 readme = "README.md"
-license = "LicenseRef-Proprietary"
 license-file = "LICENSE"
 authors = ["Fabric Blockchain Labs Inc."]
 repository = "https://github.com/Fabric-Labs/polyester-sdk-rust"

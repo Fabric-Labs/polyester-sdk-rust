@@ -38,8 +38,10 @@ impl OrdersService {
         &self,
         subaccount_id: Option<u64>,
     ) -> Result<crate::proto::orders::v1::GetOpenOrdersResponse> {
-        let mut req = GetOpenOrdersRequest::default();
-        req.subaccount_id = scope::optional_subaccount(&self.ctx, subaccount_id)?;
+        let req = GetOpenOrdersRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            ..Default::default()
+        };
         let client = self.read_client();
         Ok(unary::await_auth(
             &self.ctx.factory,
@@ -56,11 +58,11 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         limit: Option<u32>,
     ) -> Result<crate::proto::orders::v1::GetOrderHistoryResponse> {
-        let mut req = GetOrderHistoryRequest::default();
-        req.subaccount_id = scope::optional_subaccount(&self.ctx, subaccount_id)?;
-        if let Some(limit) = limit {
-            req.limit = Some(limit);
-        }
+        let req = GetOrderHistoryRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            limit,
+            ..Default::default()
+        };
         let client = self.read_client();
         Ok(unary::await_auth(
             &self.ctx.factory,
@@ -199,11 +201,11 @@ impl TradesService {
         subaccount_id: Option<u64>,
         limit: Option<u32>,
     ) -> Result<crate::proto::orders::v1::GetUserTradesResponse> {
-        let mut req = GetUserTradesRequest::default();
-        req.subaccount_id = scope::optional_subaccount(&self.ctx, subaccount_id)?;
-        if let Some(limit) = limit {
-            req.limit = Some(limit);
-        }
+        let req = GetUserTradesRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            limit,
+            ..Default::default()
+        };
         let client = OrdersReadServiceClient::new(
             self.ctx.factory.transport(true),
             self.ctx.factory.connect_config(true),

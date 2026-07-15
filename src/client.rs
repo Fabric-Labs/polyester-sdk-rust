@@ -163,19 +163,21 @@ impl Client {
 
     /// Build from `POLYESTER_API_KEY_ID` / `POLYESTER_API_PRIVATE_KEY` / `POLYESTER_ACCOUNT_ID`.
     pub fn from_env() -> Result<Self> {
-        let mut config = Config::default();
-        config.api_key_id = std::env::var(auth::API_KEY_ID_ENV).ok();
-        config.api_private_key = std::env::var(auth::API_PRIVATE_KEY_ENV).ok();
-        config.default_account_id = auth::account_id_from_env();
-        if let Ok(url) = std::env::var("POLYESTER_API_URL") {
-            if !url.trim().is_empty() {
-                config.api_url = url;
-            }
+        let mut config = Config {
+            api_key_id: std::env::var(auth::API_KEY_ID_ENV).ok(),
+            api_private_key: std::env::var(auth::API_PRIVATE_KEY_ENV).ok(),
+            default_account_id: auth::account_id_from_env(),
+            ..Default::default()
+        };
+        if let Ok(url) = std::env::var("POLYESTER_API_URL")
+            && !url.trim().is_empty()
+        {
+            config.api_url = url;
         }
-        if let Ok(url) = std::env::var("POLYESTER_WS_URL") {
-            if !url.trim().is_empty() {
-                config.ws_url = url;
-            }
+        if let Ok(url) = std::env::var("POLYESTER_WS_URL")
+            && !url.trim().is_empty()
+        {
+            config.ws_url = url;
         }
         // Force from_env credential loading
         let credentials = Credentials::load(None, None, true)?;
@@ -241,15 +243,15 @@ impl Client {
 
     /// Best-effort catalog hydration from spot + zipper configs.
     pub async fn hydrate_catalogs(&self) -> Result<()> {
-        if let Ok(spot) = self.market_data.get_spot_config().await {
-            if let Ok(json) = serde_json::to_value(&spot) {
-                self.catalogs.hydrate_spot_config_json(json);
-            }
+        if let Ok(spot) = self.market_data.get_spot_config().await
+            && let Ok(json) = serde_json::to_value(&spot)
+        {
+            self.catalogs.hydrate_spot_config_json(json);
         }
-        if let Ok(zipper) = self.zipper.get_deposit_withdraw_config().await {
-            if let Ok(json) = serde_json::to_value(&zipper) {
-                self.catalogs.hydrate_zipper_config_json(json);
-            }
+        if let Ok(zipper) = self.zipper.get_deposit_withdraw_config().await
+            && let Ok(json) = serde_json::to_value(&zipper)
+        {
+            self.catalogs.hydrate_zipper_config_json(json);
         }
         Ok(())
     }
