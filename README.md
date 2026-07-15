@@ -11,20 +11,16 @@ API-key only — no browser login or JWT flows.
 
 ## Install
 
-crates.io packaging is blocked while the checked-in Buffa/Connect gen tree is
-~15 MiB (crates.io crate size limit is 10 MiB). Until gen is slimmed or the
-limit is raised, depend on GitHub:
+```toml
+[dependencies]
+polyester-sdk = "0.1.0-alpha.1"
+```
+
+Git install (if you prefer pinning a tag before crates.io mirrors):
 
 ```toml
 [dependencies]
 polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0-alpha.1" }
-```
-
-When the package fits crates.io:
-
-```toml
-[dependencies]
-polyester-sdk = "0.1.0-alpha.1"
 ```
 
 ```rust

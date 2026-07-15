@@ -47,10 +47,10 @@ impl MarketOverviewService {
         &self,
         limit: Option<u32>,
     ) -> Result<crate::proto::marketoverview::v1::ListMarketOverviewResponse> {
-        let mut req = ListMarketOverviewRequest::default();
-        if let Some(limit) = limit {
-            req.limit = limit;
-        }
+        let req = ListMarketOverviewRequest {
+            limit: limit.unwrap_or_default(),
+            ..Default::default()
+        };
         let client = MarketOverviewServiceClient::new(
             self.ctx.factory.transport(false),
             self.ctx.factory.connect_config(false),
