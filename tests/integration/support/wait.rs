@@ -1,10 +1,8 @@
 //! Order / trigger polling helpers.
 
 use super::call::is_not_found;
-use polyester::models::Order;
-use polyester::proto::triggers::v1::{
-    GetTriggerRequest, ListTriggerEventsRequest, ListTriggerEventsResponse, Trigger,
-};
+use polyester::models::{Order, Trigger, TriggerEventsList};
+use polyester::proto::triggers::v1::{GetTriggerRequest, ListTriggerEventsRequest};
 use polyester::{Client, Error, Result};
 use std::time::{Duration, Instant};
 
@@ -169,7 +167,7 @@ pub async fn wait_for_terminal_order(
 
 pub async fn wait_for_trigger(
     client: &Client,
-    trigger_id: u64,
+    trigger_id: &str,
     timeout: Duration,
 ) -> Result<Trigger> {
     let timeout = if timeout.is_zero() {
@@ -179,20 +177,23 @@ pub async fn wait_for_trigger(
     };
     let deadline = Instant::now() + timeout;
     let mut last_err: Option<Error> = None;
+    let trigger_id_u64 = match polyester::codecs::scalars::id_to_u64(trigger_id, "trigger_id") {
+        Ok(v) => v,
+        Err(err) => return Err(err),
+    };
     while Instant::now() < deadline {
         match client
             .triggers
             .get(GetTriggerRequest {
-                trigger_id,
+                trigger_id: trigger_id_u64,
                 ..Default::default()
             })
             .await
         {
-            Ok(resp) => {
-                if let Some(trigger) = resp.trigger.as_option() {
-                    return Ok(trigger.clone());
-                }
+            Ok(Some(trigger)) => {
+                return Ok(trigger);
             }
+            Ok(None) => {}
             Err(err) if is_not_found(&err) => {
                 last_err = Some(err);
             }
@@ -208,20 +209,21 @@ pub async fn wait_for_trigger(
 
 pub async fn wait_for_trigger_events(
     client: &Client,
-    trigger_id: u64,
+    trigger_id: &str,
     timeout: Duration,
-) -> Result<ListTriggerEventsResponse> {
+) -> Result<TriggerEventsList> {
     let timeout = if timeout.is_zero() {
         Duration::from_secs(10)
     } else {
         timeout
     };
     let deadline = Instant::now() + timeout;
+    let trigger_id_u64 = polyester::codecs::scalars::id_to_u64(trigger_id, "trigger_id")?;
     while Instant::now() < deadline {
         let events = client
             .triggers
             .list_events(ListTriggerEventsRequest {
-                trigger_id,
+                trigger_id: trigger_id_u64,
                 limit: 10,
                 ..Default::default()
             })

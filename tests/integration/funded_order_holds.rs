@@ -2,7 +2,7 @@
 
 use crate::support::{
     call_optional, hydrate_spot_and_zipper, is_internal_order_error, quote_asset_id,
-    require_funded, require_live_client, require_trading_quote_balance, smoke_symbol, u128_raw,
+    require_funded, require_live_client, require_trading_quote_balance, smoke_symbol,
     unique_client_order_id, usdt_funded_buy_limit_params, wait_for_open_order,
 };
 use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
@@ -123,10 +123,8 @@ async fn order_hold_visible_while_open() {
 
     let has_hold = holds.holds.iter().any(|hold| {
         hold.asset_id == quote_asset_id
-            && hold
-                .amount_reserved_e18
-                .as_option()
-                .is_some_and(|u| u128_raw(u) > 0)
+            && !hold.amount_reserved.is_empty()
+            && hold.amount_reserved != "0"
     });
     cleanup.await;
     assert!(

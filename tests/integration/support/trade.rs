@@ -3,11 +3,11 @@
 use super::call::{call_optional, call_required};
 use super::env::{env_trade_symbol, load_dotenv, min_trading_quote, skip_funding_check};
 use polyester::codecs::scalars::{format_price_ticks, parse_price_ticks_str};
+use polyester::models::AssetBalance;
 use polyester::proto::chain::zipper::v1::GetDepositWithdrawConfigResponse;
-use polyester::proto::ledger::read::v1::{AssetBalance, GetBalancesRequest};
+use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::proto::marketdata::v1::{GetSpotConfigResponse, PairConfig};
 use polyester::proto::orderbook::v1::{GetOrderBookRequest, GetOrderBookResponse};
-use polyester::proto::polyester::r#type::v1::U128;
 use polyester::{Client, Result};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -99,12 +99,12 @@ pub fn unique_client_order_id(prefix: &str) -> String {
     format!("{p}-{nanos}")
 }
 
-pub fn u128_raw(u: &U128) -> u128 {
-    ((u.hi as u128) << 64) | (u.lo as u128)
+pub fn u128_raw_from_str(s: &str) -> u128 {
+    s.parse().unwrap_or(0)
 }
 
-pub fn ledger_u128_to_decimal(u: &U128) -> Decimal {
-    let raw = u128_raw(u);
+pub fn ledger_amount_to_decimal(raw_str: &str) -> Decimal {
+    let raw = u128_raw_from_str(raw_str);
     let s = raw.to_string();
     if s.len() <= LEDGER_SCALE as usize {
         let frac = format!("{s:0>18}");
@@ -118,10 +118,8 @@ pub fn ledger_u128_to_decimal(u: &U128) -> Decimal {
 
 pub fn trading_balance_human(balances: &[AssetBalance], asset_id: u32) -> Decimal {
     for row in balances {
-        if row.asset_id == asset_id
-            && let Some(trading) = row.trading.as_option()
-        {
-            return ledger_u128_to_decimal(trading);
+        if row.asset_id == asset_id && !row.trading.is_empty() && row.trading != "0" {
+            return ledger_amount_to_decimal(&row.trading);
         }
     }
     Decimal::ZERO
@@ -129,10 +127,8 @@ pub fn trading_balance_human(balances: &[AssetBalance], asset_id: u32) -> Decima
 
 pub fn trading_balance_raw(balances: &[AssetBalance], asset_id: u32) -> u128 {
     for row in balances {
-        if row.asset_id == asset_id
-            && let Some(trading) = row.trading.as_option()
-        {
-            return u128_raw(trading);
+        if row.asset_id == asset_id {
+            return u128_raw_from_str(&row.trading);
         }
     }
     0
