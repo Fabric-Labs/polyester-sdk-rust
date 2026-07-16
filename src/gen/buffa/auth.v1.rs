@@ -289,8 +289,10 @@ pub struct ApiKey {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub created_by_actor: ::buffa::alloc::string::String,
-    /// Time in UTC when this key's configuration was last changed. This is
-    /// independent of last_used_at, which tracks authentication activity.
+    /// Time in UTC when this key's configuration was last changed. For the same
+    /// key, later is fresher, equal is an idempotent replay, and earlier is stale.
+    /// Equal timestamps with different configuration indicate an invariant failure.
+    /// This is independent of last_used_at, which tracks authentication activity.
     ///
     /// Field 25: `updated_at`
     #[serde(
@@ -10876,7 +10878,10 @@ pub struct Subaccount {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub smart_account_salt_nonce: ::core::option::Option<u32>,
-    /// Time in UTC when this sub-account's configuration was last changed.
+    /// Time in UTC when this sub-account's configuration was last changed. For the
+    /// same sub-account, later is fresher, equal is an idempotent replay, and
+    /// earlier is stale. Equal timestamps with different configuration indicate
+    /// an invariant failure.
     ///
     /// Field 14: `updated_at`
     #[serde(
@@ -40497,8 +40502,10 @@ pub mod __buffa {
             ///
             /// Field 24: `created_by_actor`
             pub created_by_actor: &'a str,
-            /// Time in UTC when this key's configuration was last changed. This is
-            /// independent of last_used_at, which tracks authentication activity.
+            /// Time in UTC when this key's configuration was last changed. For the same
+            /// key, later is fresher, equal is an idempotent replay, and earlier is stale.
+            /// Equal timestamps with different configuration indicate an invariant failure.
+            /// This is independent of last_used_at, which tracks authentication activity.
             ///
             /// Field 25: `updated_at`
             pub updated_at: ::buffa::MessageFieldView<
@@ -41249,8 +41256,10 @@ pub mod __buffa {
             pub fn created_by_actor(&self) -> &'_ str {
                 self.0.reborrow().created_by_actor
             }
-            /// Time in UTC when this key's configuration was last changed. This is
-            /// independent of last_used_at, which tracks authentication activity.
+            /// Time in UTC when this key's configuration was last changed. For the same
+            /// key, later is fresher, equal is an idempotent replay, and earlier is stale.
+            /// Equal timestamps with different configuration indicate an invariant failure.
+            /// This is independent of last_used_at, which tracks authentication activity.
             ///
             /// Field 25: `updated_at`
             #[must_use]
@@ -58601,7 +58610,10 @@ pub mod __buffa {
             ///
             /// Field 13: `smart_account_salt_nonce`
             pub smart_account_salt_nonce: ::core::option::Option<u32>,
-            /// Time in UTC when this sub-account's configuration was last changed.
+            /// Time in UTC when this sub-account's configuration was last changed. For the
+            /// same sub-account, later is fresher, equal is an idempotent replay, and
+            /// earlier is stale. Equal timestamps with different configuration indicate
+            /// an invariant failure.
             ///
             /// Field 14: `updated_at`
             pub updated_at: ::buffa::MessageFieldView<
@@ -59250,7 +59262,10 @@ pub mod __buffa {
             pub fn smart_account_salt_nonce(&self) -> ::core::option::Option<u32> {
                 self.0.reborrow().smart_account_salt_nonce
             }
-            /// Time in UTC when this sub-account's configuration was last changed.
+            /// Time in UTC when this sub-account's configuration was last changed. For the
+            /// same sub-account, later is fresher, equal is an idempotent replay, and
+            /// earlier is stale. Equal timestamps with different configuration indicate
+            /// an invariant failure.
             ///
             /// Field 14: `updated_at`
             #[must_use]
