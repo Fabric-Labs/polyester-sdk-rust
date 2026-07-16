@@ -108,10 +108,7 @@ impl TriggersService {
         Ok(trigger_mutation_from_resume(&resp))
     }
 
-    pub async fn list_events(
-        &self,
-        req: ListTriggerEventsRequest,
-    ) -> Result<TriggerEventsList> {
+    pub async fn list_events(&self, req: ListTriggerEventsRequest) -> Result<TriggerEventsList> {
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,

@@ -4,10 +4,10 @@ use super::call::{call_optional, call_required};
 use super::env::{env_trade_symbol, load_dotenv, min_trading_quote, skip_funding_check};
 use polyester::codecs::scalars::{format_price_ticks, parse_price_ticks_str};
 use polyester::models::AssetBalance;
+use polyester::models::OrderbookData;
 use polyester::proto::chain::zipper::v1::GetDepositWithdrawConfigResponse;
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::proto::marketdata::v1::{GetSpotConfigResponse, PairConfig};
-use polyester::proto::orderbook::v1::{GetOrderBookRequest, GetOrderBookResponse};
 use polyester::{Client, Result};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -193,7 +193,7 @@ fn far_below_hint(symbol: &str) -> String {
         .unwrap_or_else(|| "100".to_owned())
 }
 
-fn post_only_buy_price_from_book(book: &GetOrderBookResponse, tick_size: &str) -> Option<String> {
+fn post_only_buy_price_from_book(book: &OrderbookData, tick_size: &str) -> Option<String> {
     if book.bids.is_empty() {
         return None;
     }
@@ -201,15 +201,16 @@ fn post_only_buy_price_from_book(book: &GetOrderBookResponse, tick_size: &str) -
     if tick_ticks == 0 {
         return None;
     }
-    let bid_ticks = book.bids[0].price_ticks;
+    let bid_ticks = book.bids[0].price.as_ref()?.as_ticks();
     let mut target = bid_ticks - tick_ticks;
     if target < tick_ticks {
         target = tick_ticks;
     }
     if let Some(ask) = book.asks.first()
-        && ask.price_ticks > 0
+        && let Some(ask_px) = ask.price.as_ref()
+        && ask_px.as_ticks() > 0
     {
-        let max_post_only = ask.price_ticks - tick_ticks;
+        let max_post_only = ask_px.as_ticks() - tick_ticks;
         if target > max_post_only {
             target = max_post_only;
         }
@@ -263,13 +264,7 @@ pub async fn resolve_post_only_buy_limit_price(
         })
         .unwrap_or("0.01");
 
-    if let Ok(book) = client
-        .orderbook
-        .get(GetOrderBookRequest {
-            symbol: symbol.to_owned(),
-            ..Default::default()
-        })
-        .await
+    if let Ok(book) = client.orderbook.get(symbol, None).await
         && let Some(price) = post_only_buy_price_from_book(&book, tick_size)
     {
         return price;
@@ -277,9 +272,10 @@ pub async fn resolve_post_only_buy_limit_price(
     if let Ok(overview) = client.market_overview.list(Some(5)).await {
         for row in &overview.markets {
             if row.symbol == symbol
-                && row.last_price_ticks > 0
+                && let Some(last) = row.last_price.as_ref()
+                && last.as_ticks() > 0
                 && let Some(price) =
-                    post_only_buy_price_from_last(row.last_price_ticks, tick_size, symbol)
+                    post_only_buy_price_from_last(last.as_ticks(), tick_size, symbol)
             {
                 return price;
             }
@@ -371,41 +367,41 @@ pub async fn market_ref_price(
             return t.to_owned();
         }
     }
-    if let Ok(book) = client
-        .orderbook
-        .get(GetOrderBookRequest {
-            symbol: symbol.to_owned(),
-            ..Default::default()
-        })
-        .await
-    {
+    if let Ok(book) = client.orderbook.get(symbol, None).await {
         let side_l = side.trim().to_ascii_lowercase();
         if side_l == "sell" {
             if let Some(bid) = book.bids.first()
-                && bid.price_ticks > 0
+                && let Some(px) = bid.price.as_ref()
+                && px.as_ticks() > 0
             {
-                return format_price_ticks(bid.price_ticks);
+                return format_price_ticks(px.as_ticks());
             }
         } else if let Some(ask) = book.asks.first()
-            && ask.price_ticks > 0
+            && let Some(px) = ask.price.as_ref()
+            && px.as_ticks() > 0
         {
-            return format_price_ticks(ask.price_ticks);
+            return format_price_ticks(px.as_ticks());
         }
         if let Some(ask) = book.asks.first()
-            && ask.price_ticks > 0
+            && let Some(px) = ask.price.as_ref()
+            && px.as_ticks() > 0
         {
-            return format_price_ticks(ask.price_ticks);
+            return format_price_ticks(px.as_ticks());
         }
         if let Some(bid) = book.bids.first()
-            && bid.price_ticks > 0
+            && let Some(px) = bid.price.as_ref()
+            && px.as_ticks() > 0
         {
-            return format_price_ticks(bid.price_ticks);
+            return format_price_ticks(px.as_ticks());
         }
     }
     if let Ok(overview) = client.market_overview.list(Some(5)).await {
         for row in &overview.markets {
-            if row.symbol == symbol && row.last_price_ticks > 0 {
-                return format_price_ticks(row.last_price_ticks);
+            if row.symbol == symbol
+                && let Some(last) = row.last_price.as_ref()
+                && last.as_ticks() > 0
+            {
+                return format_price_ticks(last.as_ticks());
             }
         }
     }

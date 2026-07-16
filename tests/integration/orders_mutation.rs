@@ -80,7 +80,10 @@ async fn order_round_trip_mutation() {
         Err(err) => panic!("orders.create: {err}"),
     };
     assert_eq!(created.client_order_id, client_order_id);
-    assert!(!created.order_id.is_empty() && created.order_id != "0", "expected order_id from create");
+    assert!(
+        !created.order_id.is_empty() && created.order_id != "0",
+        "expected order_id from create"
+    );
 
     let open_order = match wait_for_open_order(&client, &client_order_id, Duration::ZERO).await {
         Ok(o) => o,

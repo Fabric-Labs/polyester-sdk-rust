@@ -1,0 +1,66 @@
+//! Market-data SDK models (Go `models/market.go` / `models/common.go` parity).
+
+use crate::types::{Price, Quantity};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Candle {
+    pub ts_sec: i64,
+    pub open: String,
+    pub high: String,
+    pub low: String,
+    pub close: String,
+    pub volume: String,
+    pub symbol_id: u32,
+    pub timeframe: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CandlesResult {
+    pub symbol_id: u32,
+    pub timeframe: String,
+    pub candles: Vec<Candle>,
+    pub next_page_token: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarketTrade {
+    pub symbol_id: u32,
+    pub match_id: String,
+    pub price: Option<Price>,
+    pub qty: Option<Quantity>,
+    pub ts_ns: String,
+    pub side: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarketTradesResult {
+    pub trades: Vec<MarketTrade>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarketOverviewEntry {
+    pub symbol_id: u32,
+    pub symbol: String,
+    pub last_price: Option<Price>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarketOverviewList {
+    pub markets: Vec<MarketOverviewEntry>,
+    pub next_page_token: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderbookLevel {
+    pub price: Option<Price>,
+    pub qty: Option<Quantity>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderbookData {
+    pub symbol: String,
+    pub depth: u32,
+    pub book_seq: String,
+    pub bids: Vec<OrderbookLevel>,
+    pub asks: Vec<OrderbookLevel>,
+}

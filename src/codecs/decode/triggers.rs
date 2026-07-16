@@ -52,7 +52,11 @@ fn trigger_price_ticks(msg: &ProtoTrigger) -> i64 {
 
 pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
     let symbol_id = msg.symbol_id;
-    let symbol_id_opt = if symbol_id == 0 { None } else { Some(symbol_id) };
+    let symbol_id_opt = if symbol_id == 0 {
+        None
+    } else {
+        Some(symbol_id)
+    };
     let symbol = if msg.symbol.is_empty() {
         None
     } else {
@@ -81,7 +85,10 @@ pub fn get_trigger_from_proto(msg: &GetTriggerResponse) -> Option<Trigger> {
     msg.trigger.as_option().map(trigger_from_proto)
 }
 
-fn trigger_mutation(trigger_id: u64, status: buffa::EnumValue<TriggerStatus>) -> TriggerMutationResult {
+fn trigger_mutation(
+    trigger_id: u64,
+    status: buffa::EnumValue<TriggerStatus>,
+) -> TriggerMutationResult {
     TriggerMutationResult {
         trigger_id: format_uint64_id(trigger_id),
         status: enum_value_trigger_status(status),

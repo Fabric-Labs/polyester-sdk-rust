@@ -21,14 +21,14 @@ async fn internal_transfer_tiny() {
         eprintln!("skip: Set POLYESTER_TEST_INTERNAL_TRANSFER_DEST for internal transfer e2e");
         return;
     };
-    let dest_account_id = match polyester::codecs::scalars::id_to_u64(&dest, "destination_account_id")
-    {
-        Ok(id) => id,
-        Err(err) => {
-            eprintln!("skip: invalid POLYESTER_TEST_INTERNAL_TRANSFER_DEST: {err}");
-            return;
-        }
-    };
+    let dest_account_id =
+        match polyester::codecs::scalars::id_to_u64(&dest, "destination_account_id") {
+            Ok(id) => id,
+            Err(err) => {
+                eprintln!("skip: invalid POLYESTER_TEST_INTERNAL_TRANSFER_DEST: {err}");
+                return;
+            }
+        };
 
     let spot = match hydrate_spot_and_zipper(&client).await {
         Ok(s) => s,

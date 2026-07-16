@@ -18,12 +18,5 @@ pub fn decode_qty_scaled(
     if scaled == 0 {
         return None;
     }
-    Quantity::from_scaled(
-        scaled,
-        scale,
-        QuantityDomain::OrderBase,
-        symbol,
-        symbol_id,
-    )
-    .ok()
+    Quantity::from_scaled(scaled, scale, QuantityDomain::OrderBase, symbol, symbol_id).ok()
 }

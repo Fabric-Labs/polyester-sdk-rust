@@ -92,9 +92,7 @@ impl OrdersService {
         let key = if let Some(cid) = client_order_id {
             Some(get_order_request::Key::ClientOrderId(cid.to_owned()))
         } else if let Some(oid) = order_id {
-            Some(get_order_request::Key::OrderId(
-                id_to_u64(oid, "order_id")?,
-            ))
+            Some(get_order_request::Key::OrderId(id_to_u64(oid, "order_id")?))
         } else {
             return Err(Error::validation(
                 "orders.get requires client_order_id or order_id",
