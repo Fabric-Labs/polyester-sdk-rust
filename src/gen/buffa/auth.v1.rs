@@ -289,6 +289,18 @@ pub struct ApiKey {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub created_by_actor: ::buffa::alloc::string::String,
+    /// Time in UTC when this key's configuration was last changed. For the same
+    /// key, later is fresher, equal is an idempotent replay, and earlier is stale.
+    /// Equal timestamps with different configuration indicate an invariant failure.
+    /// This is independent of last_used_at, which tracks authentication activity.
+    ///
+    /// Field 25: `updated_at`
+    #[serde(
+        rename = "updatedAt",
+        alias = "updated_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -309,6 +321,7 @@ impl ::core::fmt::Debug for ApiKey {
             .field("public_key_ed25519", &self.public_key_ed25519)
             .field("expires_at", &self.expires_at)
             .field("created_by_actor", &self.created_by_actor)
+            .field("updated_at", &self.updated_at)
             .finish()
     }
 }
@@ -414,6 +427,14 @@ impl ::buffa::Message for ApiKey {
                 += 2u32
                     + ::buffa::types::string_encoded_len(&self.created_by_actor) as u32;
         }
+        if self.updated_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.updated_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -468,6 +489,10 @@ impl ::buffa::Message for ApiKey {
         }
         if !self.created_by_actor.is_empty() {
             ::buffa::types::put_string_field(24u32, &self.created_by_actor, buf);
+        }
+        if self.updated_at.is_set() {
+            ::buffa::types::put_len_delimited_header(25u32, __cache.consume_next(), buf);
+            self.updated_at.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -591,6 +616,17 @@ impl ::buffa::Message for ApiKey {
                 )?;
                 ::buffa::types::merge_string(&mut self.created_by_actor, buf)?;
             }
+            25u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.updated_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -612,6 +648,7 @@ impl ::buffa::Message for ApiKey {
         self.public_key_ed25519.clear();
         self.expires_at = ::buffa::MessageField::none();
         self.created_by_actor.clear();
+        self.updated_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -10841,6 +10878,18 @@ pub struct Subaccount {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub smart_account_salt_nonce: ::core::option::Option<u32>,
+    /// Time in UTC when this sub-account's configuration was last changed. For the
+    /// same sub-account, later is fresher, equal is an idempotent replay, and
+    /// earlier is stale. Equal timestamps with different configuration indicate
+    /// an invariant failure.
+    ///
+    /// Field 14: `updated_at`
+    #[serde(
+        rename = "updatedAt",
+        alias = "updated_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -10864,6 +10913,7 @@ impl ::core::fmt::Debug for Subaccount {
             .field("subaccount_policy_id", &self.subaccount_policy_id)
             .field("require_member_mfa", &self.require_member_mfa)
             .field("smart_account_salt_nonce", &self.smart_account_salt_nonce)
+            .field("updated_at", &self.updated_at)
             .finish()
     }
 }
@@ -10897,7 +10947,7 @@ impl ::buffa::Message for Subaccount {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -10954,12 +11004,20 @@ impl ::buffa::Message for Subaccount {
         if let Some(v) = self.smart_account_salt_nonce {
             size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
         }
+        if self.updated_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.updated_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -11009,6 +11067,10 @@ impl ::buffa::Message for Subaccount {
         }
         if let Some(v) = self.smart_account_salt_nonce {
             ::buffa::types::put_uint32_field(13u32, v, buf);
+        }
+        if self.updated_at.is_set() {
+            ::buffa::types::put_len_delimited_header(14u32, __cache.consume_next(), buf);
+            self.updated_at.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -11119,6 +11181,17 @@ impl ::buffa::Message for Subaccount {
                     ::buffa::types::decode_uint32(buf)?,
                 );
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.updated_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -11140,6 +11213,7 @@ impl ::buffa::Message for Subaccount {
         self.color.clear();
         self.require_member_mfa = false;
         self.smart_account_salt_nonce = ::core::option::Option::None;
+        self.updated_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -40428,6 +40502,15 @@ pub mod __buffa {
             ///
             /// Field 24: `created_by_actor`
             pub created_by_actor: &'a str,
+            /// Time in UTC when this key's configuration was last changed. For the same
+            /// key, later is fresher, equal is an idempotent replay, and earlier is stale.
+            /// Equal timestamps with different configuration indicate an invariant failure.
+            /// This is independent of last_used_at, which tracks authentication activity.
+            ///
+            /// Field 25: `updated_at`
+            pub updated_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ApiKeyView<'a> {
@@ -40605,6 +40688,31 @@ pub mod __buffa {
                         )?;
                         view.created_by_actor = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    25u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.updated_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.updated_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -40673,6 +40781,14 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     created_by_actor: self.created_by_actor.to_string(),
+                    updated_at: match self.updated_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -40754,6 +40870,14 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.created_by_actor)
                                 as u32;
                 }
+                if self.updated_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.updated_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -40825,6 +40949,14 @@ pub mod __buffa {
                 }
                 if !self.created_by_actor.is_empty() {
                     ::buffa::types::put_string_field(24u32, &self.created_by_actor, buf);
+                }
+                if self.updated_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        25u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.updated_at.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -40914,6 +41046,14 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.created_by_actor) {
                     __map.serialize_entry("createdByActor", self.created_by_actor)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .updated_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("updatedAt", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -41115,6 +41255,20 @@ pub mod __buffa {
             #[must_use]
             pub fn created_by_actor(&self) -> &'_ str {
                 self.0.reborrow().created_by_actor
+            }
+            /// Time in UTC when this key's configuration was last changed. For the same
+            /// key, later is fresher, equal is an idempotent replay, and earlier is stale.
+            /// Equal timestamps with different configuration indicate an invariant failure.
+            /// This is independent of last_used_at, which tracks authentication activity.
+            ///
+            /// Field 25: `updated_at`
+            #[must_use]
+            pub fn updated_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().updated_at
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ApiKeyView<'static>>>
@@ -58456,6 +58610,15 @@ pub mod __buffa {
             ///
             /// Field 13: `smart_account_salt_nonce`
             pub smart_account_salt_nonce: ::core::option::Option<u32>,
+            /// Time in UTC when this sub-account's configuration was last changed. For the
+            /// same sub-account, later is fresher, equal is an idempotent replay, and
+            /// earlier is stale. Equal timestamps with different configuration indicate
+            /// an invariant failure.
+            ///
+            /// Field 14: `updated_at`
+            pub updated_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SubaccountView<'a> {
@@ -58590,6 +58753,31 @@ pub mod __buffa {
                             ::buffa::types::decode_uint32(&mut cur)?,
                         );
                     }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.updated_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.updated_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -58628,6 +58816,14 @@ pub mod __buffa {
                     subaccount_policy_id: self.subaccount_policy_id,
                     require_member_mfa: self.require_member_mfa,
                     smart_account_salt_nonce: self.smart_account_salt_nonce,
+                    updated_at: match self.updated_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -58638,7 +58834,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for SubaccountView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -58702,13 +58898,21 @@ pub mod __buffa {
                 if let Some(v) = self.smart_account_salt_nonce {
                     size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
                 }
+                if self.updated_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.updated_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -58766,6 +58970,14 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.smart_account_salt_nonce {
                     ::buffa::types::put_uint32_field(13u32, v, buf);
+                }
+                if self.updated_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        14u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.updated_at.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -58853,6 +59065,14 @@ pub mod __buffa {
                             "smartAccountSaltNonce",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .updated_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("updatedAt", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -59041,6 +59261,20 @@ pub mod __buffa {
             #[must_use]
             pub fn smart_account_salt_nonce(&self) -> ::core::option::Option<u32> {
                 self.0.reborrow().smart_account_salt_nonce
+            }
+            /// Time in UTC when this sub-account's configuration was last changed. For the
+            /// same sub-account, later is fresher, equal is an idempotent replay, and
+            /// earlier is stale. Equal timestamps with different configuration indicate
+            /// an invariant failure.
+            ///
+            /// Field 14: `updated_at`
+            #[must_use]
+            pub fn updated_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().updated_at
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SubaccountView<'static>>>
