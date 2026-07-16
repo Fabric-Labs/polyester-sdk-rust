@@ -1,7 +1,12 @@
 use super::ServiceContext;
 use super::unary;
+use crate::codecs::decode::{
+    balance_history_from_proto, balances_list_from_proto, holds_list_from_proto,
+    transfers_list_from_proto,
+};
 use crate::connect::ledger::read::v1::LedgerReadServiceClient;
 use crate::errors::Result;
+use crate::models::{BalanceHistory, BalancesList, HoldsList, TransfersList};
 use crate::proto::ledger::read::v1::{GetBalanceHistoryRequest, GetBalancesRequest};
 
 #[derive(Clone)]
@@ -21,63 +26,64 @@ impl BalancesService {
         )
     }
 
-    pub async fn list(
-        &self,
-        req: GetBalancesRequest,
-    ) -> Result<crate::proto::ledger::read::v1::GetBalancesResponse> {
+    pub async fn list(&self, req: GetBalancesRequest) -> Result<BalancesList> {
         let client = self.client();
-        Ok(unary::await_auth(
+        let resp = unary::await_auth(
             &self.ctx.factory,
             "/ledger.read.v1.LedgerReadService/GetBalances",
             req,
             |req, opts| client.get_balances_with_options(req, opts),
         )
         .await?
-        .into_owned())
+        .into_owned();
+        Ok(balances_list_from_proto(&resp))
     }
 
     pub async fn get_balance_history(
         &self,
         req: GetBalanceHistoryRequest,
-    ) -> Result<crate::proto::ledger::read::v1::GetBalanceHistoryResponse> {
+    ) -> Result<BalanceHistory> {
         let client = self.client();
-        Ok(unary::await_auth(
+        let resp = unary::await_auth(
             &self.ctx.factory,
             "/ledger.read.v1.LedgerReadService/GetBalanceHistory",
             req,
             |req, opts| client.get_balance_history_with_options(req, opts),
         )
         .await?
-        .into_owned())
+        .into_owned();
+        Ok(balance_history_from_proto(&resp))
     }
 
     pub async fn list_transfers(
         &self,
         req: crate::proto::ledger::read::v1::ListTransfersRequest,
-    ) -> Result<crate::proto::ledger::read::v1::ListTransfersResponse> {
+    ) -> Result<TransfersList> {
         let client = self.client();
-        Ok(unary::await_auth(
+        let resp = unary::await_auth(
             &self.ctx.factory,
             "/ledger.read.v1.LedgerReadService/ListTransfers",
             req,
             |req, opts| client.list_transfers_with_options(req, opts),
         )
         .await?
-        .into_owned())
+        .into_owned();
+        Ok(transfers_list_from_proto(&resp))
     }
 
     pub async fn list_holds(
         &self,
         req: crate::proto::ledger::read::v1::ListHoldsRequest,
-    ) -> Result<crate::proto::ledger::read::v1::ListHoldsResponse> {
+    ) -> Result<HoldsList> {
         let client = self.client();
-        Ok(unary::await_auth(
+        let resp = unary::await_auth(
             &self.ctx.factory,
             "/ledger.read.v1.LedgerReadService/ListHolds",
             req,
             |req, opts| client.list_holds_with_options(req, opts),
         )
         .await?
-        .into_owned())
+        .into_owned();
+        Ok(holds_list_from_proto(&resp))
     }
 }

@@ -35,7 +35,16 @@ pub fn jwt_session_only(err: &Error) -> bool {
     match err {
         Error::Auth(msg) => {
             let m = msg.to_ascii_lowercase();
-            m.contains("authorization header") || m.contains("bearer")
+            m.contains("authorization header")
+                || m.contains("bearer")
+                || m.contains("interactive session")
+                || m.contains("permission denied")
+                || m.contains("permission_denied")
+        }
+        Error::Api { code, message, .. } => {
+            let c = code.to_ascii_lowercase();
+            let m = message.to_ascii_lowercase();
+            c.contains("permission_denied") || m.contains("interactive session")
         }
         _ => false,
     }

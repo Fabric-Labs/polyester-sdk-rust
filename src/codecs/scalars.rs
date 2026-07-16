@@ -224,6 +224,12 @@ pub fn format_uint64_id(id: u64) -> String {
     }
 }
 
+/// Format protobuf U128 hi/lo as a decimal string.
+pub fn u128_to_str(hi: u64, lo: u64) -> String {
+    let value = (u128::from(hi) << 64) | u128::from(lo);
+    value.to_string()
+}
+
 pub fn parse_decimal_input(raw: &str) -> Result<Decimal> {
     Decimal::from_str(raw.trim()).map_err(|_| Error::validation("invalid decimal".to_owned()))
 }

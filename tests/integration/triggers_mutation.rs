@@ -5,7 +5,7 @@ use crate::support::{
     require_live_client, require_mutation, require_trading_quote_balance, trade_symbol,
     unique_client_order_id, usdt_funded_buy_stop_params, wait_for_trigger, wait_for_trigger_events,
 };
-use polyester::codecs::scalars::{parse_price_ticks_str, parse_qty_scaled_str};
+use polyester::codecs::scalars::{id_to_u64, parse_price_ticks_str, parse_qty_scaled_str};
 use polyester::proto::orders::v1::{OrderType, Side};
 use polyester::proto::triggers::v1::{
     CancelTriggerRequest, CreateTriggerRequest, PauseTriggerRequest, ResumeTriggerRequest,
@@ -92,28 +92,35 @@ async fn trigger_pause_resume_cancel() {
             return;
         }
     };
-    if created.trigger_id == 0 {
+    if created.trigger_id.is_empty() || created.trigger_id == "0" {
         eprintln!("skip: no trigger_id from create");
         return;
     }
-    let status = format!("{}", created.status).to_ascii_lowercase();
-    if !status.contains("created") && !status.is_empty() {
-        eprintln!("skip: unexpected create status {status}");
-        // still try cleanup
+    if !created.status.is_empty()
+        && !created.status.to_ascii_lowercase().contains("created")
+    {
+        eprintln!("skip: unexpected create status {}", created.status);
     }
 
-    let trigger_id = created.trigger_id;
+    let trigger_id = created.trigger_id.clone();
+    let trigger_id_u64 = match id_to_u64(&trigger_id, "trigger_id") {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("skip: parse trigger_id: {err}");
+            return;
+        }
+    };
     let cleanup = || async {
         let _ = client
             .triggers
             .cancel(CancelTriggerRequest {
-                trigger_id,
+                trigger_id: trigger_id_u64,
                 ..Default::default()
             })
             .await;
     };
 
-    let trigger = match wait_for_trigger(&client, trigger_id, Duration::ZERO).await {
+    let trigger = match wait_for_trigger(&client, &trigger_id, Duration::ZERO).await {
         Ok(t) => t,
         Err(err) => {
             cleanup().await;
@@ -129,7 +136,7 @@ async fn trigger_pause_resume_cancel() {
     let paused = match client
         .triggers
         .pause(PauseTriggerRequest {
-            trigger_id,
+            trigger_id: trigger_id_u64,
             ..Default::default()
         })
         .await
@@ -141,16 +148,16 @@ async fn trigger_pause_resume_cancel() {
         }
     };
     assert_eq!(paused.trigger_id, trigger_id);
-    let paused_status = format!("{}", paused.status).to_ascii_lowercase();
     assert!(
-        paused_status.contains("paused"),
-        "pause status={paused_status}"
+        paused.status.to_ascii_lowercase().contains("paused"),
+        "pause status={}",
+        paused.status
     );
 
     let resumed = match client
         .triggers
         .resume(ResumeTriggerRequest {
-            trigger_id,
+            trigger_id: trigger_id_u64,
             ..Default::default()
         })
         .await
@@ -162,29 +169,29 @@ async fn trigger_pause_resume_cancel() {
         }
     };
     assert_eq!(resumed.trigger_id, trigger_id);
-    let resumed_status = format!("{}", resumed.status).to_ascii_lowercase();
     assert!(
-        resumed_status.contains("armed"),
-        "resume status={resumed_status}"
+        resumed.status.to_ascii_lowercase().contains("armed"),
+        "resume status={}",
+        resumed.status
     );
 
     let cancelled = client
         .triggers
         .cancel(CancelTriggerRequest {
-            trigger_id,
+            trigger_id: trigger_id_u64,
             ..Default::default()
         })
         .await
         .expect("cancel");
     assert_eq!(cancelled.trigger_id, trigger_id);
-    let cancel_status = format!("{}", cancelled.status).to_ascii_lowercase();
     assert!(
-        cancel_status.contains("cancel"),
-        "cancel status={cancel_status}"
+        cancelled.status.to_ascii_lowercase().contains("cancel"),
+        "cancel status={}",
+        cancelled.status
     );
 
     let _ = call_optional("triggers.list_events", || async {
-        wait_for_trigger_events(&client, trigger_id, Duration::ZERO).await
+        wait_for_trigger_events(&client, &trigger_id, Duration::ZERO).await
     })
     .await;
 }
