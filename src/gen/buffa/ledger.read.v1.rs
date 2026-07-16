@@ -969,6 +969,28 @@ pub struct AssetBalance {
     pub available: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
+    /// Source-owned version of the latest posted balance snapshot.
+    /// Compare only with posted_version values for the same account and asset.
+    ///
+    /// Field 6: `posted_version`
+    #[serde(
+        rename = "postedVersion",
+        alias = "posted_version",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub posted_version: u64,
+    /// Source-owned version of the latest reserved balance snapshot.
+    /// Compare only with reserved_version values for the same account and asset.
+    ///
+    /// Field 7: `reserved_version`
+    #[serde(
+        rename = "reservedVersion",
+        alias = "reserved_version",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub reserved_version: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -981,6 +1003,8 @@ impl ::core::fmt::Debug for AssetBalance {
             .field("funding", &self.funding)
             .field("reserved", &self.reserved)
             .field("available", &self.available)
+            .field("posted_version", &self.posted_version)
+            .field("reserved_version", &self.reserved_version)
             .finish()
     }
 }
@@ -1044,6 +1068,15 @@ impl ::buffa::Message for AssetBalance {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.posted_version != 0u64 {
+            size
+                += 1u32 + ::buffa::types::uint64_encoded_len(self.posted_version) as u32;
+        }
+        if self.reserved_version != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.reserved_version) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1072,6 +1105,12 @@ impl ::buffa::Message for AssetBalance {
         if self.available.is_set() {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.available.write_to(__cache, buf);
+        }
+        if self.posted_version != 0u64 {
+            ::buffa::types::put_uint64_field(6u32, self.posted_version, buf);
+        }
+        if self.reserved_version != 0u64 {
+            ::buffa::types::put_uint64_field(7u32, self.reserved_version, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1137,6 +1176,20 @@ impl ::buffa::Message for AssetBalance {
                     ctx,
                 )?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.posted_version = ::buffa::types::decode_uint64(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reserved_version = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1150,6 +1203,8 @@ impl ::buffa::Message for AssetBalance {
         self.funding = ::buffa::MessageField::none();
         self.reserved = ::buffa::MessageField::none();
         self.available = ::buffa::MessageField::none();
+        self.posted_version = 0u64;
+        self.reserved_version = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5527,6 +5582,16 @@ pub mod __buffa {
                     'a,
                 >,
             >,
+            /// Source-owned version of the latest posted balance snapshot.
+            /// Compare only with posted_version values for the same account and asset.
+            ///
+            /// Field 6: `posted_version`
+            pub posted_version: u64,
+            /// Source-owned version of the latest reserved balance snapshot.
+            /// Compare only with reserved_version values for the same account and asset.
+            ///
+            /// Field 7: `reserved_version`
+            pub reserved_version: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AssetBalanceView<'a> {
@@ -5667,6 +5732,20 @@ pub mod __buffa {
                             }
                         }
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.posted_version = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reserved_version = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -5729,6 +5808,8 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    posted_version: self.posted_version,
+                    reserved_version: self.reserved_version,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -5780,6 +5861,18 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.posted_version != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.posted_version)
+                                as u32;
+                }
+                if self.reserved_version != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.reserved_version)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -5825,6 +5918,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.available.write_to(__cache, buf);
+                }
+                if self.posted_version != 0u64 {
+                    ::buffa::types::put_uint64_field(6u32, self.posted_version, buf);
+                }
+                if self.reserved_version != 0u64 {
+                    ::buffa::types::put_uint64_field(7u32, self.reserved_version, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -5875,6 +5974,20 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("available", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.posted_version) {
+                    __map
+                        .serialize_entry(
+                            "postedVersion",
+                            &::buffa::json_helpers::ProtoJson(&self.posted_version),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.reserved_version) {
+                    __map
+                        .serialize_entry(
+                            "reservedVersion",
+                            &::buffa::json_helpers::ProtoJson(&self.reserved_version),
+                        )?;
                 }
                 __map.end()
             }
@@ -6030,6 +6143,22 @@ pub mod __buffa {
                 >,
             > {
                 &self.0.reborrow().available
+            }
+            /// Source-owned version of the latest posted balance snapshot.
+            /// Compare only with posted_version values for the same account and asset.
+            ///
+            /// Field 6: `posted_version`
+            #[must_use]
+            pub fn posted_version(&self) -> u64 {
+                self.0.reborrow().posted_version
+            }
+            /// Source-owned version of the latest reserved balance snapshot.
+            /// Compare only with reserved_version values for the same account and asset.
+            ///
+            /// Field 7: `reserved_version`
+            #[must_use]
+            pub fn reserved_version(&self) -> u64 {
+                self.0.reborrow().reserved_version
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AssetBalanceView<'static>>>

@@ -12884,6 +12884,17 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub market_max_slippage_bps: i32,
+    /// Source-owned per-order state revision. A larger value is always fresher for
+    /// the same order; clients can use it to reject stale or duplicate updates.
+    ///
+    /// Field 26: `state_revision`
+    #[serde(
+        rename = "stateRevision",
+        alias = "state_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub state_revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -12915,6 +12926,7 @@ impl ::core::fmt::Debug for Order {
             .field("market_client_ref_price_ticks", &self.market_client_ref_price_ticks)
             .field("market_max_slippage_ticks", &self.market_max_slippage_ticks)
             .field("market_max_slippage_bps", &self.market_max_slippage_bps)
+            .field("state_revision", &self.state_revision)
             .finish()
     }
 }
@@ -13065,6 +13077,10 @@ impl ::buffa::Message for Order {
                     + ::buffa::types::int32_encoded_len(self.market_max_slippage_bps)
                         as u32;
         }
+        if self.state_revision != 0u64 {
+            size
+                += 2u32 + ::buffa::types::uint64_encoded_len(self.state_revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -13170,6 +13186,9 @@ impl ::buffa::Message for Order {
         }
         if self.market_max_slippage_bps != 0i32 {
             ::buffa::types::put_int32_field(25u32, self.market_max_slippage_bps, buf);
+        }
+        if self.state_revision != 0u64 {
+            ::buffa::types::put_uint64_field(26u32, self.state_revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -13370,6 +13389,13 @@ impl ::buffa::Message for Order {
                 )?;
                 self.market_max_slippage_bps = ::buffa::types::decode_int32(buf)?;
             }
+            26u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.state_revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -13402,6 +13428,7 @@ impl ::buffa::Message for Order {
         self.market_client_ref_price_ticks = 0i64;
         self.market_max_slippage_ticks = 0i32;
         self.market_max_slippage_bps = 0i32;
+        self.state_revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -31262,6 +31289,11 @@ pub mod __buffa {
             ///
             /// Field 25: `market_max_slippage_bps`
             pub market_max_slippage_bps: i32,
+            /// Source-owned per-order state revision. A larger value is always fresher for
+            /// the same order; clients can use it to reject stale or duplicate updates.
+            ///
+            /// Field 26: `state_revision`
+            pub state_revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for OrderView<'a> {
@@ -31519,6 +31551,13 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    26u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.state_revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -31580,6 +31619,7 @@ pub mod __buffa {
                     market_client_ref_price_ticks: self.market_client_ref_price_ticks,
                     market_max_slippage_ticks: self.market_max_slippage_ticks,
                     market_max_slippage_bps: self.market_max_slippage_bps,
+                    state_revision: self.state_revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -31738,6 +31778,12 @@ pub mod __buffa {
                                 self.market_max_slippage_bps,
                             ) as u32;
                 }
+                if self.state_revision != 0u64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint64_encoded_len(self.state_revision)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -31864,6 +31910,9 @@ pub mod __buffa {
                         self.market_max_slippage_bps,
                         buf,
                     );
+                }
+                if self.state_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(26u32, self.state_revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -32043,6 +32092,13 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(
                                 &self.market_max_slippage_bps,
                             ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.state_revision) {
+                    __map
+                        .serialize_entry(
+                            "stateRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.state_revision),
                         )?;
                 }
                 __map.end()
@@ -32320,6 +32376,14 @@ pub mod __buffa {
             #[must_use]
             pub fn market_max_slippage_bps(&self) -> i32 {
                 self.0.reborrow().market_max_slippage_bps
+            }
+            /// Source-owned per-order state revision. A larger value is always fresher for
+            /// the same order; clients can use it to reject stale or duplicate updates.
+            ///
+            /// Field 26: `state_revision`
+            #[must_use]
+            pub fn state_revision(&self) -> u64 {
+                self.0.reborrow().state_revision
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<OrderView<'static>>>
