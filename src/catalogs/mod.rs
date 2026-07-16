@@ -33,32 +33,50 @@ impl Manager {
     pub fn hydrate_spot_config_json(&self, value: Value) {
         let mut inner = self.inner.write().expect("catalog lock");
         inner.spot_config = Some(value.clone());
-        if let Some(markets) = value.get("markets").and_then(|m| m.as_array()) {
-            for m in markets {
-                let symbol = m.get("symbol").and_then(|s| s.as_str()).unwrap_or("");
-                let symbol_id = m.get("symbol_id").and_then(|s| s.as_u64()).unwrap_or(0) as u32;
-                let scale = m
-                    .get("base_quantity_scale")
-                    .or_else(|| m.get("baseQuantityScale"))
-                    .and_then(|s| s.as_u64())
-                    .unwrap_or(DEFAULT_BASE_QTY_SCALE as u64) as u32;
-                if !symbol.is_empty() && symbol_id != 0 {
-                    inner.symbol_to_id.insert(symbol.to_owned(), symbol_id);
-                    inner.symbol_to_base_scale.insert(symbol.to_owned(), scale);
-                    inner.id_to_base_scale.insert(symbol_id, scale);
-                }
-                if let Some(buckets) = m
-                    .get("orderbook_price_buckets")
-                    .or_else(|| m.get("orderbookPriceBuckets"))
-                    .and_then(|b| b.as_array())
-                {
-                    let list: Vec<String> = buckets
-                        .iter()
-                        .filter_map(|b| b.as_str().map(str::to_owned))
-                        .collect();
-                    if !list.is_empty() {
-                        inner.orderbook_buckets.insert(symbol.to_owned(), list);
-                    }
+        // Wire/proto uses `pairs`; some helpers historically used `markets`.
+        let markets = value
+            .get("pairs")
+            .or_else(|| value.get("markets"))
+            .and_then(|m| m.as_array());
+        let Some(markets) = markets else {
+            return;
+        };
+        for m in markets {
+            let symbol = m.get("symbol").and_then(|s| s.as_str()).unwrap_or("");
+            let symbol_id = m
+                .get("symbol_id")
+                .or_else(|| m.get("symbolId"))
+                .and_then(|s| s.as_u64())
+                .unwrap_or(0) as u32;
+            let scale = m
+                .get("base_quantity_scale")
+                .or_else(|| m.get("baseQuantityScale"))
+                .and_then(|s| s.as_u64())
+                .unwrap_or(DEFAULT_BASE_QTY_SCALE as u64) as u32;
+            if !symbol.is_empty() && symbol_id != 0 {
+                inner.symbol_to_id.insert(symbol.to_owned(), symbol_id);
+                inner.symbol_to_base_scale.insert(symbol.to_owned(), scale);
+                inner.id_to_base_scale.insert(symbol_id, scale);
+            }
+            let buckets = m
+                .get("orderbook_price_buckets")
+                .or_else(|| m.get("orderbookPriceBuckets"))
+                .or_else(|| {
+                    m.get("marketdata")
+                        .and_then(|md| md.get("orderbook_price_buckets"))
+                })
+                .and_then(|b| b.as_array());
+            if let Some(buckets) = buckets {
+                let list: Vec<String> = buckets
+                    .iter()
+                    .filter_map(|b| match b {
+                        Value::String(s) => Some(s.clone()),
+                        Value::Number(n) => Some(n.to_string()),
+                        _ => None,
+                    })
+                    .collect();
+                if !list.is_empty() {
+                    inner.orderbook_buckets.insert(symbol.to_owned(), list);
                 }
             }
         }
@@ -126,5 +144,63 @@ impl Manager {
             .ok()
             .and_then(|i| i.orderbook_buckets.get(symbol).cloned())
             .unwrap_or_default()
+    }
+
+    pub fn ledger_id_for_asset(&self, symbol: &str) -> Option<u32> {
+        self.inner
+            .read()
+            .ok()?
+            .asset_to_ledger_id
+            .get(symbol)
+            .copied()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn hydrate_spot_pairs_sets_symbol_scale_and_buckets() {
+        let mgr = Manager::new();
+        mgr.hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8,
+                "orderbook_price_buckets": [0.01, 0.1, 1.0]
+            }]
+        }));
+        assert_eq!(mgr.symbol_id_for_symbol("BTC-USDT"), Some(1));
+        assert_eq!(mgr.base_quantity_scale_for_symbol("BTC-USDT"), 8);
+        assert_eq!(mgr.base_quantity_scale_for_symbol_id(1), 8);
+        assert_eq!(
+            mgr.orderbook_price_buckets_for_symbol("BTC-USDT"),
+            vec!["0.01".to_owned(), "0.1".to_owned(), "1.0".to_owned()]
+        );
+    }
+
+    #[test]
+    fn hydrate_zipper_assets_sets_ledger_id() {
+        let mgr = Manager::new();
+        mgr.hydrate_zipper_config_json(json!({
+            "assets": [{
+                "symbol": "USDT",
+                "ledger_id": 99,
+                "quantity_scale": 6
+            }]
+        }));
+        assert_eq!(mgr.ledger_id_for_asset("USDT"), Some(99));
+        assert_eq!(mgr.quantity_scale_for_zipped_asset_id(99), 6);
+    }
+
+    #[test]
+    fn unknown_symbol_falls_back_to_default_scale() {
+        let mgr = Manager::new();
+        assert_eq!(
+            mgr.base_quantity_scale_for_symbol("NOPE"),
+            DEFAULT_BASE_QTY_SCALE
+        );
     }
 }

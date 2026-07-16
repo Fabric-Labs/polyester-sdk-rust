@@ -969,6 +969,42 @@ pub struct AssetBalance {
     pub available: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
+    /// Source-owned revision of the latest trading balance component. For the
+    /// same account and asset, larger is fresher, equal is an idempotent replay,
+    /// and smaller is stale. Equal revisions with different values are invalid.
+    ///
+    /// Field 6: `trading_version`
+    #[serde(
+        rename = "tradingVersion",
+        alias = "trading_version",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub trading_version: u64,
+    /// Source-owned revision of the latest funding balance component. For the
+    /// same account and asset, larger is fresher, equal is an idempotent replay,
+    /// and smaller is stale. Equal revisions with different values are invalid.
+    ///
+    /// Field 7: `funding_version`
+    #[serde(
+        rename = "fundingVersion",
+        alias = "funding_version",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub funding_version: u64,
+    /// Source-owned revision of the latest reserved balance component. For the
+    /// same account and asset, larger is fresher, equal is an idempotent replay,
+    /// and smaller is stale. Equal revisions with different values are invalid.
+    ///
+    /// Field 8: `reserved_version`
+    #[serde(
+        rename = "reservedVersion",
+        alias = "reserved_version",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub reserved_version: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -981,6 +1017,9 @@ impl ::core::fmt::Debug for AssetBalance {
             .field("funding", &self.funding)
             .field("reserved", &self.reserved)
             .field("available", &self.available)
+            .field("trading_version", &self.trading_version)
+            .field("funding_version", &self.funding_version)
+            .field("reserved_version", &self.reserved_version)
             .finish()
     }
 }
@@ -1044,6 +1083,21 @@ impl ::buffa::Message for AssetBalance {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.trading_version != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.trading_version) as u32;
+        }
+        if self.funding_version != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.funding_version) as u32;
+        }
+        if self.reserved_version != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.reserved_version) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1072,6 +1126,15 @@ impl ::buffa::Message for AssetBalance {
         if self.available.is_set() {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.available.write_to(__cache, buf);
+        }
+        if self.trading_version != 0u64 {
+            ::buffa::types::put_uint64_field(6u32, self.trading_version, buf);
+        }
+        if self.funding_version != 0u64 {
+            ::buffa::types::put_uint64_field(7u32, self.funding_version, buf);
+        }
+        if self.reserved_version != 0u64 {
+            ::buffa::types::put_uint64_field(8u32, self.reserved_version, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1137,6 +1200,27 @@ impl ::buffa::Message for AssetBalance {
                     ctx,
                 )?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trading_version = ::buffa::types::decode_uint64(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.funding_version = ::buffa::types::decode_uint64(buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reserved_version = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1150,6 +1234,9 @@ impl ::buffa::Message for AssetBalance {
         self.funding = ::buffa::MessageField::none();
         self.reserved = ::buffa::MessageField::none();
         self.available = ::buffa::MessageField::none();
+        self.trading_version = 0u64;
+        self.funding_version = 0u64;
+        self.reserved_version = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5527,6 +5614,24 @@ pub mod __buffa {
                     'a,
                 >,
             >,
+            /// Source-owned revision of the latest trading balance component. For the
+            /// same account and asset, larger is fresher, equal is an idempotent replay,
+            /// and smaller is stale. Equal revisions with different values are invalid.
+            ///
+            /// Field 6: `trading_version`
+            pub trading_version: u64,
+            /// Source-owned revision of the latest funding balance component. For the
+            /// same account and asset, larger is fresher, equal is an idempotent replay,
+            /// and smaller is stale. Equal revisions with different values are invalid.
+            ///
+            /// Field 7: `funding_version`
+            pub funding_version: u64,
+            /// Source-owned revision of the latest reserved balance component. For the
+            /// same account and asset, larger is fresher, equal is an idempotent replay,
+            /// and smaller is stale. Equal revisions with different values are invalid.
+            ///
+            /// Field 8: `reserved_version`
+            pub reserved_version: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AssetBalanceView<'a> {
@@ -5667,6 +5772,27 @@ pub mod __buffa {
                             }
                         }
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trading_version = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.funding_version = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reserved_version = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -5729,6 +5855,9 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    trading_version: self.trading_version,
+                    funding_version: self.funding_version,
+                    reserved_version: self.reserved_version,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -5780,6 +5909,24 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.trading_version != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.trading_version)
+                                as u32;
+                }
+                if self.funding_version != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.funding_version)
+                                as u32;
+                }
+                if self.reserved_version != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.reserved_version)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -5825,6 +5972,15 @@ pub mod __buffa {
                         buf,
                     );
                     self.available.write_to(__cache, buf);
+                }
+                if self.trading_version != 0u64 {
+                    ::buffa::types::put_uint64_field(6u32, self.trading_version, buf);
+                }
+                if self.funding_version != 0u64 {
+                    ::buffa::types::put_uint64_field(7u32, self.funding_version, buf);
+                }
+                if self.reserved_version != 0u64 {
+                    ::buffa::types::put_uint64_field(8u32, self.reserved_version, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -5875,6 +6031,27 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("available", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.trading_version) {
+                    __map
+                        .serialize_entry(
+                            "tradingVersion",
+                            &::buffa::json_helpers::ProtoJson(&self.trading_version),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.funding_version) {
+                    __map
+                        .serialize_entry(
+                            "fundingVersion",
+                            &::buffa::json_helpers::ProtoJson(&self.funding_version),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.reserved_version) {
+                    __map
+                        .serialize_entry(
+                            "reservedVersion",
+                            &::buffa::json_helpers::ProtoJson(&self.reserved_version),
+                        )?;
                 }
                 __map.end()
             }
@@ -6030,6 +6207,33 @@ pub mod __buffa {
                 >,
             > {
                 &self.0.reborrow().available
+            }
+            /// Source-owned revision of the latest trading balance component. For the
+            /// same account and asset, larger is fresher, equal is an idempotent replay,
+            /// and smaller is stale. Equal revisions with different values are invalid.
+            ///
+            /// Field 6: `trading_version`
+            #[must_use]
+            pub fn trading_version(&self) -> u64 {
+                self.0.reborrow().trading_version
+            }
+            /// Source-owned revision of the latest funding balance component. For the
+            /// same account and asset, larger is fresher, equal is an idempotent replay,
+            /// and smaller is stale. Equal revisions with different values are invalid.
+            ///
+            /// Field 7: `funding_version`
+            #[must_use]
+            pub fn funding_version(&self) -> u64 {
+                self.0.reborrow().funding_version
+            }
+            /// Source-owned revision of the latest reserved balance component. For the
+            /// same account and asset, larger is fresher, equal is an idempotent replay,
+            /// and smaller is stale. Equal revisions with different values are invalid.
+            ///
+            /// Field 8: `reserved_version`
+            #[must_use]
+            pub fn reserved_version(&self) -> u64 {
+                self.0.reborrow().reserved_version
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AssetBalanceView<'static>>>

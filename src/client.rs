@@ -256,3 +256,45 @@ impl Client {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::transport::DEFAULT_API_URL;
+
+    #[test]
+    fn config_defaults_point_at_devnet() {
+        let cfg = Config::default();
+        assert_eq!(cfg.api_url, DEFAULT_API_URL);
+        assert!(cfg.hydrate_catalogs);
+        assert!(cfg.api_key_id.is_none());
+    }
+
+    #[test]
+    fn client_new_without_creds_exposes_service_tree() {
+        let client = Client::new(Config::default()).expect("client");
+        assert!(!client.api_url.is_empty());
+        assert_eq!(
+            client.catalogs.base_quantity_scale_for_symbol("BTC-USDT"),
+            8
+        );
+        // Touch service handles so the surface stays wired.
+        let _ = (
+            &client.auth,
+            &client.market_data,
+            &client.market_overview,
+            &client.orders,
+            &client.trades,
+            &client.triggers,
+            &client.balances,
+            &client.orderbook,
+            &client.zipper,
+            &client.transfers,
+            &client.api_keys,
+            &client.policies,
+            &client.sub_accounts,
+            &client.deposit,
+            &client.withdraw,
+        );
+    }
+}

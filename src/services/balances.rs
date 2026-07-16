@@ -2,7 +2,7 @@ use super::ServiceContext;
 use super::unary;
 use crate::connect::ledger::read::v1::LedgerReadServiceClient;
 use crate::errors::Result;
-use crate::proto::ledger::read::v1::GetBalancesRequest;
+use crate::proto::ledger::read::v1::{GetBalanceHistoryRequest, GetBalancesRequest};
 
 #[derive(Clone)]
 pub struct BalancesService {
@@ -31,6 +31,21 @@ impl BalancesService {
             "/ledger.read.v1.LedgerReadService/GetBalances",
             req,
             |req, opts| client.get_balances_with_options(req, opts),
+        )
+        .await?
+        .into_owned())
+    }
+
+    pub async fn get_balance_history(
+        &self,
+        req: GetBalanceHistoryRequest,
+    ) -> Result<crate::proto::ledger::read::v1::GetBalanceHistoryResponse> {
+        let client = self.client();
+        Ok(unary::await_auth(
+            &self.ctx.factory,
+            "/ledger.read.v1.LedgerReadService/GetBalanceHistory",
+            req,
+            |req, opts| client.get_balance_history_with_options(req, opts),
         )
         .await?
         .into_owned())

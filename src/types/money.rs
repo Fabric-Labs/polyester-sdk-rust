@@ -266,3 +266,32 @@ pub fn resolve_qty_scaled(
     value.compatible_with(QuantityDomain::OrderBase, Some(scale), symbol, symbol_id)?;
     Ok(value.as_scaled())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn price_from_ticks_rejects_negative() {
+        assert!(Price::from_ticks(-1, None).is_err());
+    }
+
+    #[test]
+    fn quantity_from_scaled_rejects_negative() {
+        assert!(Quantity::from_scaled(-1, Some(8), QuantityDomain::OrderBase, None, None).is_err());
+    }
+
+    #[test]
+    fn resolve_paths_round_trip() {
+        let price = Price::from_decimal_str("42.5", Some("BTC-USDT".into())).unwrap();
+        assert_eq!(
+            resolve_price_ticks(&price, Some("BTC-USDT")).unwrap(),
+            42_500_000
+        );
+        let qty = Quantity::from_decimal_str("1.25", 8, Some("BTC-USDT".into()), Some(1)).unwrap();
+        assert_eq!(
+            resolve_qty_scaled(&qty, 8, Some("BTC-USDT"), Some(1)).unwrap(),
+            125_000_000
+        );
+    }
+}

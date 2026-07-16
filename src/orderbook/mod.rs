@@ -47,3 +47,45 @@ pub fn apply_delta(
     apply_side_delta(asks, ask_pairs);
     (seq_end, false)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn apply_side_delta_updates_and_deletes() {
+        let mut book = BookSide::from([(100, 5)]);
+        apply_side_delta(&mut book, &[(100, 7), (101, 2)]);
+        assert_eq!(book.get(&100), Some(&7));
+        assert_eq!(book.get(&101), Some(&2));
+        apply_side_delta(&mut book, &[(101, 0)]);
+        assert!(!book.contains_key(&101));
+    }
+
+    #[test]
+    fn apply_delta_detects_gap() {
+        let mut bids = BookSide::from([(100, 5)]);
+        let mut asks = BookSide::from([(200, 3)]);
+        let (seq, needs_refresh) = apply_delta(&mut bids, &mut asks, 3, 5, 6, &[(100, 7)], &[]);
+        assert!(needs_refresh);
+        assert_eq!(seq, 3);
+        assert_eq!(bids.get(&100), Some(&5));
+    }
+
+    #[test]
+    fn apply_delta_updates_book() {
+        let mut bids = BookSide::from([(100, 5)]);
+        let mut asks = BookSide::from([(200, 3)]);
+        let (seq, needs_refresh) = apply_delta(&mut bids, &mut asks, 3, 3, 4, &[(100, 7)], &[]);
+        assert!(!needs_refresh);
+        assert_eq!(seq, 4);
+        assert_eq!(bids.get(&100), Some(&7));
+    }
+
+    #[test]
+    fn bucket_side_aggregates() {
+        let book = BookSide::from([(101, 2), (105, 3)]);
+        let bucketed = bucket_side(&book, 10);
+        assert_eq!(bucketed.get(&100), Some(&5));
+    }
+}

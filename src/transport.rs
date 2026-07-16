@@ -130,6 +130,11 @@ impl Factory {
 }
 
 fn build_http_client(api_url: &str) -> Result<HttpClient> {
+    static INIT: std::sync::Once = std::sync::Once::new();
+    INIT.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+
     if api_url.starts_with("https://") {
         let mut roots = rustls::RootCertStore::empty();
         roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());

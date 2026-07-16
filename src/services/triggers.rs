@@ -3,7 +3,8 @@ use super::unary;
 use crate::connect::triggers::v1::TriggersServiceClient;
 use crate::errors::Result;
 use crate::proto::triggers::v1::{
-    CancelTriggerRequest, CreateTriggerRequest, GetTriggerRequest, ListTriggersRequest,
+    CancelTriggerRequest, CreateTriggerRequest, GetTriggerRequest, ListTriggerEventsRequest,
+    ListTriggersRequest, PauseTriggerRequest, ResumeTriggerRequest,
 };
 
 #[derive(Clone)]
@@ -78,6 +79,51 @@ impl TriggersService {
             "/triggers.v1.TriggersService/CancelTrigger",
             req,
             |req, opts| client.cancel_trigger_with_options(req, opts),
+        )
+        .await?
+        .into_owned())
+    }
+
+    pub async fn pause(
+        &self,
+        req: PauseTriggerRequest,
+    ) -> Result<crate::proto::triggers::v1::PauseTriggerResponse> {
+        let client = self.client();
+        Ok(unary::await_auth(
+            &self.ctx.factory,
+            "/triggers.v1.TriggersService/PauseTrigger",
+            req,
+            |req, opts| client.pause_trigger_with_options(req, opts),
+        )
+        .await?
+        .into_owned())
+    }
+
+    pub async fn resume(
+        &self,
+        req: ResumeTriggerRequest,
+    ) -> Result<crate::proto::triggers::v1::ResumeTriggerResponse> {
+        let client = self.client();
+        Ok(unary::await_auth(
+            &self.ctx.factory,
+            "/triggers.v1.TriggersService/ResumeTrigger",
+            req,
+            |req, opts| client.resume_trigger_with_options(req, opts),
+        )
+        .await?
+        .into_owned())
+    }
+
+    pub async fn list_events(
+        &self,
+        req: ListTriggerEventsRequest,
+    ) -> Result<crate::proto::triggers::v1::ListTriggerEventsResponse> {
+        let client = self.client();
+        Ok(unary::await_auth(
+            &self.ctx.factory,
+            "/triggers.v1.TriggersService/ListTriggerEvents",
+            req,
+            |req, opts| client.list_trigger_events_with_options(req, opts),
         )
         .await?
         .into_owned())
