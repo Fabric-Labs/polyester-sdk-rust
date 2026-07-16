@@ -12884,8 +12884,9 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub market_max_slippage_bps: i32,
-    /// Source-owned per-order state revision. A larger value is always fresher for
-    /// the same order; clients can use it to reject stale or duplicate updates.
+    /// Source-owned per-order state revision. For the same order, a larger value
+    /// is fresher, an equal value is an idempotent replay, and a smaller value is
+    /// stale. Equal revisions with different state indicate an invariant failure.
     ///
     /// Field 26: `state_revision`
     #[serde(
@@ -31289,8 +31290,9 @@ pub mod __buffa {
             ///
             /// Field 25: `market_max_slippage_bps`
             pub market_max_slippage_bps: i32,
-            /// Source-owned per-order state revision. A larger value is always fresher for
-            /// the same order; clients can use it to reject stale or duplicate updates.
+            /// Source-owned per-order state revision. For the same order, a larger value
+            /// is fresher, an equal value is an idempotent replay, and a smaller value is
+            /// stale. Equal revisions with different state indicate an invariant failure.
             ///
             /// Field 26: `state_revision`
             pub state_revision: u64,
@@ -32377,8 +32379,9 @@ pub mod __buffa {
             pub fn market_max_slippage_bps(&self) -> i32 {
                 self.0.reborrow().market_max_slippage_bps
             }
-            /// Source-owned per-order state revision. A larger value is always fresher for
-            /// the same order; clients can use it to reject stale or duplicate updates.
+            /// Source-owned per-order state revision. For the same order, a larger value
+            /// is fresher, an equal value is an idempotent replay, and a smaller value is
+            /// stale. Equal revisions with different state indicate an invariant failure.
             ///
             /// Field 26: `state_revision`
             #[must_use]
