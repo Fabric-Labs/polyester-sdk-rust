@@ -2,10 +2,12 @@
 
 mod auth;
 mod balances;
+mod market;
 mod trading;
 mod triggers;
 
 pub use auth::*;
 pub use balances::*;
+pub use market::*;
 pub use trading::*;
 pub use triggers::*;

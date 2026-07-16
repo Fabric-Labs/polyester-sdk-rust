@@ -129,7 +129,7 @@ async fn spot_fill() {
     match maker.orders.create(maker_params).await {
         Ok(c) => {
             assert_eq!(c.client_order_id, maker_cid);
-            assert!( !c.order_id.is_empty() && c.order_id != "0");
+            assert!(!c.order_id.is_empty() && c.order_id != "0");
         }
         Err(err) if is_internal_order_error(&err) || crate::support::devnet_unavailable(&err) => {
             eprintln!("skip: maker create unavailable: {err}");
@@ -153,7 +153,7 @@ async fn spot_fill() {
     match client.orders.create(taker_params).await {
         Ok(c) => {
             assert_eq!(c.client_order_id, taker_cid);
-            assert!( !c.order_id.is_empty() && c.order_id != "0");
+            assert!(!c.order_id.is_empty() && c.order_id != "0");
         }
         Err(err) if is_internal_order_error(&err) || crate::support::devnet_unavailable(&err) => {
             let _ = maker.orders.cancel_all(Some(&symbol), false, None).await;

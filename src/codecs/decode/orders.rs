@@ -11,13 +11,17 @@ use crate::models::{
 };
 use crate::proto::orders::v1::{
     CancelAllOrdersResponse, CancelOrderResponse, CreateOrderResponse, GetOpenOrdersResponse,
-    GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse, Order
-    as ProtoOrder, UserTrade as ProtoUserTrade,
+    GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse,
+    Order as ProtoOrder, UserTrade as ProtoUserTrade,
 };
 
 pub fn order_from_proto(msg: &ProtoOrder) -> Order {
     let symbol_id = msg.symbol_id;
-    let symbol_id_opt = if symbol_id == 0 { None } else { Some(symbol_id) };
+    let symbol_id_opt = if symbol_id == 0 {
+        None
+    } else {
+        Some(symbol_id)
+    };
     Order {
         order_id: format_uint64_id(msg.order_id),
         symbol_id,
@@ -57,7 +61,11 @@ fn orders_list(orders: &[ProtoOrder], next_page_token: &str) -> OrdersList {
 
 pub fn user_trade_from_proto(msg: &ProtoUserTrade) -> UserTrade {
     let symbol_id = msg.symbol_id;
-    let symbol_id_opt = if symbol_id == 0 { None } else { Some(symbol_id) };
+    let symbol_id_opt = if symbol_id == 0 {
+        None
+    } else {
+        Some(symbol_id)
+    };
     UserTrade {
         symbol_id,
         match_id: if msg.match_id == 0 {
@@ -121,7 +129,9 @@ pub fn modify_order_from_proto(msg: &ModifyOrderResponse) -> ModifyOrderResult {
     }
 }
 
-fn modify_action_name(action: buffa::EnumValue<crate::proto::orders::v1::ModifyActionTaken>) -> String {
+fn modify_action_name(
+    action: buffa::EnumValue<crate::proto::orders::v1::ModifyActionTaken>,
+) -> String {
     use crate::proto::orders::v1::ModifyActionTaken;
     match action.as_known() {
         Some(ModifyActionTaken::Amended) => "amended".to_owned(),

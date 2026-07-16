@@ -38,7 +38,10 @@ mod tests {
         };
         let me = me_from_proto(&msg);
         assert_eq!(me.account_id, format_uint64_id(42));
-        assert_eq!(me.api_key_id.as_deref(), Some(format_uint64_id(99).as_str()));
+        assert_eq!(
+            me.api_key_id.as_deref(),
+            Some(format_uint64_id(99).as_str())
+        );
         assert_eq!(me.username.as_deref(), Some("alice"));
         assert_eq!(me.root_smart_account_address.as_deref(), Some("0xabc"));
     }

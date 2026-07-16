@@ -1,9 +1,14 @@
 use super::ServiceContext;
 use super::unary;
+use crate::codecs::decode::{
+    candles_from_proto, depth_enum_for_levels, market_overview_list_from_proto,
+    market_trades_from_proto, orderbook_from_proto,
+};
 use crate::connect::marketdata::v1::MarketDataServiceClient;
 use crate::connect::marketoverview::v1::MarketOverviewServiceClient;
 use crate::connect::orderbook::v1::OrderbookServiceClient;
 use crate::errors::{Error, Result};
+use crate::models::{CandlesResult, MarketOverviewList, MarketTradesResult, OrderbookData};
 use crate::proto::marketdata::v1::{
     GetCandlesRequest, GetSpotConfigRequest, GetTradesRequest, Timeframe,
 };
@@ -27,6 +32,7 @@ impl MarketDataService {
         )
     }
 
+    /// Spot pair catalog. Returns the proto snapshot (Go exposes a raw map escape hatch).
     pub async fn get_spot_config(
         &self,
     ) -> Result<crate::proto::marketdata::v1::GetSpotConfigResponse> {
@@ -39,11 +45,7 @@ impl MarketDataService {
     }
 
     /// Recent public trades for a symbol (resolves `symbol_id` via catalogs after hydrate).
-    pub async fn get_trades(
-        &self,
-        symbol: &str,
-        limit: Option<u32>,
-    ) -> Result<crate::proto::marketdata::v1::GetTradesResponse> {
+    pub async fn get_trades(&self, symbol: &str, limit: Option<u32>) -> Result<MarketTradesResult> {
         let symbol_id = self
             .ctx
             .catalogs
@@ -58,9 +60,10 @@ impl MarketDataService {
             limit: limit.unwrap_or(0),
             ..Default::default()
         };
-        Ok(unary::await_public(self.client().get_trades(req))
+        let resp = unary::await_public(self.client().get_trades(req))
             .await?
-            .into_owned())
+            .into_owned();
+        Ok(market_trades_from_proto(&resp))
     }
 
     /// Candle series for a symbol. `interval` accepts values like `"1m"`, `"MIN_1"`, `"5m"`.
@@ -69,7 +72,7 @@ impl MarketDataService {
         symbol: &str,
         interval: &str,
         limit: Option<u32>,
-    ) -> Result<crate::proto::marketdata::v1::GetCandlesResponse> {
+    ) -> Result<CandlesResult> {
         let symbol_id = self
             .ctx
             .catalogs
@@ -80,15 +83,20 @@ impl MarketDataService {
                 ))
             })?;
         let timeframe = parse_timeframe(interval)?;
+        let volume_scale = self
+            .ctx
+            .catalogs
+            .base_quantity_scale_for_symbol_id(symbol_id);
         let req = GetCandlesRequest {
             symbol_id,
             timeframe: timeframe.into(),
             limit: limit.unwrap_or(0),
             ..Default::default()
         };
-        Ok(unary::await_public(self.client().get_candles(req))
+        let resp = unary::await_public(self.client().get_candles(req))
             .await?
-            .into_owned())
+            .into_owned();
+        Ok(candles_from_proto(&resp, volume_scale))
     }
 
     /// Subscribe to public spot trades for a symbol (requires `realtime` feature + hydrated catalogs).
@@ -141,10 +149,7 @@ impl MarketOverviewService {
         Self { ctx }
     }
 
-    pub async fn list(
-        &self,
-        limit: Option<u32>,
-    ) -> Result<crate::proto::marketoverview::v1::ListMarketOverviewResponse> {
+    pub async fn list(&self, limit: Option<u32>) -> Result<MarketOverviewList> {
         let req = ListMarketOverviewRequest {
             limit: limit.unwrap_or_default(),
             ..Default::default()
@@ -153,9 +158,10 @@ impl MarketOverviewService {
             self.ctx.factory.transport(false),
             self.ctx.factory.connect_config(false),
         );
-        Ok(unary::await_public(client.list_market_overview(req))
+        let resp = unary::await_public(client.list_market_overview(req))
             .await?
-            .into_owned())
+            .into_owned();
+        Ok(market_overview_list_from_proto(&resp))
     }
 }
 
@@ -169,16 +175,34 @@ impl OrderbookService {
         Self { ctx }
     }
 
-    pub async fn get(
-        &self,
-        req: GetOrderBookRequest,
-    ) -> Result<crate::proto::orderbook::v1::GetOrderBookResponse> {
+    /// Snapshot orderbook for `symbol`. `depth` maps like Go (`None` / `0` → depth 5 bucket).
+    pub async fn get(&self, symbol: &str, depth: Option<u32>) -> Result<OrderbookData> {
+        let depth_levels = depth.unwrap_or(0);
+        let depth_enum = if depth_levels == 0 {
+            crate::proto::orderbook::v1::Depth::DepthUnspecified
+        } else {
+            depth_enum_for_levels(depth_levels)
+        };
+        // Record the requested depth for the model; unspecified defaults to 50 server-side.
+        let reported_depth = if depth_levels == 0 { 50 } else { depth_levels };
+        let req = GetOrderBookRequest {
+            symbol: symbol.to_owned(),
+            depth: depth_enum.into(),
+            ..Default::default()
+        };
+        let quantity_scale = self.ctx.catalogs.base_quantity_scale_for_symbol(symbol);
         let client = OrderbookServiceClient::new(
             self.ctx.factory.transport(false),
             self.ctx.factory.connect_config(false),
         );
-        Ok(unary::await_public(client.get_order_book(req))
+        let resp = unary::await_public(client.get_order_book(req))
             .await?
-            .into_owned())
+            .into_owned();
+        Ok(orderbook_from_proto(
+            &resp,
+            symbol,
+            reported_depth,
+            quantity_scale,
+        ))
     }
 }

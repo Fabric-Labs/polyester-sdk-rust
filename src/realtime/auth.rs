@@ -11,7 +11,10 @@ use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use serde::Deserialize;
 use std::time::Duration;
 
-type HyperClient = Client<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>, Empty<bytes::Bytes>>;
+type HyperClient = Client<
+    hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
+    Empty<bytes::Bytes>,
+>;
 
 pub fn connection_token_url(api_url: &str) -> String {
     format!("{}/v1/rt/token", api_url.trim_end_matches('/'))
@@ -31,10 +34,7 @@ struct TokenResponse {
     token: String,
 }
 
-pub async fn fetch_connection_token(
-    creds: &Credentials,
-    api_url: &str,
-) -> Result<String> {
+pub async fn fetch_connection_token(creds: &Credentials, api_url: &str) -> Result<String> {
     let url = connection_token_url(api_url);
     fetch_rt_token(creds, &url, "realtime connection token").await
 }

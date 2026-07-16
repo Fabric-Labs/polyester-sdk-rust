@@ -49,7 +49,12 @@ async fn orders_subscribe_receives_connection_optional() {
     let Some(client) = require_live_client() else {
         return;
     };
-    if client.default_account_id.as_deref().unwrap_or("").is_empty() {
+    if client
+        .default_account_id
+        .as_deref()
+        .unwrap_or("")
+        .is_empty()
+    {
         eprintln!("skip: POLYESTER_ACCOUNT_ID required for private orders realtime");
         return;
     }

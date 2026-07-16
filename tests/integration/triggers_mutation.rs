@@ -96,9 +96,7 @@ async fn trigger_pause_resume_cancel() {
         eprintln!("skip: no trigger_id from create");
         return;
     }
-    if !created.status.is_empty()
-        && !created.status.to_ascii_lowercase().contains("created")
-    {
+    if !created.status.is_empty() && !created.status.to_ascii_lowercase().contains("created") {
         eprintln!("skip: unexpected create status {}", created.status);
     }
 

@@ -6,8 +6,8 @@ use crate::models::{
     LedgerTransfer, TransfersList,
 };
 use crate::proto::ledger::read::v1::{
-    AssetBalance as ProtoAssetBalance, BalanceRange, GetBalanceHistoryResponse, GetBalancesResponse,
-    HoldRow, ListHoldsResponse, ListTransfersResponse, TransferRow,
+    AssetBalance as ProtoAssetBalance, BalanceRange, GetBalanceHistoryResponse,
+    GetBalancesResponse, HoldRow, ListHoldsResponse, ListTransfersResponse, TransferRow,
 };
 use crate::proto::polyester::r#type::v1::U128;
 

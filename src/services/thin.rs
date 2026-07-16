@@ -124,9 +124,11 @@ impl InternalTransfersService {
 macro_rules! signed_unary {
     ($client:expr, $procedure:expr, $req:expr, $call:expr) => {{
         use super::unary;
-        Ok(unary::await_auth(&$client.ctx.factory, $procedure, $req, $call)
-            .await?
-            .into_owned())
+        Ok(
+            unary::await_auth(&$client.ctx.factory, $procedure, $req, $call)
+                .await?
+                .into_owned(),
+        )
     }};
 }
 

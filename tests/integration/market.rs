@@ -1,7 +1,6 @@
 use crate::support::{
     call_optional, call_required, hydrate_spot_and_zipper, require_live_client, smoke_symbol,
 };
-use polyester::proto::orderbook::v1::GetOrderBookRequest;
 
 #[tokio::test]
 async fn spot_config_has_pairs() {
@@ -52,18 +51,12 @@ async fn orderbook_get_for_smoke_symbol() {
     })
     .await;
     let symbol = smoke_symbol(&cfg);
-    let Some(book) = call_optional("orderbook.get", || {
-        client.orderbook.get(GetOrderBookRequest {
-            symbol: symbol.clone(),
-            ..Default::default()
-        })
-    })
-    .await
+    let Some(book) = call_optional("orderbook.get", || client.orderbook.get(&symbol, None)).await
     else {
         return;
     };
     assert!(
-        book.symbol_id != 0 || !book.bids.is_empty() || !book.asks.is_empty(),
+        !book.book_seq.is_empty() || !book.bids.is_empty() || !book.asks.is_empty(),
         "expected orderbook payload for {symbol}: {book:?}"
     );
 }
@@ -105,7 +98,7 @@ async fn market_data_get_trades() {
     };
     for trade in &trades.trades {
         assert!(
-            trade.symbol_id != 0 || trade.match_id != 0,
+            trade.symbol_id != 0 || !trade.match_id.is_empty(),
             "trade missing ids: {trade:?}"
         );
     }

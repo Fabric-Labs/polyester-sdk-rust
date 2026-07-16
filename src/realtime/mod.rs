@@ -76,10 +76,7 @@ impl Client {
         let task = tokio::spawn(async move {
             let _guard = AliveGuard(alive_task.clone());
             while !*stop_rx.borrow() {
-                match this
-                    .run_subscription_once(&channel, &tx, &stop_rx)
-                    .await
-                {
+                match this.run_subscription_once(&channel, &tx, &stop_rx).await {
                     Ok(()) => break,
                     Err(_) if *stop_rx.borrow() => break,
                     Err(_) => {
@@ -119,13 +116,11 @@ impl Client {
                 .credentials
                 .as_ref()
                 .ok_or_else(|| Error::auth("private channel requires credentials"))?;
-            let connection_token =
-                auth::fetch_connection_token(creds, &self.api_url).await?;
+            let connection_token = auth::fetch_connection_token(creds, &self.api_url).await?;
             centrifugo_connect(&mut write, &mut read, Some(&connection_token)).await?;
             let subscription_token =
                 auth::fetch_subscription_token(creds, &self.api_url, channel).await?;
-            centrifugo_subscribe(&mut write, &mut read, channel, Some(&subscription_token))
-                .await?;
+            centrifugo_subscribe(&mut write, &mut read, channel, Some(&subscription_token)).await?;
         } else {
             centrifugo_connect(&mut write, &mut read, None).await?;
             centrifugo_subscribe(&mut write, &mut read, channel, None).await?;
@@ -207,11 +202,7 @@ pub fn is_private_channel(channel: &str) -> bool {
     channel.starts_with("private:")
 }
 
-async fn centrifugo_connect<W, R>(
-    write: &mut W,
-    read: &mut R,
-    token: Option<&str>,
-) -> Result<()>
+async fn centrifugo_connect<W, R>(write: &mut W, read: &mut R, token: Option<&str>) -> Result<()>
 where
     W: SinkExt<Message> + Unpin,
     W::Error: std::fmt::Display,
@@ -277,7 +268,11 @@ where
     let text = match msg {
         Message::Text(t) => t.to_string(),
         Message::Binary(b) => String::from_utf8_lossy(&b).into_owned(),
-        _ => return Err(Error::realtime("unexpected centrifugo reply type".to_owned())),
+        _ => {
+            return Err(Error::realtime(
+                "unexpected centrifugo reply type".to_owned(),
+            ));
+        }
     };
     let payload: serde_json::Value = serde_json::from_str(&text)
         .map_err(|e| Error::realtime(format!("centrifugo reply json: {e}")))?;
@@ -338,6 +333,9 @@ mod tests {
             handle_centrifugo_frame("{\"push\":{\"ping\":{}}}"),
             Some("{}")
         );
-        assert_eq!(handle_centrifugo_frame("{\"push\":{\"pub\":{\"data\":\"x\"}}}"), None);
+        assert_eq!(
+            handle_centrifugo_frame("{\"push\":{\"pub\":{\"data\":\"x\"}}}"),
+            None
+        );
     }
 }
