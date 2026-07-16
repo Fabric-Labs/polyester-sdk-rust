@@ -204,17 +204,16 @@ pub struct CreateInternalTransferRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub asset_id: u32,
-    /// Quantity scaled by the unified asset's quantity_scale from SpotConfig for
-    /// asset_id.
+    /// Transfer amount in canonical 18-decimal unified asset units.
+    /// For example, 0.5 is encoded as 500000000000000000.
     ///
-    /// Field 6: `qty_scaled`
+    /// Field 6: `amount_e18`
     #[serde(
-        rename = "qtyScaled",
-        alias = "qty_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub qty_scaled: i64,
+    pub amount_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
     /// Stable client-supplied idempotency key used to collapse safe retries.
     ///
     /// Field 7: `idempotency_key`
@@ -238,7 +237,7 @@ impl ::core::fmt::Debug for CreateInternalTransferRequest {
         f.debug_struct("CreateInternalTransferRequest")
             .field("subaccount_id", &self.subaccount_id)
             .field("asset_id", &self.asset_id)
-            .field("qty_scaled", &self.qty_scaled)
+            .field("amount_e18", &self.amount_e18)
             .field("idempotency_key", &self.idempotency_key)
             .field("destination", &self.destination)
             .finish()
@@ -265,7 +264,7 @@ impl ::buffa::Message for CreateInternalTransferRequest {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -294,8 +293,13 @@ impl ::buffa::Message for CreateInternalTransferRequest {
         if self.asset_id != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
         }
-        if self.qty_scaled != 0i64 {
-            size += 1u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
         }
         if !self.idempotency_key.is_empty() {
             size
@@ -307,7 +311,7 @@ impl ::buffa::Message for CreateInternalTransferRequest {
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -337,8 +341,9 @@ impl ::buffa::Message for CreateInternalTransferRequest {
         if self.asset_id != 0u32 {
             ::buffa::types::put_uint32_field(5u32, self.asset_id, buf);
         }
-        if self.qty_scaled != 0i64 {
-            ::buffa::types::put_int64_field(6u32, self.qty_scaled, buf);
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
         }
         if !self.idempotency_key.is_empty() {
             ::buffa::types::put_string_field(7u32, &self.idempotency_key, buf);
@@ -406,9 +411,13 @@ impl ::buffa::Message for CreateInternalTransferRequest {
             6u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.qty_scaled = ::buffa::types::decode_int64(buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -428,7 +437,7 @@ impl ::buffa::Message for CreateInternalTransferRequest {
         self.subaccount_id = 0u64;
         self.destination = ::core::option::Option::None;
         self.asset_id = 0u32;
-        self.qty_scaled = 0i64;
+        self.amount_e18 = ::buffa::MessageField::none();
         self.idempotency_key.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -459,7 +468,9 @@ impl<'de> serde::Deserialize<'de> for CreateInternalTransferRequest {
             ) -> ::core::result::Result<CreateInternalTransferRequest, A::Error> {
                 let mut __f_subaccount_id: ::core::option::Option<u64> = None;
                 let mut __f_asset_id: ::core::option::Option<u32> = None;
-                let mut __f_qty_scaled: ::core::option::Option<i64> = None;
+                let mut __f_amount_e18: ::core::option::Option<
+                    ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+                > = None;
                 let mut __f_idempotency_key: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
@@ -498,20 +509,15 @@ impl<'de> serde::Deserialize<'de> for CreateInternalTransferRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "qtyScaled" | "qty_scaled" => {
-                            __f_qty_scaled = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i64, D::Error> {
-                                        ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
+                        "amountE18" | "amount_e18" => {
+                            __f_amount_e18 = Some(
+                                map
+                                    .next_value::<
+                                        ::buffa::MessageField<
+                                            super::super::polyester::r#type::v1::U128,
+                                        >,
+                                    >()?,
+                            );
                         }
                         "idempotencyKey" | "idempotency_key" => {
                             __f_idempotency_key = Some({
@@ -630,8 +636,8 @@ impl<'de> serde::Deserialize<'de> for CreateInternalTransferRequest {
                 if let ::core::option::Option::Some(v) = __f_asset_id {
                     __r.asset_id = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_qty_scaled {
-                    __r.qty_scaled = v;
+                if let ::core::option::Option::Some(v) = __f_amount_e18 {
+                    __r.amount_e18 = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_idempotency_key {
                     __r.idempotency_key = v;
@@ -925,17 +931,15 @@ pub struct CreateInternalTransferResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub u_asset_id: ::buffa::alloc::string::String,
-    /// Echoed transfer quantity scaled by the unified asset's quantity_scale from
-    /// SpotConfig for asset_id.
+    /// Echoed transfer amount in canonical 18-decimal unified asset units.
     ///
-    /// Field 7: `qty_scaled`
+    /// Field 7: `amount_e18`
     #[serde(
-        rename = "qtyScaled",
-        alias = "qty_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub qty_scaled: i64,
+    pub amount_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
     /// Server-resolved destination summary.
     ///
     /// Field 8: `destination`
@@ -966,7 +970,7 @@ impl ::core::fmt::Debug for CreateInternalTransferResponse {
             .field("asset_id", &self.asset_id)
             .field("asset_code", &self.asset_code)
             .field("u_asset_id", &self.u_asset_id)
-            .field("qty_scaled", &self.qty_scaled)
+            .field("amount_e18", &self.amount_e18)
             .field("destination", &self.destination)
             .field("status", &self.status)
             .finish()
@@ -1017,8 +1021,13 @@ impl ::buffa::Message for CreateInternalTransferResponse {
         if !self.u_asset_id.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.u_asset_id) as u32;
         }
-        if self.qty_scaled != 0i64 {
-            size += 1u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
         }
         if self.destination.is_set() {
             let __slot = __cache.reserve();
@@ -1062,8 +1071,9 @@ impl ::buffa::Message for CreateInternalTransferResponse {
         if !self.u_asset_id.is_empty() {
             ::buffa::types::put_string_field(6u32, &self.u_asset_id, buf);
         }
-        if self.qty_scaled != 0i64 {
-            ::buffa::types::put_int64_field(7u32, self.qty_scaled, buf);
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
         }
         if self.destination.is_set() {
             ::buffa::types::put_len_delimited_header(8u32, __cache.consume_next(), buf);
@@ -1133,9 +1143,13 @@ impl ::buffa::Message for CreateInternalTransferResponse {
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.qty_scaled = ::buffa::types::decode_int64(buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             8u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -1171,7 +1185,7 @@ impl ::buffa::Message for CreateInternalTransferResponse {
         self.asset_id = 0u32;
         self.asset_code.clear();
         self.u_asset_id.clear();
-        self.qty_scaled = 0i64;
+        self.amount_e18 = ::buffa::MessageField::none();
         self.destination = ::buffa::MessageField::none();
         self.status = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
@@ -1236,11 +1250,15 @@ pub mod __buffa {
             ///
             /// Field 5: `asset_id`
             pub asset_id: u32,
-            /// Quantity scaled by the unified asset's quantity_scale from SpotConfig for
-            /// asset_id.
+            /// Transfer amount in canonical 18-decimal unified asset units.
+            /// For example, 0.5 is encoded as 500000000000000000.
             ///
-            /// Field 6: `qty_scaled`
-            pub qty_scaled: i64,
+            /// Field 6: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
             /// Stable client-supplied idempotency key used to collapse safe retries.
             ///
             /// Field 7: `idempotency_key`
@@ -1300,9 +1318,27 @@ pub mod __buffa {
                     6u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -1375,7 +1411,14 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::CreateInternalTransferRequest {
                     subaccount_id: self.subaccount_id,
                     asset_id: self.asset_id,
-                    qty_scaled: self.qty_scaled,
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     idempotency_key: self.idempotency_key.to_string(),
                     destination: self
                         .destination
@@ -1413,7 +1456,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for CreateInternalTransferRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -1444,10 +1487,13 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
                 }
-                if self.qty_scaled != 0i64 {
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
                     size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
                 }
                 if !self.idempotency_key.is_empty() {
                     size
@@ -1461,7 +1507,7 @@ pub mod __buffa {
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -1491,8 +1537,13 @@ pub mod __buffa {
                 if self.asset_id != 0u32 {
                     ::buffa::types::put_uint32_field(5u32, self.asset_id, buf);
                 }
-                if self.qty_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(6u32, self.qty_scaled, buf);
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
                 }
                 if !self.idempotency_key.is_empty() {
                     ::buffa::types::put_string_field(7u32, &self.idempotency_key, buf);
@@ -1532,12 +1583,13 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.asset_id),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
-                    __map
-                        .serialize_entry(
-                            "qtyScaled",
-                            &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
-                        )?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.idempotency_key) {
                     __map.serialize_entry("idempotencyKey", self.idempotency_key)?;
@@ -1684,13 +1736,19 @@ pub mod __buffa {
             pub fn asset_id(&self) -> u32 {
                 self.0.reborrow().asset_id
             }
-            /// Quantity scaled by the unified asset's quantity_scale from SpotConfig for
-            /// asset_id.
+            /// Transfer amount in canonical 18-decimal unified asset units.
+            /// For example, 0.5 is encoded as 500000000000000000.
             ///
-            /// Field 6: `qty_scaled`
+            /// Field 6: `amount_e18`
             #[must_use]
-            pub fn qty_scaled(&self) -> i64 {
-                self.0.reborrow().qty_scaled
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
             }
             /// Stable client-supplied idempotency key used to collapse safe retries.
             ///
@@ -2148,11 +2206,14 @@ pub mod __buffa {
             ///
             /// Field 6: `u_asset_id`
             pub u_asset_id: &'a str,
-            /// Echoed transfer quantity scaled by the unified asset's quantity_scale from
-            /// SpotConfig for asset_id.
+            /// Echoed transfer amount in canonical 18-decimal unified asset units.
             ///
-            /// Field 7: `qty_scaled`
-            pub qty_scaled: i64,
+            /// Field 7: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
             /// Server-resolved destination summary.
             ///
             /// Field 8: `destination`
@@ -2243,9 +2304,27 @@ pub mod __buffa {
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -2316,7 +2395,14 @@ pub mod __buffa {
                     asset_id: self.asset_id,
                     asset_code: self.asset_code.to_string(),
                     u_asset_id: self.u_asset_id.to_string(),
-                    qty_scaled: self.qty_scaled,
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     destination: match self.destination.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -2375,10 +2461,13 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.u_asset_id)
                                 as u32;
                 }
-                if self.qty_scaled != 0i64 {
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
                     size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
                 }
                 if self.destination.is_set() {
                     let __slot = __cache.reserve();
@@ -2423,8 +2512,13 @@ pub mod __buffa {
                 if !self.u_asset_id.is_empty() {
                     ::buffa::types::put_string_field(6u32, &self.u_asset_id, buf);
                 }
-                if self.qty_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(7u32, self.qty_scaled, buf);
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
                 }
                 if self.destination.is_set() {
                     ::buffa::types::put_len_delimited_header(
@@ -2489,12 +2583,13 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.u_asset_id) {
                     __map.serialize_entry("uAssetId", self.u_asset_id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
-                    __map
-                        .serialize_entry(
-                            "qtyScaled",
-                            &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
-                        )?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
                 }
                 {
                     if let ::core::option::Option::Some(__v) = self
@@ -2649,13 +2744,18 @@ pub mod __buffa {
             pub fn u_asset_id(&self) -> &'_ str {
                 self.0.reborrow().u_asset_id
             }
-            /// Echoed transfer quantity scaled by the unified asset's quantity_scale from
-            /// SpotConfig for asset_id.
+            /// Echoed transfer amount in canonical 18-decimal unified asset units.
             ///
-            /// Field 7: `qty_scaled`
+            /// Field 7: `amount_e18`
             #[must_use]
-            pub fn qty_scaled(&self) -> i64 {
-                self.0.reborrow().qty_scaled
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
             }
             /// Server-resolved destination summary.
             ///
