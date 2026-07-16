@@ -215,6 +215,15 @@ pub fn format_id(id: u64) -> String {
     bs58::encode(&bytes[start..]).into_string()
 }
 
+/// Format a uint64 id as base58, or `"0"` when zero (order/trade ids).
+pub fn format_uint64_id(id: u64) -> String {
+    if id == 0 {
+        "0".to_owned()
+    } else {
+        format_id(id)
+    }
+}
+
 pub fn parse_decimal_input(raw: &str) -> Result<Decimal> {
     Decimal::from_str(raw.trim()).map_err(|_| Error::validation("invalid decimal".to_owned()))
 }
@@ -240,5 +249,21 @@ mod tests {
     fn qty_positive() {
         assert!(parse_qty_scaled_str("0", 8, "qty").is_err());
         assert_eq!(parse_qty_scaled_str("0.00000001", 8, "qty").unwrap(), 1);
+    }
+
+    #[test]
+    fn qty_rejects_excess_precision() {
+        let err = parse_qty_scaled_str("1.123456789", 8, "qty").unwrap_err();
+        assert!(err.to_string().contains("at most") || err.to_string().contains("precision"));
+    }
+
+    #[test]
+    fn price_rejects_negative_string() {
+        assert!(parse_price_ticks_str("-1", "price").is_err());
+    }
+
+    #[test]
+    fn format_qty_scaled_round_trip() {
+        assert_eq!(format_qty_scaled(1_000_000, 8), "0.01");
     }
 }

@@ -194,6 +194,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn canonical_query_sorts_and_encodes_values() {
+        let got = canonical_query("https://api.example.test/path?b=2&a=hello world");
+        assert_eq!(got, "a=hello%20world&b=2");
+    }
+
+    #[test]
+    fn canonical_signing_string_matches_contract() {
+        let got = canonical_signing_string(
+            "123",
+            "post",
+            "https://api.example.test/foo/bar?b=2&a=1",
+            b"{}",
+        );
+        let want = "123\nPOST\n/foo/bar\na=1&b=2\n44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a";
+        assert_eq!(got, want);
+    }
+
+    #[test]
     fn canonical_string_empty_body() {
         let s = canonical_signing_string(
             "1700000000000",
@@ -204,6 +222,17 @@ mod tests {
         let expected_hash = hex::encode(Sha256::digest(b""));
         assert!(s.contains(&expected_hash));
         assert!(s.starts_with("1700000000000\nPOST\n/orders.v1.OrdersService/CreateOrder\n\n"));
+    }
+
+    #[test]
+    fn sign_request_returns_polyester_headers() {
+        let (seed, _) = generate_ed25519_keypair();
+        let creds = Credentials::new("key_123", &seed).unwrap();
+        let headers =
+            creds.sign_request("POST", "https://api.example.test/foo", b"{}", Some("123"));
+        assert_eq!(headers.get(HEADER_KEY_ID).unwrap(), "key_123");
+        assert_eq!(headers.get(HEADER_TIMESTAMP).unwrap(), "123");
+        assert_eq!(headers.get(HEADER_SIGNATURE).unwrap().len(), 128);
     }
 
     #[test]
@@ -219,5 +248,31 @@ mod tests {
         assert_eq!(headers.get(HEADER_KEY_ID).unwrap(), "ak_test");
         assert_eq!(headers.get(HEADER_TIMESTAMP).unwrap(), "1");
         assert_eq!(headers.get(HEADER_SIGNATURE).unwrap().len(), 128);
+    }
+
+    #[test]
+    fn load_credentials_requires_both() {
+        let err = Credentials::load(Some("ak_test"), Some(""), false).unwrap_err();
+        assert!(matches!(err, Error::Auth(_)));
+    }
+
+    #[test]
+    fn load_credentials_none_when_empty() {
+        assert!(Credentials::load(None, None, false).unwrap().is_none());
+    }
+
+    #[test]
+    fn request_url_joins_base_and_procedure() {
+        assert_eq!(
+            request_url(
+                "https://api.example.test/",
+                "orders.v1.OrdersService/CreateOrder"
+            ),
+            "https://api.example.test/orders.v1.OrdersService/CreateOrder"
+        );
+        assert_eq!(
+            request_url("https://api.example.test", "/auth.v1.AuthService/Me"),
+            "https://api.example.test/auth.v1.AuthService/Me"
+        );
     }
 }

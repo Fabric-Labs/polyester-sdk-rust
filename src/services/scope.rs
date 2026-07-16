@@ -19,10 +19,19 @@ pub fn optional_subaccount(ctx: &ServiceContext, explicit: Option<u64>) -> Resul
     Ok(None)
 }
 
-#[allow(dead_code)]
 pub fn require_account_id(ctx: &ServiceContext) -> Result<String> {
     ctx.default_account_id
         .clone()
         .filter(|s| !s.is_empty())
         .ok_or_else(|| Error::validation("default_account_id is required for this call"))
+}
+
+pub fn resolve_account_id(ctx: &ServiceContext, explicit: Option<&str>) -> Result<String> {
+    if let Some(value) = explicit {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            return Ok(trimmed.to_owned());
+        }
+    }
+    require_account_id(ctx)
 }

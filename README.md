@@ -131,10 +131,27 @@ Headers: `X-API-KEY-ID`, `X-API-TIMESTAMP`, `X-API-SIGNATURE`.
 ## Development
 
 ```bash
+source "$HOME/.cargo/env"   # if cargo is not on PATH yet
 cargo check
-cargo test
+cargo test --lib --all-features
+cargo test --test integration --all-features
 cargo clippy --all-targets -- -D warnings
 ```
+
+Live integration tests under `tests/integration/` need
+`POLYESTER_API_KEY_ID` / `POLYESTER_API_PRIVATE_KEY` (and usually
+`POLYESTER_ACCOUNT_ID`). Without those env vars they soft-skip.
+
+Optional tiers (same gates as Go/Python):
+
+| Env | Enables |
+|---|---|
+| `POLYESTER_TEST_MUTATION=1` | Order/trigger/market-order write round-trips |
+| `POLYESTER_TEST_FUNDED=1` | Balance-changing transfers / fills |
+| `POLYESTER_TEST_TRADE_E2E=1` + `POLYESTER_TEST_MAKER_*` | Maker+taker fill e2e |
+| `POLYESTER_TEST_INTERNAL_TRANSFER_DEST` | Internal / unified→user transfers |
+
+With a local `.env`, `dotenvy` loads it automatically (`.env` is gitignored).
 
 CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python).
 
