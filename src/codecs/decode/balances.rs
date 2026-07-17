@@ -68,6 +68,46 @@ pub fn balance_history_from_proto(msg: &GetBalanceHistoryResponse) -> BalanceHis
     }
 }
 
+pub fn equity_history_from_proto(
+    msg: &crate::proto::ledger::read::v1::GetEquityHistorySeriesResponse,
+) -> crate::models::EquityHistory {
+    use crate::models::{EquityHistory, EquityHistorySeries};
+    use crate::proto::ledger::read::v1::__buffa::oneof::equity_series::Grouping;
+    EquityHistory {
+        range: balance_range_label(msg.range),
+        bucket: msg.bucket.clone(),
+        start_ts_sec: msg.start_ts_sec as i64,
+        end_ts_sec: msg.end_ts_sec as i64,
+        quote_asset: msg.quote_asset.clone(),
+        points: msg.points as i32,
+        series: msg
+            .series
+            .iter()
+            .map(|s| {
+                let mut row = EquityHistorySeries {
+                    account_code: 0,
+                    account_name: String::new(),
+                    asset_id: 0,
+                    asset_symbol: String::new(),
+                    equity_q: s.equity_q.clone(),
+                };
+                match s.grouping.as_ref() {
+                    Some(Grouping::Account(a)) => {
+                        row.account_code = a.account_code;
+                        row.account_name = a.name.clone();
+                    }
+                    Some(Grouping::Asset(a)) => {
+                        row.asset_id = a.id;
+                        row.asset_symbol = a.symbol.clone();
+                    }
+                    None => {}
+                }
+                row
+            })
+            .collect(),
+    }
+}
+
 pub fn hold_from_proto(msg: &HoldRow) -> Hold {
     Hold {
         hold_id: format_uint64_id(msg.hold_id),
@@ -114,7 +154,11 @@ pub fn transfers_list_from_proto(msg: &ListTransfersResponse) -> TransfersList {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::ledger::read::v1::GetBalancesResponse;
+    use crate::proto::ledger::read::v1::__buffa::oneof::equity_series::Grouping;
+    use crate::proto::ledger::read::v1::{
+        AccountGrouping, BalanceSeries, GetBalanceHistoryResponse, GetEquityHistorySeriesResponse,
+        ListHoldsResponse, ListTransfersResponse,
+    };
 
     #[test]
     fn balances_list_maps_u128() {
@@ -138,6 +182,56 @@ mod tests {
     }
 
     #[test]
+    fn balance_history_maps_range_and_series() {
+        let msg = GetBalanceHistoryResponse {
+            range: BalanceRange::Day7.into(),
+            bucket: "1h".into(),
+            start_ts_sec: 100,
+            end_ts_sec: 200,
+            points: 2,
+            series: vec![BalanceSeries {
+                asset_id: 1,
+                balance_q: vec![100, 200],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let result = balance_history_from_proto(&msg);
+        assert_eq!(result.range, "7d");
+        assert_eq!(result.bucket, "1h");
+        assert_eq!(result.series.len(), 1);
+        assert_eq!(result.series[0].balance_q, vec![100, 200]);
+    }
+
+    #[test]
+    fn equity_history_maps_account_grouping() {
+        let msg = GetEquityHistorySeriesResponse {
+            range: BalanceRange::Day30.into(),
+            bucket: "1d".into(),
+            start_ts_sec: 1,
+            end_ts_sec: 2,
+            quote_asset: "USD".into(),
+            points: 1,
+            series: vec![crate::proto::ledger::read::v1::EquitySeries {
+                equity_q: vec![999],
+                grouping: Some(Grouping::Account(Box::new(AccountGrouping {
+                    account_code: 5,
+                    name: "Trading".into(),
+                    ..Default::default()
+                }))),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let result = equity_history_from_proto(&msg);
+        assert_eq!(result.range, "30d");
+        assert_eq!(result.quote_asset, "USD");
+        assert_eq!(result.series[0].account_code, 5);
+        assert_eq!(result.series[0].account_name, "Trading");
+        assert_eq!(result.series[0].equity_q, vec![999]);
+    }
+
+    #[test]
     fn hold_formats_id_and_amount() {
         let msg = HoldRow {
             hold_id: 42,
@@ -155,5 +249,63 @@ mod tests {
         assert_eq!(hold.hold_id, format_uint64_id(42));
         assert_eq!(hold.amount_reserved, "99");
         assert_eq!(hold.expires_at_ns, "123");
+    }
+
+    #[test]
+    fn holds_list_maps_rows() {
+        let msg = ListHoldsResponse {
+            holds: vec![HoldRow {
+                hold_id: 42,
+                asset_id: 1,
+                amount_reserved_e18: U128 {
+                    hi: 0,
+                    lo: 500,
+                    ..Default::default()
+                }
+                .into(),
+                expires_at_ns: 1_700_000_000_000,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let result = holds_list_from_proto(&msg);
+        assert_eq!(result.holds.len(), 1);
+        assert_eq!(result.holds[0].hold_id, format_uint64_id(42));
+        assert_eq!(result.holds[0].amount_reserved, "500");
+    }
+
+    #[test]
+    fn transfer_row_and_list_cursor() {
+        let row = TransferRow {
+            asset_id: 2,
+            amount_e18: U128 {
+                hi: 0,
+                lo: 1000,
+                ..Default::default()
+            }
+            .into(),
+            transfer_code: buffa::EnumValue::from(5),
+            account_code: buffa::EnumValue::from(1),
+            ts_us: 999,
+            is_debit: true,
+            flow_id: "flow-abc".into(),
+            ..Default::default()
+        };
+        let transfer = transfer_row_from_proto(&row);
+        assert_eq!(transfer.amount, "1000");
+        assert_eq!(transfer.transfer_type, 5);
+        assert_eq!(transfer.tx_id, "flow-abc");
+        assert!(transfer.is_debit);
+
+        let list = transfers_list_from_proto(&ListTransfersResponse {
+            transfers: vec![TransferRow {
+                asset_id: 1,
+                ..Default::default()
+            }],
+            next_page_token: "12345".into(),
+            ..Default::default()
+        });
+        assert_eq!(list.transfers.len(), 1);
+        assert_eq!(list.next_cursor, Some(12345));
     }
 }

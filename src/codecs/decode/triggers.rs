@@ -133,7 +133,9 @@ pub fn trigger_events_list_from_proto(msg: &ListTriggerEventsResponse) -> Trigge
 mod tests {
     use super::*;
     use crate::proto::orders::v1::Side;
-    use crate::proto::triggers::v1::{StopDetails, TriggerType};
+    use crate::proto::triggers::v1::{
+        GetTriggerResponse, ListTriggersResponse, StopDetails, TriggerType,
+    };
 
     #[test]
     fn trigger_from_proto_maps_status_and_stop_price() {
@@ -163,5 +165,30 @@ mod tests {
         assert_eq!(t.qty.as_ref().unwrap().as_scaled(), 100);
         assert_eq!(t.trigger_price.as_ref().unwrap().as_ticks(), 5000);
         assert_eq!(t.client_trigger_id, "cid");
+    }
+
+    #[test]
+    fn triggers_list_and_get() {
+        let listed = triggers_list_from_proto(&ListTriggersResponse {
+            triggers: vec![ProtoTrigger {
+                trigger_id: 1,
+                symbol_id: 1,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        assert_eq!(listed.triggers.len(), 1);
+        assert_eq!(listed.total, 1);
+
+        let got = get_trigger_from_proto(&GetTriggerResponse {
+            trigger: ProtoTrigger {
+                trigger_id: 3,
+                symbol_id: 1,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        });
+        assert_eq!(got.unwrap().trigger_id, format_uint64_id(3));
     }
 }

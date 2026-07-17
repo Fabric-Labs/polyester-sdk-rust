@@ -154,7 +154,7 @@ mod tests {
     use super::*;
     use crate::codecs::scalars::format_uint64_id;
     use crate::proto::orders::v1::{
-        GetOpenOrdersResponse, OrderStatus, OrderType, Side, TimeInForce,
+        GetOpenOrdersResponse, GetOrderResponse, OrderStatus, OrderType, Side, TimeInForce,
     };
 
     #[test]
@@ -204,5 +204,65 @@ mod tests {
         assert_eq!(result.orders.len(), 1);
         assert_eq!(result.next_page_token, "tok");
         assert_eq!(result.orders[0].side, "sell");
+    }
+
+    #[test]
+    fn get_order_includes_trades() {
+        let msg = GetOrderResponse {
+            order: ProtoOrder {
+                order_id: 7,
+                symbol_id: 2,
+                ..Default::default()
+            }
+            .into(),
+            trades: vec![ProtoUserTrade {
+                symbol_id: 2,
+                match_id: 99,
+                order_id: 7,
+                side: Side::Buy.into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let result = get_order_from_proto(&msg);
+        assert_eq!(result.order.as_ref().unwrap().order_id, format_uint64_id(7));
+        assert_eq!(result.trades.len(), 1);
+        assert_eq!(result.trades[0].match_id, "99");
+    }
+
+    #[test]
+    fn modify_and_mutation_results() {
+        use crate::proto::orders::v1::{
+            CancelOrderResponse, CreateOrderResponse, ModifyActionTaken, ModifyOrderResponse,
+        };
+        let modified = modify_order_from_proto(&ModifyOrderResponse {
+            action_taken: ModifyActionTaken::Amended.into(),
+            old_order_id: 10,
+            final_order_id: 11,
+            code: "ok".into(),
+            ..Default::default()
+        });
+        assert_eq!(modified.action_taken, "amended");
+        assert_eq!(modified.old_order_id, format_uint64_id(10));
+        assert_eq!(modified.final_order_id, format_uint64_id(11));
+
+        let created = order_mutation_from_create(&CreateOrderResponse {
+            status: "accepted".into(),
+            order_id: 42,
+            client_order_id: "coid-1".into(),
+            ..Default::default()
+        });
+        assert_eq!(created.status, "accepted");
+        assert_eq!(created.order_id, format_uint64_id(42));
+        assert_eq!(created.client_order_id, "coid-1");
+
+        let cancelled = order_mutation_from_cancel(&CancelOrderResponse {
+            status: "cancelled".into(),
+            order_id: 42,
+            ..Default::default()
+        });
+        assert_eq!(cancelled.status, "cancelled");
+        assert_eq!(cancelled.order_id, format_uint64_id(42));
+        assert!(cancelled.client_order_id.is_empty());
     }
 }

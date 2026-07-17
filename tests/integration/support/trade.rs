@@ -3,9 +3,7 @@
 use super::call::{call_optional, call_required};
 use super::env::{env_trade_symbol, load_dotenv, min_trading_quote, skip_funding_check};
 use polyester::codecs::scalars::{format_price_ticks, parse_price_ticks_str};
-use polyester::models::AssetBalance;
-use polyester::models::OrderbookData;
-use polyester::proto::chain::zipper::v1::GetDepositWithdrawConfigResponse;
+use polyester::models::{AssetBalance, DepositWithdrawConfig, OrderbookData};
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::proto::marketdata::v1::{GetSpotConfigResponse, PairConfig};
 use polyester::{Client, Result};
@@ -137,7 +135,7 @@ pub fn trading_balance_raw(balances: &[AssetBalance], asset_id: u32) -> u128 {
 pub fn quote_asset_id(
     spot: &GetSpotConfigResponse,
     symbol: &str,
-    zipper: Option<&GetDepositWithdrawConfigResponse>,
+    zipper: Option<&DepositWithdrawConfig>,
 ) -> Option<u32> {
     let pair = pair_for_symbol(spot, symbol)?;
     if !pair.quote_asset.is_empty()
@@ -155,7 +153,7 @@ pub fn quote_asset_id(
 pub fn base_asset_id(
     spot: &GetSpotConfigResponse,
     symbol: &str,
-    zipper: Option<&GetDepositWithdrawConfigResponse>,
+    zipper: Option<&DepositWithdrawConfig>,
 ) -> Option<u32> {
     let pair = pair_for_symbol(spot, symbol)?;
     if !pair.base_asset.is_empty()

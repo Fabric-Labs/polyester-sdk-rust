@@ -1,13 +1,15 @@
 use super::ServiceContext;
 use super::unary;
 use crate::codecs::decode::{
-    balance_history_from_proto, balances_list_from_proto, holds_list_from_proto,
-    transfers_list_from_proto,
+    balance_history_from_proto, balances_list_from_proto, equity_history_from_proto,
+    holds_list_from_proto, transfers_list_from_proto,
 };
 use crate::connect::ledger::read::v1::LedgerReadServiceClient;
 use crate::errors::Result;
-use crate::models::{BalanceHistory, BalancesList, HoldsList, TransfersList};
-use crate::proto::ledger::read::v1::{GetBalanceHistoryRequest, GetBalancesRequest};
+use crate::models::{BalanceHistory, BalancesList, EquityHistory, HoldsList, TransfersList};
+use crate::proto::ledger::read::v1::{
+    GetBalanceHistoryRequest, GetBalancesRequest, GetEquityHistorySeriesRequest,
+};
 
 #[derive(Clone)]
 pub struct BalancesService {
@@ -53,6 +55,22 @@ impl BalancesService {
         .await?
         .into_owned();
         Ok(balance_history_from_proto(&resp))
+    }
+
+    pub async fn get_equity_history(
+        &self,
+        req: GetEquityHistorySeriesRequest,
+    ) -> Result<EquityHistory> {
+        let client = self.client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/ledger.read.v1.LedgerReadService/GetEquityHistorySeries",
+            req,
+            |req, opts| client.get_equity_history_series_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        Ok(equity_history_from_proto(&resp))
     }
 
     pub async fn list_transfers(

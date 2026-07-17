@@ -88,7 +88,11 @@ impl Manager {
         // Best-effort extract asset scales from common shapes.
         if let Some(assets) = value.get("assets").and_then(|a| a.as_array()) {
             for a in assets {
-                let sym = a.get("symbol").and_then(|s| s.as_str()).unwrap_or("");
+                let sym = a
+                    .get("asset")
+                    .or_else(|| a.get("symbol"))
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("");
                 let ledger_id = a
                     .get("ledger_id")
                     .or_else(|| a.get("ledgerId"))
@@ -186,7 +190,7 @@ mod tests {
         let mgr = Manager::new();
         mgr.hydrate_zipper_config_json(json!({
             "assets": [{
-                "symbol": "USDT",
+                "asset": "USDT",
                 "ledger_id": 99,
                 "quantity_scale": 6
             }]

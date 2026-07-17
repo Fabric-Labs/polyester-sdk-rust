@@ -35,6 +35,26 @@ pub struct BalanceHistory {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EquityHistorySeries {
+    pub account_code: u32,
+    pub account_name: String,
+    pub asset_id: u32,
+    pub asset_symbol: String,
+    pub equity_q: Vec<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EquityHistory {
+    pub range: String,
+    pub bucket: String,
+    pub start_ts_sec: i64,
+    pub end_ts_sec: i64,
+    pub quote_asset: String,
+    pub points: i32,
+    pub series: Vec<EquityHistorySeries>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hold {
     pub hold_id: String,
     pub asset_id: u32,

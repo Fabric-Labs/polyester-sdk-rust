@@ -1,6 +1,6 @@
 //! Trading read/write models (Go `models/trading.go` parity).
 
-use crate::types::{Price, Quantity};
+use crate::types::{AssetAmount, Price, Quantity};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Order {
@@ -106,4 +106,57 @@ pub enum CreateTimeInForce {
     Gtc,
     Ioc,
     Fok,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InternalTransferResult {
+    pub request_id: String,
+    pub transfer_id: String,
+    pub asset_id: u32,
+    pub asset_code: String,
+    pub quantity: Option<AssetAmount>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepositAddress {
+    pub chain_id: u32,
+    pub deposit_address: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepositAddressesList {
+    pub addresses: Vec<DepositAddress>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WithdrawIntentResult {
+    pub intent_id: String,
+    pub status: String,
+    pub flow_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApiKeySummary {
+    pub key_id: String,
+    pub label: String,
+    pub status: String,
+    pub public_key_ed25519: String,
+    pub updated_at_ms: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApiKeysList {
+    pub keys: Vec<ApiKeySummary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedAccount {
+    pub account_id: String,
+    pub username: String,
+    pub smart_account_address: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedAccountsList {
+    pub accounts: Vec<ResolvedAccount>,
 }
