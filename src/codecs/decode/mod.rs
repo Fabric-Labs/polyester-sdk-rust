@@ -1,21 +1,39 @@
 //! Proto → SDK model decoders (Go `codecs/decode` parity).
 
+mod address_book;
+mod admin;
 mod auth;
 mod balances;
+mod common;
+mod deposit_withdraw;
 mod enums;
+mod guard_signer;
+mod lifecycle;
 mod market_data;
 mod market_overview;
 mod money;
 mod orderbook;
 mod orders;
+mod policies;
+mod sub_accounts;
 mod triggers;
+mod zipper;
 
+pub use address_book::*;
+pub use admin::*;
 pub use auth::*;
 pub use balances::*;
+pub use common::*;
+pub use deposit_withdraw::*;
 pub use enums::*;
+pub use guard_signer::*;
+pub use lifecycle::*;
 pub use market_data::*;
 pub use market_overview::*;
 pub use money::*;
 pub use orderbook::*;
 pub use orders::*;
+pub use policies::*;
+pub use sub_accounts::*;
 pub use triggers::*;
+pub use zipper::*;

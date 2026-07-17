@@ -107,43 +107,41 @@ impl InternalTransfersService {
     pub async fn create(
         &self,
         req: crate::proto::transfer::v1::CreateInternalTransferRequest,
-    ) -> crate::errors::Result<crate::proto::transfer::v1::CreateInternalTransferResponse> {
+    ) -> crate::errors::Result<crate::models::InternalTransferResult> {
         use super::unary;
+        use crate::codecs::decode::internal_transfer_from_proto;
         let client = self.connect_client();
-        Ok(unary::await_auth(
+        let resp = unary::await_auth(
             &self.ctx.factory,
             "/transfer.v1.InternalTransferService/CreateInternalTransfer",
             req,
             |req, opts| client.create_internal_transfer_with_options(req, opts),
         )
         .await?
-        .into_owned())
+        .into_owned();
+        Ok(internal_transfer_from_proto(&resp))
     }
-}
-
-macro_rules! signed_unary {
-    ($client:expr, $procedure:expr, $req:expr, $call:expr) => {{
-        use super::unary;
-        Ok(
-            unary::await_auth(&$client.ctx.factory, $procedure, $req, $call)
-                .await?
-                .into_owned(),
-        )
-    }};
 }
 
 impl ApiKeysService {
     pub async fn list(
         &self,
         req: crate::proto::auth::v1::ListApiKeysRequest,
-    ) -> crate::errors::Result<crate::proto::auth::v1::ListApiKeysResponse> {
+    ) -> crate::errors::Result<crate::models::ApiKeysList> {
+        use crate::codecs::decode::api_keys_list_from_proto;
         let client = self.connect_client();
-        signed_unary!(
-            self,
-            "/auth.v1.ApiKeyService/ListApiKeys",
-            req,
-            |req, opts| client.list_api_keys_with_options(req, opts)
-        )
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.ApiKeyService/ListApiKeys",
+                req,
+                |req, opts| client.list_api_keys_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        Ok(api_keys_list_from_proto(&resp))
     }
 }
 
@@ -151,27 +149,41 @@ impl PoliciesService {
     pub async fn list_subaccount_policies(
         &self,
         req: crate::proto::auth::v1::ListSubaccountPoliciesRequest,
-    ) -> crate::errors::Result<crate::proto::auth::v1::ListSubaccountPoliciesResponse> {
+    ) -> crate::errors::Result<crate::models::SubaccountPoliciesList> {
+        use crate::codecs::decode::subaccount_policies_list_from_proto;
         let client = self.connect_client();
-        signed_unary!(
-            self,
-            "/auth.v1.PolicyService/ListSubaccountPolicies",
-            req,
-            |req, opts| client.list_subaccount_policies_with_options(req, opts)
-        )
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.PolicyService/ListSubaccountPolicies",
+                req,
+                |req, opts| client.list_subaccount_policies_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        Ok(subaccount_policies_list_from_proto(&resp))
     }
 
     pub async fn list_api_policies(
         &self,
         req: crate::proto::auth::v1::ListApiPoliciesRequest,
-    ) -> crate::errors::Result<crate::proto::auth::v1::ListApiPoliciesResponse> {
+    ) -> crate::errors::Result<crate::models::ApiPoliciesList> {
+        use crate::codecs::decode::api_policies_list_from_proto;
         let client = self.connect_client();
-        signed_unary!(
-            self,
-            "/auth.v1.PolicyService/ListApiPolicies",
-            req,
-            |req, opts| client.list_api_policies_with_options(req, opts)
-        )
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.PolicyService/ListApiPolicies",
+                req,
+                |req, opts| client.list_api_policies_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        Ok(api_policies_list_from_proto(&resp))
     }
 }
 
@@ -179,14 +191,21 @@ impl SubAccountsService {
     pub async fn list(
         &self,
         req: crate::proto::auth::v1::ListSubaccountsRequest,
-    ) -> crate::errors::Result<crate::proto::auth::v1::ListSubaccountsResponse> {
+    ) -> crate::errors::Result<crate::models::SubAccountsList> {
+        use crate::codecs::decode::subaccounts_list_from_proto;
         let client = self.connect_client();
-        signed_unary!(
-            self,
-            "/auth.v1.SubaccountService/ListSubaccounts",
-            req,
-            |req, opts| client.list_subaccounts_with_options(req, opts)
-        )
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.SubaccountService/ListSubaccounts",
+                req,
+                |req, opts| client.list_subaccounts_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        Ok(subaccounts_list_from_proto(&resp))
     }
 }
 
@@ -194,14 +213,21 @@ impl ResolveService {
     pub async fn resolve_account(
         &self,
         req: crate::proto::auth::v1::ResolveAccountRequest,
-    ) -> crate::errors::Result<crate::proto::auth::v1::ResolveAccountResponse> {
+    ) -> crate::errors::Result<crate::models::ResolvedAccountsList> {
+        use crate::codecs::decode::resolved_accounts_from_proto;
         let client = self.connect_client();
-        signed_unary!(
-            self,
-            "/auth.v1.ResolveService/ResolveAccount",
-            req,
-            |req, opts| client.resolve_account_with_options(req, opts)
-        )
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.ResolveService/ResolveAccount",
+                req,
+                |req, opts| client.resolve_account_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        Ok(resolved_accounts_from_proto(&resp))
     }
 }
 
@@ -209,14 +235,21 @@ impl AddressBookService {
     pub async fn list_books(
         &self,
         req: crate::proto::auth::v1::ListAddressBooksRequest,
-    ) -> crate::errors::Result<crate::proto::auth::v1::ListAddressBooksResponse> {
+    ) -> crate::errors::Result<crate::models::AddressBooksList> {
+        use crate::codecs::decode::list_books_from_proto;
         let client = self.connect_client();
-        signed_unary!(
-            self,
-            "/auth.v1.AddressBookService/ListAddressBooks",
-            req,
-            |req, opts| client.list_address_books_with_options(req, opts)
-        )
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.AddressBookService/ListAddressBooks",
+                req,
+                |req, opts| client.list_address_books_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        Ok(list_books_from_proto(&resp))
     }
 }
 
@@ -224,14 +257,21 @@ impl LifecycleService {
     pub async fn list_flows(
         &self,
         req: crate::proto::chain::lifecycle::v1::ListFlowsRequest,
-    ) -> crate::errors::Result<crate::proto::chain::lifecycle::v1::ListFlowsResponse> {
+    ) -> crate::errors::Result<crate::models::LifecycleFlowsList> {
+        use crate::codecs::decode::flows_list_from_proto;
         let client = self.connect_client();
-        signed_unary!(
-            self,
-            "/chain.lifecycle.v1.LifecycleReadService/ListFlows",
-            req,
-            |req, opts| client.list_flows_with_options(req, opts)
-        )
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/chain.lifecycle.v1.LifecycleReadService/ListFlows",
+                req,
+                |req, opts| client.list_flows_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        Ok(flows_list_from_proto(&resp))
     }
 }
 
@@ -239,14 +279,21 @@ impl GuardSignerService {
     pub async fn get_status(
         &self,
         req: crate::proto::chain::guard::v1::GetGuardSignerStatusRequest,
-    ) -> crate::errors::Result<crate::proto::chain::guard::v1::GetGuardSignerStatusResponse> {
+    ) -> crate::errors::Result<Option<crate::models::GuardSignerStatus>> {
+        use crate::codecs::decode::status_from_proto;
         let client = self.connect_client();
-        signed_unary!(
-            self,
-            "/chain.guard.v1.GuardSignerService/GetGuardSignerStatus",
-            req,
-            |req, opts| client.get_guard_signer_status_with_options(req, opts)
-        )
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/chain.guard.v1.GuardSignerService/GetGuardSignerStatus",
+                req,
+                |req, opts| client.get_guard_signer_status_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        Ok(status_from_proto(&resp))
     }
 }
 
@@ -254,14 +301,21 @@ impl LayoutService {
     pub async fn get_layouts(
         &self,
         req: crate::proto::layout::v1::GetLayoutsRequest,
-    ) -> crate::errors::Result<crate::proto::layout::v1::GetLayoutsResponse> {
+    ) -> crate::errors::Result<crate::models::ApiData> {
+        use crate::codecs::decode::api_data_from_proto;
         let client = self.connect_client();
-        signed_unary!(
-            self,
-            "/layout.v1.LayoutService/GetLayouts",
-            req,
-            |req, opts| client.get_layouts_with_options(req, opts)
-        )
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/layout.v1.LayoutService/GetLayouts",
+                req,
+                |req, opts| client.get_layouts_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        Ok(api_data_from_proto(&resp))
     }
 }
 
@@ -269,13 +323,20 @@ impl PolychartService {
     pub async fn get_market_layers(
         &self,
         req: crate::proto::polychart::v1::GetMarketLayersRequest,
-    ) -> crate::errors::Result<crate::proto::polychart::v1::GetMarketLayersResponse> {
+    ) -> crate::errors::Result<crate::models::ApiData> {
+        use crate::codecs::decode::api_data_from_proto;
         let client = self.connect_client();
-        signed_unary!(
-            self,
-            "/polychart.v1.PolychartService/GetMarketLayers",
-            req,
-            |req, opts| client.get_market_layers_with_options(req, opts)
-        )
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/polychart.v1.PolychartService/GetMarketLayers",
+                req,
+                |req, opts| client.get_market_layers_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        Ok(api_data_from_proto(&resp))
     }
 }

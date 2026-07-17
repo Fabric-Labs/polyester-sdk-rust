@@ -5,6 +5,7 @@ use rust_decimal::Decimal;
 use std::str::FromStr;
 
 pub const PRICE_TICK_SCALE: u32 = 6;
+pub const LEDGER_SCALE: u32 = 18;
 pub const INT64_MAX: i128 = i64::MAX as i128;
 pub const INT64_MIN: i128 = i64::MIN as i128;
 pub const UINT64_MAX: u128 = u64::MAX as u128;
