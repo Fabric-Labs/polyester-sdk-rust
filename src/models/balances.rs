@@ -7,9 +7,9 @@ pub struct AssetBalance {
     pub funding: String,
     pub reserved: String,
     pub available: String,
-    pub trading_version: u64,
-    pub funding_version: u64,
-    pub reserved_version: u64,
+    pub trading_updated_at_ns: u64,
+    pub funding_updated_at_ns: u64,
+    pub reserved_updated_at_ns: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

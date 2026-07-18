@@ -1,20 +1,22 @@
 //! Sub-account models (Go `models/sub_accounts.go` thin parity).
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+use buffa_types::google::protobuf::Timestamp;
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct SubAccount {
     pub subaccount_id: String,
     pub label: String,
     pub smart_account_address: String,
     pub status: String,
-    pub updated_at_ms: i64,
+    pub updated_at: Option<Timestamp>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SubAccountsList {
     pub subaccounts: Vec<SubAccount>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct GetSubaccountResult {
     pub subaccount: Option<SubAccount>,
 }
