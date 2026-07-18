@@ -8,8 +8,8 @@ use crate::models::{
 };
 use crate::proto::triggers::v1::{
     CancelTriggerResponse, CreateTriggerResponse, GetTriggerResponse, ListTriggerEventsResponse,
-    ListTriggersResponse, PauseTriggerResponse, ResumeTriggerResponse, Trigger as ProtoTrigger,
-    TriggerEvent as ProtoTriggerEvent, TriggerStatus,
+    ListTriggersResponse, ModifyTriggerResponse, PauseTriggerResponse, ResumeTriggerResponse,
+    Trigger as ProtoTrigger, TriggerEvent as ProtoTriggerEvent, TriggerStatus,
 };
 use buffa::Enumeration;
 
@@ -108,6 +108,10 @@ pub fn trigger_mutation_from_pause(msg: &PauseTriggerResponse) -> TriggerMutatio
 }
 
 pub fn trigger_mutation_from_resume(msg: &ResumeTriggerResponse) -> TriggerMutationResult {
+    trigger_mutation(msg.trigger_id, msg.status)
+}
+
+pub fn trigger_mutation_from_modify(msg: &ModifyTriggerResponse) -> TriggerMutationResult {
     trigger_mutation(msg.trigger_id, msg.status)
 }
 

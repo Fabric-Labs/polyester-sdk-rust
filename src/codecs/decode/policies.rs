@@ -3,10 +3,12 @@
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{ApiPoliciesList, ApiPolicy, SubaccountPoliciesList, SubaccountPolicy};
 use crate::proto::auth::v1::{
-    ApiPolicyView, ListApiPoliciesResponse, ListSubaccountPoliciesResponse, SubaccountPolicyView,
+    ApiPolicyView, CreateApiPolicyResponse, CreateSubaccountPolicyResponse, GetApiPolicyResponse,
+    GetSubaccountPolicyResponse, ListApiPoliciesResponse, ListSubaccountPoliciesResponse,
+    SubaccountPolicyView, UpdateApiPolicyResponse, UpdateSubaccountPolicyResponse,
 };
 
-fn subaccount_policy_from_proto(msg: &SubaccountPolicyView) -> SubaccountPolicy {
+pub fn subaccount_policy_from_proto(msg: &SubaccountPolicyView) -> SubaccountPolicy {
     SubaccountPolicy {
         policy_id: format_uint64_id(msg.id),
         name: msg.name.clone(),
@@ -26,7 +28,25 @@ pub fn subaccount_policies_list_from_proto(
     }
 }
 
-fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
+pub fn get_subaccount_policy_from_proto(
+    msg: &GetSubaccountPolicyResponse,
+) -> Option<SubaccountPolicy> {
+    msg.policy.as_option().map(subaccount_policy_from_proto)
+}
+
+pub fn create_subaccount_policy_from_proto(
+    msg: &CreateSubaccountPolicyResponse,
+) -> Option<SubaccountPolicy> {
+    msg.policy.as_option().map(subaccount_policy_from_proto)
+}
+
+pub fn update_subaccount_policy_from_proto(
+    msg: &UpdateSubaccountPolicyResponse,
+) -> Option<SubaccountPolicy> {
+    msg.policy.as_option().map(subaccount_policy_from_proto)
+}
+
+pub fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
     ApiPolicy {
         policy_id: format_uint64_id(msg.id),
         name: msg.name.clone(),
@@ -38,6 +58,18 @@ pub fn api_policies_list_from_proto(msg: &ListApiPoliciesResponse) -> ApiPolicie
     ApiPoliciesList {
         policies: msg.policies.iter().map(api_policy_from_proto).collect(),
     }
+}
+
+pub fn get_api_policy_from_proto(msg: &GetApiPolicyResponse) -> Option<ApiPolicy> {
+    msg.policy.as_option().map(api_policy_from_proto)
+}
+
+pub fn create_api_policy_from_proto(msg: &CreateApiPolicyResponse) -> Option<ApiPolicy> {
+    msg.policy.as_option().map(api_policy_from_proto)
+}
+
+pub fn update_api_policy_from_proto(msg: &UpdateApiPolicyResponse) -> Option<ApiPolicy> {
+    msg.policy.as_option().map(api_policy_from_proto)
 }
 
 #[cfg(test)]

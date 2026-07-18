@@ -1,10 +1,15 @@
 //! Zipper deposit/withdraw config decoder.
 
+use crate::codecs::scalars::format_ledger_u64;
 use crate::models::{
-    DepositWithdrawConfig, ZipperAssetChainVariant, ZipperAssetConfig, ZipperChainConfig,
-    ZipperChainContractConfig, ZipperTokenConfig,
+    DepositWithdrawConfig, ZippedAssetSupplyBatch, ZippedAssetSupplyUpdate,
+    ZipperAssetChainVariant, ZipperAssetConfig, ZipperChainConfig, ZipperChainContractConfig,
+    ZipperTokenConfig,
 };
-use crate::proto::chain::zipper::v1::GetDepositWithdrawConfigResponse;
+use crate::proto::chain::zipper::v1::{
+    GetDepositWithdrawConfigResponse, ZippedAssetSupplyBatch as ProtoZippedAssetSupplyBatch,
+    ZippedAssetSupplyUpdate as ProtoZippedAssetSupplyUpdate,
+};
 
 pub fn deposit_withdraw_config_from_proto(
     msg: &GetDepositWithdrawConfigResponse,
@@ -73,6 +78,30 @@ pub fn deposit_withdraw_config_from_proto(
                 description: c.description.clone(),
                 version: c.version,
             })
+            .collect(),
+    }
+}
+
+pub fn zipped_asset_supply_update_from_proto(
+    msg: &ProtoZippedAssetSupplyUpdate,
+    scale_fn: impl Fn(u32) -> u32,
+) -> ZippedAssetSupplyUpdate {
+    let scale = scale_fn(msg.zipped_asset_id);
+    ZippedAssetSupplyUpdate {
+        zipped_asset_id: msg.zipped_asset_id,
+        supply: format_ledger_u64(msg.supply_q, scale),
+    }
+}
+
+pub fn zipped_asset_supply_batch_from_proto(
+    msg: &ProtoZippedAssetSupplyBatch,
+    scale_fn: impl Fn(u32) -> u32,
+) -> ZippedAssetSupplyBatch {
+    ZippedAssetSupplyBatch {
+        updates: msg
+            .updates
+            .iter()
+            .map(|u| zipped_asset_supply_update_from_proto(u, &scale_fn))
             .collect(),
     }
 }

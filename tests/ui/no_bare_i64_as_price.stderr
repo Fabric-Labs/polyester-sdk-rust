@@ -1,0 +1,7 @@
+error[E0308]: mismatched types
+ --> tests/ui/no_bare_i64_as_price.rs:5:20
+  |
+5 |     let _: Price = 1_500_000;
+  |            -----   ^^^^^^^^^ expected `Price`, found integer
+  |            |
+  |            expected due to this

@@ -1,7 +1,7 @@
 //! Offline integration checks for the public money surface (no live API).
 
 use polyester::Error;
-use polyester::types::{Price, Quantity, QuantityDomain};
+use polyester::types::{AssetAmount, Price, Quantity, QuantityDomain, resolve_asset_amount_scaled};
 
 #[test]
 fn price_quantity_dual_constructors() {
@@ -34,4 +34,19 @@ fn money_symbol_mismatch() {
     let p = Price::from_ticks(1, Some("BTC-USDT".into())).unwrap();
     assert!(p.compatible_with(Some("ETH-USDT")).is_err());
     assert!(p.compatible_with(Some("BTC-USDT")).is_ok());
+}
+
+#[test]
+fn asset_amount_dual_constructors_and_domain_safety() {
+    let decimal =
+        AssetAmount::from_decimal_str("0.5", 18, QuantityDomain::LedgerE18, Some(7)).unwrap();
+    let scaled = AssetAmount::from_scaled(
+        500_000_000_000_000_000,
+        Some(18),
+        QuantityDomain::LedgerE18,
+        Some(7),
+    )
+    .unwrap();
+    assert_eq!(decimal.as_scaled(), scaled.as_scaled());
+    assert!(resolve_asset_amount_scaled(&decimal, 18, QuantityDomain::Asset, Some(7)).is_err());
 }

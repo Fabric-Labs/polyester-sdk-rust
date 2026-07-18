@@ -1,20 +1,27 @@
 //! Service wrappers over generated Connect clients.
 
+mod api_keys;
 mod auth;
 mod balances;
 mod deposit_withdraw;
 mod market_data;
 mod orders;
+mod profile;
 mod scope;
 mod thin;
 mod triggers;
 mod unary;
 
+pub use api_keys::{ApiKeysService, UpdateApiKeyParams};
 pub use auth::AuthService;
 pub use balances::BalancesService;
 pub use deposit_withdraw::{DepositService, WithdrawService, ZipperService};
-pub use market_data::{MarketDataService, MarketOverviewService, OrderbookService};
+pub use market_data::{
+    CreateSubscriptionOptions, ListMarketOverviewOptions, MarketDataService,
+    MarketOverviewCreateSubscriptionOptions, MarketOverviewService, OrderbookService,
+};
 pub use orders::{OrdersService, TradesService};
+pub use profile::ProfileService;
 pub use thin::*;
 pub use triggers::TriggersService;
 

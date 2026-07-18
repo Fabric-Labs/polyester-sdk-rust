@@ -1,5 +1,10 @@
 //! Spot / zipper catalog cache for scale lookups.
+//!
+//! Zipper live supply is stored in [`Manager::zipped_asset_supply`] (keyed by
+//! `zipped_asset_id`). Full enriched zipper config rows are not mutated; use
+//! [`Manager::patch_zipper_supply`] from `subscribe_zipped_asset_supply(true)`.
 
+use crate::models::ZippedAssetSupplyUpdate;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -20,6 +25,8 @@ struct Inner {
     asset_to_ledger_id: HashMap<String, u32>,
     asset_to_qty_scale: HashMap<String, u32>,
     zipped_id_to_scale: HashMap<u32, u32>,
+    /// Live supply strings by `zipped_asset_id` (updated via [`Manager::patch_zipper_supply`]).
+    zipped_id_to_supply: HashMap<u32, String>,
     orderbook_buckets: HashMap<String, Vec<String>>,
     spot_config: Option<Value>,
     zipper_config: Option<Value>,
@@ -158,6 +165,39 @@ impl Manager {
             .get(symbol)
             .copied()
     }
+
+    /// Latest supply string for a zipped asset id, if patched from realtime updates.
+    pub fn supply_for_zipped_asset_id(&self, id: u32) -> Option<String> {
+        self.inner
+            .read()
+            .ok()?
+            .zipped_id_to_supply
+            .get(&id)
+            .cloned()
+    }
+
+    /// Apply supply updates to the in-memory `zipped_asset_id -> supply` map.
+    ///
+    /// Returns `true` when at least one entry changed. Unlike Go/Python, Rust
+    /// catalogs do not store full enriched zipper chain rows with a `supply`
+    /// field; this map is the live-supply source of truth.
+    pub fn patch_zipper_supply(&self, updates: &[ZippedAssetSupplyUpdate]) -> bool {
+        if updates.is_empty() {
+            return false;
+        }
+        let mut inner = self.inner.write().expect("catalog lock");
+        let mut changed = false;
+        for update in updates {
+            let prev = inner.zipped_id_to_supply.get(&update.zipped_asset_id);
+            if prev.map(String::as_str) != Some(update.supply.as_str()) {
+                inner
+                    .zipped_id_to_supply
+                    .insert(update.zipped_asset_id, update.supply.clone());
+                changed = true;
+            }
+        }
+        changed
+    }
 }
 
 #[cfg(test)]
@@ -206,5 +246,24 @@ mod tests {
             mgr.base_quantity_scale_for_symbol("NOPE"),
             DEFAULT_BASE_QTY_SCALE
         );
+    }
+
+    #[test]
+    fn patch_zipper_supply_updates_map() {
+        let mgr = Manager::new();
+        assert!(mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
+            zipped_asset_id: 42,
+            supply: "100.5".to_owned(),
+        }]));
+        assert_eq!(mgr.supply_for_zipped_asset_id(42).as_deref(), Some("100.5"));
+        assert!(!mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
+            zipped_asset_id: 42,
+            supply: "100.5".to_owned(),
+        }]));
+        assert!(mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
+            zipped_asset_id: 42,
+            supply: "200".to_owned(),
+        }]));
+        assert_eq!(mgr.supply_for_zipped_asset_id(42).as_deref(), Some("200"));
     }
 }

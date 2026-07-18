@@ -65,6 +65,7 @@ tokio-tungstenite = { version = "0.26", optional = true, features = ["rustls-tls
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }
 dotenvy = "0.15"
+trybuild = "1.0"
 
 [package.metadata.docs.rs]
 all-features = true

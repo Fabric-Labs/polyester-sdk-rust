@@ -1,12 +1,31 @@
-use crate::support::{call_optional, call_required, require_live_client, smoke_symbol};
+use crate::support::{
+    call_optional, call_required, is_internal_order_error, require_live_client, smoke_symbol,
+};
+use polyester::Result;
+
+async fn soft_list_rpc<T, F, Fut>(label: &str, f: F) -> Option<T>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<T>>,
+{
+    match f().await {
+        Ok(v) => Some(v),
+        Err(err) if is_internal_order_error(&err) => {
+            // Known backend NULL-scan / internal failure on some environments.
+            eprintln!("skip: {label} backend unavailable: {err}");
+            None
+        }
+        Err(err) => call_optional(label, || async { Err(err) }).await,
+    }
+}
 
 #[tokio::test]
 async fn orders_list_open_and_history() {
     let Some(client) = require_live_client() else {
         return;
     };
-    let _ = call_optional("orders.list_open", || client.orders.list_open(None)).await;
-    let _ = call_optional("orders.list_history", || {
+    let _ = soft_list_rpc("orders.list_open", || client.orders.list_open(None)).await;
+    let _ = soft_list_rpc("orders.list_history", || {
         client.orders.list_history(None, Some(10))
     })
     .await;

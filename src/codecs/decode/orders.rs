@@ -6,13 +6,16 @@ use super::enums::{
 use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
-    CancelAllOrdersResult, GetOrderResult, ModifyOrderResult, Order, OrderMutationResult,
-    OrdersList, UserTrade, UserTradesList,
+    BatchCancelOrdersResult, BatchCancelResultItem, BatchCreateOrdersResult, BatchCreateResultItem,
+    BatchModifyOrdersResult, BatchModifyResultItem, CancelAllAfterResult, CancelAllOrdersResult,
+    GetOrderResult, ModifyOrderResult, Order, OrderMutationResult, OrdersList, UserTrade,
+    UserTradesList,
 };
 use crate::proto::orders::v1::{
-    CancelAllOrdersResponse, CancelOrderResponse, CreateOrderResponse, GetOpenOrdersResponse,
-    GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse,
-    Order as ProtoOrder, UserTrade as ProtoUserTrade,
+    BatchCancelOrdersResponse, BatchCreateOrdersResponse, BatchModifyOrdersResponse,
+    CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse, CreateOrderResponse,
+    GetOpenOrdersResponse, GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse,
+    ModifyOrderResponse, Order as ProtoOrder, UserTrade as ProtoUserTrade,
 };
 
 pub fn order_from_proto(msg: &ProtoOrder) -> Order {
@@ -149,6 +152,70 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> CancelAllOrdersRe
     }
 }
 
+pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> BatchCreateOrdersResult {
+    BatchCreateOrdersResult {
+        results: msg
+            .results
+            .iter()
+            .map(|item| BatchCreateResultItem {
+                status: item.status.clone(),
+                order_id: format_uint64_id(item.order_id),
+                client_order_id: item.client_order_id.clone(),
+                code: item.code.clone(),
+            })
+            .collect(),
+        accepted_count: msg.accepted_count as i32,
+        rejected_count: msg.rejected_count as i32,
+    }
+}
+
+pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> BatchCancelOrdersResult {
+    BatchCancelOrdersResult {
+        results: msg
+            .results
+            .iter()
+            .map(|item| BatchCancelResultItem {
+                status: item.status.clone(),
+                order_id: format_uint64_id(item.order_id),
+                client_order_id: item.client_order_id.clone(),
+                code: item.code.clone(),
+            })
+            .collect(),
+        accepted_count: msg.accepted_count as i32,
+        rejected_count: msg.rejected_count as i32,
+    }
+}
+
+pub fn batch_modify_from_proto(msg: &BatchModifyOrdersResponse) -> BatchModifyOrdersResult {
+    BatchModifyOrdersResult {
+        results: msg
+            .results
+            .iter()
+            .map(|item| BatchModifyResultItem {
+                status: item.status.clone(),
+                client_order_id: item.client_order_id.clone(),
+                final_order_id: format_uint64_id(item.final_order_id),
+                code: item.code.clone(),
+            })
+            .collect(),
+        amended_count: msg.amended_count as i32,
+        replaced_count: msg.replaced_count as i32,
+        rejected_count: msg.rejected_count as i32,
+    }
+}
+
+pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> CancelAllAfterResult {
+    CancelAllAfterResult {
+        status: msg.status.clone(),
+        effective_timeout_sec: msg.effective_timeout_sec as i32,
+        expires_at_ts_ns: if msg.expires_at_ts_ns == 0 {
+            String::new()
+        } else {
+            msg.expires_at_ts_ns.to_string()
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,5 +331,24 @@ mod tests {
         assert_eq!(cancelled.status, "cancelled");
         assert_eq!(cancelled.order_id, format_uint64_id(42));
         assert!(cancelled.client_order_id.is_empty());
+    }
+
+    #[test]
+    fn batch_create_from_proto_maps_counts() {
+        use crate::proto::orders::v1::BatchCreateResultItem as ProtoItem;
+        let msg = BatchCreateOrdersResponse {
+            results: vec![ProtoItem {
+                status: "accepted".into(),
+                order_id: 9,
+                client_order_id: "c1".into(),
+                ..Default::default()
+            }],
+            accepted_count: 1,
+            rejected_count: 0,
+            ..Default::default()
+        };
+        let result = batch_create_from_proto(&msg);
+        assert_eq!(result.accepted_count, 1);
+        assert_eq!(result.results[0].order_id, format_uint64_id(9));
     }
 }

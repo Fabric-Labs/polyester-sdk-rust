@@ -11,12 +11,20 @@ async fn spot_config_has_pairs() {
         client.market_data.get_spot_config()
     })
     .await;
-    assert!(!cfg.pairs.is_empty(), "expected spot pairs");
-    for pair in &cfg.pairs {
-        assert!(
-            !pair.symbol.trim().is_empty(),
-            "pair missing symbol: {pair:?}"
-        );
+    let pairs = cfg
+        .raw
+        .get("pairs")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(!pairs.is_empty(), "expected spot pairs");
+    for pair in &pairs {
+        let symbol = pair
+            .get("symbol")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
+        assert!(!symbol.is_empty(), "pair missing symbol: {pair:?}");
     }
 }
 

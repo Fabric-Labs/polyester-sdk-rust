@@ -1,11 +1,19 @@
 //! Public market-data decoders (trades / candles).
 
+use super::common::api_data_from_proto;
 use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::{format_price_ticks, format_qty_scaled};
-use crate::models::{Candle, CandlesResult, MarketTrade, MarketTradesResult};
+use crate::models::{Candle, CandlesResult, MarketTrade, MarketTradesResult, SpotConfig};
 use crate::proto::marketdata::v1::{
-    CandlePoint, GetCandlesResponse, GetTradesResponse, MarketTrade as ProtoMarketTrade, Timeframe,
+    CandlePoint, GetCandlesColumnsResponse, GetCandlesResponse, GetSpotConfigResponse,
+    GetTradesResponse, MarketTrade as ProtoMarketTrade, Timeframe,
 };
+
+pub fn spot_config_from_proto(msg: &GetSpotConfigResponse) -> SpotConfig {
+    SpotConfig {
+        raw: api_data_from_proto(msg).raw,
+    }
+}
 
 pub fn timeframe_label(tf: Timeframe) -> &'static str {
     match tf {
@@ -96,6 +104,59 @@ pub fn candles_from_proto(msg: &GetCandlesResponse, volume_scale: u32) -> Candle
             .iter()
             .map(|c| candle_point_from_proto(c, volume_scale, symbol_id, &timeframe))
             .collect(),
+        next_page_token: msg.next_page_token.clone(),
+    }
+}
+
+/// Decode columnar OHLCV into row-oriented [`CandlesResult`] (Go `CandlesColumnsFromProto`).
+pub fn candles_columns_from_proto(
+    msg: &GetCandlesColumnsResponse,
+    volume_scale: u32,
+) -> CandlesResult {
+    let timeframe = enum_value_timeframe(msg.timeframe);
+    let symbol_id = msg.symbol_id;
+    let mut candles = Vec::with_capacity(msg.ts_sec.len());
+    for (i, &ts) in msg.ts_sec.iter().enumerate() {
+        candles.push(Candle {
+            ts_sec: ts as i64,
+            open: msg
+                .open
+                .get(i)
+                .copied()
+                .map(format_price_ticks)
+                .unwrap_or_default(),
+            high: msg
+                .high
+                .get(i)
+                .copied()
+                .map(format_price_ticks)
+                .unwrap_or_default(),
+            low: msg
+                .low
+                .get(i)
+                .copied()
+                .map(format_price_ticks)
+                .unwrap_or_default(),
+            close: msg
+                .close
+                .get(i)
+                .copied()
+                .map(format_price_ticks)
+                .unwrap_or_default(),
+            volume: msg
+                .volume
+                .get(i)
+                .copied()
+                .map(|v| format_qty_scaled(v, volume_scale))
+                .unwrap_or_default(),
+            symbol_id,
+            timeframe: timeframe.clone(),
+        });
+    }
+    CandlesResult {
+        symbol_id,
+        timeframe,
+        candles,
         next_page_token: msg.next_page_token.clone(),
     }
 }

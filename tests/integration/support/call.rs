@@ -75,12 +75,20 @@ pub fn devnet_unavailable(err: &Error) -> bool {
 
 pub fn is_internal_order_error(err: &Error) -> bool {
     match err {
-        Error::Server(msg) => msg.to_ascii_lowercase().contains("internal error"),
+        // Connect maps ErrorCode::Internal → Error::Server with messages like
+        // "internal: can't scan into dest[N] ... cannot scan NULL into *int64".
+        Error::Server(msg) => {
+            let m = msg.to_ascii_lowercase();
+            m.contains("internal") || m.contains("can't scan") || m.contains("cannot scan")
+        }
         Error::Api { code, message, .. } => {
             let c = code.to_ascii_uppercase();
+            let m = message.to_ascii_lowercase();
             c == "INTERNAL"
                 || c == "INTERNAL_ERROR"
-                || message.to_ascii_lowercase().contains("internal error")
+                || m.contains("internal error")
+                || m.contains("can't scan")
+                || m.contains("cannot scan")
         }
         _ => false,
     }

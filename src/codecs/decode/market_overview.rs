@@ -3,7 +3,7 @@
 use super::money::decode_price_ticks;
 use crate::models::{MarketOverviewEntry, MarketOverviewList};
 use crate::proto::marketoverview::v1::{
-    ListMarketOverviewResponse, MarketOverview as ProtoMarketOverview,
+    ListMarketOverviewResponse, MarketOverview as ProtoMarketOverview, MarketOverviewBatch,
 };
 
 pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> MarketOverviewEntry {
@@ -22,6 +22,17 @@ pub fn market_overview_list_from_proto(msg: &ListMarketOverviewResponse) -> Mark
             .map(market_overview_entry_from_proto)
             .collect(),
         next_page_token: msg.next_page_token.clone(),
+    }
+}
+
+pub fn market_overview_batch_from_proto(msg: &MarketOverviewBatch) -> MarketOverviewList {
+    MarketOverviewList {
+        markets: msg
+            .markets
+            .iter()
+            .map(market_overview_entry_from_proto)
+            .collect(),
+        next_page_token: String::new(),
     }
 }
 

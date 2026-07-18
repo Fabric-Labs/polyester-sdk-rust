@@ -4,10 +4,9 @@ use crate::support::{
     require_trading_quote_balance, scaled_quantity_string, smoke_symbol, trading_balance_raw,
     unique_client_order_id,
 };
+use polyester::models::CreateInternalTransferParams;
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
-use polyester::proto::polyester::r#type::v1::U128;
-use polyester::proto::transfer::v1::CreateInternalTransferRequest;
-use polyester::proto::transfer::v1::create_internal_transfer_request::Destination;
+use polyester::types::{AssetAmount, QuantityDomain};
 
 #[tokio::test]
 async fn internal_transfer_tiny() {
@@ -21,14 +20,10 @@ async fn internal_transfer_tiny() {
         eprintln!("skip: Set POLYESTER_TEST_INTERNAL_TRANSFER_DEST for internal transfer e2e");
         return;
     };
-    let dest_account_id =
-        match polyester::codecs::scalars::id_to_u64(&dest, "destination_account_id") {
-            Ok(id) => id,
-            Err(err) => {
-                eprintln!("skip: invalid POLYESTER_TEST_INTERNAL_TRANSFER_DEST: {err}");
-                return;
-            }
-        };
+    if let Err(err) = polyester::codecs::scalars::id_to_u64(&dest, "destination_account_id") {
+        eprintln!("skip: invalid POLYESTER_TEST_INTERNAL_TRANSFER_DEST: {err}");
+        return;
+    }
 
     let spot = match hydrate_spot_and_zipper(&client).await {
         Ok(s) => s,
@@ -56,42 +51,25 @@ async fn internal_transfer_tiny() {
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "1".to_owned());
-    // Prefer asset quantity_scale when known; fall back to ledger 18 for balance compare.
-    let asset_scale = zipper
-        .as_ref()
-        .and_then(|z| {
-            z.assets
-                .iter()
-                .find(|a| a.ledger_id == asset_id)
-                .map(|a| a.quantity_scale)
-        })
-        .filter(|s| *s > 0)
-        .unwrap_or(LEDGER_SCALE);
 
-    let qty_scaled: u128 = match scaled_quantity_string(&quantity, asset_scale) {
-        Ok(s) => match s.parse() {
-            Ok(v) => v,
-            Err(_) => {
-                eprintln!("skip: cannot parse scaled qty");
-                return;
-            }
-        },
+    let amount = match AssetAmount::from_decimal_str(
+        &quantity,
+        LEDGER_SCALE,
+        QuantityDomain::LedgerE18,
+        Some(asset_id),
+    ) {
+        Ok(a) => a,
         Err(err) => {
-            eprintln!("skip: scale qty: {err}");
+            eprintln!("skip: amount: {err}");
             return;
         }
     };
-    if qty_scaled == 0 {
-        eprintln!("skip: invalid qty_scaled");
-        return;
-    }
 
     let before = call_required("balances.list", || {
         client.balances.list(GetBalancesRequest::default())
     })
     .await;
     let trading_before = trading_balance_raw(&before.balances, asset_id);
-    // Rough compare: if human balance below min, already gated; also check scaled.
     let qty_raw_ledger = match scaled_quantity_string(&quantity, LEDGER_SCALE) {
         Ok(s) => s.parse::<u128>().unwrap_or(0),
         Err(_) => 0,
@@ -104,21 +82,18 @@ async fn internal_transfer_tiny() {
     }
     let _ = min_trading_quote();
 
-    let idempotency_key = unique_client_order_id("e2e-xfer");
-    // Prefer signed helper; connect_client remains available for escape hatches.
     let _ = client.internal_transfers.connect_client();
-    let mut req = CreateInternalTransferRequest {
+    let params = CreateInternalTransferParams {
         asset_id,
-        idempotency_key,
-        destination: Some(Destination::DestinationAccountId(dest_account_id)),
-        ..Default::default()
+        quantity: amount,
+        idempotency_key: unique_client_order_id("e2e-xfer"),
+        subaccount_id: None,
+        destination_account_id: Some(dest),
+        destination_subaccount_id: None,
+        destination_smart_account_address: None,
+        quantity_scale: Some(LEDGER_SCALE),
     };
-    *req.amount_e18.get_or_insert_default() = U128 {
-        hi: (qty_scaled >> 64) as u64,
-        lo: qty_scaled as u64,
-        ..Default::default()
-    };
-    let result = match client.internal_transfers.create(req).await {
+    let result = match client.internal_transfers.create(params).await {
         Ok(r) => r,
         Err(err) if devnet_unavailable(&err) => {
             eprintln!("skip: devnet internal transfer unavailable: {err}");

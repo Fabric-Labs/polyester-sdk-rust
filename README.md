@@ -94,6 +94,24 @@ Public order/trigger write paths take **`Price` / `Quantity` wrappers only**:
 - **Reject bare integers** on public order APIs — use the named constructors.
 - **Reject excess fractional digits** on decimal→scaled conversion (no silent floor).
 - Price ticks are fixed **1e6**; qty scale comes from pair `base_quantity_scale` (catalog).
+- Transfer/withdraw amounts use the separate **`AssetAmount`** type, so order
+  quantities cannot be passed as ledger amounts.
+
+## Catalog readiness
+
+`Config::hydrate_catalogs` defaults to `true`. When constructed inside a Tokio
+runtime, the client starts best-effort spot and zipper catalog hydration in the
+background. Await readiness before decimal writes that depend on catalog scales:
+
+```rust,no_run
+let client = polyester::Client::from_env()?;
+client.wait_for_catalogs().await?;
+```
+
+If a client is constructed before entering a Tokio runtime,
+`wait_for_catalogs()` starts hydration on the current runtime. Scaled bot inputs
+(`Price::from_ticks`, `Quantity::from_scaled`, `AssetAmount::from_scaled`) do not
+need catalog lookup solely to scale the value.
 
 ## Layout
 

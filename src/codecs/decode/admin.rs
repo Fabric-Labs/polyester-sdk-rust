@@ -3,8 +3,8 @@
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{ApiKeySummary, ApiKeysList, ResolvedAccount, ResolvedAccountsList};
 use crate::proto::auth::v1::{
-    ApiKey as ProtoApiKey, ListApiKeysResponse, ResolveAccountResponse,
-    ResolvedAccount as ProtoResolvedAccount,
+    ApiKey as ProtoApiKey, CreateApiKeyResponse, GetApiKeyResponse, ListApiKeysResponse,
+    ResolveAccountResponse, ResolvedAccount as ProtoResolvedAccount, UpdateApiKeyResponse,
 };
 use buffa::Enumeration;
 
@@ -35,6 +35,18 @@ pub fn api_keys_list_from_proto(msg: &ListApiKeysResponse) -> ApiKeysList {
     ApiKeysList {
         keys: msg.api_keys.iter().map(api_key_from_proto).collect(),
     }
+}
+
+pub fn api_key_from_get_proto(msg: &GetApiKeyResponse) -> Option<ApiKeySummary> {
+    msg.api_key.as_option().map(api_key_from_proto)
+}
+
+pub fn api_key_from_create_proto(msg: &CreateApiKeyResponse) -> Option<ApiKeySummary> {
+    msg.api_key.as_option().map(api_key_from_proto)
+}
+
+pub fn api_key_from_update_proto(msg: &UpdateApiKeyResponse) -> Option<ApiKeySummary> {
+    msg.api_key.as_option().map(api_key_from_proto)
 }
 
 pub fn resolved_account_from_proto(msg: &ProtoResolvedAccount) -> ResolvedAccount {

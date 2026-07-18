@@ -1,6 +1,6 @@
 //! Lifecycle flow models (Go `models/trading.go` lifecycle parity).
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct LifecycleFlowSummary {
     pub intent_id: String,
     pub flow_kind: String,

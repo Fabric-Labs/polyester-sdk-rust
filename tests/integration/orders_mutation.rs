@@ -64,6 +64,7 @@ async fn order_round_trip_mutation() {
         subaccount_id: None,
         post_only: Some(true),
         market_client_ref_price: None,
+        attached_risk: None,
     };
     let _ = &mut params;
 
