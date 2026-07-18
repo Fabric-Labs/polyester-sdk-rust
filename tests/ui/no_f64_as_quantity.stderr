@@ -1,0 +1,7 @@
+error[E0308]: mismatched types
+ --> tests/ui/no_f64_as_quantity.rs:5:23
+  |
+5 |     let _: Quantity = 0.01_f64;
+  |            --------   ^^^^^^^^ expected `Quantity`, found `f64`
+  |            |
+  |            expected due to this
