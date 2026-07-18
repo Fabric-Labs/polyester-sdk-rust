@@ -8,13 +8,6 @@ use crate::proto::auth::v1::{
 };
 use buffa::Enumeration;
 
-fn timestamp_ms(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> i64 {
-    match ts {
-        Some(t) => t.seconds.saturating_mul(1000) + (t.nanos as i64) / 1_000_000,
-        None => 0,
-    }
-}
-
 pub fn api_key_from_proto(msg: &ProtoApiKey) -> ApiKeySummary {
     let status = msg
         .status
@@ -26,8 +19,9 @@ pub fn api_key_from_proto(msg: &ProtoApiKey) -> ApiKeySummary {
         label: msg.label.clone(),
         status,
         public_key_ed25519: hex::encode(&msg.public_key_ed25519),
-        // Proto has created_at (no updated_at); surface create time as updated_at_ms for Go parity.
-        updated_at_ms: timestamp_ms(msg.created_at.as_option()),
+        created_at: msg.created_at.as_option().cloned(),
+        last_used_at: msg.last_used_at.as_option().cloned(),
+        updated_at: msg.updated_at.as_option().cloned(),
     }
 }
 
@@ -76,6 +70,7 @@ pub fn resolved_accounts_from_proto(msg: &ResolveAccountResponse) -> ResolvedAcc
 mod tests {
     use super::*;
     use crate::proto::auth::v1::ApiKeyStatus;
+    use buffa_types::google::protobuf::Timestamp;
 
     #[test]
     fn api_keys_list_maps_status() {
@@ -84,6 +79,22 @@ mod tests {
                 key_id: "key-1".into(),
                 label: "bot".into(),
                 status: ApiKeyStatus::Active.into(),
+                created_at: Timestamp {
+                    seconds: 1,
+                    ..Default::default()
+                }
+                .into(),
+                last_used_at: Timestamp {
+                    seconds: 2,
+                    ..Default::default()
+                }
+                .into(),
+                updated_at: Timestamp {
+                    seconds: 3,
+                    nanos: 123_456_000,
+                    ..Default::default()
+                }
+                .into(),
                 ..Default::default()
             }],
             ..Default::default()
@@ -92,6 +103,12 @@ mod tests {
         assert_eq!(result.keys.len(), 1);
         assert_eq!(result.keys[0].key_id, "key-1");
         assert_eq!(result.keys[0].status, "ACTIVE");
+        assert_eq!(result.keys[0].created_at.as_ref().unwrap().seconds, 1);
+        assert_eq!(result.keys[0].last_used_at.as_ref().unwrap().seconds, 2);
+        assert_eq!(
+            result.keys[0].updated_at.as_ref().unwrap().nanos,
+            123_456_000
+        );
     }
 
     #[test]

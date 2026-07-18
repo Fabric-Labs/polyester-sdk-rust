@@ -43,7 +43,7 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Order {
         } else {
             msg.created_ts_ns.to_string()
         },
-        state_revision: msg.state_revision,
+        version: msg.version,
     }
 }
 
@@ -250,9 +250,9 @@ mod tests {
         assert_eq!(order.tif, "gtc");
         assert_eq!(order.orig_qty.as_ref().unwrap().as_scaled(), 100);
         let mut msg2 = msg;
-        msg2.state_revision = 7;
+        msg2.version = 7;
         let order2 = order_from_proto(&msg2);
-        assert_eq!(order2.state_revision, 7);
+        assert_eq!(order2.version, 7);
     }
 
     #[test]

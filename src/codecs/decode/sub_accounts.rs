@@ -29,13 +29,20 @@ fn enum_label<T: Enumeration>(value: &buffa::EnumValue<T>) -> String {
         .unwrap_or_default()
 }
 
+fn activity_label<T: Enumeration>(value: &buffa::EnumValue<T>, prefix: &str) -> String {
+    enum_label(value)
+        .strip_prefix(prefix)
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+}
+
 pub fn subaccount_from_proto(msg: &Subaccount) -> SubAccount {
     SubAccount {
         subaccount_id: format_uint64_id(msg.id),
         label: msg.label.clone(),
         smart_account_address: msg.smart_account_address.clone(),
         status: msg.status.clone(),
-        updated_at_ms: timestamp_ms(msg.updated_at.as_option()),
+        updated_at: msg.updated_at.as_option().cloned(),
     }
 }
 
@@ -109,7 +116,11 @@ pub fn subaccount_activity_list_from_proto(
             .events
             .iter()
             .map(|e| SubAccountActivityEvent {
-                event_type: format!("{}:{}", e.entity_kind, e.event_action),
+                event_type: format!(
+                    "{}:{}",
+                    activity_label(&e.entity_kind, "ACTIVITY_ENTITY_"),
+                    activity_label(&e.event_action, "ACTIVITY_ACTION_")
+                ),
                 ts_ms: timestamp_ms(e.created_at.as_option()),
             })
             .collect(),
@@ -120,7 +131,10 @@ pub fn subaccount_activity_list_from_proto(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::auth::v1::{ActivityEvent, SubaccountRole};
+    use crate::proto::auth::v1::{
+        ActivityEntityKind, ActivityEvent, ActivityEventAction, SubaccountRole,
+    };
+    use buffa_types::google::protobuf::Timestamp;
 
     #[test]
     fn subaccounts_list_maps_fields() {
@@ -130,6 +144,12 @@ mod tests {
                 label: "trading".into(),
                 smart_account_address: "0xabc".into(),
                 status: "active".into(),
+                updated_at: Timestamp {
+                    seconds: 3,
+                    nanos: 123_456_000,
+                    ..Default::default()
+                }
+                .into(),
                 ..Default::default()
             }],
             ..Default::default()
@@ -138,6 +158,10 @@ mod tests {
         assert_eq!(result.subaccounts.len(), 1);
         assert_eq!(result.subaccounts[0].subaccount_id, format_uint64_id(12));
         assert_eq!(result.subaccounts[0].smart_account_address, "0xabc");
+        assert_eq!(
+            result.subaccounts[0].updated_at.as_ref().unwrap().nanos,
+            123_456_000
+        );
     }
 
     #[test]
@@ -160,8 +184,8 @@ mod tests {
     fn activity_list_joins_entity_and_action() {
         let msg = ListSubaccountEventsResponse {
             events: vec![ActivityEvent {
-                entity_kind: "invite".into(),
-                event_action: "created".into(),
+                entity_kind: ActivityEntityKind::ACTIVITY_ENTITY_INVITE.into(),
+                event_action: ActivityEventAction::ACTIVITY_ACTION_CREATED.into(),
                 ..Default::default()
             }],
             next_page_token: "n".into(),
