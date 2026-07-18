@@ -1,0 +1,10 @@
+error[E0624]: associated function `new` is private
+ --> tests/ui/no_price_ticks_as_qty_scaled.rs:5:25
+  |
+5 |     let _ = PriceTicks::new(1);
+  |                         ^^^ private associated function
+  |
+ ::: src/types/money.rs
+  |
+  |     pub(crate) const fn new(ticks: i64) -> Self {
+  |     ------------------------------------------- private associated function defined here
