@@ -9,8 +9,6 @@ API-key only — no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
 
-Versioning (independent of Go/Python): see [VERSIONING.md](VERSIONING.md).
-
 ## Install
 
 ```toml

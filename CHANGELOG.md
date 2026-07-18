@@ -4,7 +4,7 @@
 
 ## 0.1.0a2
 
-Package version: `0.1.0-alpha.2`. Git tag: `v0.1.0a2` (see [VERSIONING.md](VERSIONING.md)).
+Package version: `0.1.0-alpha.2`. Git tag: `v0.1.0a2`.
 
 ### Breaking
 - Authoritative freshness (POLY-3564): `Order.state_revision` → `Order.version`; balance `trading_version` / `funding_version` / `reserved_version` → `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`; subaccount and API-key `updated_at` are configuration timestamps; API-key `last_used_at` stays independent activity time
@@ -13,9 +13,6 @@ Package version: `0.1.0-alpha.2`. Git tag: `v0.1.0a2` (see [VERSIONING.md](VERSI
 ### Features
 - Generated reconciliation and policy types exposed in the public SDK surface
 - Internal transfer amounts use U128 wire types end-to-end
-
-### Docs
-- Added [VERSIONING.md](VERSIONING.md): independent per-SDK versions, shared tag format
 
 ## 0.1.0-alpha.1
 
