@@ -17,11 +17,14 @@ pub enum QuantityDomain {
 }
 
 /// Distinct newtype for protocol price ticks (compile-time mix-up prevention).
+///
+/// Construction is crate-private so invalid negative ticks cannot bypass
+/// [`Price::from_ticks`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PriceTicks(i64);
 
 impl PriceTicks {
-    pub const fn new(ticks: i64) -> Self {
+    pub(crate) const fn new(ticks: i64) -> Self {
         Self(ticks)
     }
     pub const fn get(self) -> i64 {
@@ -30,11 +33,14 @@ impl PriceTicks {
 }
 
 /// Distinct newtype for order/trigger qty_scaled.
+///
+/// Construction is crate-private so invalid negative values cannot bypass
+/// [`Quantity::from_scaled`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct QtyScaled(i64);
 
 impl QtyScaled {
-    pub const fn new(scaled: i64) -> Self {
+    pub(crate) const fn new(scaled: i64) -> Self {
         Self(scaled)
     }
     pub const fn get(self) -> i64 {
@@ -45,7 +51,7 @@ impl QtyScaled {
 /// Resolved protocol price units (protobuf `price_ticks`, fixed 1e6).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Price {
-    pub ticks: PriceTicks,
+    ticks: PriceTicks,
     pub symbol: Option<String>,
 }
 
@@ -99,7 +105,7 @@ impl Price {
 /// Resolved order/trigger base quantity (protobuf `qty_scaled`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Quantity {
-    pub scaled: QtyScaled,
+    scaled: QtyScaled,
     pub scale: Option<u32>,
     pub domain: QuantityDomain,
     pub symbol: Option<String>,
@@ -242,21 +248,80 @@ impl AssetAmount {
         })
     }
 
+    pub fn from_decimal_str(
+        raw: &str,
+        scale: u32,
+        domain: QuantityDomain,
+        asset_id: Option<u32>,
+    ) -> Result<Self> {
+        use crate::codecs::scalars::decimal_to_scaled_str;
+        let scaled = decimal_to_scaled_str(raw, scale, "amount")?;
+        Self::from_scaled(scaled, Some(scale), domain, asset_id)
+    }
+
+    pub fn from_decimal(
+        raw: Decimal,
+        scale: u32,
+        domain: QuantityDomain,
+        asset_id: Option<u32>,
+    ) -> Result<Self> {
+        use crate::codecs::scalars::decimal_to_scaled;
+        let scaled = decimal_to_scaled(raw, scale, "amount")?;
+        Self::from_scaled(scaled, Some(scale), domain, asset_id)
+    }
+
     pub fn as_i64(&self) -> Result<i64> {
         if self.scaled > i64::MAX as i128 {
             return Err(Error::validation("amount exceeds int64 range"));
         }
         Ok(self.scaled as i64)
     }
+
+    pub fn as_scaled(&self) -> i128 {
+        self.scaled
+    }
+
+    pub fn compatible_with(
+        &self,
+        domain: QuantityDomain,
+        scale: Option<u32>,
+        asset_id: Option<u32>,
+    ) -> Result<()> {
+        if self.domain != domain {
+            return Err(Error::validation(format!(
+                "amount domain mismatch: value is {:?}, destination is {domain:?}",
+                self.domain
+            )));
+        }
+        if let (Some(a), Some(b)) = (self.scale, scale)
+            && a != b
+        {
+            return Err(Error::validation(format!(
+                "amount scale mismatch: value scale is {a}, destination is {b}"
+            )));
+        }
+        if let (Some(a), Some(b)) = (self.asset_id, asset_id)
+            && a != b
+        {
+            return Err(Error::validation(format!(
+                "amount asset_id mismatch: value is for {a}, destination is {b}"
+            )));
+        }
+        Ok(())
+    }
 }
 
-/// Resolve price for write paths: `Price` or decimal string.
+/// Resolve price for write paths.
 pub fn resolve_price_ticks(value: &Price, symbol: Option<&str>) -> Result<i64> {
     value.compatible_with(symbol)?;
-    Ok(value.as_ticks())
+    let ticks = value.as_ticks();
+    if ticks < 0 {
+        return Err(Error::validation("ticks must be non-negative"));
+    }
+    Ok(ticks)
 }
 
-/// Resolve qty for write paths.
+/// Resolve qty for write paths. Requires a positive scaled value.
 pub fn resolve_qty_scaled(
     value: &Quantity,
     scale: u32,
@@ -264,7 +329,28 @@ pub fn resolve_qty_scaled(
     symbol_id: Option<u32>,
 ) -> Result<i64> {
     value.compatible_with(QuantityDomain::OrderBase, Some(scale), symbol, symbol_id)?;
-    Ok(value.as_scaled())
+    let scaled = value.as_scaled();
+    if scaled <= 0 {
+        return Err(Error::validation("qty must be positive"));
+    }
+    Ok(scaled)
+}
+
+/// Resolve asset/ledger amount for transfer/withdraw write paths.
+pub fn resolve_asset_amount_scaled(
+    value: &AssetAmount,
+    scale: u32,
+    domain: QuantityDomain,
+    asset_id: Option<u32>,
+) -> Result<i128> {
+    value.compatible_with(domain, Some(scale), asset_id)?;
+    if value.scaled <= 0 {
+        return Err(Error::validation("amount must be positive"));
+    }
+    if domain != QuantityDomain::LedgerE18 && value.scaled > crate::codecs::scalars::INT64_MAX {
+        return Err(Error::validation("amount exceeds int64 range"));
+    }
+    Ok(value.scaled)
 }
 
 #[cfg(test)]
@@ -292,6 +378,67 @@ mod tests {
         assert_eq!(
             resolve_qty_scaled(&qty, 8, Some("BTC-USDT"), Some(1)).unwrap(),
             125_000_000
+        );
+    }
+
+    #[test]
+    fn resolve_qty_rejects_zero() {
+        let qty = Quantity::from_scaled(0, Some(8), QuantityDomain::OrderBase, None, None).unwrap();
+        assert!(resolve_qty_scaled(&qty, 8, None, None).is_err());
+    }
+
+    #[test]
+    fn asset_amount_dual_path() {
+        let from_dec =
+            AssetAmount::from_decimal_str("0.5", 18, QuantityDomain::LedgerE18, Some(7)).unwrap();
+        let from_scaled = AssetAmount::from_scaled(
+            500_000_000_000_000_000,
+            Some(18),
+            QuantityDomain::LedgerE18,
+            Some(7),
+        )
+        .unwrap();
+        assert_eq!(
+            resolve_asset_amount_scaled(&from_dec, 18, QuantityDomain::LedgerE18, Some(7)).unwrap(),
+            resolve_asset_amount_scaled(&from_scaled, 18, QuantityDomain::LedgerE18, Some(7))
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn asset_amount_rejects_domain_scale_and_asset_mismatch() {
+        let amount =
+            AssetAmount::from_scaled(100, Some(18), QuantityDomain::LedgerE18, Some(7)).unwrap();
+        assert!(resolve_asset_amount_scaled(&amount, 18, QuantityDomain::Asset, Some(7)).is_err());
+        assert!(
+            resolve_asset_amount_scaled(&amount, 6, QuantityDomain::LedgerE18, Some(7)).is_err()
+        );
+        assert!(
+            resolve_asset_amount_scaled(&amount, 18, QuantityDomain::LedgerE18, Some(8)).is_err()
+        );
+    }
+
+    #[test]
+    fn quantity_reuse_rejects_scale_symbol_and_symbol_id_mismatch() {
+        let qty = Quantity::from_scaled(
+            100,
+            Some(8),
+            QuantityDomain::OrderBase,
+            Some("BTC-USDT".into()),
+            Some(7),
+        )
+        .unwrap();
+        assert!(resolve_qty_scaled(&qty, 6, Some("BTC-USDT"), Some(7)).is_err());
+        assert!(resolve_qty_scaled(&qty, 8, Some("ETH-USDT"), Some(7)).is_err());
+        assert!(resolve_qty_scaled(&qty, 8, Some("BTC-USDT"), Some(8)).is_err());
+    }
+
+    #[test]
+    fn asset_amount_requires_positive_value_at_resolve() {
+        let amount =
+            AssetAmount::from_scaled(0, Some(18), QuantityDomain::LedgerE18, Some(7)).unwrap();
+        assert!(
+            resolve_asset_amount_scaled(&amount, 18, QuantityDomain::LedgerE18, Some(7)).is_err()
         );
     }
 }

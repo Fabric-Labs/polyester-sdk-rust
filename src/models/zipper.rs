@@ -64,3 +64,14 @@ pub struct DepositWithdrawConfig {
     pub polyester_chain_id: u32,
     pub ts_ms: i64,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub struct ZippedAssetSupplyUpdate {
+    pub zipped_asset_id: u32,
+    pub supply: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub struct ZippedAssetSupplyBatch {
+    pub updates: Vec<ZippedAssetSupplyUpdate>,
+}

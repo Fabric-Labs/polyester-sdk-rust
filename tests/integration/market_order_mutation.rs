@@ -39,9 +39,9 @@ async fn market_buy_mutation() {
         eprintln!("skip: symbol {symbol} not in spot config");
         return;
     };
-    let price = resolve_post_only_buy_limit_price(&client, &symbol, Some(pair)).await;
-    let qty = min_base_qty_for_pair(Some(pair), &price);
-    let ref_price = market_ref_price(&client, &symbol, "buy", Some(pair)).await;
+    let price = resolve_post_only_buy_limit_price(&client, &symbol, Some(&pair)).await;
+    let qty = min_base_qty_for_pair(Some(&pair), &price);
+    let ref_price = market_ref_price(&client, &symbol, "buy", Some(&pair)).await;
     let scale = client.catalogs.base_quantity_scale_for_symbol(&symbol);
     let client_order_id = unique_client_order_id("mkt-buy");
 
@@ -70,6 +70,7 @@ async fn market_buy_mutation() {
                 }
             },
         ),
+        attached_risk: None,
     };
 
     let created = match client.orders.create(params).await {
@@ -133,9 +134,9 @@ async fn market_sell_mutation() {
         eprintln!("skip: symbol {symbol} not in spot config");
         return;
     };
-    let price = resolve_post_only_buy_limit_price(&client, &symbol, Some(pair)).await;
-    let qty = min_base_qty_for_pair(Some(pair), &price);
-    let ref_price = market_ref_price(&client, &symbol, "sell", Some(pair)).await;
+    let price = resolve_post_only_buy_limit_price(&client, &symbol, Some(&pair)).await;
+    let qty = min_base_qty_for_pair(Some(&pair), &price);
+    let ref_price = market_ref_price(&client, &symbol, "sell", Some(&pair)).await;
     if !require_trading_base_balance(&client, &symbol, &qty).await {
         return;
     }
@@ -167,6 +168,7 @@ async fn market_sell_mutation() {
                 }
             },
         ),
+        attached_risk: None,
     };
 
     let created = match client.orders.create(params).await {

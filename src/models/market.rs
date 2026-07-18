@@ -1,6 +1,42 @@
 //! Market-data SDK models (Go `models/market.go` / `models/common.go` parity).
 
 use crate::types::{Price, Quantity};
+use serde_json::Value;
+
+/// Options for [`crate::services::MarketDataService::get_candles_with`].
+#[derive(Debug, Clone, Default)]
+pub struct GetCandlesOpts {
+    pub symbol: Option<String>,
+    pub symbol_id: Option<u32>,
+    /// Candle interval alias (`"1m"`, `"MIN_1"`, …). Default `"1m"` when empty.
+    pub timeframe: String,
+    pub limit: Option<u32>,
+    /// Inclusive lower bound (unix seconds UTC).
+    pub start: Option<i64>,
+    /// Inclusive upper bound (unix seconds UTC).
+    pub end: Option<i64>,
+    pub include_incomplete: bool,
+    pub page_token: Option<String>,
+}
+
+/// Options for [`crate::services::MarketDataService::get_trades_with`].
+#[derive(Debug, Clone, Default)]
+pub struct GetTradesOpts {
+    pub symbol: Option<String>,
+    pub symbol_id: Option<u32>,
+    pub limit: Option<u32>,
+    /// Inclusive lower bound (unix seconds UTC).
+    pub start: Option<i64>,
+    /// Inclusive upper bound (unix seconds UTC).
+    pub end: Option<i64>,
+    pub page_token: Option<String>,
+}
+
+/// Spot pair catalog payload (Go `SpotConfig` raw-map escape hatch).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpotConfig {
+    pub raw: Value,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Candle {

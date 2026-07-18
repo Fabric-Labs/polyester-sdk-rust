@@ -74,6 +74,7 @@ async fn order_hold_visible_while_open() {
         subaccount_id: None,
         post_only: Some(true),
         market_client_ref_price: None,
+        attached_risk: None,
     };
 
     let created = match client.orders.create(params).await {

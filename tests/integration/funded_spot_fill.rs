@@ -61,7 +61,7 @@ async fn spot_fill() {
         .ok()
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| min_base_qty_for_pair(Some(pair), &price));
+        .unwrap_or_else(|| min_base_qty_for_pair(Some(&pair), &price));
 
     let Some(quote_asset_id) = quote_asset_id(&spot, &symbol, zipper.as_ref()) else {
         eprintln!("skip: missing quote asset id");
@@ -125,6 +125,7 @@ async fn spot_fill() {
         subaccount_id: None,
         post_only: Some(true),
         market_client_ref_price: None,
+        attached_risk: None,
     };
     match maker.orders.create(maker_params).await {
         Ok(c) => {
@@ -149,6 +150,7 @@ async fn spot_fill() {
         subaccount_id: None,
         post_only: Some(false),
         market_client_ref_price: None,
+        attached_risk: None,
     };
     match client.orders.create(taker_params).await {
         Ok(c) => {

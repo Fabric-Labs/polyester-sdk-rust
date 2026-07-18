@@ -3,10 +3,14 @@
 use super::call::{call_optional, call_required};
 use super::env::{env_trade_symbol, load_dotenv, min_trading_quote, skip_funding_check};
 use polyester::codecs::scalars::{format_price_ticks, parse_price_ticks_str};
-use polyester::models::{AssetBalance, DepositWithdrawConfig, OrderbookData};
+use polyester::models::{AssetBalance, DepositWithdrawConfig, OrderbookData, SpotConfig};
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::proto::marketdata::v1::{GetSpotConfigResponse, PairConfig};
 use polyester::{Client, Result};
+
+fn spot_proto(spot: &SpotConfig) -> GetSpotConfigResponse {
+    serde_json::from_value(spot.raw.clone()).unwrap_or_default()
+}
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 
@@ -29,7 +33,7 @@ const FAR_ABOVE_BUY_STOP_HINTS: &[(&str, &str)] = &[
 pub const LEDGER_SCALE: u32 = 18;
 
 /// Prefer `POLYESTER_TEST_SMOKE_SYMBOL`, else first liquid candidate present, else first pair.
-pub fn smoke_symbol(spot: &GetSpotConfigResponse) -> String {
+pub fn smoke_symbol(spot: &SpotConfig) -> String {
     load_dotenv();
     if let Ok(sym) = std::env::var("POLYESTER_TEST_SMOKE_SYMBOL") {
         let trimmed = sym.trim();
@@ -43,7 +47,8 @@ pub fn smoke_symbol(spot: &GetSpotConfigResponse) -> String {
             return trimmed.to_owned();
         }
     }
-    let symbols: Vec<&str> = spot
+    let proto = spot_proto(spot);
+    let symbols: Vec<&str> = proto
         .pairs
         .iter()
         .map(|p| p.symbol.trim())
@@ -60,26 +65,24 @@ pub fn smoke_symbol(spot: &GetSpotConfigResponse) -> String {
         .unwrap_or_else(|| "BTC-USDT".to_owned())
 }
 
-pub fn trade_symbol(spot: &GetSpotConfigResponse) -> String {
+pub fn trade_symbol(spot: &SpotConfig) -> String {
     if let Some(override_sym) = env_trade_symbol() {
         return override_sym;
     }
     smoke_symbol(spot)
 }
 
-pub fn pair_for_symbol<'a>(
-    spot: &'a GetSpotConfigResponse,
-    symbol: &str,
-) -> Option<&'a PairConfig> {
-    spot.pairs.iter().find(|p| p.symbol == symbol)
+pub fn pair_for_symbol(spot: &SpotConfig, symbol: &str) -> Option<PairConfig> {
+    spot_proto(spot)
+        .pairs
+        .into_iter()
+        .find(|p| p.symbol == symbol)
 }
 
 /// Hydrate catalogs from spot + zipper; returns spot config.
-pub async fn hydrate_spot_and_zipper(client: &Client) -> Result<GetSpotConfigResponse> {
+pub async fn hydrate_spot_and_zipper(client: &Client) -> Result<SpotConfig> {
     let spot = client.market_data.get_spot_config().await?;
-    if let Ok(json) = serde_json::to_value(&spot) {
-        client.catalogs.hydrate_spot_config_json(json);
-    }
+    client.catalogs.hydrate_spot_config_json(spot.raw.clone());
     if let Ok(zipper) = client.zipper.get_deposit_withdraw_config().await
         && let Ok(json) = serde_json::to_value(&zipper)
     {
@@ -133,7 +136,7 @@ pub fn trading_balance_raw(balances: &[AssetBalance], asset_id: u32) -> u128 {
 }
 
 pub fn quote_asset_id(
-    spot: &GetSpotConfigResponse,
+    spot: &SpotConfig,
     symbol: &str,
     zipper: Option<&DepositWithdrawConfig>,
 ) -> Option<u32> {
@@ -151,7 +154,7 @@ pub fn quote_asset_id(
 }
 
 pub fn base_asset_id(
-    spot: &GetSpotConfigResponse,
+    spot: &SpotConfig,
     symbol: &str,
     zipper: Option<&DepositWithdrawConfig>,
 ) -> Option<u32> {
@@ -347,8 +350,8 @@ pub async fn usdt_funded_buy_limit_params(
 ) -> Result<(String, String)> {
     let spot = hydrate_spot_and_zipper(client).await?;
     let pair = pair_for_symbol(&spot, symbol);
-    let price = resolve_post_only_buy_limit_price(client, symbol, pair).await;
-    let qty = min_base_qty_for_pair(pair, &price);
+    let price = resolve_post_only_buy_limit_price(client, symbol, pair.as_ref()).await;
+    let qty = min_base_qty_for_pair(pair.as_ref(), &price);
     Ok((price, qty))
 }
 
@@ -488,7 +491,7 @@ pub async fn usdt_funded_buy_stop_params(
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| trigger_price.clone());
-    let qty = min_base_qty_for_pair(pair, &limit_price);
+    let qty = min_base_qty_for_pair(pair.as_ref(), &limit_price);
     Ok((trigger_price, limit_price, qty))
 }
 

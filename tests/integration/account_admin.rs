@@ -2,8 +2,8 @@
 
 use crate::support::{call_optional, require_live_client};
 use polyester::proto::auth::v1::{
-    ListAddressBooksRequest, ListApiKeysRequest, ListApiPoliciesRequest,
-    ListSubaccountPoliciesRequest, ListSubaccountsRequest, ResolveAccountRequest,
+    ListAddressBooksRequest, ListApiPoliciesRequest, ListSubaccountPoliciesRequest,
+    ListSubaccountsRequest, ResolveAccountRequest,
 };
 
 #[tokio::test]
@@ -11,10 +11,7 @@ async fn api_keys_list() {
     let Some(client) = require_live_client() else {
         return;
     };
-    let _ = call_optional("api_keys.list", || {
-        client.api_keys.list(ListApiKeysRequest::default())
-    })
-    .await;
+    let _ = call_optional("api_keys.list", || client.api_keys.list(None)).await;
 }
 
 #[tokio::test]

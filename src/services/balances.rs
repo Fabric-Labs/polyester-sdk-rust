@@ -1,4 +1,5 @@
 use super::ServiceContext;
+use super::scope;
 use super::unary;
 use crate::codecs::decode::{
     balance_history_from_proto, balances_list_from_proto, equity_history_from_proto,
@@ -6,7 +7,9 @@ use crate::codecs::decode::{
 };
 use crate::connect::ledger::read::v1::LedgerReadServiceClient;
 use crate::errors::Result;
-use crate::models::{BalanceHistory, BalancesList, EquityHistory, HoldsList, TransfersList};
+use crate::models::{
+    AssetBalance, BalanceHistory, BalancesList, EquityHistory, HoldsList, TransfersList,
+};
 use crate::proto::ledger::read::v1::{
     GetBalanceHistoryRequest, GetBalancesRequest, GetEquityHistorySeriesRequest,
 };
@@ -103,5 +106,19 @@ impl BalancesService {
         .await?
         .into_owned();
         Ok(holds_list_from_proto(&resp))
+    }
+
+    /// Subscribe to private balance updates (requires `realtime` feature).
+    #[cfg(feature = "realtime")]
+    pub async fn subscribe(
+        &self,
+        account_id: Option<&str>,
+    ) -> Result<crate::realtime::TypedSubscription<AssetBalance>> {
+        let account = scope::resolve_account_id(&self.ctx, account_id)?;
+        let channel = format!("private:ledger:balances:{account}:proto");
+        self.ctx
+            .realtime
+            .subscribe_proto(&channel, crate::codecs::decode::asset_balance_from_bytes)
+            .await
     }
 }

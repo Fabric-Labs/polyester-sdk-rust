@@ -45,6 +45,7 @@ pub mod catalogs;
 pub mod client;
 pub mod codecs;
 pub mod errors;
+pub mod marketoverview;
 pub mod models;
 pub mod orderbook;
 pub mod services;
@@ -57,6 +58,9 @@ pub mod realtime;
 
 pub use client::{Client, Config};
 pub use errors::{Error, Result};
-pub use types::{AssetAmount, Price, PriceTicks, QtyScaled, Quantity, QuantityDomain};
+pub use types::{
+    AssetAmount, Price, PriceTicks, QtyScaled, Quantity, QuantityDomain,
+    resolve_asset_amount_scaled, resolve_price_ticks, resolve_qty_scaled,
+};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

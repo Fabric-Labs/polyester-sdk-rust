@@ -61,8 +61,8 @@ async fn market_order_fill() {
         .ok()
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| min_base_qty_for_pair(Some(pair), &price));
-    let ref_price = market_ref_price(&client, &symbol, "buy", Some(pair)).await;
+        .unwrap_or_else(|| min_base_qty_for_pair(Some(&pair), &price));
+    let ref_price = market_ref_price(&client, &symbol, "buy", Some(&pair)).await;
 
     let Some(quote_asset_id) = quote_asset_id(&spot, &symbol, zipper.as_ref()) else {
         eprintln!("skip: missing quote asset id");
@@ -123,6 +123,7 @@ async fn market_order_fill() {
         subaccount_id: None,
         post_only: Some(true),
         market_client_ref_price: None,
+        attached_risk: None,
     };
     match maker.orders.create(maker_params).await {
         Ok(c) => {
@@ -149,6 +150,7 @@ async fn market_order_fill() {
         market_client_ref_price: Some(
             Price::from_decimal_str(&ref_price, Some(symbol.clone())).expect("ref"),
         ),
+        attached_risk: None,
     };
     match client.orders.create(taker_params).await {
         Ok(c) => {

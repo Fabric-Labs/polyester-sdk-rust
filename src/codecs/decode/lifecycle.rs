@@ -5,7 +5,7 @@ use buffa::Enumeration;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{LifecycleFlowSummary, LifecycleFlowsList};
 use crate::proto::chain::lifecycle::v1::{
-    FlowSummaryView, FlowTxMatchView, ListFlowsByTxResponse, ListFlowsResponse,
+    FlowSummaryView, FlowTxMatchView, GetFlowResponse, ListFlowsByTxResponse, ListFlowsResponse,
 };
 
 fn enum_label<T: Enumeration>(value: &buffa::EnumValue<T>) -> String {
@@ -55,6 +55,24 @@ pub fn flows_by_tx_list_from_proto(msg: &ListFlowsByTxResponse) -> LifecycleFlow
         flows: msg.matches.iter().map(flow_tx_match_from_proto).collect(),
         next_page_token: msg.next_page_token.clone(),
     }
+}
+
+pub fn flow_from_get_response(msg: &GetFlowResponse) -> LifecycleFlowSummary {
+    match msg.flow.as_option() {
+        Some(detail) => detail
+            .summary
+            .as_option()
+            .map(flow_summary_from_proto)
+            .unwrap_or_default(),
+        None => LifecycleFlowSummary::default(),
+    }
+}
+
+pub fn flow_from_get_by_tx_response(msg: &ListFlowsByTxResponse) -> LifecycleFlowSummary {
+    msg.matches
+        .first()
+        .map(flow_tx_match_from_proto)
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

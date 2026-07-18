@@ -1,4 +1,5 @@
 use super::ServiceContext;
+use super::profile::ProfileService;
 use super::unary;
 use crate::codecs::decode::me_from_proto;
 use crate::connect::auth::v1::AuthServiceClient;
@@ -9,11 +10,15 @@ use crate::proto::auth::v1::MeRequest;
 #[derive(Clone)]
 pub struct AuthService {
     ctx: ServiceContext,
+    pub profile: ProfileService,
 }
 
 impl AuthService {
     pub fn new(ctx: ServiceContext) -> Self {
-        Self { ctx }
+        Self {
+            profile: ProfileService::new(ctx.clone()),
+            ctx,
+        }
     }
 
     pub async fn me(&self) -> Result<MeResult> {

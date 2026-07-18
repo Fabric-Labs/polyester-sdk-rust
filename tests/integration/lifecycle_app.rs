@@ -1,11 +1,9 @@
 //! Signed lifecycle / app surface integration tests.
 
 use crate::support::{call_optional, require_live_client};
-use polyester::proto::chain::analytics::v1::GetUnifiedAssetBalancesRequest;
 use polyester::proto::chain::guard::v1::GetGuardSignerStatusRequest;
 use polyester::proto::chain::lifecycle::v1::ListFlowsRequest;
 use polyester::proto::layout::v1::GetLayoutsRequest;
-use polyester::proto::marketdata::v1::GetOrderbookHeatmapRequest;
 use polyester::proto::polychart::v1::GetMarketLayersRequest;
 
 #[tokio::test]
@@ -13,16 +11,11 @@ async fn heatmap_get_shallow() {
     let Some(client) = require_live_client() else {
         return;
     };
-    let api = client.heatmap.connect_client();
-    match api
-        .get_orderbook_heatmap(GetOrderbookHeatmapRequest::default())
-        .await
-    {
-        Ok(resp) => {
-            let _ = resp.into_owned();
-        }
-        Err(err) => eprintln!("skip: heatmap.get: {err}"),
-    }
+    let _ = client.wait_for_catalogs().await;
+    let _ = call_optional("heatmap.get", || {
+        client.heatmap.get("BTC-USDT", "1m", 50, 10, "close")
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -78,14 +71,10 @@ async fn chain_analytics_unified_balances_shallow() {
     let Some(client) = require_live_client() else {
         return;
     };
-    let api = client.chain_analytics.connect_client();
-    match api
-        .get_unified_asset_balances(GetUnifiedAssetBalancesRequest::default())
-        .await
-    {
-        Ok(resp) => {
-            let _ = resp.into_owned();
-        }
-        Err(err) => eprintln!("skip: chain_analytics.get_unified_asset_balances: {err}"),
-    }
+    let _ = call_optional("chain_analytics.get_unified_asset_balances", || {
+        client
+            .chain_analytics
+            .get_unified_asset_balances(1, "1d", "", 0, 0)
+    })
+    .await;
 }

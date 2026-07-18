@@ -16,6 +16,7 @@ use crate::transport::{
 };
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::OnceCell;
 
 #[cfg(feature = "realtime")]
 use crate::realtime::Client as RealtimeClient;
@@ -86,10 +87,13 @@ pub struct Client {
     pub layout: LayoutService,
     pub guard_signer: GuardSignerService,
     pub withdraw: WithdrawService,
+    catalog_ready: Arc<OnceCell<()>>,
+    hydrate_catalogs_enabled: bool,
 }
 
 impl Client {
     pub fn new(config: Config) -> Result<Self> {
+        let hydrate_catalogs_enabled = config.hydrate_catalogs;
         let credentials = Credentials::load(
             config.api_key_id.as_deref(),
             config.api_private_key.as_deref(),
@@ -156,8 +160,11 @@ impl Client {
             layout: LayoutService::new(ctx.clone()),
             guard_signer: GuardSignerService::new(ctx.clone()),
             withdraw: WithdrawService::new(ctx),
+            catalog_ready: Arc::new(OnceCell::new()),
+            hydrate_catalogs_enabled,
         };
 
+        client.start_catalog_hydration();
         Ok(client)
     }
 
@@ -204,7 +211,7 @@ impl Client {
             #[cfg(feature = "realtime")]
             realtime: realtime.clone(),
         };
-        Ok(Self {
+        let client = Self {
             api_url: config.api_url,
             ws_url: config.ws_url,
             default_sub_account_id: config.default_sub_account_id,
@@ -238,21 +245,79 @@ impl Client {
             layout: LayoutService::new(ctx.clone()),
             guard_signer: GuardSignerService::new(ctx.clone()),
             withdraw: WithdrawService::new(ctx),
-        })
+            catalog_ready: Arc::new(OnceCell::new()),
+            hydrate_catalogs_enabled: config.hydrate_catalogs,
+        };
+        client.start_catalog_hydration();
+        Ok(client)
+    }
+
+    fn start_catalog_hydration(&self) {
+        if !self.hydrate_catalogs_enabled || tokio::runtime::Handle::try_current().is_err() {
+            return;
+        }
+
+        let ready = self.catalog_ready.clone();
+        let market_data = self.market_data.clone();
+        let zipper = self.zipper.clone();
+        let catalogs = self.catalogs.clone();
+        tokio::spawn(async move {
+            ready
+                .get_or_init(|| async move {
+                    Self::hydrate_catalogs_with(market_data, zipper, catalogs).await;
+                })
+                .await;
+        });
+    }
+
+    async fn hydrate_catalogs_with(
+        market_data: MarketDataService,
+        zipper: ZipperService,
+        catalogs: Arc<CatalogManager>,
+    ) {
+        if let Ok(spot) = market_data.get_spot_config().await {
+            catalogs.hydrate_spot_config_json(spot.raw);
+        }
+        if let Ok(zipper) = zipper.get_deposit_withdraw_config().await
+            && let Ok(json) = serde_json::to_value(&zipper)
+        {
+            catalogs.hydrate_zipper_config_json(json);
+        }
     }
 
     /// Best-effort catalog hydration from spot + zipper configs.
+    ///
+    /// This can be called explicitly to refresh the caches after construction.
     pub async fn hydrate_catalogs(&self) -> Result<()> {
-        if let Ok(spot) = self.market_data.get_spot_config().await
-            && let Ok(json) = serde_json::to_value(&spot)
-        {
-            self.catalogs.hydrate_spot_config_json(json);
+        Self::hydrate_catalogs_with(
+            self.market_data.clone(),
+            self.zipper.clone(),
+            self.catalogs.clone(),
+        )
+        .await;
+        let _ = self.catalog_ready.set(());
+        Ok(())
+    }
+
+    /// Wait until construction-time best-effort catalog hydration finishes.
+    ///
+    /// If the client was created outside a Tokio runtime, this starts hydration
+    /// on the caller's current runtime. Returns immediately when hydration was
+    /// disabled in [`Config`].
+    pub async fn wait_for_catalogs(&self) -> Result<()> {
+        if !self.hydrate_catalogs_enabled {
+            return Ok(());
         }
-        if let Ok(zipper) = self.zipper.get_deposit_withdraw_config().await
-            && let Ok(json) = serde_json::to_value(&zipper)
-        {
-            self.catalogs.hydrate_zipper_config_json(json);
-        }
+        self.catalog_ready
+            .get_or_init(|| async {
+                Self::hydrate_catalogs_with(
+                    self.market_data.clone(),
+                    self.zipper.clone(),
+                    self.catalogs.clone(),
+                )
+                .await;
+            })
+            .await;
         Ok(())
     }
 }
@@ -296,5 +361,33 @@ mod tests {
             &client.deposit,
             &client.withdraw,
         );
+    }
+
+    #[tokio::test]
+    async fn wait_for_catalogs_completes_best_effort_hydration() {
+        let client = Client::new(Config {
+            api_url: "http://127.0.0.1:9".into(),
+            timeout: Duration::from_millis(50),
+            hydrate_catalogs: true,
+            ..Default::default()
+        })
+        .expect("client");
+
+        client.wait_for_catalogs().await.expect("best effort");
+        assert!(client.catalog_ready.get().is_some());
+    }
+
+    #[tokio::test]
+    async fn wait_for_catalogs_returns_immediately_when_disabled() {
+        let client = Client::new(Config {
+            api_url: "http://127.0.0.1:9".into(),
+            timeout: Duration::from_millis(50),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .expect("client");
+
+        client.wait_for_catalogs().await.expect("disabled");
+        assert!(client.catalog_ready.get().is_none());
     }
 }

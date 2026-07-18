@@ -164,6 +164,12 @@ pub fn format_qty_scaled(qty_scaled: i64, scale: u32) -> String {
     format_scaled(qty_scaled as i128, scale)
 }
 
+/// Format a ledger quantity integer by `10^scale` (Go `FormatLedgerU128` for u64 inputs).
+pub fn format_ledger_u64(value: u64, scale: u32) -> String {
+    let scale = if scale == 0 { LEDGER_SCALE } else { scale };
+    format_scaled(value as i128, scale)
+}
+
 fn format_scaled(value: i128, scale: u32) -> String {
     if scale == 0 {
         return value.to_string();
@@ -229,6 +235,28 @@ pub fn format_uint64_id(id: u64) -> String {
 pub fn u128_to_str(hi: u64, lo: u64) -> String {
     let value = (u128::from(hi) << 64) | u128::from(lo);
     value.to_string()
+}
+
+/// Encode a non-negative scaled integer as protobuf `U128` (hi/lo).
+pub fn i128_to_u128(n: i128) -> Result<crate::proto::polyester::r#type::v1::U128> {
+    if n < 0 {
+        return Err(Error::validation("u128 value must be non-negative"));
+    }
+    let value = n as u128;
+    Ok(crate::proto::polyester::r#type::v1::U128 {
+        hi: (value >> 64) as u64,
+        lo: value as u64,
+        ..Default::default()
+    })
+}
+
+/// Encode a `u128` as protobuf `U128` (hi/lo).
+pub fn u128_to_proto(value: u128) -> crate::proto::polyester::r#type::v1::U128 {
+    crate::proto::polyester::r#type::v1::U128 {
+        hi: (value >> 64) as u64,
+        lo: value as u64,
+        ..Default::default()
+    }
 }
 
 pub fn parse_decimal_input(raw: &str) -> Result<Decimal> {
