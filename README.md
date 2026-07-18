@@ -173,6 +173,12 @@ With a local `.env`, `dotenvy` loads it automatically (`.env` is gitignored).
 
 CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python).
 
+## Examples
+
+Runnable cookbook examples live in the sibling repo
+[`polyester-examples-rust`](https://github.com/Fabric-Labs/polyester-examples-rust)
+(REST market data, realtime streams, decimal + scaled-int order paths, batch create, RSI bot).
+
 ## License
 
 Proprietary — see [LICENSE](LICENSE).
