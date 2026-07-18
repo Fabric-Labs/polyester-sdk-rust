@@ -12884,18 +12884,16 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub market_max_slippage_bps: i32,
-    /// Source-owned per-order state revision. For the same order, a larger value
-    /// is fresher, an equal value is an idempotent replay, and a smaller value is
-    /// stale. Equal revisions with different state indicate an invariant failure.
+    /// Per-order state version. Starts at 1 and increases for every published
+    /// state change. Use this field to reconcile API and realtime updates.
     ///
-    /// Field 26: `state_revision`
+    /// Field 26: `version`
     #[serde(
-        rename = "stateRevision",
-        alias = "state_revision",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+        rename = "version",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
-    pub state_revision: u64,
+    pub version: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -12927,7 +12925,7 @@ impl ::core::fmt::Debug for Order {
             .field("market_client_ref_price_ticks", &self.market_client_ref_price_ticks)
             .field("market_max_slippage_ticks", &self.market_max_slippage_ticks)
             .field("market_max_slippage_bps", &self.market_max_slippage_bps)
-            .field("state_revision", &self.state_revision)
+            .field("version", &self.version)
             .finish()
     }
 }
@@ -13078,9 +13076,8 @@ impl ::buffa::Message for Order {
                     + ::buffa::types::int32_encoded_len(self.market_max_slippage_bps)
                         as u32;
         }
-        if self.state_revision != 0u64 {
-            size
-                += 2u32 + ::buffa::types::uint64_encoded_len(self.state_revision) as u32;
+        if self.version != 0u32 {
+            size += 2u32 + ::buffa::types::uint32_encoded_len(self.version) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -13188,8 +13185,8 @@ impl ::buffa::Message for Order {
         if self.market_max_slippage_bps != 0i32 {
             ::buffa::types::put_int32_field(25u32, self.market_max_slippage_bps, buf);
         }
-        if self.state_revision != 0u64 {
-            ::buffa::types::put_uint64_field(26u32, self.state_revision, buf);
+        if self.version != 0u32 {
+            ::buffa::types::put_uint32_field(26u32, self.version, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -13395,7 +13392,7 @@ impl ::buffa::Message for Order {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.state_revision = ::buffa::types::decode_uint64(buf)?;
+                self.version = ::buffa::types::decode_uint32(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -13429,7 +13426,7 @@ impl ::buffa::Message for Order {
         self.market_client_ref_price_ticks = 0i64;
         self.market_max_slippage_ticks = 0i32;
         self.market_max_slippage_bps = 0i32;
-        self.state_revision = 0u64;
+        self.version = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -31290,12 +31287,11 @@ pub mod __buffa {
             ///
             /// Field 25: `market_max_slippage_bps`
             pub market_max_slippage_bps: i32,
-            /// Source-owned per-order state revision. For the same order, a larger value
-            /// is fresher, an equal value is an idempotent replay, and a smaller value is
-            /// stale. Equal revisions with different state indicate an invariant failure.
+            /// Per-order state version. Starts at 1 and increases for every published
+            /// state change. Use this field to reconcile API and realtime updates.
             ///
-            /// Field 26: `state_revision`
-            pub state_revision: u64,
+            /// Field 26: `version`
+            pub version: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for OrderView<'a> {
@@ -31558,7 +31554,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.state_revision = ::buffa::types::decode_uint64(&mut cur)?;
+                        view.version = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -31621,7 +31617,7 @@ pub mod __buffa {
                     market_client_ref_price_ticks: self.market_client_ref_price_ticks,
                     market_max_slippage_ticks: self.market_max_slippage_ticks,
                     market_max_slippage_bps: self.market_max_slippage_bps,
-                    state_revision: self.state_revision,
+                    version: self.version,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -31780,11 +31776,10 @@ pub mod __buffa {
                                 self.market_max_slippage_bps,
                             ) as u32;
                 }
-                if self.state_revision != 0u64 {
+                if self.version != 0u32 {
                     size
                         += 2u32
-                            + ::buffa::types::uint64_encoded_len(self.state_revision)
-                                as u32;
+                            + ::buffa::types::uint32_encoded_len(self.version) as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -31913,8 +31908,8 @@ pub mod __buffa {
                         buf,
                     );
                 }
-                if self.state_revision != 0u64 {
-                    ::buffa::types::put_uint64_field(26u32, self.state_revision, buf);
+                if self.version != 0u32 {
+                    ::buffa::types::put_uint32_field(26u32, self.version, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -32096,11 +32091,11 @@ pub mod __buffa {
                             ),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.state_revision) {
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.version) {
                     __map
                         .serialize_entry(
-                            "stateRevision",
-                            &::buffa::json_helpers::ProtoJson(&self.state_revision),
+                            "version",
+                            &::buffa::json_helpers::ProtoJson(&self.version),
                         )?;
                 }
                 __map.end()
@@ -32379,14 +32374,13 @@ pub mod __buffa {
             pub fn market_max_slippage_bps(&self) -> i32 {
                 self.0.reborrow().market_max_slippage_bps
             }
-            /// Source-owned per-order state revision. For the same order, a larger value
-            /// is fresher, an equal value is an idempotent replay, and a smaller value is
-            /// stale. Equal revisions with different state indicate an invariant failure.
+            /// Per-order state version. Starts at 1 and increases for every published
+            /// state change. Use this field to reconcile API and realtime updates.
             ///
-            /// Field 26: `state_revision`
+            /// Field 26: `version`
             #[must_use]
-            pub fn state_revision(&self) -> u64 {
-                self.0.reborrow().state_revision
+            pub fn version(&self) -> u32 {
+                self.0.reborrow().version
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<OrderView<'static>>>

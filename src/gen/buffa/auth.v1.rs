@@ -4186,19 +4186,33 @@ pub const __SUBACCOUNT_POLICY_VIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
     from_json: ::buffa::type_registry::any_from_json::<SubaccountPolicyView>,
     is_wkt: false,
 };
-/// ListSubaccountPoliciesRequest lists all sub-account policy templates visible
-/// to the caller. The request has no filters or pagination.
+/// ListSubaccountPoliciesRequest lists the finite set of sub-account policies
+/// visible in the requested account scope. Results are sorted by ascending
+/// policy ID and are not paginated.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListSubaccountPoliciesRequest {
+    /// Optional sub-account context for delegated administration. When omitted,
+    /// only policies owned by the caller's root account are returned.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ListSubaccountPoliciesRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListSubaccountPoliciesRequest").finish()
+        f.debug_struct("ListSubaccountPoliciesRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .finish()
     }
 }
 impl ListSubaccountPoliciesRequest {
@@ -4207,6 +4221,15 @@ impl ListSubaccountPoliciesRequest {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListSubaccountPoliciesRequest";
+}
+impl ListSubaccountPoliciesRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(ListSubaccountPoliciesRequest);
 impl ::buffa::MessageName for ListSubaccountPoliciesRequest {
@@ -4226,6 +4249,9 @@ impl ::buffa::Message for ListSubaccountPoliciesRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -4236,6 +4262,9 @@ impl ::buffa::Message for ListSubaccountPoliciesRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -4249,6 +4278,15 @@ impl ::buffa::Message for ListSubaccountPoliciesRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4257,6 +4295,7 @@ impl ::buffa::Message for ListSubaccountPoliciesRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
+        self.subaccount_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4440,6 +4479,17 @@ pub struct GetSubaccountPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub policy_id: u64,
+    /// Optional sub-account context for delegated administration. When omitted,
+    /// the policy must be owned by the caller's root account.
+    ///
+    /// Field 2: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -4448,6 +4498,7 @@ impl ::core::fmt::Debug for GetSubaccountPolicyRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetSubaccountPolicyRequest")
             .field("policy_id", &self.policy_id)
+            .field("subaccount_id", &self.subaccount_id)
             .finish()
     }
 }
@@ -4457,6 +4508,15 @@ impl GetSubaccountPolicyRequest {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetSubaccountPolicyRequest";
+}
+impl GetSubaccountPolicyRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(GetSubaccountPolicyRequest);
 impl ::buffa::MessageName for GetSubaccountPolicyRequest {
@@ -4479,6 +4539,9 @@ impl ::buffa::Message for GetSubaccountPolicyRequest {
         if self.policy_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -4491,6 +4554,9 @@ impl ::buffa::Message for GetSubaccountPolicyRequest {
         use ::buffa::Enumeration as _;
         if self.policy_id != 0u64 {
             ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
+        }
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(2u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4512,6 +4578,15 @@ impl ::buffa::Message for GetSubaccountPolicyRequest {
                 )?;
                 self.policy_id = ::buffa::types::decode_fixed64(buf)?;
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4521,6 +4596,7 @@ impl ::buffa::Message for GetSubaccountPolicyRequest {
     }
     fn clear(&mut self) {
         self.policy_id = 0u64;
+        self.subaccount_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7769,19 +7845,30 @@ pub const __API_POLICY_VIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
     from_json: ::buffa::type_registry::any_from_json::<ApiPolicyView>,
     is_wkt: false,
 };
-/// ListApiPoliciesRequest lists all API key policy templates visible to the
-/// caller. The request has no filters or pagination.
+/// ListApiPoliciesRequest lists the finite set of API key policies visible in
+/// the requested account scope. Results are sorted by ascending policy ID and
+/// are not paginated.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListApiPoliciesRequest {
+    /// Optional API key context for delegated administration. When omitted, only
+    /// policies owned by the caller's root account are returned.
+    ///
+    /// Field 1: `key_id`
+    #[serde(
+        rename = "keyId",
+        alias = "key_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub key_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ListApiPoliciesRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListApiPoliciesRequest").finish()
+        f.debug_struct("ListApiPoliciesRequest").field("key_id", &self.key_id).finish()
     }
 }
 impl ListApiPoliciesRequest {
@@ -7790,6 +7877,18 @@ impl ListApiPoliciesRequest {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListApiPoliciesRequest";
+}
+impl ListApiPoliciesRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::key_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_key_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.key_id = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(ListApiPoliciesRequest);
 impl ::buffa::MessageName for ListApiPoliciesRequest {
@@ -7809,6 +7908,9 @@ impl ::buffa::Message for ListApiPoliciesRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
+        if let Some(ref v) = self.key_id {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7819,6 +7921,9 @@ impl ::buffa::Message for ListApiPoliciesRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
+        if let Some(ref v) = self.key_id {
+            ::buffa::types::put_string_field(1u32, v, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -7832,6 +7937,16 @@ impl ::buffa::Message for ListApiPoliciesRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.key_id.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7840,6 +7955,7 @@ impl ::buffa::Message for ListApiPoliciesRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
+        self.key_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8023,6 +8139,16 @@ pub struct GetApiPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub policy_id: u64,
+    /// Optional API key context for delegated administration. When omitted, the
+    /// policy must be owned by the caller's root account.
+    ///
+    /// Field 2: `key_id`
+    #[serde(
+        rename = "keyId",
+        alias = "key_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub key_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8031,6 +8157,7 @@ impl ::core::fmt::Debug for GetApiPolicyRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetApiPolicyRequest")
             .field("policy_id", &self.policy_id)
+            .field("key_id", &self.key_id)
             .finish()
     }
 }
@@ -8040,6 +8167,18 @@ impl GetApiPolicyRequest {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetApiPolicyRequest";
+}
+impl GetApiPolicyRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::key_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_key_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.key_id = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(GetApiPolicyRequest);
 impl ::buffa::MessageName for GetApiPolicyRequest {
@@ -8062,6 +8201,9 @@ impl ::buffa::Message for GetApiPolicyRequest {
         if self.policy_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        if let Some(ref v) = self.key_id {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8074,6 +8216,9 @@ impl ::buffa::Message for GetApiPolicyRequest {
         use ::buffa::Enumeration as _;
         if self.policy_id != 0u64 {
             ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
+        }
+        if let Some(ref v) = self.key_id {
+            ::buffa::types::put_string_field(2u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8095,6 +8240,16 @@ impl ::buffa::Message for GetApiPolicyRequest {
                 )?;
                 self.policy_id = ::buffa::types::decode_fixed64(buf)?;
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.key_id.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8104,6 +8259,7 @@ impl ::buffa::Message for GetApiPolicyRequest {
     }
     fn clear(&mut self) {
         self.policy_id = 0u64;
+        self.key_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -10582,6 +10738,696 @@ impl ::buffa::Enumeration for SubaccountInviteAction {
             Self::SUBACCOUNT_INVITE_ACTION_ACCEPT,
             Self::SUBACCOUNT_INVITE_ACTION_DECLINE,
             Self::SUBACCOUNT_INVITE_ACTION_CANCEL,
+        ]
+    }
+}
+/// Entity category affected by an activity event.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum ActivityEntityKind {
+    /// No activity entity category was specified.
+    ACTIVITY_ENTITY_UNSPECIFIED = 0i32,
+    /// Root account.
+    ACTIVITY_ENTITY_ACCOUNT = 1i32,
+    /// Authentication session.
+    ACTIVITY_ENTITY_SESSION = 2i32,
+    /// API key.
+    ACTIVITY_ENTITY_API_KEY = 3i32,
+    /// Sub-account.
+    ACTIVITY_ENTITY_SUBACCOUNT = 4i32,
+    /// Sub-account member.
+    ACTIVITY_ENTITY_MEMBER = 5i32,
+    /// Access policy.
+    ACTIVITY_ENTITY_POLICY = 6i32,
+    /// Sub-account invitation.
+    ACTIVITY_ENTITY_INVITE = 7i32,
+    /// Account security configuration.
+    ACTIVITY_ENTITY_SECURITY = 8i32,
+    /// Saved transfer destination.
+    ACTIVITY_ENTITY_DESTINATION = 9i32,
+}
+impl ActivityEntityKind {
+    ///Idiomatic alias for [`Self::ACTIVITY_ENTITY_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityEntityUnspecified: Self = Self::ACTIVITY_ENTITY_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ENTITY_ACCOUNT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityEntityAccount: Self = Self::ACTIVITY_ENTITY_ACCOUNT;
+    ///Idiomatic alias for [`Self::ACTIVITY_ENTITY_SESSION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityEntitySession: Self = Self::ACTIVITY_ENTITY_SESSION;
+    ///Idiomatic alias for [`Self::ACTIVITY_ENTITY_API_KEY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityEntityApiKey: Self = Self::ACTIVITY_ENTITY_API_KEY;
+    ///Idiomatic alias for [`Self::ACTIVITY_ENTITY_SUBACCOUNT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityEntitySubaccount: Self = Self::ACTIVITY_ENTITY_SUBACCOUNT;
+    ///Idiomatic alias for [`Self::ACTIVITY_ENTITY_MEMBER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityEntityMember: Self = Self::ACTIVITY_ENTITY_MEMBER;
+    ///Idiomatic alias for [`Self::ACTIVITY_ENTITY_POLICY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityEntityPolicy: Self = Self::ACTIVITY_ENTITY_POLICY;
+    ///Idiomatic alias for [`Self::ACTIVITY_ENTITY_INVITE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityEntityInvite: Self = Self::ACTIVITY_ENTITY_INVITE;
+    ///Idiomatic alias for [`Self::ACTIVITY_ENTITY_SECURITY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityEntitySecurity: Self = Self::ACTIVITY_ENTITY_SECURITY;
+    ///Idiomatic alias for [`Self::ACTIVITY_ENTITY_DESTINATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityEntityDestination: Self = Self::ACTIVITY_ENTITY_DESTINATION;
+}
+impl ::core::default::Default for ActivityEntityKind {
+    fn default() -> Self {
+        Self::ACTIVITY_ENTITY_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ActivityEntityKind {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ActivityEntityKind {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ActivityEntityKind;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(ActivityEntityKind)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ActivityEntityKind, E> {
+                <ActivityEntityKind as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ActivityEntityKind, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ActivityEntityKind as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ActivityEntityKind, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ActivityEntityKind as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ActivityEntityKind, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ActivityEntityKind {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ActivityEntityKind {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::ACTIVITY_ENTITY_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::ACTIVITY_ENTITY_ACCOUNT),
+            2i32 => ::core::option::Option::Some(Self::ACTIVITY_ENTITY_SESSION),
+            3i32 => ::core::option::Option::Some(Self::ACTIVITY_ENTITY_API_KEY),
+            4i32 => ::core::option::Option::Some(Self::ACTIVITY_ENTITY_SUBACCOUNT),
+            5i32 => ::core::option::Option::Some(Self::ACTIVITY_ENTITY_MEMBER),
+            6i32 => ::core::option::Option::Some(Self::ACTIVITY_ENTITY_POLICY),
+            7i32 => ::core::option::Option::Some(Self::ACTIVITY_ENTITY_INVITE),
+            8i32 => ::core::option::Option::Some(Self::ACTIVITY_ENTITY_SECURITY),
+            9i32 => ::core::option::Option::Some(Self::ACTIVITY_ENTITY_DESTINATION),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::ACTIVITY_ENTITY_UNSPECIFIED => "ACTIVITY_ENTITY_UNSPECIFIED",
+            Self::ACTIVITY_ENTITY_ACCOUNT => "ACTIVITY_ENTITY_ACCOUNT",
+            Self::ACTIVITY_ENTITY_SESSION => "ACTIVITY_ENTITY_SESSION",
+            Self::ACTIVITY_ENTITY_API_KEY => "ACTIVITY_ENTITY_API_KEY",
+            Self::ACTIVITY_ENTITY_SUBACCOUNT => "ACTIVITY_ENTITY_SUBACCOUNT",
+            Self::ACTIVITY_ENTITY_MEMBER => "ACTIVITY_ENTITY_MEMBER",
+            Self::ACTIVITY_ENTITY_POLICY => "ACTIVITY_ENTITY_POLICY",
+            Self::ACTIVITY_ENTITY_INVITE => "ACTIVITY_ENTITY_INVITE",
+            Self::ACTIVITY_ENTITY_SECURITY => "ACTIVITY_ENTITY_SECURITY",
+            Self::ACTIVITY_ENTITY_DESTINATION => "ACTIVITY_ENTITY_DESTINATION",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "ACTIVITY_ENTITY_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ENTITY_UNSPECIFIED)
+            }
+            "ACTIVITY_ENTITY_ACCOUNT" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ENTITY_ACCOUNT)
+            }
+            "ACTIVITY_ENTITY_SESSION" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ENTITY_SESSION)
+            }
+            "ACTIVITY_ENTITY_API_KEY" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ENTITY_API_KEY)
+            }
+            "ACTIVITY_ENTITY_SUBACCOUNT" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ENTITY_SUBACCOUNT)
+            }
+            "ACTIVITY_ENTITY_MEMBER" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ENTITY_MEMBER)
+            }
+            "ACTIVITY_ENTITY_POLICY" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ENTITY_POLICY)
+            }
+            "ACTIVITY_ENTITY_INVITE" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ENTITY_INVITE)
+            }
+            "ACTIVITY_ENTITY_SECURITY" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ENTITY_SECURITY)
+            }
+            "ACTIVITY_ENTITY_DESTINATION" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ENTITY_DESTINATION)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::ACTIVITY_ENTITY_UNSPECIFIED,
+            Self::ACTIVITY_ENTITY_ACCOUNT,
+            Self::ACTIVITY_ENTITY_SESSION,
+            Self::ACTIVITY_ENTITY_API_KEY,
+            Self::ACTIVITY_ENTITY_SUBACCOUNT,
+            Self::ACTIVITY_ENTITY_MEMBER,
+            Self::ACTIVITY_ENTITY_POLICY,
+            Self::ACTIVITY_ENTITY_INVITE,
+            Self::ACTIVITY_ENTITY_SECURITY,
+            Self::ACTIVITY_ENTITY_DESTINATION,
+        ]
+    }
+}
+/// Action recorded by an activity event.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum ActivityEventAction {
+    /// No activity action was specified.
+    ACTIVITY_ACTION_UNSPECIFIED = 0i32,
+    /// Entity was created.
+    ACTIVITY_ACTION_CREATED = 1i32,
+    /// Entity was updated.
+    ACTIVITY_ACTION_UPDATED = 2i32,
+    /// Entity was deleted.
+    ACTIVITY_ACTION_DELETED = 3i32,
+    /// Entity was enabled.
+    ACTIVITY_ACTION_ENABLED = 4i32,
+    /// Entity was disabled.
+    ACTIVITY_ACTION_DISABLED = 5i32,
+    /// Entity was removed from its parent scope.
+    ACTIVITY_ACTION_REMOVED = 6i32,
+    /// Member role was assigned or changed.
+    ACTIVITY_ACTION_ROLE_SET = 7i32,
+    /// Security challenge or request was received.
+    ACTIVITY_ACTION_RECEIVED = 8i32,
+    /// Invitation or request was answered.
+    ACTIVITY_ACTION_REPLIED = 9i32,
+    /// Operation failed.
+    ACTIVITY_ACTION_FAILED = 10i32,
+    /// Access was revoked.
+    ACTIVITY_ACTION_REVOKED = 11i32,
+    /// Operation was blocked.
+    ACTIVITY_ACTION_BLOCKED = 12i32,
+    /// Security hold was placed.
+    ACTIVITY_ACTION_HOLD_PLACED = 13i32,
+    /// Security hold was released.
+    ACTIVITY_ACTION_HOLD_RELEASED = 14i32,
+}
+impl ActivityEventAction {
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionUnspecified: Self = Self::ACTIVITY_ACTION_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_CREATED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionCreated: Self = Self::ACTIVITY_ACTION_CREATED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_UPDATED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionUpdated: Self = Self::ACTIVITY_ACTION_UPDATED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_DELETED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionDeleted: Self = Self::ACTIVITY_ACTION_DELETED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_ENABLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionEnabled: Self = Self::ACTIVITY_ACTION_ENABLED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_DISABLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionDisabled: Self = Self::ACTIVITY_ACTION_DISABLED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_REMOVED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionRemoved: Self = Self::ACTIVITY_ACTION_REMOVED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_ROLE_SET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionRoleSet: Self = Self::ACTIVITY_ACTION_ROLE_SET;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_RECEIVED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionReceived: Self = Self::ACTIVITY_ACTION_RECEIVED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_REPLIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionReplied: Self = Self::ACTIVITY_ACTION_REPLIED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_FAILED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionFailed: Self = Self::ACTIVITY_ACTION_FAILED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_REVOKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionRevoked: Self = Self::ACTIVITY_ACTION_REVOKED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_BLOCKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionBlocked: Self = Self::ACTIVITY_ACTION_BLOCKED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_HOLD_PLACED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionHoldPlaced: Self = Self::ACTIVITY_ACTION_HOLD_PLACED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_HOLD_RELEASED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionHoldReleased: Self = Self::ACTIVITY_ACTION_HOLD_RELEASED;
+}
+impl ::core::default::Default for ActivityEventAction {
+    fn default() -> Self {
+        Self::ACTIVITY_ACTION_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ActivityEventAction {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ActivityEventAction {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ActivityEventAction;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(ActivityEventAction)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ActivityEventAction, E> {
+                <ActivityEventAction as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ActivityEventAction, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ActivityEventAction as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ActivityEventAction, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ActivityEventAction as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ActivityEventAction, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ActivityEventAction {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ActivityEventAction {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_CREATED),
+            2i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_UPDATED),
+            3i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_DELETED),
+            4i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_ENABLED),
+            5i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_DISABLED),
+            6i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_REMOVED),
+            7i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_ROLE_SET),
+            8i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_RECEIVED),
+            9i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_REPLIED),
+            10i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_FAILED),
+            11i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_REVOKED),
+            12i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_BLOCKED),
+            13i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_HOLD_PLACED),
+            14i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_HOLD_RELEASED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::ACTIVITY_ACTION_UNSPECIFIED => "ACTIVITY_ACTION_UNSPECIFIED",
+            Self::ACTIVITY_ACTION_CREATED => "ACTIVITY_ACTION_CREATED",
+            Self::ACTIVITY_ACTION_UPDATED => "ACTIVITY_ACTION_UPDATED",
+            Self::ACTIVITY_ACTION_DELETED => "ACTIVITY_ACTION_DELETED",
+            Self::ACTIVITY_ACTION_ENABLED => "ACTIVITY_ACTION_ENABLED",
+            Self::ACTIVITY_ACTION_DISABLED => "ACTIVITY_ACTION_DISABLED",
+            Self::ACTIVITY_ACTION_REMOVED => "ACTIVITY_ACTION_REMOVED",
+            Self::ACTIVITY_ACTION_ROLE_SET => "ACTIVITY_ACTION_ROLE_SET",
+            Self::ACTIVITY_ACTION_RECEIVED => "ACTIVITY_ACTION_RECEIVED",
+            Self::ACTIVITY_ACTION_REPLIED => "ACTIVITY_ACTION_REPLIED",
+            Self::ACTIVITY_ACTION_FAILED => "ACTIVITY_ACTION_FAILED",
+            Self::ACTIVITY_ACTION_REVOKED => "ACTIVITY_ACTION_REVOKED",
+            Self::ACTIVITY_ACTION_BLOCKED => "ACTIVITY_ACTION_BLOCKED",
+            Self::ACTIVITY_ACTION_HOLD_PLACED => "ACTIVITY_ACTION_HOLD_PLACED",
+            Self::ACTIVITY_ACTION_HOLD_RELEASED => "ACTIVITY_ACTION_HOLD_RELEASED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "ACTIVITY_ACTION_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_UNSPECIFIED)
+            }
+            "ACTIVITY_ACTION_CREATED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_CREATED)
+            }
+            "ACTIVITY_ACTION_UPDATED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_UPDATED)
+            }
+            "ACTIVITY_ACTION_DELETED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_DELETED)
+            }
+            "ACTIVITY_ACTION_ENABLED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_ENABLED)
+            }
+            "ACTIVITY_ACTION_DISABLED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_DISABLED)
+            }
+            "ACTIVITY_ACTION_REMOVED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_REMOVED)
+            }
+            "ACTIVITY_ACTION_ROLE_SET" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_ROLE_SET)
+            }
+            "ACTIVITY_ACTION_RECEIVED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_RECEIVED)
+            }
+            "ACTIVITY_ACTION_REPLIED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_REPLIED)
+            }
+            "ACTIVITY_ACTION_FAILED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_FAILED)
+            }
+            "ACTIVITY_ACTION_REVOKED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_REVOKED)
+            }
+            "ACTIVITY_ACTION_BLOCKED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_BLOCKED)
+            }
+            "ACTIVITY_ACTION_HOLD_PLACED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_HOLD_PLACED)
+            }
+            "ACTIVITY_ACTION_HOLD_RELEASED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_HOLD_RELEASED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::ACTIVITY_ACTION_UNSPECIFIED,
+            Self::ACTIVITY_ACTION_CREATED,
+            Self::ACTIVITY_ACTION_UPDATED,
+            Self::ACTIVITY_ACTION_DELETED,
+            Self::ACTIVITY_ACTION_ENABLED,
+            Self::ACTIVITY_ACTION_DISABLED,
+            Self::ACTIVITY_ACTION_REMOVED,
+            Self::ACTIVITY_ACTION_ROLE_SET,
+            Self::ACTIVITY_ACTION_RECEIVED,
+            Self::ACTIVITY_ACTION_REPLIED,
+            Self::ACTIVITY_ACTION_FAILED,
+            Self::ACTIVITY_ACTION_REVOKED,
+            Self::ACTIVITY_ACTION_BLOCKED,
+            Self::ACTIVITY_ACTION_HOLD_PLACED,
+            Self::ACTIVITY_ACTION_HOLD_RELEASED,
+        ]
+    }
+}
+/// Client channel from which an activity event originated.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum ActivityEventSource {
+    /// No activity source was specified.
+    ACTIVITY_SOURCE_UNSPECIFIED = 0i32,
+    /// Web client.
+    ACTIVITY_SOURCE_WEB = 1i32,
+    /// Mobile client.
+    ACTIVITY_SOURCE_MOBILE = 2i32,
+    /// Programmatic API client.
+    ACTIVITY_SOURCE_API = 3i32,
+}
+impl ActivityEventSource {
+    ///Idiomatic alias for [`Self::ACTIVITY_SOURCE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivitySourceUnspecified: Self = Self::ACTIVITY_SOURCE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ACTIVITY_SOURCE_WEB`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivitySourceWeb: Self = Self::ACTIVITY_SOURCE_WEB;
+    ///Idiomatic alias for [`Self::ACTIVITY_SOURCE_MOBILE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivitySourceMobile: Self = Self::ACTIVITY_SOURCE_MOBILE;
+    ///Idiomatic alias for [`Self::ACTIVITY_SOURCE_API`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivitySourceApi: Self = Self::ACTIVITY_SOURCE_API;
+}
+impl ::core::default::Default for ActivityEventSource {
+    fn default() -> Self {
+        Self::ACTIVITY_SOURCE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ActivityEventSource {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ActivityEventSource {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ActivityEventSource;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(ActivityEventSource)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ActivityEventSource, E> {
+                <ActivityEventSource as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ActivityEventSource, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ActivityEventSource as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ActivityEventSource, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ActivityEventSource as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ActivityEventSource, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ActivityEventSource {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ActivityEventSource {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::ACTIVITY_SOURCE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::ACTIVITY_SOURCE_WEB),
+            2i32 => ::core::option::Option::Some(Self::ACTIVITY_SOURCE_MOBILE),
+            3i32 => ::core::option::Option::Some(Self::ACTIVITY_SOURCE_API),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::ACTIVITY_SOURCE_UNSPECIFIED => "ACTIVITY_SOURCE_UNSPECIFIED",
+            Self::ACTIVITY_SOURCE_WEB => "ACTIVITY_SOURCE_WEB",
+            Self::ACTIVITY_SOURCE_MOBILE => "ACTIVITY_SOURCE_MOBILE",
+            Self::ACTIVITY_SOURCE_API => "ACTIVITY_SOURCE_API",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "ACTIVITY_SOURCE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_SOURCE_UNSPECIFIED)
+            }
+            "ACTIVITY_SOURCE_WEB" => {
+                ::core::option::Option::Some(Self::ACTIVITY_SOURCE_WEB)
+            }
+            "ACTIVITY_SOURCE_MOBILE" => {
+                ::core::option::Option::Some(Self::ACTIVITY_SOURCE_MOBILE)
+            }
+            "ACTIVITY_SOURCE_API" => {
+                ::core::option::Option::Some(Self::ACTIVITY_SOURCE_API)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::ACTIVITY_SOURCE_UNSPECIFIED,
+            Self::ACTIVITY_SOURCE_WEB,
+            Self::ACTIVITY_SOURCE_MOBILE,
+            Self::ACTIVITY_SOURCE_API,
         ]
     }
 }
@@ -15661,35 +16507,35 @@ pub struct ActivityEvent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub created_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Type of entity changed, such as "subaccount", "api_key", or "invite".
+    /// Category of entity affected by the event.
     ///
     /// Field 3: `entity_kind`
     #[serde(
         rename = "entityKind",
         alias = "entity_kind",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub entity_kind: ::buffa::alloc::string::String,
-    /// Action that occurred, such as "created", "updated", or "removed".
+    pub entity_kind: ::buffa::EnumValue<ActivityEntityKind>,
+    /// Action recorded for the entity.
     ///
     /// Field 4: `event_action`
     #[serde(
         rename = "eventAction",
         alias = "event_action",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub event_action: ::buffa::alloc::string::String,
-    /// Source of the event, such as "web", "mobile", or "api".
+    pub event_action: ::buffa::EnumValue<ActivityEventAction>,
+    /// Client channel from which the event originated.
     ///
     /// Field 5: `source`
     #[serde(
         rename = "source",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub source: ::buffa::alloc::string::String,
+    pub source: ::buffa::EnumValue<ActivityEventSource>,
     /// Origin IP address. Masked for non-owner and non-admin callers.
     ///
     /// Field 6: `ip`
@@ -15780,14 +16626,23 @@ impl ::buffa::Message for ActivityEvent {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if !self.entity_kind.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.entity_kind) as u32;
+        {
+            let val = self.entity_kind.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
-        if !self.event_action.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.event_action) as u32;
+        {
+            let val = self.event_action.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
-        if !self.source.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.source) as u32;
+        {
+            let val = self.source.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         if !self.ip.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.ip) as u32;
@@ -15815,14 +16670,23 @@ impl ::buffa::Message for ActivityEvent {
             ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
             self.created_at.write_to(__cache, buf);
         }
-        if !self.entity_kind.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.entity_kind, buf);
+        {
+            let val = self.entity_kind.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
         }
-        if !self.event_action.is_empty() {
-            ::buffa::types::put_string_field(4u32, &self.event_action, buf);
+        {
+            let val = self.event_action.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
         }
-        if !self.source.is_empty() {
-            ::buffa::types::put_string_field(5u32, &self.source, buf);
+        {
+            let val = self.source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
         }
         if !self.ip.is_empty() {
             ::buffa::types::put_string_field(6u32, &self.ip, buf);
@@ -15863,23 +16727,29 @@ impl ::buffa::Message for ActivityEvent {
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.entity_kind, buf)?;
+                self.entity_kind = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.event_action, buf)?;
+                self.event_action = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.source, buf)?;
+                self.source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             6u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -15918,9 +16788,9 @@ impl ::buffa::Message for ActivityEvent {
     }
     fn clear(&mut self) {
         self.created_at = ::buffa::MessageField::none();
-        self.entity_kind.clear();
-        self.event_action.clear();
-        self.source.clear();
+        self.entity_kind = ::buffa::EnumValue::from(0);
+        self.event_action = ::buffa::EnumValue::from(0);
+        self.source = ::buffa::EnumValue::from(0);
         self.ip.clear();
         self.user_agent.clear();
         self.actor_account_id = 0u64;
@@ -34185,6 +35055,12 @@ pub enum AuthErrorCode {
     AUTH_STEP_UP_PROOF_UNAVAILABLE = 32i32,
     /// The step-up proof has already been claimed.
     AUTH_STEP_UP_ALREADY_CLAIMED = 33i32,
+    /// The requested policy cannot be removed because it is still in use.
+    AUTH_POLICY_IN_USE = 34i32,
+    /// The requested policy is locked against this mutation.
+    AUTH_POLICY_LOCKED = 35i32,
+    /// The requested policy does not belong to the target account scope.
+    AUTH_POLICY_SCOPE_MISMATCH = 36i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -34289,6 +35165,15 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_STEP_UP_ALREADY_CLAIMED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthStepUpAlreadyClaimed: Self = Self::AUTH_STEP_UP_ALREADY_CLAIMED;
+    ///Idiomatic alias for [`Self::AUTH_POLICY_IN_USE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthPolicyInUse: Self = Self::AUTH_POLICY_IN_USE;
+    ///Idiomatic alias for [`Self::AUTH_POLICY_LOCKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthPolicyLocked: Self = Self::AUTH_POLICY_LOCKED;
+    ///Idiomatic alias for [`Self::AUTH_POLICY_SCOPE_MISMATCH`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthPolicyScopeMismatch: Self = Self::AUTH_POLICY_SCOPE_MISMATCH;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -34428,6 +35313,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             31i32 => ::core::option::Option::Some(Self::AUTH_STEP_UP_REQUIRED),
             32i32 => ::core::option::Option::Some(Self::AUTH_STEP_UP_PROOF_UNAVAILABLE),
             33i32 => ::core::option::Option::Some(Self::AUTH_STEP_UP_ALREADY_CLAIMED),
+            34i32 => ::core::option::Option::Some(Self::AUTH_POLICY_IN_USE),
+            35i32 => ::core::option::Option::Some(Self::AUTH_POLICY_LOCKED),
+            36i32 => ::core::option::Option::Some(Self::AUTH_POLICY_SCOPE_MISMATCH),
             _ => ::core::option::Option::None,
         }
     }
@@ -34478,6 +35366,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_STEP_UP_REQUIRED => "AUTH_STEP_UP_REQUIRED",
             Self::AUTH_STEP_UP_PROOF_UNAVAILABLE => "AUTH_STEP_UP_PROOF_UNAVAILABLE",
             Self::AUTH_STEP_UP_ALREADY_CLAIMED => "AUTH_STEP_UP_ALREADY_CLAIMED",
+            Self::AUTH_POLICY_IN_USE => "AUTH_POLICY_IN_USE",
+            Self::AUTH_POLICY_LOCKED => "AUTH_POLICY_LOCKED",
+            Self::AUTH_POLICY_SCOPE_MISMATCH => "AUTH_POLICY_SCOPE_MISMATCH",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -34582,6 +35473,15 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_STEP_UP_ALREADY_CLAIMED" => {
                 ::core::option::Option::Some(Self::AUTH_STEP_UP_ALREADY_CLAIMED)
             }
+            "AUTH_POLICY_IN_USE" => {
+                ::core::option::Option::Some(Self::AUTH_POLICY_IN_USE)
+            }
+            "AUTH_POLICY_LOCKED" => {
+                ::core::option::Option::Some(Self::AUTH_POLICY_LOCKED)
+            }
+            "AUTH_POLICY_SCOPE_MISMATCH" => {
+                ::core::option::Option::Some(Self::AUTH_POLICY_SCOPE_MISMATCH)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -34621,6 +35521,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_STEP_UP_REQUIRED,
             Self::AUTH_STEP_UP_PROOF_UNAVAILABLE,
             Self::AUTH_STEP_UP_ALREADY_CLAIMED,
+            Self::AUTH_POLICY_IN_USE,
+            Self::AUTH_POLICY_LOCKED,
+            Self::AUTH_POLICY_SCOPE_MISMATCH,
         ]
     }
 }
@@ -47250,10 +48153,16 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ListSubaccountPoliciesRequest lists all sub-account policy templates visible
-        /// to the caller. The request has no filters or pagination.
+        /// ListSubaccountPoliciesRequest lists the finite set of sub-account policies
+        /// visible in the requested account scope. Results are sorted by ascending
+        /// policy ID and are not paginated.
         #[derive(Clone, Debug, Default)]
         pub struct ListSubaccountPoliciesRequestView<'a> {
+            /// Optional sub-account context for delegated administration. When omitted,
+            /// only policies owned by the caller's root account are returned.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListSubaccountPoliciesRequestView<'a> {
@@ -47287,6 +48196,15 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -47316,6 +48234,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListSubaccountPoliciesRequest {
+                    subaccount_id: self.subaccount_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -47330,6 +48249,9 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -47341,6 +48263,9 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(1u32, v, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -47362,6 +48287,13 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
                 __map.end()
             }
         }
@@ -47461,6 +48393,14 @@ pub mod __buffa {
             #[must_use]
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
+            }
+            /// Optional sub-account context for delegated administration. When omitted,
+            /// only policies owned by the caller's root account are returned.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
             }
         }
         impl ::core::convert::From<
@@ -47813,6 +48753,11 @@ pub mod __buffa {
             ///
             /// Field 1: `policy_id`
             pub policy_id: u64,
+            /// Optional sub-account context for delegated administration. When omitted,
+            /// the policy must be owned by the caller's root account.
+            ///
+            /// Field 2: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetSubaccountPolicyRequestView<'a> {
@@ -47853,6 +48798,15 @@ pub mod __buffa {
                         )?;
                         view.policy_id = ::buffa::types::decode_fixed64(&mut cur)?;
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -47883,6 +48837,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetSubaccountPolicyRequest {
                     policy_id: self.policy_id,
+                    subaccount_id: self.subaccount_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -47900,6 +48855,9 @@ pub mod __buffa {
                 if self.policy_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -47913,6 +48871,9 @@ pub mod __buffa {
                 use ::buffa::Enumeration as _;
                 if self.policy_id != 0u64 {
                     ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
+                }
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(2u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -47940,6 +48901,13 @@ pub mod __buffa {
                         .serialize_entry(
                             "policyId",
                             &::buffa::json_helpers::ProtoJson(&self.policy_id),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
                 __map.end()
@@ -48048,6 +49016,14 @@ pub mod __buffa {
             #[must_use]
             pub fn policy_id(&self) -> u64 {
                 self.0.reborrow().policy_id
+            }
+            /// Optional sub-account context for delegated administration. When omitted,
+            /// the policy must be owned by the caller's root account.
+            ///
+            /// Field 2: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
             }
         }
         impl ::core::convert::From<
@@ -53816,10 +54792,16 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ListApiPoliciesRequest lists all API key policy templates visible to the
-        /// caller. The request has no filters or pagination.
+        /// ListApiPoliciesRequest lists the finite set of API key policies visible in
+        /// the requested account scope. Results are sorted by ascending policy ID and
+        /// are not paginated.
         #[derive(Clone, Debug, Default)]
         pub struct ListApiPoliciesRequestView<'a> {
+            /// Optional API key context for delegated administration. When omitted, only
+            /// policies owned by the caller's root account are returned.
+            ///
+            /// Field 1: `key_id`
+            pub key_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListApiPoliciesRequestView<'a> {
@@ -53853,6 +54835,13 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.key_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -53882,6 +54871,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListApiPoliciesRequest {
+                    key_id: self.key_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -53896,6 +54886,9 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
+                if let Some(ref v) = self.key_id {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -53907,6 +54900,9 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
+                if let Some(ref v) = self.key_id {
+                    ::buffa::types::put_string_field(1u32, v, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -53928,6 +54924,9 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.key_id {
+                    __map.serialize_entry("keyId", __v)?;
+                }
                 __map.end()
             }
         }
@@ -54023,6 +55022,14 @@ pub mod __buffa {
             #[must_use]
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
+            }
+            /// Optional API key context for delegated administration. When omitted, only
+            /// policies owned by the caller's root account are returned.
+            ///
+            /// Field 1: `key_id`
+            #[must_use]
+            pub fn key_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().key_id
             }
         }
         impl ::core::convert::From<
@@ -54373,6 +55380,11 @@ pub mod __buffa {
             ///
             /// Field 1: `policy_id`
             pub policy_id: u64,
+            /// Optional API key context for delegated administration. When omitted, the
+            /// policy must be owned by the caller's root account.
+            ///
+            /// Field 2: `key_id`
+            pub key_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetApiPolicyRequestView<'a> {
@@ -54413,6 +55425,13 @@ pub mod __buffa {
                         )?;
                         view.policy_id = ::buffa::types::decode_fixed64(&mut cur)?;
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.key_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -54443,6 +55462,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetApiPolicyRequest {
                     policy_id: self.policy_id,
+                    key_id: self.key_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -54460,6 +55480,9 @@ pub mod __buffa {
                 if self.policy_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
+                if let Some(ref v) = self.key_id {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -54473,6 +55496,9 @@ pub mod __buffa {
                 use ::buffa::Enumeration as _;
                 if self.policy_id != 0u64 {
                     ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
+                }
+                if let Some(ref v) = self.key_id {
+                    ::buffa::types::put_string_field(2u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -54501,6 +55527,9 @@ pub mod __buffa {
                             "policyId",
                             &::buffa::json_helpers::ProtoJson(&self.policy_id),
                         )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.key_id {
+                    __map.serialize_entry("keyId", __v)?;
                 }
                 __map.end()
             }
@@ -54604,6 +55633,14 @@ pub mod __buffa {
             #[must_use]
             pub fn policy_id(&self) -> u64 {
                 self.0.reborrow().policy_id
+            }
+            /// Optional API key context for delegated administration. When omitted, the
+            /// policy must be owned by the caller's root account.
+            ///
+            /// Field 2: `key_id`
+            #[must_use]
+            pub fn key_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().key_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetApiPolicyRequestView<'static>>>
@@ -67995,18 +69032,18 @@ pub mod __buffa {
             pub created_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Type of entity changed, such as "subaccount", "api_key", or "invite".
+            /// Category of entity affected by the event.
             ///
             /// Field 3: `entity_kind`
-            pub entity_kind: &'a str,
-            /// Action that occurred, such as "created", "updated", or "removed".
+            pub entity_kind: ::buffa::EnumValue<super::super::ActivityEntityKind>,
+            /// Action recorded for the entity.
             ///
             /// Field 4: `event_action`
-            pub event_action: &'a str,
-            /// Source of the event, such as "web", "mobile", or "api".
+            pub event_action: ::buffa::EnumValue<super::super::ActivityEventAction>,
+            /// Client channel from which the event originated.
             ///
             /// Field 5: `source`
-            pub source: &'a str,
+            pub source: ::buffa::EnumValue<super::super::ActivityEventSource>,
             /// Origin IP address. Masked for non-owner and non-admin callers.
             ///
             /// Field 6: `ip`
@@ -68084,23 +69121,29 @@ pub mod __buffa {
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.entity_kind = ::buffa::types::borrow_str(&mut cur)?;
+                        view.entity_kind = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.event_action = ::buffa::types::borrow_str(&mut cur)?;
+                        view.event_action = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.source = ::buffa::types::borrow_str(&mut cur)?;
+                        view.source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     6u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -68169,9 +69212,9 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    entity_kind: self.entity_kind.to_string(),
-                    event_action: self.event_action.to_string(),
-                    source: self.source.to_string(),
+                    entity_kind: self.entity_kind,
+                    event_action: self.event_action,
+                    source: self.source,
                     ip: self.ip.to_string(),
                     user_agent: self.user_agent.to_string(),
                     actor_account_id: self.actor_account_id,
@@ -68198,22 +69241,23 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if !self.entity_kind.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.entity_kind)
-                                as u32;
+                {
+                    let val = self.entity_kind.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
-                if !self.event_action.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.event_action)
-                                as u32;
+                {
+                    let val = self.event_action.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
-                if !self.source.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.source) as u32;
+                {
+                    let val = self.source.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 if !self.ip.is_empty() {
                     size += 1u32 + ::buffa::types::string_encoded_len(&self.ip) as u32;
@@ -68252,14 +69296,23 @@ pub mod __buffa {
                     );
                     self.created_at.write_to(__cache, buf);
                 }
-                if !self.entity_kind.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.entity_kind, buf);
+                {
+                    let val = self.entity_kind.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
                 }
-                if !self.event_action.is_empty() {
-                    ::buffa::types::put_string_field(4u32, &self.event_action, buf);
+                {
+                    let val = self.event_action.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
                 }
-                if !self.source.is_empty() {
-                    ::buffa::types::put_string_field(5u32, &self.source, buf);
+                {
+                    let val = self.source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(5u32, val, buf);
+                    }
                 }
                 if !self.ip.is_empty() {
                     ::buffa::types::put_string_field(6u32, &self.ip, buf);
@@ -68302,14 +69355,18 @@ pub mod __buffa {
                         __map.serialize_entry("createdAt", __v)?;
                     }
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.entity_kind) {
-                    __map.serialize_entry("entityKind", self.entity_kind)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.entity_kind,
+                ) {
+                    __map.serialize_entry("entityKind", &self.entity_kind)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.event_action) {
-                    __map.serialize_entry("eventAction", self.event_action)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.event_action,
+                ) {
+                    __map.serialize_entry("eventAction", &self.event_action)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.source) {
-                    __map.serialize_entry("source", self.source)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.source) {
+                    __map.serialize_entry("source", &self.source)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.ip) {
                     __map.serialize_entry("ip", self.ip)?;
@@ -68434,25 +69491,31 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().created_at
             }
-            /// Type of entity changed, such as "subaccount", "api_key", or "invite".
+            /// Category of entity affected by the event.
             ///
             /// Field 3: `entity_kind`
             #[must_use]
-            pub fn entity_kind(&self) -> &'_ str {
+            pub fn entity_kind(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::ActivityEntityKind> {
                 self.0.reborrow().entity_kind
             }
-            /// Action that occurred, such as "created", "updated", or "removed".
+            /// Action recorded for the entity.
             ///
             /// Field 4: `event_action`
             #[must_use]
-            pub fn event_action(&self) -> &'_ str {
+            pub fn event_action(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::ActivityEventAction> {
                 self.0.reborrow().event_action
             }
-            /// Source of the event, such as "web", "mobile", or "api".
+            /// Client channel from which the event originated.
             ///
             /// Field 5: `source`
             #[must_use]
-            pub fn source(&self) -> &'_ str {
+            pub fn source(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::ActivityEventSource> {
                 self.0.reborrow().source
             }
             /// Origin IP address. Masked for non-owner and non-admin callers.

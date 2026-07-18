@@ -1,6 +1,7 @@
 //! Trading read/write models (Go `models/trading.go` parity).
 
 use crate::types::{AssetAmount, Price, Quantity};
+use buffa_types::google::protobuf::Timestamp;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Order {
@@ -17,7 +18,7 @@ pub struct Order {
     pub price: Option<Price>,
     pub avg_px: Option<Price>,
     pub created_ts_ns: String,
-    pub state_revision: u64,
+    pub version: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -374,16 +375,18 @@ pub struct WithdrawIntentResult {
     pub flow_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ApiKeySummary {
     pub key_id: String,
     pub label: String,
     pub status: String,
     pub public_key_ed25519: String,
-    pub updated_at_ms: i64,
+    pub created_at: Option<Timestamp>,
+    pub last_used_at: Option<Timestamp>,
+    pub updated_at: Option<Timestamp>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ApiKeysList {
     pub keys: Vec<ApiKeySummary>,
 }
