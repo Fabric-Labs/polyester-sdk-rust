@@ -4,23 +4,25 @@ Official Rust SDK for Polyester APIs — parity with `polyester-sdk-go` and
 `polyester-sdk-python`, built on [Connect for Rust](https://github.com/connectrpc/connect-rust)
 (Buffa + Connect **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.1`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0-alpha.8`, git tag `v0.1.0a8`). Proprietary license (not open source).
 API-key only — no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
+
+Versioning with Go/Python: see [VERSIONING.md](VERSIONING.md).
 
 ## Install
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.1"
+polyester-sdk = "0.1.0-alpha.8"
 ```
 
 Git install (if you prefer pinning a tag before crates.io mirrors):
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0-alpha.1" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a8" }
 ```
 
 ```rust
