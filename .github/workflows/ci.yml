@@ -29,6 +29,9 @@ jobs:
             exit 1
           fi
 
+      - name: SDK Connect coverage
+        run: python3 scripts/check_sdk_coverage.py
+
       - name: Format
         run: cargo fmt --all -- --check
 

@@ -4,7 +4,7 @@ Official Rust SDK for Polyester APIs — parity with `polyester-sdk-go` and
 `polyester-sdk-python`, built on [Connect for Rust](https://github.com/connectrpc/connect-rust)
 (Buffa + Connect **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.2`, git tag `v0.1.0a2`). Proprietary license (not open source).
+**Status:** Alpha (`0.1.0-alpha.3`, git tag `v0.1.0a3`). Proprietary license (not open source).
 API-key only — no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -13,14 +13,14 @@ API-key only — no browser login or JWT flows.
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.2"
+polyester-sdk = "0.1.0-alpha.3"
 ```
 
 Git install (if you prefer pinning a tag before crates.io mirrors):
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a2" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a3" }
 ```
 
 ```rust
@@ -113,6 +113,10 @@ If a client is constructed before entering a Tokio runtime,
 (`Price::from_ticks`, `Quantity::from_scaled`, `AssetAmount::from_scaled`) do not
 need catalog lookup solely to scale the value.
 
+Realtime subscription handles stop their background tasks when explicitly
+closed or dropped. Call `close()` when prompt shutdown matters; `Drop` provides
+the cleanup safety net.
+
 ## Layout
 
 | Path | Role |
@@ -172,6 +176,16 @@ Optional tiers (same gates as Go/Python):
 With a local `.env`, `dotenvy` loads it automatically (`.env` is gitignored).
 
 CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python).
+
+Connect RPC wrapper coverage (public gen vs handwritten services) is tracked in
+[`docs/sdk-coverage.md`](docs/sdk-coverage.md). After wrapping a new RPC or
+refreshing gen:
+
+```bash
+python3 scripts/check_sdk_coverage.py --write
+```
+
+CI fails on unexpected gaps or a stale committed report.
 
 ## Examples
 

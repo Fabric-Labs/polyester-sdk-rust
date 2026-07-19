@@ -331,6 +331,12 @@ impl Subscription {
     }
 }
 
+impl Drop for Subscription {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
 /// Handle for a typed protobuf realtime subscription.
 pub struct TypedSubscription<T> {
     rx: mpsc::Receiver<T>,
@@ -351,6 +357,12 @@ impl<T> TypedSubscription<T> {
 
     pub fn close(&self) {
         let _ = self.stop.send(true);
+    }
+}
+
+impl<T> Drop for TypedSubscription<T> {
+    fn drop(&mut self) {
+        self.close();
     }
 }
 
@@ -551,5 +563,59 @@ mod tests {
         let bytes = publication_payload(frame).unwrap().unwrap();
         assert_eq!(bytes, vec![1, 2, 3]);
         assert!(publication_payload(r#"{"ping":{}}"#).is_none());
+    }
+
+    #[tokio::test]
+    async fn dropping_raw_subscription_signals_stop() {
+        let (stop, mut stop_rx) = watch::channel(false);
+        let (_tx, rx) = mpsc::channel::<String>(1);
+        let alive = Arc::new(AtomicBool::new(true));
+        let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            stop_rx.changed().await.expect("stop sender");
+            let _ = done_tx.send(*stop_rx.borrow());
+        });
+        let subscription = Subscription {
+            rx,
+            stop,
+            alive,
+            task,
+        };
+
+        drop(subscription);
+
+        assert!(
+            tokio::time::timeout(Duration::from_secs(1), done_rx)
+                .await
+                .expect("stop timeout")
+                .expect("stop signal")
+        );
+    }
+
+    #[tokio::test]
+    async fn dropping_typed_subscription_signals_stop() {
+        let (stop, mut stop_rx) = watch::channel(false);
+        let (_tx, rx) = mpsc::channel::<u8>(1);
+        let alive = Arc::new(AtomicBool::new(true));
+        let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            stop_rx.changed().await.expect("stop sender");
+            let _ = done_tx.send(*stop_rx.borrow());
+        });
+        let subscription = TypedSubscription {
+            rx,
+            stop,
+            alive,
+            task,
+        };
+
+        drop(subscription);
+
+        assert!(
+            tokio::time::timeout(Duration::from_secs(1), done_rx)
+                .await
+                .expect("stop timeout")
+                .expect("stop signal")
+        );
     }
 }
