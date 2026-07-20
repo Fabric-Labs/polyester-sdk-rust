@@ -7,6 +7,8 @@
 
 ### Docs
 - README `Supported surface` table is generated from `sdk-capabilities.json` (`--write-capabilities`); links to the public [SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix)
+- README expanded toward Python parity (credentials, auth patterns, orders, balances, market data, realtime)
+- CI auto-commits refreshed `sdk-capabilities.json` + README capability table when they drift (same-repo)
 
 ## 0.1.0a3
 

@@ -1,11 +1,12 @@
 # Polyester Rust SDK
 
-Official Rust SDK for Polyester APIs — parity with `polyester-sdk-go` and
-`polyester-sdk-python`, built on [Connect for Rust](https://github.com/connectrpc/connect-rust)
-(Buffa + Connect **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
+Official Rust SDK for Polyester APIs, built for trading bots, backend services,
+and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
+on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
+**0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.3`, git tag `v0.1.0a3`). Proprietary license (not open source).
-API-key only — no browser login or JWT flows.
+**Status:** Alpha (`0.1.0-alpha.3`, git tag `v0.1.0a3`). Proprietary license
+(not open source). API-key only — no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
 
@@ -61,6 +62,9 @@ Full cross-language comparison:
 polyester-sdk = "0.1.0-alpha.3"
 ```
 
+The default feature set includes realtime WebSocket streams. Disable `realtime`
+if you only need Connect RPC calls.
+
 Git install (if you prefer pinning a tag before crates.io mirrors):
 
 ```toml
@@ -68,8 +72,12 @@ Git install (if you prefer pinning a tag before crates.io mirrors):
 polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a3" }
 ```
 
-```rust
-use polyester::{Client, Config, Price, Quantity};
+For development from a git checkout:
+
+```bash
+git clone https://github.com/Fabric-Labs/polyester-sdk-rust.git
+cd polyester-sdk-rust
+cargo test --lib --all-features
 ```
 
 Pin the Connect runtime: this crate depends on `connectrpc` / `buffa` **0.8.x**.
@@ -77,70 +85,103 @@ Review upstream notes before upgrading.
 
 ## Quick start
 
+Create an API key in the Polyester app (**API** in the sidebar). Copy the key id
+and private key when shown — the private key is only displayed once.
+
 ```rust,no_run
 use polyester::{Client, Config, Result};
-use polyester::models::{CreateOrderType, CreateSide};
-use polyester::types::{Price, Quantity};
+use polyester::services::ListMarketOverviewOptions;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = Client::new(Config {
         api_key_id: Some("ak_...".into()),
-        api_private_key: Some("/* 64-char hex seed */".into()),
-        default_account_id: Some("/* Profile Account ID */".into()),
+        api_private_key: Some("...".into()), // 64-char hex from key creation
+        default_account_id: Some("RLxqJGUDg92".into()), // Profile → Account ID
         ..Default::default()
     })?;
 
-    let _me = client.auth.me().await?;
-    let _spot = client.market_data.get_spot_config().await?;
+    let overview = client
+        .market_overview
+        .list(ListMarketOverviewOptions {
+            limit: Some(5),
+            ..Default::default()
+        })
+        .await?;
+    for market in overview.markets {
+        let ticks = market
+            .last_price
+            .as_ref()
+            .map(|p| p.as_ticks());
+        println!("{} {:?}", market.symbol, ticks);
+    }
 
-    // Humans: decimal strings / Decimal
-    let price = Price::from_decimal_str("1.5", None)?;
-    let qty = Quantity::from_decimal_str("0.01", 8, None, None)?;
-
-    // Bots: scaled ints (no string round-trip)
-    let _price2 = Price::from_ticks(1_500_000, None)?;
-    let _qty2 = Quantity::from_scaled(1_000_000, Some(8), Default::default(), None, None)?;
-
-    let params = client.orders.create_params(
-        "BTC-USDT",
-        CreateSide::Buy,
-        CreateOrderType::Limit,
-        qty,
-        Some(price),
-    );
-    let _ = client.orders.create(params).await?;
+    let open_orders = client.orders.list_open(None).await?;
+    println!("{} open orders", open_orders.orders.len());
     Ok(())
 }
 ```
 
-Or load credentials from the environment:
+## Credentials
 
-```bash
-export POLYESTER_API_KEY_ID=ak_...
-export POLYESTER_API_PRIVATE_KEY=...
-export POLYESTER_ACCOUNT_ID=...
+| Value | Where to find it | Config field |
+| --- | --- | --- |
+| API key id | **API** → create or view key | `api_key_id` |
+| API private key | Shown once when the key is created | `api_private_key` |
+| Account ID | **Profile** → **Account ID** (e.g. `RLxqJGUDg92`) | `default_account_id` |
+
+Pass credentials on `Config` / `Client::new`. The SDK does not implicitly read
+environment variables unless you call `Client::from_env`.
+
+`api_private_key` accepts the 64-character hex Ed25519 secret from key creation.
+
+`default_account_id` is the **Account ID** string from your Profile page. Use the
+value exactly as shown in the app. Do not use an internal numeric id.
+
+`default_account_id` is optional for public market-data calls. It is required for
+account-scoped operations such as private realtime channels, bucket transfers, and
+some ledger writes.
+
+## Authentication patterns
+
+**Recommended — explicit config:**
+
+```rust,no_run
+use polyester::{Client, Config};
+
+let client = Client::new(Config {
+    api_key_id: Some("ak_...".into()),
+    api_private_key: Some("...".into()),
+    default_account_id: Some("RLxqJGUDg92".into()),
+    ..Default::default()
+})?;
 ```
+
+**If your deployment stores secrets in environment variables**, read them in your
+application and pass them to `Client::new`:
+
+```rust,no_run
+use std::env;
+use polyester::{Client, Config};
+
+let client = Client::new(Config {
+    api_key_id: env::var("POLYESTER_API_KEY_ID").ok(),
+    api_private_key: env::var("POLYESTER_API_PRIVATE_KEY").ok(),
+    default_account_id: env::var("POLYESTER_ACCOUNT_ID").ok(),
+    ..Default::default()
+})?;
+```
+
+`Client::new` never implicitly reads the process environment.
+
+**Scripts and local tests only** — `Client::from_env()` loads
+`POLYESTER_API_KEY_ID`, `POLYESTER_API_PRIVATE_KEY`, and optionally
+`POLYESTER_ACCOUNT_ID` / `POLYESTER_API_URL`. This is a convenience helper, not
+the primary integration pattern.
 
 ```rust,no_run
 let client = polyester::Client::from_env()?;
 ```
-
-## Qty / price
-
-Public order/trigger write paths take **`Price` / `Quantity` wrappers only**:
-
-| Audience | Constructor |
-|---|---|
-| Humans / demos | `Price::from_decimal_str` / `Quantity::from_decimal_str` (or `from_decimal`) |
-| Bots / MMs | `Price::from_ticks` / `Quantity::from_scaled` |
-
-- **Reject floats** (`f32`/`f64`) — they are not accepted on these APIs.
-- **Reject bare integers** on public order APIs — use the named constructors.
-- **Reject excess fractional digits** on decimal→scaled conversion (no silent floor).
-- Price ticks are fixed **1e6**; qty scale comes from pair `base_quantity_scale` (catalog).
-- Transfer/withdraw amounts use the separate **`AssetAmount`** type, so order
-  quantities cannot be passed as ledger amounts.
 
 ## Catalog readiness
 
@@ -158,9 +199,221 @@ If a client is constructed before entering a Tokio runtime,
 (`Price::from_ticks`, `Quantity::from_scaled`, `AssetAmount::from_scaled`) do not
 need catalog lookup solely to scale the value.
 
+## Create and cancel orders
+
+```rust,no_run
+use polyester::models::{CreateOrderType, CreateSide, CreateTimeInForce};
+use polyester::types::{Price, Quantity};
+
+client.wait_for_catalogs().await?;
+
+let mut params = client.orders.create_params(
+    "BNB-USDT",
+    CreateSide::Buy,
+    CreateOrderType::Limit,
+    Quantity::from_decimal_str("0.01", 8, None, None)?,
+    Some(Price::from_decimal_str("100", None)?),
+);
+params.time_in_force = Some(CreateTimeInForce::Gtc);
+params.post_only = Some(true);
+params.client_order_id = Some("my-bot-001".into());
+
+let result = client.orders.create(params).await?;
+println!("{} {}", result.status, result.order_id);
+
+client
+    .orders
+    .cancel_by_client_order_id("my-bot-001", Some("BNB-USDT"), None)
+    .await?;
+```
+
+Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
+Do **not** pass floats. Price ticks are Polyester protocol price units (fixed
+1e6), not market tick-size alignment (server validates tick size).
+
+### For bots (scaled integers)
+
+Stay in integer space — no string round-trip:
+
+```rust,no_run
+use polyester::models::{CreateOrderType, CreateSide};
+use polyester::types::{Price, Quantity};
+
+let params = client.orders.create_params(
+    "BNB-USDT",
+    CreateSide::Buy,
+    CreateOrderType::Limit,
+    Quantity::from_scaled(1_000_000, Some(8), Default::default(), None, None)?,
+    Some(Price::from_ticks(100_000_000, None)?), // 100.000000 at 1e6
+);
+let _ = client.orders.create(params).await?;
+// Reads expose the same types: order.price.as_ticks(), order.orig_qty.as_scaled()
+```
+
+Compatible values from fills/books can be passed back into writes when the
+instrument/domain matches. Transfers and trading withdraws use `AssetAmount`
+(not order `Quantity`).
+
+Your API key needs a policy that allows trading. Spot orders spend **trading**
+balance (see below).
+
+## Qty / price rules
+
+Public order/trigger write paths take **`Price` / `Quantity` wrappers only**:
+
+| Audience | Constructor |
+|---|---|
+| Humans / demos | `Price::from_decimal_str` / `Quantity::from_decimal_str` (or `from_decimal`) |
+| Bots / MMs | `Price::from_ticks` / `Quantity::from_scaled` |
+
+- **Reject floats** (`f32`/`f64`) — they are not accepted on these APIs.
+- **Reject bare integers** on public order APIs — use the named constructors.
+- **Reject excess fractional digits** on decimal→scaled conversion (no silent floor).
+- Price ticks are fixed **1e6**; qty scale comes from pair `base_quantity_scale` (catalog).
+
+## Balances: funding vs trading
+
+Ledger balances have separate **funding** and **trading** buckets per asset.
+
+- Deposits land in **funding**.
+- Spot orders spend **trading** balance.
+- Move funds funding → trading in the Polyester UI (**Funding → Unified Trading**)
+  or on-chain via the funding wallet.
+
+SDK notes:
+
+- **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
+- **Funding → another user's funding wallet:** on-chain `FundingAccount.UAssetTransfer`
+  via wallet/smart-account signing in the Polyester app (not an API-key RPC).
+- **Trading → funding:** `client.withdraw.create_to_funding(...)` with a signed
+  intent payload.
+- **Trading → trading (another account):** `client.internal_transfers.create(...)`.
+
+Pass `default_account_id` (your Profile **Account ID**) on the client for bucket
+transfers and other account-scoped ledger operations.
+
+Balance fields are ledger u128 wire decimal strings (18-scale). Print them
+directly, or format smaller integers with `polyester::codecs::format_ledger_u64`
+when you already have a `u64` quantity.
+
+```rust,no_run
+use polyester::proto::ledger::read::v1::GetBalancesRequest;
+
+let balances = client.balances.list(GetBalancesRequest::default()).await?;
+for bal in balances.balances {
+    println!("{} funding={} trading={}", bal.asset_id, bal.funding, bal.trading);
+}
+```
+
+## Public market data
+
+Public endpoints do not require an API key. Authenticated endpoints use the
+credentials above.
+
+```rust,no_run
+let candles = client
+    .market_data
+    .get_candles("BTC-USDT", "1m", Some(50))
+    .await?;
+let current = client
+    .market_data
+    .get_current_candle("BTC-USDT", "1m")
+    .await?;
+let trades = client.market_data.get_trades("BTC-USDT", Some(20)).await?;
+let _ = (candles, current, trades);
+
+client.wait_for_catalogs().await?;
+let mut sub = client.market_data.subscribe_trades("BNB-USDT").await?;
+if let Some(trade) = sub.recv().await {
+    println!(
+        "{:?} {:?}",
+        trade.price.as_ref().map(|p| p.as_ticks()),
+        trade.qty.as_ref().map(|q| q.as_scaled())
+    );
+}
+```
+
+Merged market overview stream (snapshot + live updates):
+
+```rust,no_run
+use polyester::services::MarketOverviewCreateSubscriptionOptions;
+
+let mut sub = client
+    .market_overview
+    .create_subscription(MarketOverviewCreateSubscriptionOptions {
+        limit: Some(50),
+        ..Default::default()
+    })
+    .await?;
+if let Some(markets) = sub.updates().recv().await {
+    println!("{} rows", markets.len());
+}
+```
+
+## Realtime
+
 Realtime subscription handles stop their background tasks when explicitly
 closed or dropped. Call `close()` when prompt shutdown matters; `Drop` provides
 the cleanup safety net.
+
+```rust,no_run
+use polyester::services::CreateSubscriptionOptions;
+
+let mut orders = client.orders.subscribe(None).await?;
+if let Some(order) = orders.recv().await {
+    println!("{} {}", order.order_id, order.status);
+}
+
+let mut book = client
+    .orderbook
+    .create_subscription(CreateSubscriptionOptions {
+        symbol: "ETH-USDT".into(),
+        depth: Some(50),
+        ..Default::default()
+    })
+    .await?;
+if let Some(snapshot) = book.updates().recv().await {
+    println!("{} {}", snapshot.book_seq, snapshot.bids.len());
+}
+```
+
+## Development
+
+```bash
+source "$HOME/.cargo/env"   # if cargo is not on PATH yet
+cargo check
+cargo test --lib --all-features
+cargo test --test integration --all-features
+cargo clippy --all-targets -- -D warnings
+```
+
+CI requires every public Connect RPC in gen to be wrapped or listed in
+`sdk-coverage.toml`. Contributors:
+
+```bash
+python3 scripts/check_sdk_coverage.py
+python3 scripts/check_sdk_coverage.py --write-capabilities  # refresh JSON + README table
+```
+
+CI also refreshes `sdk-capabilities.json` and the README capability table on the
+same branch when they drift (same-repo PRs / pushes to `main`).
+
+Live integration tests under `tests/integration/` need
+`POLYESTER_API_KEY_ID` / `POLYESTER_API_PRIVATE_KEY` (and usually
+`POLYESTER_ACCOUNT_ID`). Without those env vars they soft-skip.
+
+Optional tiers (same gates as Go/Python):
+
+| Env | Enables |
+|---|---|
+| `POLYESTER_TEST_MUTATION=1` | Order/trigger/market-order write round-trips |
+| `POLYESTER_TEST_FUNDED=1` | Balance-changing transfers / fills |
+| `POLYESTER_TEST_TRADE_E2E=1` + `POLYESTER_TEST_MAKER_*` | Maker+taker fill e2e |
+| `POLYESTER_TEST_INTERNAL_TRANSFER_DEST` | Internal / unified→user transfers |
+
+With a local `.env`, `dotenvy` loads it automatically (`.env` is gitignored).
+
+CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python).
 
 ## Layout
 
@@ -195,41 +448,15 @@ hex(sha256(body))
 
 Headers: `X-API-KEY-ID`, `X-API-TIMESTAMP`, `X-API-SIGNATURE`.
 
-## Development
-
-```bash
-source "$HOME/.cargo/env"   # if cargo is not on PATH yet
-cargo check
-cargo test --lib --all-features
-cargo test --test integration --all-features
-cargo clippy --all-targets -- -D warnings
-```
-
-Live integration tests under `tests/integration/` need
-`POLYESTER_API_KEY_ID` / `POLYESTER_API_PRIVATE_KEY` (and usually
-`POLYESTER_ACCOUNT_ID`). Without those env vars they soft-skip.
-
-Optional tiers (same gates as Go/Python):
-
-| Env | Enables |
-|---|---|
-| `POLYESTER_TEST_MUTATION=1` | Order/trigger/market-order write round-trips |
-| `POLYESTER_TEST_FUNDED=1` | Balance-changing transfers / fills |
-| `POLYESTER_TEST_TRADE_E2E=1` + `POLYESTER_TEST_MAKER_*` | Maker+taker fill e2e |
-| `POLYESTER_TEST_INTERNAL_TRANSFER_DEST` | Internal / unified→user transfers |
-
-With a local `.env`, `dotenvy` loads it automatically (`.env` is gitignored).
-
-CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python).
-
-CI also requires every public Connect RPC in gen to be wrapped or listed in
-`sdk-coverage.toml`. Contributors: `python3 scripts/check_sdk_coverage.py`.
-
 ## Examples
 
 Runnable cookbook examples live in the sibling repo
 [`polyester-examples-rust`](https://github.com/Fabric-Labs/polyester-examples-rust)
 (REST market data, realtime streams, decimal + scaled-int order paths, batch create, RSI bot).
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
