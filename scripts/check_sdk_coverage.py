@@ -1097,11 +1097,14 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if args.write_capabilities:
-        cap_path.write_text(
-            json.dumps(capabilities, indent=2, sort_keys=False) + "\n",
-            encoding="utf-8",
-        )
-        print(f"wrote {cap_path.relative_to(root)}")
+        if not capabilities_match(cap_path, capabilities):
+            cap_path.write_text(
+                json.dumps(capabilities, indent=2, sort_keys=False) + "\n",
+                encoding="utf-8",
+            )
+            print(f"wrote {cap_path.relative_to(root)}")
+        else:
+            print(f"ok: {cap_path.relative_to(root)} unchanged")
         try:
             changed = sync_readme_capabilities(readme_path, capabilities)
         except (FileNotFoundError, RuntimeError) as exc:
