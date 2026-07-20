@@ -1,19 +1,15 @@
-# Intentional Connect RPC gaps for the public API-key SDKs.
+# Intentional Connect RPC omissions for this API-key SDK.
 # Every public gen procedure must be either wrapped or listed here.
-# Re-run: python3 scripts/check_sdk_coverage.py --write
-
-[report]
-markdown = "docs/sdk-coverage.md"
-json = "docs/sdk-coverage.json"
+# CI: python3 scripts/check_sdk_coverage.py
 
 [[allowlist]]
 service = "auth.v1.MFAService"
-reason = "Browser/session MFA enrollment and step-up; not part of the API-key SDK surface."
+reason = "MFA enrollment and step-up are outside the API-key SDK surface."
 
 [[allowlist]]
 procedure = "/auth.v1.AuthService/GetNonce"
-reason = "Wallet login nonce; API-key SDKs authenticate via HMAC credentials."
+reason = "Wallet login; this SDK authenticates with API-key HMAC credentials."
 
 [[allowlist]]
 procedure = "/auth.v1.AuthService/LoginWithWallet"
-reason = "Wallet login; API-key SDKs authenticate via HMAC credentials."
+reason = "Wallet login; this SDK authenticates with API-key HMAC credentials."
