@@ -7,10 +7,15 @@ Official Rust SDK for Polyester APIs — parity with `polyester-sdk-go` and
 **Status:** Alpha (`0.1.0-alpha.3`, git tag `v0.1.0a3`). Proprietary license (not open source).
 API-key only — no browser login or JWT flows.
 
+**MSRV:** Rust 1.88+
+
+## Supported surface
+
+API-key trading, market data, accounts, funding, and realtime streams — parity with
+the Go and Python SDKs. Wallet login and session MFA are TypeScript/browser only.
+
 Full cross-language comparison:
 [SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
-
-**MSRV:** Rust 1.88+
 
 ## Install
 
@@ -84,7 +89,7 @@ export POLYESTER_ACCOUNT_ID=...
 let client = polyester::Client::from_env()?;
 ```
 
-## Qty / price (POLY-3262)
+## Qty / price
 
 Public order/trigger write paths take **`Price` / `Quantity` wrappers only**:
 

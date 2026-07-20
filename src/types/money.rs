@@ -1,4 +1,4 @@
-//! Money scalar types for write/read surfaces (POLY-3262).
+//! Money scalar types for write/read surfaces.
 
 use crate::codecs::scalars::{
     format_price_ticks, format_qty_scaled, parse_price_ticks, parse_price_ticks_str,

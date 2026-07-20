@@ -1,4 +1,4 @@
-//! Strict decimal ↔ scaled-integer codecs (POLY-3262).
+//! Strict decimal ↔ scaled-integer codecs.
 
 use crate::errors::{Error, Result};
 use rust_decimal::Decimal;
