@@ -4,6 +4,7 @@
 
 ### Changed
 - Connect RPC coverage gate no longer commits dashboard reports under `docs/`; CI fails on unexpected gaps only (`sdk-coverage.toml` + `scripts/check_sdk_coverage.py`)
+- `check_sdk_coverage.py --json` writes JSON to stdout only (summary on stderr) for scoreboard piping
 
 ## 0.1.0a3
 

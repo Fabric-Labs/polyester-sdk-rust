@@ -665,15 +665,23 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(payload, indent=2, sort_keys=False) + "\n",
             encoding="utf-8",
         )
-        print(f"wrote {md_path.relative_to(root)} (local scratch; do not commit)")
-        print(f"wrote {json_path.relative_to(root)} (local scratch; do not commit)")
+        print(
+            f"wrote {md_path.relative_to(root)} (local scratch; do not commit)",
+            file=sys.stderr,
+        )
+        print(
+            f"wrote {json_path.relative_to(root)} (local scratch; do not commit)",
+            file=sys.stderr,
+        )
 
-    print(
+    # Keep the one-line summary off stdout when emitting JSON (for piping).
+    summary_line = (
         f"{result.sdk}: {result.covered_count}/{result.total} wrapped "
         f"({result.pct_wrapped:.1f}%), "
         f"{result.allowlisted_count} allowlisted, "
         f"{len(result.unexpected)} unexpected"
     )
+    print(summary_line, file=sys.stderr if args.json else sys.stdout)
 
     if result.unexpected:
         print("unexpected gaps:", file=sys.stderr)
