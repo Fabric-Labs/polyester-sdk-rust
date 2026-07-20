@@ -39,6 +39,8 @@ PROCEDURE_RE = re.compile(
 )
 # Local-only scratch output; must stay gitignored (not published with the SDK).
 DEFAULT_WRITE_DIR = ".sdk-coverage"
+# Public product capability snapshot (committed; consumed by docs automation).
+CAPABILITIES_PATH = "sdk-capabilities.json"
 
 
 def _parse_toml_subset(text: str) -> dict[str, Any]:
@@ -578,6 +580,301 @@ def build_json(result: CoverageResult) -> dict:
     }
 
 
+# Product-facing rows for the public SDK capability matrix.
+# Detection uses wrapped Connect services (and a few filesystem heuristics).
+# When a new public Connect service is wrapped but unmapped, CI fails so a row
+# can be added intentionally (or folded into an existing row).
+CAPABILITY_DEFS: list[dict[str, Any]] = [
+    {
+        "id": "market_data",
+        "label": "Public market data (spot config, trades, candles)",
+        "any_services": ["marketdata.v1.MarketDataService"],
+    },
+    {
+        "id": "orderbook",
+        "label": "Order book snapshot + realtime",
+        "any_services": ["orderbook.v1.OrderbookService"],
+    },
+    {
+        "id": "market_overview",
+        "label": "Market overview (list + subscribe)",
+        "any_services": ["marketoverview.v1.MarketOverviewService"],
+    },
+    {
+        "id": "heatmap",
+        "label": "Order book heatmap",
+        "any_services": ["marketdata.v1.HeatmapService"],
+    },
+    {
+        "id": "api_key_auth",
+        "label": "API-key (Ed25519 HMAC) auth",
+        "kind": "always_yes",
+    },
+    {
+        "id": "wallet_login",
+        "label": "Wallet / browser login",
+        "kind": "always_no",
+        "note": "API-key SDKs only; use the TypeScript browser client.",
+    },
+    {
+        "id": "session_mfa",
+        "label": "Session MFA enrollment and challenges",
+        "kind": "always_no",
+        "note": "API-key SDKs only; use the TypeScript browser client.",
+    },
+    {
+        "id": "profile",
+        "label": "Profile",
+        "any_services": ["auth.v1.ProfileService"],
+    },
+    {
+        "id": "api_keys",
+        "label": "API keys",
+        "any_services": ["auth.v1.ApiKeyService"],
+    },
+    {
+        "id": "subaccounts",
+        "label": "Subaccounts (members, invites, activity)",
+        "any_services": [
+            "auth.v1.SubaccountService",
+            "auth.v1.SubaccountViewService",
+        ],
+    },
+    {
+        "id": "address_book",
+        "label": "Address book",
+        "any_services": ["auth.v1.AddressBookService"],
+    },
+    {
+        "id": "policies",
+        "label": "Policies",
+        "any_services": ["auth.v1.PolicyService"],
+    },
+    {
+        "id": "guard_signer",
+        "label": "Guard signer",
+        "any_services": ["chain.guard.v1.GuardSignerService"],
+    },
+    {
+        "id": "balances",
+        "label": "Balances, holds, equity history",
+        "any_services": ["ledger.read.v1.LedgerReadService"],
+        # LedgerRead also backs transfers; balances is yes if any ledger read RPC wrapped.
+    },
+    {
+        "id": "orders",
+        "label": "Orders (create, cancel, modify, batch, cancel-all)",
+        "any_services": [
+            "orders.v1.OrdersService",
+            "orders.v1.OrdersReadService",
+        ],
+    },
+    {
+        "id": "user_trades",
+        "label": "User trades",
+        "any_services": ["orders.v1.OrdersReadService"],
+        "any_procedures": ["/orders.v1.OrdersReadService/GetUserTrades"],
+    },
+    {
+        "id": "triggers",
+        "label": "Triggers",
+        "any_services": ["triggers.v1.TriggersService"],
+    },
+    {
+        "id": "internal_transfers",
+        "label": "Internal transfers",
+        "any_services": ["transfer.v1.InternalTransferService"],
+    },
+    {
+        "id": "transfer_history",
+        "label": "Transfer history",
+        "any_procedures": ["/ledger.read.v1.LedgerReadService/ListTransfers"],
+    },
+    {
+        "id": "deposit_addresses",
+        "label": "Deposit addresses",
+        "any_services": ["chain.deposit.v1.DepositAddressService"],
+    },
+    {
+        "id": "withdraws",
+        "label": "Trading / funding withdraws",
+        "any_services": ["chain.withdraw.v1.WithdrawService"],
+    },
+    {
+        "id": "zipper_config",
+        "label": "Zipper deposit-withdraw config",
+        "any_services": ["chain.zipper.v1.ZipperService"],
+    },
+    {
+        "id": "chain_analytics",
+        "label": "Chain analytics",
+        "any_services": ["chain.analytics.v1.ChainAnalyticsService"],
+    },
+    {
+        "id": "lifecycle",
+        "label": "Lifecycle flows",
+        "any_services": ["chain.lifecycle.v1.LifecycleReadService"],
+    },
+    {
+        "id": "collab",
+        "label": "Polychart / layout / whiteboard",
+        "any_services": [
+            "polychart.v1.PolychartService",
+            "layout.v1.LayoutService",
+            "collab.v1.WhiteboardService",
+        ],
+    },
+    {
+        "id": "realtime",
+        "label": "Realtime account and market streams",
+        "kind": "realtime",
+    },
+    {
+        "id": "catalogs",
+        "label": "Reference catalogs + wait-for-ready",
+        "kind": "catalogs",
+    },
+    {
+        "id": "qty_price",
+        "label": "Qty / price decimal + scaled-int inputs",
+        "kind": "qty_price",
+    },
+    {
+        "id": "auth_me",
+        "label": "Auth Me (API-key session)",
+        "any_procedures": ["/auth.v1.AuthService/Me"],
+        "hidden": True,  # covered by api_key_auth row; keep for unmapped checks
+    },
+    {
+        "id": "social_verification",
+        "label": "Social verification",
+        "any_services": ["auth.v1.SocialVerificationService"],
+    },
+    {
+        "id": "resolve",
+        "label": "Account resolve / lookup",
+        "any_services": ["auth.v1.ResolveService"],
+    },
+]
+
+
+def _services_in_result(result: CoverageResult) -> set[str]:
+    return {service_of(p) for p in result.procedures}
+
+
+def _service_has_wrapper(result: CoverageResult, service: str) -> bool:
+    return any(
+        p in result.covered for p in result.procedures if service_of(p) == service
+    )
+
+
+def _procedure_wrapped(result: CoverageResult, procedure: str) -> bool:
+    return procedure in result.covered
+
+
+def _detect_qty_price(root: Path, sdk: str) -> bool:
+    if sdk == "go":
+        return (root / "codecs" / "scalars.go").is_file()
+    if sdk == "python":
+        return (root / "src" / "polyester" / "codecs" / "scalars.py").is_file()
+    if sdk == "rust":
+        return (root / "src" / "types" / "money.rs").is_file()
+    return False
+
+
+def _detect_catalogs(root: Path, sdk: str) -> bool:
+    if sdk == "go":
+        return (root / "catalogs").is_dir()
+    if sdk == "python":
+        return (root / "src" / "polyester" / "catalogs").is_dir()
+    if sdk == "rust":
+        return (root / "src" / "catalogs").is_dir() or (
+            root / "src" / "catalog"
+        ).is_dir()
+    return False
+
+
+def _detect_realtime(root: Path, sdk: str) -> bool:
+    if sdk == "go":
+        return (root / "realtime").is_dir()
+    if sdk == "python":
+        return (root / "src" / "polyester" / "realtime").is_dir()
+    if sdk == "rust":
+        return (root / "src" / "realtime").is_dir()
+    return False
+
+
+def build_capabilities(result: CoverageResult, root: Path) -> dict[str, Any]:
+    """Public product capability snapshot derived from wrappers + heuristics."""
+    rows: list[dict[str, Any]] = []
+    mapped_services: set[str] = set()
+    for cap in CAPABILITY_DEFS:
+        for svc in cap.get("any_services") or []:
+            mapped_services.add(svc)
+        for proc in cap.get("any_procedures") or []:
+            mapped_services.add(service_of(proc))
+        kind = cap.get("kind")
+        if kind == "always_yes":
+            supported = True
+        elif kind == "always_no":
+            supported = False
+        elif kind == "qty_price":
+            supported = _detect_qty_price(root, result.sdk)
+        elif kind == "catalogs":
+            supported = _detect_catalogs(root, result.sdk)
+        elif kind == "realtime":
+            supported = _detect_realtime(root, result.sdk)
+        elif cap.get("any_procedures"):
+            supported = any(
+                _procedure_wrapped(result, p) for p in cap["any_procedures"]
+            )
+        else:
+            supported = any(
+                _service_has_wrapper(result, s) for s in (cap.get("any_services") or [])
+            )
+        if cap.get("hidden"):
+            continue
+        row = {
+            "id": cap["id"],
+            "label": cap["label"],
+            "supported": bool(supported),
+        }
+        if cap.get("note"):
+            row["note"] = cap["note"]
+        rows.append(row)
+
+    # Services that appear in public gen with at least one wrapper, but no matrix row.
+    unmapped = sorted(
+        svc
+        for svc in _services_in_result(result)
+        if svc not in mapped_services
+        and _service_has_wrapper(result, svc)
+        and not svc.endswith("MFAService")
+    )
+    return {
+        "schemaVersion": 1,
+        "sdk": result.sdk,
+        "generatedAt": _utc_now_iso(),
+        "publicDescriptorSha256": result.descriptor_sha256,
+        "capabilities": rows,
+        "unmappedWrappedServices": unmapped,
+    }
+
+
+def capabilities_match(existing: Path, payload: dict) -> bool:
+    if not existing.is_file():
+        return False
+    try:
+        current = json.loads(existing.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False
+    a = dict(current)
+    b = dict(payload)
+    a.pop("generatedAt", None)
+    b.pop("generatedAt", None)
+    return a == b
+
+
 def build_markdown(result: CoverageResult, payload: dict) -> str:
     summary = payload["summary"]
     lines = [
@@ -635,9 +932,19 @@ def main(argv: list[str] | None = None) -> int:
         help=f"Write local scratch reports under {DEFAULT_WRITE_DIR}/ (gitignored)",
     )
     parser.add_argument(
+        "--write-capabilities",
+        action="store_true",
+        help=f"Write committed {CAPABILITIES_PATH} (public product matrix input)",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
-        help="Print the JSON report to stdout (still enforces the gap gate)",
+        help="Print the coverage JSON report to stdout (still enforces gates)",
+    )
+    parser.add_argument(
+        "--capabilities-json",
+        action="store_true",
+        help="Print capabilities JSON to stdout (still enforces gates)",
     )
     parser.add_argument(
         "--root",
@@ -650,8 +957,15 @@ def main(argv: list[str] | None = None) -> int:
     root = args.root.resolve()
     result = analyze(root)
     payload = build_json(result)
+    capabilities = build_capabilities(result, root)
+    cap_path = root / CAPABILITIES_PATH
 
-    if args.json:
+    if args.capabilities_json:
+        json.dump(capabilities, sys.stdout, indent=2, sort_keys=False)
+        sys.stdout.write("\n")
+    elif args.json:
+        payload = dict(payload)
+        payload["capabilities"] = capabilities
         json.dump(payload, sys.stdout, indent=2, sort_keys=False)
         sys.stdout.write("\n")
 
@@ -674,6 +988,13 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
 
+    if args.write_capabilities:
+        cap_path.write_text(
+            json.dumps(capabilities, indent=2, sort_keys=False) + "\n",
+            encoding="utf-8",
+        )
+        print(f"wrote {cap_path.relative_to(root)}")
+
     # Keep the one-line summary off stdout when emitting JSON (for piping).
     summary_line = (
         f"{result.sdk}: {result.covered_count}/{result.total} wrapped "
@@ -681,8 +1002,12 @@ def main(argv: list[str] | None = None) -> int:
         f"{result.allowlisted_count} allowlisted, "
         f"{len(result.unexpected)} unexpected"
     )
-    print(summary_line, file=sys.stderr if args.json else sys.stdout)
+    print(
+        summary_line,
+        file=sys.stderr if (args.json or args.capabilities_json) else sys.stdout,
+    )
 
+    exit_code = 0
     if result.unexpected:
         print("unexpected gaps:", file=sys.stderr)
         for proc in sorted(result.unexpected):
@@ -691,8 +1016,30 @@ def main(argv: list[str] | None = None) -> int:
             "Wrap these RPCs or add them to sdk-coverage.toml with a reason.",
             file=sys.stderr,
         )
-        return 1
-    return 0
+        exit_code = 1
+
+    if capabilities.get("unmappedWrappedServices"):
+        print("unmapped wrapped Connect services:", file=sys.stderr)
+        for svc in capabilities["unmappedWrappedServices"]:
+            print(f"  {svc}", file=sys.stderr)
+        print(
+            "Add a CAPABILITY_DEFS row (or fold into an existing row) in "
+            "scripts/check_sdk_coverage.py, then re-run with --write-capabilities.",
+            file=sys.stderr,
+        )
+        exit_code = 1
+
+    if not args.write_capabilities and not capabilities_match(cap_path, capabilities):
+        print(
+            f"error: committed {CAPABILITIES_PATH} is missing or stale\n"
+            "  run: python3 scripts/check_sdk_coverage.py --write-capabilities",
+            file=sys.stderr,
+        )
+        exit_code = 1
+    elif not args.write_capabilities:
+        print(f"ok: {CAPABILITIES_PATH} matches wrappers")
+
+    return exit_code
 
 
 if __name__ == "__main__":

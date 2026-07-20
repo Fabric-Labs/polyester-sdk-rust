@@ -123,7 +123,7 @@ pub struct BatchModifyItem {
     pub new_client_order_id: Option<String>,
 }
 
-/// Typed single-order modify params (POLY-3262 wrappers-only).
+/// Typed single-order modify params.
 #[derive(Debug, Clone)]
 pub struct ModifyOrderParams {
     pub symbol: String,
@@ -192,7 +192,7 @@ pub struct AttachedRisk {
     pub oco: bool,
 }
 
-/// Typed internal-transfer create params (POLY-3262 `AssetAmount`).
+/// Typed internal-transfer create params.
 #[derive(Debug, Clone)]
 pub struct CreateInternalTransferParams {
     pub asset_id: u32,
@@ -206,7 +206,7 @@ pub struct CreateInternalTransferParams {
     pub quantity_scale: Option<u32>,
 }
 
-/// Typed trading-withdraw create params (POLY-3262 `AssetAmount`).
+/// Typed trading-withdraw create params.
 #[derive(Debug, Clone)]
 pub struct CreateTradingWithdrawParams {
     pub asset_id: u32,
@@ -220,7 +220,7 @@ pub struct CreateTradingWithdrawParams {
     pub nonce: Option<u128>,
 }
 
-/// Typed wallet trading-withdraw create params (POLY-3262 `AssetAmount`).
+/// Typed wallet trading-withdraw create params.
 #[derive(Debug, Clone)]
 pub struct CreateWalletTradingWithdrawParams {
     pub action: String,

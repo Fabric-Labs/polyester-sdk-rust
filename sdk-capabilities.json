@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "sdk": "rust",
+  "generatedAt": "2026-07-20T14:25:30Z",
+  "publicDescriptorSha256": "286358d1c69b8c7bf7e81f7caf13e7c8efbae2d00df110037a4c71892840a8c5",
+  "capabilities": [
+    {
+      "id": "market_data",
+      "label": "Public market data (spot config, trades, candles)",
+      "supported": true
+    },
+    {
+      "id": "orderbook",
+      "label": "Order book snapshot + realtime",
+      "supported": true
+    },
+    {
+      "id": "market_overview",
+      "label": "Market overview (list + subscribe)",
+      "supported": true
+    },
+    {
+      "id": "heatmap",
+      "label": "Order book heatmap",
+      "supported": true
+    },
+    {
+      "id": "api_key_auth",
+      "label": "API-key (Ed25519 HMAC) auth",
+      "supported": true
+    },
+    {
+      "id": "wallet_login",
+      "label": "Wallet / browser login",
+      "supported": false,
+      "note": "API-key SDKs only; use the TypeScript browser client."
+    },
+    {
+      "id": "session_mfa",
+      "label": "Session MFA enrollment and challenges",
+      "supported": false,
+      "note": "API-key SDKs only; use the TypeScript browser client."
+    },
+    {
+      "id": "profile",
+      "label": "Profile",
+      "supported": true
+    },
+    {
+      "id": "api_keys",
+      "label": "API keys",
+      "supported": true
+    },
+    {
+      "id": "subaccounts",
+      "label": "Subaccounts (members, invites, activity)",
+      "supported": true
+    },
+    {
+      "id": "address_book",
+      "label": "Address book",
+      "supported": true
+    },
+    {
+      "id": "policies",
+      "label": "Policies",
+      "supported": true
+    },
+    {
+      "id": "guard_signer",
+      "label": "Guard signer",
+      "supported": true
+    },
+    {
+      "id": "balances",
+      "label": "Balances, holds, equity history",
+      "supported": true
+    },
+    {
+      "id": "orders",
+      "label": "Orders (create, cancel, modify, batch, cancel-all)",
+      "supported": true
+    },
+    {
+      "id": "user_trades",
+      "label": "User trades",
+      "supported": true
+    },
+    {
+      "id": "triggers",
+      "label": "Triggers",
+      "supported": true
+    },
+    {
+      "id": "internal_transfers",
+      "label": "Internal transfers",
+      "supported": true
+    },
+    {
+      "id": "transfer_history",
+      "label": "Transfer history",
+      "supported": true
+    },
+    {
+      "id": "deposit_addresses",
+      "label": "Deposit addresses",
+      "supported": true
+    },
+    {
+      "id": "withdraws",
+      "label": "Trading / funding withdraws",
+      "supported": true
+    },
+    {
+      "id": "zipper_config",
+      "label": "Zipper deposit-withdraw config",
+      "supported": true
+    },
+    {
+      "id": "chain_analytics",
+      "label": "Chain analytics",
+      "supported": true
+    },
+    {
+      "id": "lifecycle",
+      "label": "Lifecycle flows",
+      "supported": true
+    },
+    {
+      "id": "collab",
+      "label": "Polychart / layout / whiteboard",
+      "supported": true
+    },
+    {
+      "id": "realtime",
+      "label": "Realtime account and market streams",
+      "supported": true
+    },
+    {
+      "id": "catalogs",
+      "label": "Reference catalogs + wait-for-ready",
+      "supported": true
+    },
+    {
+      "id": "qty_price",
+      "label": "Qty / price decimal + scaled-int inputs",
+      "supported": true
+    },
+    {
+      "id": "social_verification",
+      "label": "Social verification",
+      "supported": true
+    },
+    {
+      "id": "resolve",
+      "label": "Account resolve / lookup",
+      "supported": true
+    }
+  ],
+  "unmappedWrappedServices": []
+}

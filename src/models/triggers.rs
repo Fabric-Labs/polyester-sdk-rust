@@ -12,7 +12,7 @@ pub enum CreateTriggerType {
     Ladder,
 }
 
-/// Typed create-trigger params (POLY-3262 wrappers-only for prices/qty).
+/// Typed create-trigger params.
 #[derive(Debug, Clone)]
 pub struct CreateTriggerParams {
     pub symbol: String,
@@ -42,7 +42,7 @@ pub struct CreateTriggerParams {
     pub self_trade_prevention_mode: Option<String>,
 }
 
-/// Typed modify-trigger params (POLY-3262 wrappers-only for prices).
+/// Typed modify-trigger params.
 #[derive(Debug, Clone)]
 pub struct ModifyTriggerParams {
     pub trigger_id: String,
