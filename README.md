@@ -177,15 +177,8 @@ With a local `.env`, `dotenvy` loads it automatically (`.env` is gitignored).
 
 CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python).
 
-Connect RPC wrapper coverage (public gen vs handwritten services) is tracked in
-[`docs/sdk-coverage.md`](docs/sdk-coverage.md). After wrapping a new RPC or
-refreshing gen:
-
-```bash
-python3 scripts/check_sdk_coverage.py --write
-```
-
-CI fails on unexpected gaps or a stale committed report.
+CI also requires every public Connect RPC in gen to be wrapped or listed in
+`sdk-coverage.toml`. Contributors: `python3 scripts/check_sdk_coverage.py`.
 
 ## Examples
 

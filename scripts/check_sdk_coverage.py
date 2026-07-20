@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Map public Connect RPCs to handwritten SDK wrappers (POLY-3533).
+"""CI gate: every public Connect RPC is wrapped or allowlisted.
 
-Discovers generated Connect procedures under the path declared in
-``manifest.json``, discovers wrapper call sites for the current SDK language,
-applies ``sdk-coverage.toml`` allowlists, and emits machine + human reports.
+Discovers generated Connect procedures under the path in ``manifest.json``,
+finds handwritten wrapper call sites for this SDK language, and applies
+``sdk-coverage.toml``. Fails if any public RPC is neither wrapped nor
+allowlisted.
 
 Usage:
-  python3 scripts/check_sdk_coverage.py           # check gaps + committed reports
-  python3 scripts/check_sdk_coverage.py --write   # regenerate docs/sdk-coverage.*
-  python3 scripts/check_sdk_coverage.py --json    # print JSON to stdout only
+  python3 scripts/check_sdk_coverage.py         # CI / local gate (default)
+  python3 scripts/check_sdk_coverage.py --json  # same gate + JSON on stdout
+  python3 scripts/check_sdk_coverage.py --write # optional local scratch under .sdk-coverage/
 
 Keep this file identical across polyester-sdk-{go,python,rust}. Language behavior
 is selected from ``manifest.json`` ``sdk``.
@@ -36,11 +37,13 @@ ROOT = Path(__file__).resolve().parents[1]
 PROCEDURE_RE = re.compile(
     r"^/[a-z][a-z0-9_.]+\.[A-Za-z0-9_]+/[A-Za-z0-9_]+$"
 )
+# Local-only scratch output; must stay gitignored (not published with the SDK).
+DEFAULT_WRITE_DIR = ".sdk-coverage"
 
 
 def _parse_toml_subset(text: str) -> dict[str, Any]:
     """Minimal TOML reader for sdk-coverage.toml (stdlib-only fallback)."""
-    data: dict[str, Any] = {"report": {}, "allowlist": []}
+    data: dict[str, Any] = {"allowlist": []}
     section: str | None = None
     current: dict[str, str] | None = None
 
@@ -54,14 +57,14 @@ def _parse_toml_subset(text: str) -> dict[str, Any]:
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
-        if line == "[report]":
-            flush()
-            section = "report"
-            continue
         if line == "[[allowlist]]":
             flush()
             section = "allowlist"
             current = {}
+            continue
+        if line.startswith("["):
+            flush()
+            section = None
             continue
         if "=" not in line:
             die(f"unsupported TOML line (use Python 3.11+ or simplify): {raw}")
@@ -69,12 +72,10 @@ def _parse_toml_subset(text: str) -> dict[str, Any]:
         if not (value.startswith('"') and value.endswith('"')):
             die(f"only double-quoted string values supported in fallback TOML: {raw}")
         value = value[1:-1]
-        if section == "report":
-            data["report"][key] = value
-        elif section == "allowlist" and current is not None:
+        if section == "allowlist" and current is not None:
             current[key] = value
         else:
-            die(f"TOML key outside known section: {raw}")
+            die(f"TOML key outside [[allowlist]]: {raw}")
     flush()
     return data
 
@@ -148,14 +149,11 @@ def load_manifest(root: Path) -> dict:
     return data
 
 
-def load_allowlist(root: Path) -> tuple[list[AllowEntry], Path, Path]:
+def load_allowlist(root: Path) -> list[AllowEntry]:
     path = root / "sdk-coverage.toml"
     if not path.is_file():
         die(f"missing {path}")
     data = load_toml(path)
-    report = data.get("report") or {}
-    md = root / report.get("markdown", "docs/sdk-coverage.md")
-    js = root / report.get("json", "docs/sdk-coverage.json")
     entries: list[AllowEntry] = []
     for raw in data.get("allowlist") or []:
         proc = raw.get("procedure")
@@ -171,7 +169,7 @@ def load_allowlist(root: Path) -> tuple[list[AllowEntry], Path, Path]:
         if proc and not PROCEDURE_RE.match(proc):
             die(f"invalid allowlist procedure path: {proc}")
         entries.append(AllowEntry(procedure=proc, service=svc, reason=reason))
-    return entries, md, js
+    return entries
 
 
 def service_of(procedure: str) -> str:
@@ -209,7 +207,6 @@ def apply_allowlist(
             p for p in procedures if service_of(p) == entry.service and p not in covered
         }
         if not matched:
-            # Entire service wrapped, or service removed from gen.
             still_in_gen = {p for p in procedures if service_of(p) == entry.service}
             if still_in_gen and still_in_gen <= covered:
                 die(
@@ -338,8 +335,7 @@ def extract_wrapped_go(services_root: Path, service_names: dict[str, str]) -> se
             fqdn = service_names.get(short)
             if not fqdn:
                 continue
-            proc = f"/{fqdn}/{meth}"
-            covered.add(proc)
+            covered.add(f"/{fqdn}/{meth}")
     return covered
 
 
@@ -478,7 +474,7 @@ def analyze(root: Path) -> CoverageResult:
     gen_rel = manifest["paths"]["gen"]
     gen_root = root / gen_rel
     descriptor = manifest.get("publicDescriptorSha256") or ""
-    allow_entries, _, _ = load_allowlist(root)
+    allow_entries = load_allowlist(root)
 
     if sdk == "go":
         procedures, service_names = extract_gen_go(gen_root)
@@ -521,7 +517,7 @@ def analyze(root: Path) -> CoverageResult:
 
 
 # ---------------------------------------------------------------------------
-# Reporting
+# Optional local scratch reporting (gitignored; not for publication)
 # ---------------------------------------------------------------------------
 
 
@@ -541,7 +537,6 @@ def _utc_now_iso() -> str:
 
 
 def build_json(result: CoverageResult) -> dict:
-    gaps_unexpected = sorted(result.unexpected)
     gaps_allowlisted = [
         {"procedure": p, "reason": result.allow_reasons[p]}
         for p in sorted(result.allowlisted)
@@ -565,7 +560,6 @@ def build_json(result: CoverageResult) -> dict:
     return {
         "schemaVersion": 1,
         "sdk": result.sdk,
-        # timezone.utc: keep Python 3.10 runners working (datetime.UTC is 3.11+).
         "generatedAt": _utc_now_iso(),
         "publicDescriptorSha256": result.descriptor_sha256,
         "genRoot": result.gen_root,
@@ -578,7 +572,7 @@ def build_json(result: CoverageResult) -> dict:
             "pctAccounted": round(result.pct_accounted, 2),
         },
         "allowlistedGaps": gaps_allowlisted,
-        "unexpectedGaps": gaps_unexpected,
+        "unexpectedGaps": sorted(result.unexpected),
         "services": services,
         "wrappedProcedures": sorted(result.covered),
     }
@@ -589,11 +583,8 @@ def build_markdown(result: CoverageResult, payload: dict) -> str:
     lines = [
         f"# SDK Connect coverage ({result.sdk})",
         "",
-        "Generated by `scripts/check_sdk_coverage.py`. Do not edit by hand — run:",
-        "",
-        "```bash",
-        "python3 scripts/check_sdk_coverage.py --write",
-        "```",
+        "Local scratch report from `scripts/check_sdk_coverage.py --write`.",
+        "Do not commit this file — keep coverage dashboards out of the published SDK tree.",
         "",
         "## Summary",
         "",
@@ -606,30 +597,11 @@ def build_markdown(result: CoverageResult, payload: dict) -> str:
         f"| % wrapped | {summary['pctWrapped']:.2f}% |",
         f"| % accounted (wrapped + allowlisted) | {summary['pctAccounted']:.2f}% |",
         "",
-        f"- Gen root: `{result.gen_root}`",
-        f"- Public descriptor SHA-256: `{result.descriptor_sha256 or '(missing)'}`",
-        f"- Report generated at: `{payload['generatedAt']}`",
-        "",
-        "## What this measures",
-        "",
-        "This report maps **public generated Connect RPC procedures** to "
-        "**handwritten unary wrapper call sites** in the SDK service layer.",
-        "",
-        "It does **not** count:",
-        "",
-        "- Realtime / Centrifugo subscribe helpers",
-        "- Client field aliases (`candles` → `market_data`, etc.)",
-        "- Catalog, codec, or money-type helpers",
-        "- Private services excluded from public gen (e.g. `ledger.write`)",
-        "",
         "## Intentional gaps (allowlisted)",
         "",
     ]
     if payload["allowlistedGaps"]:
-        lines += [
-            "| Procedure | Reason |",
-            "| --- | --- |",
-        ]
+        lines += ["| Procedure | Reason |", "| --- | --- |"]
         for gap in payload["allowlistedGaps"]:
             reason = gap["reason"].replace("|", "\\|")
             lines.append(f"| `{gap['procedure']}` | {reason} |")
@@ -637,12 +609,10 @@ def build_markdown(result: CoverageResult, payload: dict) -> str:
         lines.append("_None._")
     lines += ["", "## Unexpected gaps", ""]
     if payload["unexpectedGaps"]:
-        lines.append("These must be wrapped or added to `sdk-coverage.toml`:")
-        lines.append("")
         for proc in payload["unexpectedGaps"]:
             lines.append(f"- `{proc}`")
     else:
-        lines.append("_None — every public Connect RPC is wrapped or allowlisted._")
+        lines.append("_None._")
     lines += ["", "## By service", ""]
     lines += [
         "| Service | Total | Wrapped | Allowlisted | Unexpected | % wrapped |",
@@ -653,25 +623,8 @@ def build_markdown(result: CoverageResult, payload: dict) -> str:
             f"| `{svc['service']}` | {svc['total']} | {svc['wrapped']} | "
             f"{svc['allowlisted']} | {svc['unexpected']} | {svc['pct_wrapped']:.1f}% |"
         )
-    lines += ["", "## Config", "", "- Allowlist: `sdk-coverage.toml`", ""]
-    return "\n".join(lines) + "\n"
-
-
-def normalize_for_compare(payload: dict) -> dict:
-    """Drop volatile timestamp so committed-report checks stay stable within a run."""
-    out = dict(payload)
-    out.pop("generatedAt", None)
-    return out
-
-
-def reports_match(existing: Path, payload: dict) -> bool:
-    if not existing.is_file():
-        return False
-    try:
-        current = json.loads(existing.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return False
-    return normalize_for_compare(current) == normalize_for_compare(payload)
+    lines.append("")
+    return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -679,12 +632,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--write",
         action="store_true",
-        help="Write docs/sdk-coverage.md and docs/sdk-coverage.json",
+        help=f"Write local scratch reports under {DEFAULT_WRITE_DIR}/ (gitignored)",
     )
     parser.add_argument(
         "--json",
         action="store_true",
-        help="Print the JSON report to stdout (still enforces gap checks)",
+        help="Print the JSON report to stdout (still enforces the gap gate)",
     )
     parser.add_argument(
         "--root",
@@ -695,39 +648,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     root = args.root.resolve()
-    _, md_path, json_path = load_allowlist(root)
     result = analyze(root)
     payload = build_json(result)
-    markdown = build_markdown(result, payload)
 
     if args.json:
         json.dump(payload, sys.stdout, indent=2, sort_keys=False)
         sys.stdout.write("\n")
 
     if args.write:
-        md_path.parent.mkdir(parents=True, exist_ok=True)
-        json_path.parent.mkdir(parents=True, exist_ok=True)
-        md_path.write_text(markdown, encoding="utf-8")
+        out_dir = root / DEFAULT_WRITE_DIR
+        out_dir.mkdir(parents=True, exist_ok=True)
+        md_path = out_dir / "sdk-coverage.md"
+        json_path = out_dir / "sdk-coverage.json"
+        md_path.write_text(build_markdown(result, payload), encoding="utf-8")
         json_path.write_text(
             json.dumps(payload, indent=2, sort_keys=False) + "\n",
             encoding="utf-8",
         )
-        print(f"wrote {md_path.relative_to(root)}")
-        print(f"wrote {json_path.relative_to(root)}")
-    elif not args.json:
-        if not reports_match(json_path, payload):
-            print(
-                f"error: committed report out of date: {json_path.relative_to(root)}\n"
-                "  run: python3 scripts/check_sdk_coverage.py --write",
-                file=sys.stderr,
-            )
-            # Still print summary below, but fail.
-            stale = True
-        else:
-            stale = False
-            print(f"ok: committed report matches ({json_path.relative_to(root)})")
-    else:
-        stale = False
+        print(f"wrote {md_path.relative_to(root)} (local scratch; do not commit)")
+        print(f"wrote {json_path.relative_to(root)} (local scratch; do not commit)")
 
     print(
         f"{result.sdk}: {result.covered_count}/{result.total} wrapped "
@@ -744,8 +683,6 @@ def main(argv: list[str] | None = None) -> int:
             "Wrap these RPCs or add them to sdk-coverage.toml with a reason.",
             file=sys.stderr,
         )
-        return 1
-    if not args.write and not args.json and stale:
         return 1
     return 0
 

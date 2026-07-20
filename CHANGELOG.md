@@ -2,13 +2,16 @@
 
 ## Unreleased
 
+### Changed
+- Connect RPC coverage gate no longer commits dashboard reports under `docs/`; CI fails on unexpected gaps only (`sdk-coverage.toml` + `scripts/check_sdk_coverage.py`)
+
 ## 0.1.0a3
 
 Package version: `0.1.0-alpha.3`. Git tag: `v0.1.0a3`.
 
 ### Features
 - Raw and typed Centrifugo subscription handles stop their background tasks on `Drop` (in addition to explicit `close()`)
-- Connect RPC wrapper coverage gate (POLY-3533): `scripts/check_sdk_coverage.py`, allowlist, and committed `docs/sdk-coverage.*` reports
+- Connect RPC wrapper coverage gate (POLY-3533): `scripts/check_sdk_coverage.py` + `sdk-coverage.toml`
 
 ### Docs
 - README notes Drop cleanup for realtime subscriptions
