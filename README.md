@@ -7,6 +7,9 @@ Official Rust SDK for Polyester APIs — parity with `polyester-sdk-go` and
 **Status:** Alpha (`0.1.0-alpha.3`, git tag `v0.1.0a3`). Proprietary license (not open source).
 API-key only — no browser login or JWT flows.
 
+Full cross-language comparison:
+[SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
+
 **MSRV:** Rust 1.88+
 
 ## Install
