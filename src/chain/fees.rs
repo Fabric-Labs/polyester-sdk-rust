@@ -55,9 +55,8 @@ pub async fn quote_zipper_fee(
 
     let decimals_raw = eth_call(client, &token, decimalsCall {}.abi_encode()).await?;
     let decimals = u256_from_eth_call_result(&decimals_raw)?;
-    let z_token_decimals = u8::try_from(decimals).map_err(|_| {
-        Error::validation(format!("decimals out of range: {decimals}"))
-    })?;
+    let z_token_decimals = u8::try_from(decimals)
+        .map_err(|_| Error::validation(format!("decimals out of range: {decimals}")))?;
 
     let token_addr: Address = token
         .parse()

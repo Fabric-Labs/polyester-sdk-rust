@@ -147,7 +147,8 @@ impl Client {
         T: Send + 'static,
         F: Fn(&[u8]) -> Result<T> + Send + Sync + 'static,
     {
-        self.subscribe_proto_with_options(channel, decode, true).await
+        self.subscribe_proto_with_options(channel, decode, true)
+            .await
     }
 
     /// Subscribe with optional auto-reconnect control.
