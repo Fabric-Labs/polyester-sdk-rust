@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Testing
+- Live funded UserOp tests: Funding → Trading and Funding → external withdraw, gated by `POLYESTER_TEST_CHAIN_USEROP=1`
+
 ### Changed
 - Realtime (`tokio-tungstenite`) and on-chain Funding helpers (`alloy-*`, `k256`) are always-on dependencies, not optional features. Empty `realtime` / `chain` feature stubs remain for Cargo compatibility.
 - Clippy cleanups in always-on `chain` (needless borrows, `too_many_arguments` allow, collapsible status poll)
