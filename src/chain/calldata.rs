@@ -75,11 +75,7 @@ pub fn encode_trading_gateway_deposit(
         uAmount: quantity_scaled,
     }
     .abi_encode();
-    Ok(ChainCall {
-        to,
-        data,
-        value: 0,
-    })
+    Ok(ChainCall { to, data, value: 0 })
 }
 
 /// Encode `TradingGateway.depositTo(address,bytes32,uint256)`.
@@ -101,11 +97,7 @@ pub fn encode_trading_gateway_deposit_to(
         uAmount: quantity_scaled,
     }
     .abi_encode();
-    Ok(ChainCall {
-        to,
-        data,
-        value: 0,
-    })
+    Ok(ChainCall { to, data, value: 0 })
 }
 
 /// Encode `FundingAccount.withdrawToChain((uint16,address,bytes,uint256,uint256))`.
@@ -142,11 +134,7 @@ pub fn encode_funding_withdraw_to_chain(
         },
     }
     .abi_encode();
-    Ok(ChainCall {
-        to,
-        data,
-        value: 0,
-    })
+    Ok(ChainCall { to, data, value: 0 })
 }
 
 fn resolve_guard_tuple(approval: Option<GuardApproval>) -> GuardApprovalTuple {
@@ -172,11 +160,7 @@ pub fn encode_set_external_destination_allowlist_required(
         guardSigIfFalse: resolve_guard_tuple(approval),
     }
     .abi_encode();
-    Ok(ChainCall {
-        to,
-        data,
-        value: 0,
-    })
+    Ok(ChainCall { to, data, value: 0 })
 }
 
 /// Encode `setInternalAccountAllowlistRequired(bool,(uint192,uint256,bytes))`.
@@ -191,11 +175,7 @@ pub fn encode_set_internal_account_allowlist_required(
         guardSigIfFalse: resolve_guard_tuple(approval),
     }
     .abi_encode();
-    Ok(ChainCall {
-        to,
-        data,
-        value: 0,
-    })
+    Ok(ChainCall { to, data, value: 0 })
 }
 
 /// Encode `addAllowedExternalDestinations(uint16,bytes[],(uint192,uint256,bytes))`.
@@ -266,11 +246,7 @@ fn encode_external_destinations(
         .map(|d| Bytes::copy_from_slice(d))
         .collect();
     let data = pack(chain_id, dest_bytes, resolve_guard_tuple(approval));
-    Ok(ChainCall {
-        to,
-        data,
-        value: 0,
-    })
+    Ok(ChainCall { to, data, value: 0 })
 }
 
 /// Encode `addAllowedInternalAccounts(address[],(uint192,uint256,bytes))`.
@@ -279,18 +255,9 @@ pub fn encode_add_allowed_internal_accounts(
     accounts: &[&str],
     approval: Option<GuardApproval>,
 ) -> Result<ChainCall> {
-    encode_internal_accounts(
-        funding_account,
-        accounts,
-        approval,
-        |accounts, approval| {
-            addAllowedInternalAccountsCall {
-                accounts,
-                approval,
-            }
-            .abi_encode()
-        },
-    )
+    encode_internal_accounts(funding_account, accounts, approval, |accounts, approval| {
+        addAllowedInternalAccountsCall { accounts, approval }.abi_encode()
+    })
 }
 
 /// Encode `removeAllowedInternalAccounts(address[],(uint192,uint256,bytes))`.
@@ -299,18 +266,9 @@ pub fn encode_remove_allowed_internal_accounts(
     accounts: &[&str],
     approval: Option<GuardApproval>,
 ) -> Result<ChainCall> {
-    encode_internal_accounts(
-        funding_account,
-        accounts,
-        approval,
-        |accounts, approval| {
-            removeAllowedInternalAccountsCall {
-                accounts,
-                approval,
-            }
-            .abi_encode()
-        },
-    )
+    encode_internal_accounts(funding_account, accounts, approval, |accounts, approval| {
+        removeAllowedInternalAccountsCall { accounts, approval }.abi_encode()
+    })
 }
 
 fn encode_internal_accounts(
@@ -328,11 +286,7 @@ fn encode_internal_accounts(
         .map(|a| parse_address(a, "accounts"))
         .collect::<Result<Vec<_>>>()?;
     let data = pack(addrs, resolve_guard_tuple(approval));
-    Ok(ChainCall {
-        to,
-        data,
-        value: 0,
-    })
+    Ok(ChainCall { to, data, value: 0 })
 }
 
 /// Encode `GuardRegistry.initializeSigner(address)`.
@@ -343,11 +297,7 @@ pub fn encode_initialize_guard_signer(guard_registry: &str, signer: &str) -> Res
         signer: signer_addr,
     }
     .abi_encode();
-    Ok(ChainCall {
-        to,
-        data,
-        value: 0,
-    })
+    Ok(ChainCall { to, data, value: 0 })
 }
 
 /// Encode `GuardRegistry.rotateSigner(address,(uint192,uint256,bytes))`.
@@ -363,11 +313,7 @@ pub fn encode_rotate_guard_signer(
         approval: resolve_guard_tuple(approval),
     }
     .abi_encode();
-    Ok(ChainCall {
-        to,
-        data,
-        value: 0,
-    })
+    Ok(ChainCall { to, data, value: 0 })
 }
 
 fn normalize_address(value: &str, field: &str) -> Result<String> {
@@ -399,8 +345,8 @@ fn normalize_bytes32(value: &str, field: &str) -> Result<B256> {
             "{field} must be 32 bytes (64 hex chars)"
         )));
     }
-    let raw = hex::decode(text)
-        .map_err(|_| Error::validation(format!("{field} is not valid hex")))?;
+    let raw =
+        hex::decode(text).map_err(|_| Error::validation(format!("{field} is not valid hex")))?;
     Ok(B256::from_slice(&raw))
 }
 
@@ -411,18 +357,14 @@ mod tests {
     const TRADING_GATEWAY: &str = "0x4444444444444444444444444444444444444444";
     const FUNDING_ACCOUNT: &str = "0x1111111111111111111111111111111111111111";
     const INTERNAL_ACCOUNT: &str = "0x3333333333333333333333333333333333333333";
-    const U_ASSET_ID: &str =
-        "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const U_ASSET_ID: &str = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const Z_TOKEN: &str = "0x5555555555555555555555555555555555555555";
 
     #[test]
     fn encode_deposit_selector_and_args() {
-        let call = encode_trading_gateway_deposit(
-            TRADING_GATEWAY,
-            U_ASSET_ID,
-            U256::from(1_000_000u64),
-        )
-        .unwrap();
+        let call =
+            encode_trading_gateway_deposit(TRADING_GATEWAY, U_ASSET_ID, U256::from(1_000_000u64))
+                .unwrap();
         assert_eq!(call.to, TRADING_GATEWAY.to_ascii_lowercase());
         assert_eq!(call.value, 0);
         assert_eq!(&call.data[..4], depositCall::SELECTOR.as_slice());
@@ -441,7 +383,10 @@ mod tests {
         .unwrap();
         assert_eq!(&call.data[..4], depositToCall::SELECTOR.as_slice());
         let decoded = depositToCall::abi_decode(&call.data).unwrap();
-        assert_eq!(decoded.toAccount, parse_address(INTERNAL_ACCOUNT, "to").unwrap());
+        assert_eq!(
+            decoded.toAccount,
+            parse_address(INTERNAL_ACCOUNT, "to").unwrap()
+        );
     }
 
     #[test]
@@ -469,17 +414,18 @@ mod tests {
 
     #[test]
     fn encode_allowlist_required() {
-        let call =
-            encode_set_external_destination_allowlist_required(FUNDING_ACCOUNT, true, None)
-                .unwrap();
+        let call = encode_set_external_destination_allowlist_required(FUNDING_ACCOUNT, true, None)
+            .unwrap();
         assert_eq!(
             &call.data[..4],
             setExternalDestinationAllowlistRequiredCall::SELECTOR.as_slice()
         );
-        let decoded =
-            setExternalDestinationAllowlistRequiredCall::abi_decode(&call.data).unwrap();
+        let decoded = setExternalDestinationAllowlistRequiredCall::abi_decode(&call.data).unwrap();
         assert!(decoded.required);
-        assert_eq!(decoded.guardSigIfFalse.nonceSpace, alloy_primitives::Uint::ZERO);
+        assert_eq!(
+            decoded.guardSigIfFalse.nonceSpace,
+            alloy_primitives::Uint::ZERO
+        );
         assert_eq!(decoded.guardSigIfFalse.deadline, U256::ZERO);
         assert!(decoded.guardSigIfFalse.signature.is_empty());
     }
@@ -532,9 +478,11 @@ mod tests {
 
     #[test]
     fn encode_add_remove_allowed_internal_accounts() {
-        let accounts = [INTERNAL_ACCOUNT, "0x6666666666666666666666666666666666666666"];
-        let add =
-            encode_add_allowed_internal_accounts(FUNDING_ACCOUNT, &accounts, None).unwrap();
+        let accounts = [
+            INTERNAL_ACCOUNT,
+            "0x6666666666666666666666666666666666666666",
+        ];
+        let add = encode_add_allowed_internal_accounts(FUNDING_ACCOUNT, &accounts, None).unwrap();
         assert_eq!(
             &add.data[..4],
             addAllowedInternalAccountsCall::SELECTOR.as_slice()

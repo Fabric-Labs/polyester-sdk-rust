@@ -59,8 +59,7 @@ fn parse_address(value: &str) -> Result<Address> {
             "address must be a 20-byte 0x-prefixed hex string",
         ));
     }
-    let raw = hex::decode(hex)
-        .map_err(|_| Error::validation("address is not valid hex"))?;
+    let raw = hex::decode(hex).map_err(|_| Error::validation("address is not valid hex"))?;
     Ok(Address::from_slice(&raw))
 }
 
@@ -74,7 +73,11 @@ fn encode_internal_tx(to: Address, data: &[u8], value: U256, operation: u8) -> V
     out
 }
 
-fn get_initializer(owners: &[Address], threshold: u64, safe: &SafeDeploymentConfig) -> Result<Vec<u8>> {
+fn get_initializer(
+    owners: &[Address],
+    threshold: u64,
+    safe: &SafeDeploymentConfig,
+) -> Result<Vec<u8>> {
     let module = parse_address(safe.safe_4337_module_address)?;
     let setup_addr = parse_address(safe.safe_module_setup_address)?;
     let multi_send = parse_address(safe.multi_send_address)?;
@@ -84,7 +87,12 @@ fn get_initializer(owners: &[Address], threshold: u64, safe: &SafeDeploymentConf
     }
     .abi_encode();
 
-    let multi_calls = [encode_internal_tx(setup_addr, &enable_modules, U256::ZERO, 1)];
+    let multi_calls = [encode_internal_tx(
+        setup_addr,
+        &enable_modules,
+        U256::ZERO,
+        1,
+    )];
     let packed: Vec<u8> = multi_calls.into_iter().flatten().collect();
     let multi_send_calldata = multiSendCall {
         transactions: Bytes::from(packed),
@@ -156,8 +164,10 @@ pub fn predict_safe_address(
     salt_nonce: u64,
     environment: Option<&PolyesterChainEnvironment>,
 ) -> Result<String> {
-    Ok(predict_safe_address_with_data(&[owner_address], salt_nonce, None, None, environment)?
-        .address)
+    Ok(
+        predict_safe_address_with_data(&[owner_address], salt_nonce, None, None, environment)?
+            .address,
+    )
 }
 
 /// Alias matching the TypeScript `predictPolyesterSmartAccountAddress` name.

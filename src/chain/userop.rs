@@ -113,8 +113,7 @@ fn parse_address(value: &str) -> Result<Address> {
             "address must be a 20-byte 0x-prefixed hex string",
         ));
     }
-    let raw = hex::decode(hex)
-        .map_err(|_| Error::validation("address is not valid hex"))?;
+    let raw = hex::decode(hex).map_err(|_| Error::validation("address is not valid hex"))?;
     Ok(Address::from_slice(&raw))
 }
 
@@ -131,12 +130,10 @@ fn parse_private_key(owner_private_key: &str) -> Result<SigningKey> {
         .trim()
         .strip_prefix("0x")
         .unwrap_or(owner_private_key.trim());
-    let raw = hex::decode(hex)
-        .map_err(|_| Error::validation("owner_private_key is not valid hex"))?;
+    let raw =
+        hex::decode(hex).map_err(|_| Error::validation("owner_private_key is not valid hex"))?;
     if raw.len() != 32 {
-        return Err(Error::validation(
-            "owner_private_key must be 32 bytes",
-        ));
+        return Err(Error::validation("owner_private_key must be 32 bytes"));
     }
     SigningKey::from_slice(&raw)
         .map_err(|e| Error::validation(format!("invalid secp256k1 private key: {e}")))
@@ -165,9 +162,7 @@ fn as_u64(value: &Value) -> Result<u64> {
                     .map_err(|e| Error::transport(format!("invalid int: {e}")))
             }
         }
-        _ => Err(Error::transport(format!(
-            "cannot convert {value} to int"
-        ))),
+        _ => Err(Error::transport(format!("cannot convert {value} to int"))),
     }
 }
 
@@ -420,10 +415,7 @@ impl PolyesterSmartAccount {
         // paymasterPostOpGasLimit=1; without a floor the bundler accepts then rejects.
         let sponsored = self
             .paymaster
-            .request(
-                "pm_sponsorUserOperation",
-                json!([user_op, entry_point]),
-            )
+            .request("pm_sponsorUserOperation", json!([user_op, entry_point]))
             .await?;
 
         let call_gas = add_user_operation_gas_buffer(as_u64(
@@ -467,10 +459,7 @@ impl PolyesterSmartAccount {
 
         let sponsored = self
             .paymaster
-            .request(
-                "pm_sponsorUserOperation",
-                json!([buffered_op, entry_point]),
-            )
+            .request("pm_sponsorUserOperation", json!([buffered_op, entry_point]))
             .await?;
 
         // Keep the exact buffered limits we asked the paymaster to cover. Taking
@@ -486,12 +475,8 @@ impl PolyesterSmartAccount {
             .unwrap_or("0x");
         let pm_data_bytes = decode_hex_bytes(pm_data_hex)?;
 
-        let paymaster_and_data = pack_paymaster_and_data(
-            paymaster.as_deref(),
-            pm_ver,
-            pm_post,
-            &pm_data_bytes,
-        )?;
+        let paymaster_and_data =
+            pack_paymaster_and_data(paymaster.as_deref(), pm_ver, pm_post, &pm_data_bytes)?;
         let signature = sign_safe_user_operation(
             &self.signing_key,
             &self.environment,
@@ -558,10 +543,7 @@ impl PolyesterSmartAccount {
         while Instant::now() < deadline {
             let raw = self
                 .bundler
-                .request(
-                    "eth_getUserOperationReceipt",
-                    json!([user_operation_hash]),
-                )
+                .request("eth_getUserOperationReceipt", json!([user_operation_hash]))
                 .await?;
             if !raw.is_null() {
                 let receipt = raw.get("receipt").cloned().unwrap_or(Value::Null);
