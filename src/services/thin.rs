@@ -2611,7 +2611,9 @@ pub fn build_update_subaccount_policy_request(
     params: UpdateSubaccountPolicyParams,
 ) -> crate::errors::Result<crate::proto::auth::v1::UpdateSubaccountPolicyRequest> {
     use crate::errors::Error;
-    use crate::proto::auth::v1::{SpotMarketRule, SubaccountPolicySpec, UpdateSubaccountPolicyRequest};
+    use crate::proto::auth::v1::{
+        SpotMarketRule, SubaccountPolicySpec, UpdateSubaccountPolicyRequest,
+    };
     use buffa_types::google::protobuf::FieldMask;
 
     if expected_revision == 0 {
@@ -2819,15 +2821,19 @@ mod tests {
 
     #[test]
     fn update_subaccount_request_rejects_zero_revision_and_empty_mask() {
-        let err = build_update_subaccount_request(1, 0, UpdateSubaccountParams {
-            label: Some("x".into()),
-            ..Default::default()
-        })
+        let err = build_update_subaccount_request(
+            1,
+            0,
+            UpdateSubaccountParams {
+                label: Some("x".into()),
+                ..Default::default()
+            },
+        )
         .unwrap_err();
         assert!(err.to_string().contains("expected_revision"));
 
-        let err = build_update_subaccount_request(1, 1, UpdateSubaccountParams::default())
-            .unwrap_err();
+        let err =
+            build_update_subaccount_request(1, 1, UpdateSubaccountParams::default()).unwrap_err();
         assert!(err.to_string().contains("update_mask"));
     }
 
@@ -2869,12 +2875,9 @@ mod tests {
         .unwrap_err();
         assert!(err.to_string().contains("expected_revision"));
 
-        let err = build_update_address_book_entry_request(
-            1,
-            1,
-            UpdateAddressBookEntryParams::default(),
-        )
-        .unwrap_err();
+        let err =
+            build_update_address_book_entry_request(1, 1, UpdateAddressBookEntryParams::default())
+                .unwrap_err();
         assert!(err.to_string().contains("update_mask"));
     }
 
