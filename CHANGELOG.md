@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+- Realtime (`tokio-tungstenite`) and on-chain Funding helpers (`alloy-*`, `k256`) are always-on dependencies, not optional features. Empty `realtime` / `chain` feature stubs remain for Cargo compatibility.
+- Clippy cleanups in always-on `chain` (needless borrows, `too_many_arguments` allow, collapsible status poll)
+
 ## 0.1.0a4
 
 Package version: `0.1.0-alpha.4`. Git tag: `v0.1.0a4`.

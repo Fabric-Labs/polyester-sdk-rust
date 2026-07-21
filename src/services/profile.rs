@@ -80,7 +80,6 @@ impl ProfileService {
     }
 
     /// Subscribe to public identity updates (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_identity(
         &self,
     ) -> Result<crate::realtime::TypedSubscription<AccountIdentity>> {

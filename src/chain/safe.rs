@@ -149,7 +149,7 @@ pub fn predict_safe_address_with_data(
     salt_material[32..].copy_from_slice(&U256::from(salt_nonce).to_be_bytes::<32>());
     let salt = B256::from(keccak256(salt_material));
     let init_code_hash = B256::from(keccak256(&deployment_code));
-    let address = factory.create2(&salt, &init_code_hash);
+    let address = factory.create2(salt, init_code_hash);
 
     Ok(PredictedSafe {
         address: address.to_checksum(None),

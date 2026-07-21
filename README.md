@@ -59,17 +59,16 @@ Full cross-language comparison:
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.3"
+polyester-sdk = "0.1.0-alpha.4"
 ```
 
-The default feature set includes realtime WebSocket streams. Disable `realtime`
-if you only need Connect RPC calls.
+Realtime (Centrifugo) and on-chain Funding helpers are always included.
 
 Git install (if you prefer pinning a tag before crates.io mirrors):
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a3" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a4" }
 ```
 
 For development from a git checkout:
@@ -77,7 +76,7 @@ For development from a git checkout:
 ```bash
 git clone https://github.com/Fabric-Labs/polyester-sdk-rust.git
 cd polyester-sdk-rust
-cargo test --lib --all-features
+cargo test --lib
 ```
 
 Pin the Connect runtime: this crate depends on `connectrpc` / `buffa` **0.8.x**.
@@ -283,11 +282,11 @@ Ledger balances have separate **funding** and **trading** buckets per asset.
 SDK notes:
 
 - **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
-  Enable Cargo feature `chain`, then either encode calldata or submit a UserOp via
-  `PolyesterSmartAccount` with a caller-supplied owner EOA key (SDK derives the
-  Polyester Safe — no UI-exported owner key).
-- **Funding → external:** on-chain `FundingAccount.withdrawToChain` (same `chain` feature);
-  quote fees with `quote_zipper_fee` first.
+  Either encode calldata or submit a UserOp via `PolyesterSmartAccount` with a
+  caller-supplied owner EOA key (SDK derives the Polyester Safe — no UI-exported
+  owner key).
+- **Funding → external:** on-chain `FundingAccount.withdrawToChain` (same
+  `polyester::chain`); quote fees with `quote_zipper_fee` first.
 - **Whitelist:** FundingAccount allowlist + GuardRegistry signer encoders under
   `polyester::chain` (`encode_add_allowed_external_destinations`, …).
 - **Funding → another user's funding wallet:** on-chain `FundingAccount.UAssetTransfer`
@@ -409,8 +408,8 @@ if let Some(snapshot) = book.updates().recv().await {
 ```bash
 source "$HOME/.cargo/env"   # if cargo is not on PATH yet
 cargo check
-cargo test --lib --all-features
-cargo test --test integration --all-features
+cargo test --lib
+cargo test --test integration
 cargo clippy --all-targets -- -D warnings
 ```
 

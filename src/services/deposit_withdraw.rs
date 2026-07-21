@@ -11,7 +11,6 @@ use crate::connect::chain::deposit::v1::DepositAddressServiceClient;
 use crate::connect::chain::withdraw::v1::WithdrawServiceClient;
 use crate::connect::chain::zipper::v1::ZipperServiceClient;
 use crate::errors::{Error, Result};
-#[cfg(feature = "realtime")]
 use crate::models::ZippedAssetSupplyBatch;
 use crate::models::{
     CreateTradingWithdrawParams, CreateWalletTradingWithdrawParams, DepositAddress,
@@ -327,7 +326,6 @@ impl ZipperService {
     ///
     /// When `patch_catalog` is true, each batch updates
     /// [`crate::catalogs::Manager::patch_zipper_supply`] (`zipped_asset_id` → supply string).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_zipped_asset_supply(
         &self,
         patch_catalog: bool,

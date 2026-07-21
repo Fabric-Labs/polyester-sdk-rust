@@ -162,7 +162,6 @@ impl HeatmapService {
     }
 
     /// Subscribe to live heatmap buckets (requires `realtime` feature + hydrated catalogs).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_live(
         &self,
         symbol: &str,
@@ -273,7 +272,6 @@ impl InternalTransfersService {
 
 impl PoliciesService {
     /// Subscribe to private subaccount policy updates (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
@@ -569,7 +567,6 @@ pub struct GetSubaccountOpts {
 
 impl SubAccountsService {
     /// Subscribe to private subaccount updates (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
@@ -583,7 +580,6 @@ impl SubAccountsService {
     }
 
     /// Subscribe to private API key updates for an account (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_api_keys(
         &self,
         account_id: Option<&str>,
@@ -890,7 +886,6 @@ impl ResolveService {
 
 impl AddressBookService {
     /// Subscribe to address-book view invalidations (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
@@ -909,7 +904,6 @@ impl AddressBookService {
     }
 
     /// Alias for [`Self::subscribe`] (Go `SubscribeViewInvalidations` parity).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_view_invalidations(
         &self,
         root_account_public_id: Option<&str>,
@@ -1218,7 +1212,6 @@ impl TransfersService {
     }
 
     /// Subscribe to private transfer updates (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
@@ -1411,7 +1404,6 @@ impl LifecycleService {
     ///
     /// When `account_id` is `Some`, uses the private account channel; otherwise
     /// the public open-flows channel (Go `SubscribeOpenFlows` parity).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_open_flows(
         &self,
         account_id: Option<&str>,
@@ -1436,7 +1428,6 @@ impl LifecycleService {
     }
 
     /// Subscribe to a single flow's detail updates (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_flow_detail(
         &self,
         flow_id: &str,

@@ -18,7 +18,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::OnceCell;
 
-#[cfg(feature = "realtime")]
 use crate::realtime::Client as RealtimeClient;
 
 /// Client configuration.
@@ -58,7 +57,6 @@ pub struct Client {
     pub default_sub_account_id: Option<String>,
     pub default_account_id: Option<String>,
     pub catalogs: Arc<CatalogManager>,
-    #[cfg(feature = "realtime")]
     pub realtime: RealtimeClient,
 
     pub auth: AuthService,
@@ -109,7 +107,6 @@ impl Client {
         let factory = Factory::new(transport_cfg, credentials.clone())?;
         let catalogs = Arc::new(CatalogManager::new());
 
-        #[cfg(feature = "realtime")]
         let realtime = RealtimeClient::new(
             config.ws_url.clone(),
             config.api_url.clone(),
@@ -122,7 +119,6 @@ impl Client {
             catalogs: catalogs.clone(),
             default_sub_account_id: config.default_sub_account_id.clone(),
             default_account_id: config.default_account_id.clone(),
-            #[cfg(feature = "realtime")]
             realtime: realtime.clone(),
         };
 
@@ -132,7 +128,6 @@ impl Client {
             default_sub_account_id: config.default_sub_account_id,
             default_account_id: config.default_account_id,
             catalogs,
-            #[cfg(feature = "realtime")]
             realtime,
             auth: AuthService::new(ctx.clone()),
             market_data: MarketDataService::new(ctx.clone()),
@@ -196,7 +191,6 @@ impl Client {
         };
         let factory = Factory::new(transport_cfg, credentials.clone())?;
         let catalogs = Arc::new(CatalogManager::new());
-        #[cfg(feature = "realtime")]
         let realtime = RealtimeClient::new(
             config.ws_url.clone(),
             config.api_url.clone(),
@@ -208,7 +202,6 @@ impl Client {
             catalogs: catalogs.clone(),
             default_sub_account_id: config.default_sub_account_id.clone(),
             default_account_id: config.default_account_id.clone(),
-            #[cfg(feature = "realtime")]
             realtime: realtime.clone(),
         };
         let client = Self {
@@ -217,7 +210,6 @@ impl Client {
             default_sub_account_id: config.default_sub_account_id,
             default_account_id: config.default_account_id,
             catalogs,
-            #[cfg(feature = "realtime")]
             realtime,
             auth: AuthService::new(ctx.clone()),
             market_data: MarketDataService::new(ctx.clone()),

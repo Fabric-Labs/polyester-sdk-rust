@@ -52,16 +52,11 @@ pub mod services;
 pub mod transport;
 pub mod types;
 
-#[cfg(feature = "realtime")]
-#[cfg_attr(docsrs, doc(cfg(feature = "realtime")))]
 pub mod realtime;
 
-/// Optional on-chain Funding / smart-account helpers (POLY-3569).
+/// On-chain Funding / smart-account helpers (POLY-3569).
 ///
-/// Enable with `polyester-sdk = { version = "...", features = ["chain"] }`.
-/// Includes calldata encoders, Safe CREATE2 prediction, and UserOperation submit.
-#[cfg(feature = "chain")]
-#[cfg_attr(docsrs, doc(cfg(feature = "chain")))]
+/// Calldata encoders, Safe CREATE2 prediction, and UserOperation submit.
 pub mod chain;
 
 pub use client::{Client, Config};

@@ -815,7 +815,6 @@ impl OrdersService {
     }
 
     /// Subscribe to private order updates for an account (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
@@ -865,7 +864,6 @@ impl TradesService {
     }
 
     /// Subscribe to private user trade updates (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,

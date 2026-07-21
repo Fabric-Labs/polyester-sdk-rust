@@ -29,7 +29,6 @@ use crate::catalogs::Manager as CatalogManager;
 use crate::transport::Factory;
 use std::sync::Arc;
 
-#[cfg(feature = "realtime")]
 use crate::realtime::Client as RealtimeClient;
 
 /// Shared dependencies for service constructors.
@@ -39,6 +38,5 @@ pub struct ServiceContext {
     pub catalogs: Arc<CatalogManager>,
     pub default_sub_account_id: Option<String>,
     pub default_account_id: Option<String>,
-    #[cfg(feature = "realtime")]
     pub realtime: RealtimeClient,
 }
