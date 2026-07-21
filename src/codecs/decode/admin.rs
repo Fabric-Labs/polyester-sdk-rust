@@ -22,6 +22,7 @@ pub fn api_key_from_proto(msg: &ProtoApiKey) -> ApiKeySummary {
         created_at: msg.created_at.as_option().cloned(),
         last_used_at: msg.last_used_at.as_option().cloned(),
         updated_at: msg.updated_at.as_option().cloned(),
+        revision: msg.revision,
     }
 }
 
@@ -95,6 +96,7 @@ mod tests {
                     ..Default::default()
                 }
                 .into(),
+                revision: 9,
                 ..Default::default()
             }],
             ..Default::default()
@@ -109,6 +111,7 @@ mod tests {
             result.keys[0].updated_at.as_ref().unwrap().nanos,
             123_456_000
         );
+        assert_eq!(result.keys[0].revision, 9);
     }
 
     #[test]
