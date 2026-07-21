@@ -384,6 +384,8 @@ pub struct ApiKeySummary {
     pub created_at: Option<Timestamp>,
     pub last_used_at: Option<Timestamp>,
     pub updated_at: Option<Timestamp>,
+    /// Monotonic resource revision for conditional updates.
+    pub revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]

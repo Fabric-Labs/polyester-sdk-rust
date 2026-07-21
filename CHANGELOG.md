@@ -2,8 +2,16 @@
 
 ## Unreleased
 
+### Breaking
+- Durable auth PATCH contract: API-key, subaccount, and address-book entry updates use nested mutable specs, a non-empty FieldMask, and a positive `expected_revision` (`UpdateApiKeyParams` / `UpdateSubaccountParams` / `UpdateAddressBookEntryParams`)
+- Soft-delete subaccount requires `expected_revision`; durable resource models expose `revision`
+- Address-book tag updates use optional `UpdateAddressBookTagParams` (no revision/mask); empty name is rejected
+- Connect `AuthErrorDetail` maps `AUTH_REVISION_CONFLICT` onto `Error::Api { code: "AUTH_REVISION_CONFLICT", .. }`
+- Policy creates nest under `policy`; policy update builders (`UpdateSubaccountPolicyParams` / `UpdateApiPolicyParams`) replace flattened request fields
+
 ### Testing
 - Live funded UserOp tests: Funding → Trading and Funding → external withdraw, gated by `POLYESTER_TEST_CHAIN_USEROP=1`
+- Unit coverage for nested FieldMask request builders, presence/clear semantics, revision decode, and revision-conflict error mapping
 
 ### Changed
 - Realtime (`tokio-tungstenite`) and on-chain Funding helpers (`alloy-*`, `k256`) are always-on dependencies, not optional features. Empty `realtime` / `chain` feature stubs remain for Cargo compatibility.

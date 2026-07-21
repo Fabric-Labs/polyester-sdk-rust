@@ -12,20 +12,26 @@ use crate::connect::auth::v1::ApiKeyServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::{ApiKeySummary, ApiKeysList, Ed25519Keypair};
 use crate::proto::auth::v1::{
-    ApiKeyStatus, CreateApiKeyRequest, DeleteApiKeyRequest, GetApiKeyRequest, IpWhitelist,
+    ApiKeyStatus, ApiKeyUpdateSpec, CreateApiKeyRequest, DeleteApiKeyRequest, GetApiKeyRequest,
     ListApiKeysRequest, UpdateApiKeyRequest,
 };
 use buffa::Enumeration;
-use buffa_types::google::protobuf::Timestamp;
+use buffa_types::google::protobuf::{FieldMask, Timestamp};
 
+/// Presence-aware patch fields for [`ApiKeysService::update`].
+///
+/// - `None` omits the field from the update mask.
+/// - `Some(value)` selects the field; empty string / empty list / `false` / `0` are sent as-is.
+/// - `expires_at`: `None` omits; `Some(None)` clears expiry; `Some(Some(ts))` sets expiry.
 #[derive(Debug, Clone, Default)]
 pub struct UpdateApiKeyParams {
-    pub label: String,
-    pub icon: String,
-    pub color: String,
+    pub expected_revision: u64,
+    pub label: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
     pub status: Option<String>,
     pub ip_whitelist: Option<Vec<String>>,
-    pub expires_at_unix_secs: Option<i64>,
+    pub expires_at: Option<Option<Timestamp>>,
 }
 
 #[derive(Clone)]
@@ -113,31 +119,7 @@ impl ApiKeysService {
         key_id: &str,
         params: UpdateApiKeyParams,
     ) -> Result<Option<ApiKeySummary>> {
-        let mut req = UpdateApiKeyRequest {
-            key_id: key_id.to_owned(),
-            label: params.label,
-            icon: params.icon,
-            color: params.color,
-            ..Default::default()
-        };
-        if let Some(status) = params.status.filter(|s| !s.is_empty()) {
-            req.status = api_key_status_from_label(&status)?.into();
-        }
-        if let Some(cidrs) = params.ip_whitelist {
-            req.ip_whitelist = IpWhitelist {
-                cidrs,
-                ..Default::default()
-            }
-            .into();
-        }
-        if let Some(secs) = params.expires_at_unix_secs {
-            req.expires_at = Timestamp {
-                seconds: secs,
-                nanos: 0,
-                ..Default::default()
-            }
-            .into();
-        }
+        let req = build_update_api_key_request(key_id, params)?;
         let client = self.connect_client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -192,6 +174,68 @@ impl ApiKeysService {
     }
 }
 
+/// Build a durable-auth `UpdateApiKeyRequest` from presence-aware params.
+pub fn build_update_api_key_request(
+    key_id: &str,
+    params: UpdateApiKeyParams,
+) -> Result<UpdateApiKeyRequest> {
+    if params.expected_revision == 0 {
+        return Err(Error::validation(
+            "expected_revision must be a positive revision from a prior read",
+        ));
+    }
+
+    let mut spec = ApiKeyUpdateSpec::default();
+    let mut paths = Vec::new();
+
+    if let Some(label) = params.label {
+        paths.push("label".to_owned());
+        spec.label = label;
+    }
+    if let Some(icon) = params.icon {
+        paths.push("icon".to_owned());
+        spec.icon = icon;
+    }
+    if let Some(color) = params.color {
+        paths.push("color".to_owned());
+        spec.color = color;
+    }
+    if let Some(status) = params.status {
+        paths.push("status".to_owned());
+        spec.status = api_key_status_from_label(&status)?.into();
+    }
+    if let Some(cidrs) = params.ip_whitelist {
+        paths.push("ip_whitelist".to_owned());
+        spec.ip_whitelist = cidrs;
+    }
+    if let Some(expires) = params.expires_at {
+        paths.push("expires_at".to_owned());
+        match expires {
+            Some(ts) => spec.expires_at = ts.into(),
+            // Selected clear: leave the message field unset (null / omission).
+            None => spec.expires_at = buffa::MessageField::none(),
+        }
+    }
+
+    if paths.is_empty() {
+        return Err(Error::validation(
+            "update_mask must be non-empty; set at least one field on UpdateApiKeyParams",
+        ));
+    }
+
+    Ok(UpdateApiKeyRequest {
+        key_id: key_id.to_owned(),
+        api_key: spec.into(),
+        update_mask: FieldMask {
+            paths,
+            ..Default::default()
+        }
+        .into(),
+        expected_revision: params.expected_revision,
+        ..Default::default()
+    })
+}
+
 fn api_key_status_from_label(status: &str) -> Result<ApiKeyStatus> {
     let key = status.trim().to_ascii_lowercase();
     match key.as_str() {
@@ -201,5 +245,89 @@ fn api_key_status_from_label(status: &str) -> Result<ApiKeyStatus> {
         _ => ApiKeyStatus::from_proto_name(&status.trim().to_ascii_uppercase())
             .filter(|s| *s != ApiKeyStatus::API_KEY_STATUS_UNSPECIFIED)
             .ok_or_else(|| Error::validation(format!("unknown API key status: {status}"))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_request_builds_nested_spec_and_mask() {
+        let req = build_update_api_key_request(
+            "ak_abc",
+            UpdateApiKeyParams {
+                expected_revision: 7,
+                label: Some(String::new()),
+                icon: Some("⚡".into()),
+                color: None,
+                status: Some("disabled".into()),
+                ip_whitelist: Some(vec![]),
+                expires_at: Some(None),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(req.key_id, "ak_abc");
+        assert_eq!(req.expected_revision, 7);
+        let mask = req.update_mask.as_option().unwrap();
+        assert_eq!(
+            mask.paths,
+            vec!["label", "icon", "status", "ip_whitelist", "expires_at"]
+        );
+        let spec = req.api_key.as_option().unwrap();
+        assert_eq!(spec.label, "");
+        assert_eq!(spec.icon, "⚡");
+        assert_eq!(spec.status.as_known(), Some(ApiKeyStatus::DISABLED));
+        assert!(spec.ip_whitelist.is_empty());
+        assert!(!spec.expires_at.is_set());
+    }
+
+    #[test]
+    fn update_request_sets_expires_at_when_provided() {
+        let ts = Timestamp {
+            seconds: 1_700_000_000,
+            nanos: 0,
+            ..Default::default()
+        };
+        let req = build_update_api_key_request(
+            "ak_abc",
+            UpdateApiKeyParams {
+                expected_revision: 1,
+                expires_at: Some(Some(ts.clone())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let spec = req.api_key.as_option().unwrap();
+        assert_eq!(spec.expires_at.as_option().unwrap().seconds, ts.seconds);
+        assert_eq!(
+            req.update_mask.as_option().unwrap().paths,
+            vec!["expires_at"]
+        );
+    }
+
+    #[test]
+    fn update_request_rejects_zero_revision_and_empty_mask() {
+        let err = build_update_api_key_request(
+            "ak_abc",
+            UpdateApiKeyParams {
+                expected_revision: 0,
+                label: Some("x".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("expected_revision"));
+
+        let err = build_update_api_key_request(
+            "ak_abc",
+            UpdateApiKeyParams {
+                expected_revision: 1,
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("update_mask"));
     }
 }
