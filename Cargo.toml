@@ -1,6 +1,6 @@
 [package]
 name = "polyester-sdk"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 edition = "2024"
 rust-version = "1.88"
 description = "Official Rust SDK for Polyester APIs."
@@ -27,6 +27,8 @@ path = "src/lib.rs"
 [features]
 default = ["realtime"]
 realtime = ["dep:tokio-tungstenite"]
+# Optional on-chain Funding / smart-account helpers (POLY-3569). Not required for API-key trading.
+chain = ["dep:alloy-primitives", "dep:alloy-sol-types", "dep:k256"]
 
 [dependencies]
 buffa = { version = "0.8.1", features = ["json"] }
@@ -61,6 +63,11 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 
 # Realtime (optional)
 tokio-tungstenite = { version = "0.26", optional = true, features = ["rustls-tls-webpki-roots"] }
+
+# Chain calldata / UserOps (optional) — FundingAccount ABI + Safe CREATE2 + EIP-712
+alloy-primitives = { version = "1", optional = true }
+alloy-sol-types = { version = "1", optional = true }
+k256 = { version = "0.13", optional = true, default-features = false, features = ["ecdsa", "std"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }
