@@ -36,12 +36,15 @@ fn usdt_asset(cfg: &DepositWithdrawConfig) -> Option<ZipperAssetConfig> {
         .ok()
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty());
-    cfg.assets.iter().cloned().find(|asset| {
-        if let Some(ref o) = override_id {
-            return asset.u_asset_id.eq_ignore_ascii_case(o);
-        }
-        asset.ledger_id == 1 || asset.asset.eq_ignore_ascii_case("USDT")
-    })
+    cfg.assets
+        .iter()
+        .find(|&asset| {
+            if let Some(ref o) = override_id {
+                return asset.u_asset_id.eq_ignore_ascii_case(o);
+            }
+            asset.ledger_id == 1 || asset.asset.eq_ignore_ascii_case("USDT")
+        })
+        .cloned()
 }
 
 fn deposit_qty_scaled() -> U256 {
