@@ -7,7 +7,7 @@ use thiserror::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Polyester SDK error.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum Error {
     #[error("{0}")]
     Auth(String),
@@ -35,6 +35,10 @@ pub enum Error {
     RouteNotFound { procedure: String },
     #[error("{0}")]
     Realtime(String),
+    /// Realtime subscription queue was full; the subscription fails instead of
+    /// silently dropping updates.
+    #[error("{0}")]
+    QueueOverflow(String),
 }
 
 impl Error {
@@ -52,6 +56,10 @@ impl Error {
 
     pub fn realtime(msg: impl Into<String>) -> Self {
         Self::Realtime(msg.into())
+    }
+
+    pub fn queue_overflow(msg: impl Into<String>) -> Self {
+        Self::QueueOverflow(msg.into())
     }
 }
 
