@@ -22,6 +22,32 @@ const DEFAULT_QUEUE: usize = 1000;
 const CENTRIFUGO_READ_TIMEOUT: Duration = Duration::from_secs(30);
 const CENTRIFUGO_RECONNECT_DELAY: Duration = Duration::from_secs(1);
 
+/// Enqueue a publication without blocking. On a full queue, mark the
+/// subscription closed and return [`Error::QueueOverflow`] — never silently drop.
+pub fn try_enqueue<T>(
+    tx: &mpsc::Sender<T>,
+    item: T,
+    closed: &AtomicBool,
+    last_error: &std::sync::Mutex<Option<Error>>,
+    message: &str,
+) -> bool {
+    if closed.load(Ordering::SeqCst) {
+        return false;
+    }
+    match tx.try_send(item) {
+        Ok(()) => true,
+        Err(mpsc::error::TrySendError::Full(_)) => {
+            closed.store(true, Ordering::SeqCst);
+            *last_error.lock().expect("error lock") = Some(Error::queue_overflow(message));
+            false
+        }
+        Err(mpsc::error::TrySendError::Closed(_)) => {
+            closed.store(true, Ordering::SeqCst);
+            false
+        }
+    }
+}
+
 /// Realtime websocket client.
 #[derive(Clone)]
 pub struct Client {
@@ -121,6 +147,24 @@ impl Client {
         T: Send + 'static,
         F: Fn(&[u8]) -> Result<T> + Send + Sync + 'static,
     {
+        self.subscribe_proto_with_options(channel, decode, true)
+            .await
+    }
+
+    /// Subscribe with optional auto-reconnect control.
+    ///
+    /// Snapshot-then-stream sets `auto_reconnect=false` so it can rebuild REST
+    /// state between reconnect attempts.
+    pub async fn subscribe_proto_with_options<T, F>(
+        &self,
+        channel: &str,
+        decode: F,
+        auto_reconnect: bool,
+    ) -> Result<TypedSubscription<T>>
+    where
+        T: Send + 'static,
+        F: Fn(&[u8]) -> Result<T> + Send + Sync + 'static,
+    {
         self.validate_channel(channel)?;
 
         let (stop_tx, stop_rx) = watch::channel(false);
@@ -141,7 +185,7 @@ impl Client {
                     Ok(()) => break,
                     Err(_) if *stop_rx.borrow() => break,
                     Err(_) => {
-                        if *stop_rx.borrow() {
+                        if *stop_rx.borrow() || !auto_reconnect {
                             break;
                         }
                         tokio::time::sleep(CENTRIFUGO_RECONNECT_DELAY).await;
@@ -563,6 +607,36 @@ mod tests {
         let bytes = publication_payload(frame).unwrap().unwrap();
         assert_eq!(bytes, vec![1, 2, 3]);
         assert!(publication_payload(r#"{"ping":{}}"#).is_none());
+    }
+
+    #[test]
+    fn try_enqueue_fails_on_overflow_without_silent_drop() {
+        use std::sync::Mutex;
+
+        let (tx, mut rx) = mpsc::channel::<u8>(1);
+        let closed = AtomicBool::new(false);
+        let last_error = Mutex::new(None);
+        assert!(try_enqueue(
+            &tx,
+            1,
+            &closed,
+            &last_error,
+            "orderbook subscription queue full; consumer too slow"
+        ));
+        assert!(!try_enqueue(
+            &tx,
+            2,
+            &closed,
+            &last_error,
+            "orderbook subscription queue full; consumer too slow"
+        ));
+        assert!(closed.load(Ordering::SeqCst));
+        assert!(matches!(
+            last_error.lock().unwrap().as_ref(),
+            Some(Error::QueueOverflow(_))
+        ));
+        assert_eq!(rx.try_recv().unwrap(), 1);
+        assert!(rx.try_recv().is_err());
     }
 
     #[tokio::test]

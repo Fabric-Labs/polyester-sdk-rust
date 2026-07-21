@@ -1,6 +1,6 @@
 //! Managed orderbook subscription (Go `orderbook.Subscription` parity).
 
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 use crate::models::{OrderBookDeltaUpdate, OrderbookData};
 use crate::realtime::SnapshotThenStream;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -8,12 +8,16 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
 /// Managed orderbook stream with snapshot prefetch and sequence-checked deltas.
+///
+/// Delivery contract: a full consumer queue fails the subscription with
+/// [`Error::QueueOverflow`] instead of silently dropping books.
 pub struct Subscription {
     rx: mpsc::Receiver<OrderbookData>,
     stream: SnapshotThenStream<OrderbookData, OrderBookDeltaUpdate>,
     closed: Arc<AtomicBool>,
     bucket_ticks: Arc<Mutex<i64>>,
     emit: Arc<dyn Fn() + Send + Sync>,
+    last_error: Arc<Mutex<Option<Error>>>,
 }
 
 impl Subscription {
@@ -23,6 +27,7 @@ impl Subscription {
         closed: Arc<AtomicBool>,
         bucket_ticks: Arc<Mutex<i64>>,
         emit: Arc<dyn Fn() + Send + Sync>,
+        last_error: Arc<Mutex<Option<Error>>>,
     ) -> Self {
         Self {
             rx,
@@ -30,12 +35,18 @@ impl Subscription {
             closed,
             bucket_ticks,
             emit,
+            last_error,
         }
     }
 
     /// Receiver for merged orderbook snapshots.
     pub fn updates(&mut self) -> &mut mpsc::Receiver<OrderbookData> {
         &mut self.rx
+    }
+
+    /// Terminal subscription error, if the stream failed (e.g. queue overflow).
+    pub fn err(&self) -> Option<Error> {
+        self.last_error.lock().expect("error lock").clone()
     }
 
     /// Change the active price bucket and re-emit the current book.

@@ -14,6 +14,7 @@ type ApplySnapshotFn<TSnapshot, TPublication> =
 type ApplyLiveFn<TPublication> = Arc<dyn Fn(Vec<TPublication>) + Send + Sync>;
 type ReadPublicationFn<TPublication> = Arc<dyn Fn(TPublication) -> Vec<TPublication> + Send + Sync>;
 type DecodeFn<TPublication> = Arc<dyn Fn(&[u8]) -> Result<TPublication> + Send + Sync>;
+type NotifyFn = Arc<dyn Fn() + Send + Sync>;
 
 /// Configuration for [`SnapshotThenStream`].
 pub struct SnapshotThenStreamConfig<TSnapshot, TPublication> {
@@ -25,6 +26,8 @@ pub struct SnapshotThenStreamConfig<TSnapshot, TPublication> {
     pub apply_snapshot: ApplySnapshotFn<TSnapshot, TPublication>,
     pub apply_live_publications: ApplyLiveFn<TPublication>,
     pub max_buffered: usize,
+    pub on_reconnect: Option<NotifyFn>,
+    pub on_snapshot_refresh: Option<NotifyFn>,
 }
 
 /// Coordinates REST snapshot hydration with a live protobuf channel.
@@ -41,6 +44,8 @@ struct Inner<TSnapshot, TPublication> {
     apply_snapshot: ApplySnapshotFn<TSnapshot, TPublication>,
     apply_live_publications: ApplyLiveFn<TPublication>,
     max_buffered: usize,
+    on_reconnect: Option<NotifyFn>,
+    on_snapshot_refresh: Option<NotifyFn>,
     ready: AtomicBool,
     disposed: AtomicBool,
     generation: AtomicU64,
@@ -71,6 +76,8 @@ where
                 apply_snapshot: cfg.apply_snapshot,
                 apply_live_publications: cfg.apply_live_publications,
                 max_buffered,
+                on_reconnect: cfg.on_reconnect,
+                on_snapshot_refresh: cfg.on_snapshot_refresh,
                 ready: AtomicBool::new(false),
                 disposed: AtomicBool::new(false),
                 generation: AtomicU64::new(0),
@@ -123,6 +130,9 @@ where
             return Ok(());
         }
         self.inner.ready.store(true, Ordering::SeqCst);
+        if let Some(cb) = &self.inner.on_snapshot_refresh {
+            cb();
+        }
         Ok(())
     }
 
@@ -167,10 +177,12 @@ impl<TSnapshot, TPublication> Clone for SnapshotThenStream<TSnapshot, TPublicati
 
 impl<TSnapshot, TPublication> Inner<TSnapshot, TPublication>
 where
+    TSnapshot: Send + 'static,
     TPublication: Send + 'static,
 {
     async fn run(self: Arc<Self>) {
         let mut stop_rx = self.stop_tx.subscribe();
+        let mut first = true;
         loop {
             if self.disposed.load(Ordering::SeqCst) || *stop_rx.borrow() {
                 break;
@@ -183,7 +195,11 @@ where
                     }
                     continue;
                 }
-                sub = self.client.subscribe_proto(&self.channel, move |bytes| decode(bytes)) => {
+                sub = self.client.subscribe_proto_with_options(
+                    &self.channel,
+                    move |bytes| decode(bytes),
+                    false,
+                ) => {
                     match sub {
                         Ok(sub) => sub,
                         Err(_) => {
@@ -200,10 +216,21 @@ where
                 sub.close();
                 break;
             }
+            if !first {
+                if let Some(cb) = &self.on_reconnect {
+                    cb();
+                }
+                let this = SnapshotThenStream {
+                    inner: self.clone(),
+                };
+                let _ = this.refresh_snapshot().await;
+            }
+            first = false;
             self.pump_subscription(sub, &mut stop_rx).await;
             if self.disposed.load(Ordering::SeqCst) || *stop_rx.borrow() {
                 break;
             }
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
     }
 
@@ -248,5 +275,41 @@ where
             return;
         }
         (self.apply_live_publications)(items);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures_util::future::FutureExt;
+    use std::sync::atomic::AtomicUsize;
+
+    #[tokio::test]
+    async fn refresh_snapshot_fires_on_snapshot_refresh() {
+        let fired = Arc::new(AtomicUsize::new(0));
+        let fired_cb = fired.clone();
+        let client = Client::new(
+            "wss://example.invalid",
+            "https://example.invalid",
+            None,
+            None,
+        );
+        let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+            client,
+            channel: "public:test".into(),
+            decode: Arc::new(|_b| Ok(1u8)),
+            fetch_snapshot: Arc::new(|| async { Ok("snap".to_string()) }.boxed()),
+            read_publication: Arc::new(|p| vec![p]),
+            apply_snapshot: Arc::new(|_s, _p| {}),
+            apply_live_publications: Arc::new(|_p| {}),
+            max_buffered: 8,
+            on_reconnect: None,
+            on_snapshot_refresh: Some(Arc::new(move || {
+                fired_cb.fetch_add(1, Ordering::SeqCst);
+            })),
+        });
+        sts.refresh_snapshot().await.expect("refresh");
+        assert_eq!(fired.load(Ordering::SeqCst), 1);
+        assert!(sts.is_ready());
     }
 }

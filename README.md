@@ -283,11 +283,38 @@ Ledger balances have separate **funding** and **trading** buckets per asset.
 SDK notes:
 
 - **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
+  Enable Cargo feature `chain`, then either encode calldata or submit a UserOp via
+  `PolyesterSmartAccount` with a caller-supplied owner EOA key (SDK derives the
+  Polyester Safe — no UI-exported owner key).
+- **Funding → external:** on-chain `FundingAccount.withdrawToChain` (same `chain` feature);
+  quote fees with `quote_zipper_fee` first.
+- **Whitelist:** FundingAccount allowlist + GuardRegistry signer encoders under
+  `polyester::chain` (`encode_add_allowed_external_destinations`, …).
 - **Funding → another user's funding wallet:** on-chain `FundingAccount.UAssetTransfer`
   via wallet/smart-account signing in the Polyester app (not an API-key RPC).
 - **Trading → funding:** `client.withdraw.create_to_funding(...)` with a signed
   intent payload.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
+
+```rust,no_run
+use alloy_primitives::U256;
+use polyester::chain::{
+    POLYESTER_TESTNET_ENVIRONMENT, PolyesterSmartAccount, encode_trading_gateway_deposit,
+};
+use std::time::Duration;
+
+let account = PolyesterSmartAccount::new(owner_private_key, None, 0, Duration::from_secs(60))?;
+let call = encode_trading_gateway_deposit(
+    POLYESTER_TESTNET_ENVIRONMENT.contracts.trading_gateway_address,
+    u_asset_id,
+    U256::from(10u64).pow(U256::from(18u64)),
+)?;
+let result = account.send_calls(&[call], true, Duration::from_secs(60)).await?;
+```
+
+Realtime queues fail with `Error::QueueOverflow` instead of silently dropping;
+managed streams rebuild snapshots after reconnect and expose
+`on_reconnect` / `on_snapshot_refresh` hooks.
 
 Pass `default_account_id` (your Profile **Account ID**) on the client for bucket
 transfers and other account-scoped ledger operations.
