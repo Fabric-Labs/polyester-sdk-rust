@@ -54,10 +54,7 @@ fn deposit_qty_scaled() -> U256 {
     U256::from(10u64).pow(U256::from(18u64))
 }
 
-fn funding_balance_raw(
-    balances: &[polyester::models::AssetBalance],
-    asset_id: u32,
-) -> u128 {
+fn funding_balance_raw(balances: &[polyester::models::AssetBalance], asset_id: u32) -> u128 {
     for row in balances {
         if row.asset_id == asset_id {
             return row.funding.parse().unwrap_or(0);
@@ -106,7 +103,9 @@ async fn funding_to_trading_userop() {
     let account = PolyesterSmartAccount::new(&owner, None, 0, Duration::from_secs(60))
         .expect("smart account");
     let call = encode_trading_gateway_deposit(
-        POLYESTER_TESTNET_ENVIRONMENT.contracts.trading_gateway_address,
+        POLYESTER_TESTNET_ENVIRONMENT
+            .contracts
+            .trading_gateway_address,
         &asset.u_asset_id,
         qty,
     )
@@ -210,7 +209,9 @@ async fn funding_withdraw_to_chain_userop() {
     let fee = quote_zipper_fee(
         chain_id,
         &variant.z_token.address,
-        POLYESTER_TESTNET_ENVIRONMENT.contracts.zipper_endpoint_address,
+        POLYESTER_TESTNET_ENVIRONMENT
+            .contracts
+            .zipper_endpoint_address,
         None,
         None,
     )
@@ -228,7 +229,9 @@ async fn funding_withdraw_to_chain_userop() {
         .expect("smart account");
     let dest_bytes = encode_withdraw_destination(&dest, case_sensitive);
     let call = encode_funding_withdraw_to_chain(
-        POLYESTER_TESTNET_ENVIRONMENT.contracts.funding_account_address,
+        POLYESTER_TESTNET_ENVIRONMENT
+            .contracts
+            .funding_account_address,
         chain_id,
         &variant.z_token.address,
         &dest_bytes,
