@@ -565,6 +565,18 @@ pub struct GetSubaccountOpts {
     pub invites_direction: String,
 }
 
+/// Presence-aware patch fields for [`SubAccountsService::update`].
+///
+/// `None` omits the field from the update mask; `Some(value)` selects it
+/// (including empty string clears when selected).
+#[derive(Debug, Clone, Default)]
+pub struct UpdateSubaccountParams {
+    pub label: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+    pub status: Option<String>,
+}
+
 impl SubAccountsService {
     /// Subscribe to private subaccount updates (requires `realtime` feature).
     pub async fn subscribe(
@@ -671,22 +683,13 @@ impl SubAccountsService {
     pub async fn update(
         &self,
         subaccount_id: u64,
-        label: &str,
-        icon: &str,
-        color: &str,
-        status: &str,
-    ) -> crate::errors::Result<()> {
-        use crate::proto::auth::v1::UpdateSubaccountRequest;
-        let req = UpdateSubaccountRequest {
-            subaccount_id,
-            label: label.to_owned(),
-            icon: icon.to_owned(),
-            color: color.to_owned(),
-            status: status.to_owned(),
-            ..Default::default()
-        };
+        expected_revision: u64,
+        params: UpdateSubaccountParams,
+    ) -> crate::errors::Result<Option<crate::models::SubAccount>> {
+        use crate::codecs::decode::subaccount_from_proto;
+        let req = build_update_subaccount_request(subaccount_id, expected_revision, params)?;
         let client = self.connect_client();
-        let _ = {
+        let resp = {
             use super::unary;
             unary::await_auth(
                 &self.ctx.factory,
@@ -695,13 +698,26 @@ impl SubAccountsService {
                 |req, opts| client.update_subaccount_with_options(req, opts),
             )
             .await?
+            .into_owned()
         };
-        Ok(())
+        Ok(resp.subaccount.as_option().map(subaccount_from_proto))
     }
 
     /// Soft-delete by setting status to `"deleted"` (Go `Delete` parity).
-    pub async fn delete(&self, subaccount_id: u64) -> crate::errors::Result<()> {
-        self.update(subaccount_id, "", "", "", "deleted").await
+    pub async fn delete(
+        &self,
+        subaccount_id: u64,
+        expected_revision: u64,
+    ) -> crate::errors::Result<Option<crate::models::SubAccount>> {
+        self.update(
+            subaccount_id,
+            expected_revision,
+            UpdateSubaccountParams {
+                status: Some("deleted".into()),
+                ..Default::default()
+            },
+        )
+        .await
     }
 
     pub async fn set_member_mfa_requirement(
@@ -884,6 +900,54 @@ impl ResolveService {
     }
 }
 
+/// Presence-aware patch fields for [`AddressBookService::update_entry`].
+///
+/// `None` omits the field from the update mask; `Some(value)` selects it
+/// (including empty string / empty `tag_ids` clears when selected).
+#[derive(Debug, Clone, Default)]
+pub struct UpdateAddressBookEntryParams {
+    pub label: Option<String>,
+    pub note: Option<String>,
+    pub tag_ids: Option<Vec<u64>>,
+}
+
+/// Optional scalar fields for [`AddressBookService::update_tag`].
+///
+/// `None` omits the field; `Some(value)` sets it. Empty `color` clears color.
+/// Empty `name` is rejected (names cannot be cleared to blank).
+#[derive(Debug, Clone, Default)]
+pub struct UpdateAddressBookTagParams {
+    pub name: Option<String>,
+    pub color: Option<String>,
+}
+
+/// Presence-aware patch fields for common durable-auth subaccount policy updates.
+///
+/// Covers the fields exercised by Go/Python SDK tests without a full policy surface.
+/// `None` omits; `Some(value)` selects (including zero/false/empty clears).
+/// Timestamps: `None` omits; `Some(None)` clears; `Some(Some(ts))` sets.
+#[derive(Debug, Clone, Default)]
+pub struct UpdateSubaccountPolicyParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub actions: Option<Vec<crate::proto::auth::v1::PolicyAction>>,
+    pub spot_markets: Option<Vec<String>>,
+    pub trading_halted: Option<bool>,
+    pub global_notional_cap: Option<u64>,
+    pub max_order_notional: Option<u64>,
+    pub review_at: Option<Option<buffa_types::google::protobuf::Timestamp>>,
+    pub expires_at: Option<Option<buffa_types::google::protobuf::Timestamp>>,
+}
+
+/// Presence-aware patch fields for common durable-auth API policy updates.
+#[derive(Debug, Clone, Default)]
+pub struct UpdateApiPolicyParams {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub actions: Option<Vec<crate::proto::auth::v1::PolicyAction>>,
+    pub max_order_notional: Option<u64>,
+}
+
 impl AddressBookService {
     /// Subscribe to address-book view invalidations (requires `realtime` feature).
     pub async fn subscribe(
@@ -975,9 +1039,12 @@ impl AddressBookService {
 
     pub async fn update_entry(
         &self,
-        req: crate::proto::auth::v1::UpdateAddressBookEntryRequest,
+        entry_id: u64,
+        expected_revision: u64,
+        params: UpdateAddressBookEntryParams,
     ) -> crate::errors::Result<crate::models::AddressBookEntry> {
         use crate::codecs::decode::entry_from_update_proto;
+        let req = build_update_address_book_entry_request(entry_id, expected_revision, params)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -1053,9 +1120,11 @@ impl AddressBookService {
 
     pub async fn update_tag(
         &self,
-        req: crate::proto::auth::v1::UpdateAddressBookTagRequest,
+        tag_id: u64,
+        params: UpdateAddressBookTagParams,
     ) -> crate::errors::Result<crate::models::AddressBookTag> {
         use crate::codecs::decode::tag_from_update_proto;
+        let req = build_update_address_book_tag_request(tag_id, params)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -2407,8 +2476,279 @@ impl WhiteboardService {
     }
 }
 
+/// Build a durable-auth `UpdateSubaccountRequest` from presence-aware params.
+pub fn build_update_subaccount_request(
+    subaccount_id: u64,
+    expected_revision: u64,
+    params: UpdateSubaccountParams,
+) -> crate::errors::Result<crate::proto::auth::v1::UpdateSubaccountRequest> {
+    use crate::errors::Error;
+    use crate::proto::auth::v1::{SubaccountUpdateSpec, UpdateSubaccountRequest};
+    use buffa_types::google::protobuf::FieldMask;
+
+    if expected_revision == 0 {
+        return Err(Error::validation(
+            "expected_revision must be a positive revision from a prior read",
+        ));
+    }
+
+    let mut spec = SubaccountUpdateSpec::default();
+    let mut paths = Vec::new();
+
+    if let Some(label) = params.label {
+        paths.push("label".to_owned());
+        spec.label = label;
+    }
+    if let Some(icon) = params.icon {
+        paths.push("icon".to_owned());
+        spec.icon = icon;
+    }
+    if let Some(color) = params.color {
+        paths.push("color".to_owned());
+        spec.color = color;
+    }
+    if let Some(status) = params.status {
+        paths.push("status".to_owned());
+        spec.status = status;
+    }
+
+    if paths.is_empty() {
+        return Err(Error::validation(
+            "update_mask must be non-empty; set at least one field on UpdateSubaccountParams",
+        ));
+    }
+
+    Ok(UpdateSubaccountRequest {
+        subaccount_id,
+        subaccount: spec.into(),
+        update_mask: FieldMask {
+            paths,
+            ..Default::default()
+        }
+        .into(),
+        expected_revision,
+        ..Default::default()
+    })
+}
+
+/// Build a durable-auth `UpdateAddressBookEntryRequest` from presence-aware params.
+pub fn build_update_address_book_entry_request(
+    entry_id: u64,
+    expected_revision: u64,
+    params: UpdateAddressBookEntryParams,
+) -> crate::errors::Result<crate::proto::auth::v1::UpdateAddressBookEntryRequest> {
+    use crate::errors::Error;
+    use crate::proto::auth::v1::{AddressBookEntryUpdateSpec, UpdateAddressBookEntryRequest};
+    use buffa_types::google::protobuf::FieldMask;
+
+    if expected_revision == 0 {
+        return Err(Error::validation(
+            "expected_revision must be a positive revision from a prior read",
+        ));
+    }
+
+    let mut spec = AddressBookEntryUpdateSpec::default();
+    let mut paths = Vec::new();
+
+    if let Some(label) = params.label {
+        paths.push("label".to_owned());
+        spec.label = label;
+    }
+    if let Some(note) = params.note {
+        paths.push("note".to_owned());
+        spec.note = note;
+    }
+    if let Some(tag_ids) = params.tag_ids {
+        paths.push("tag_ids".to_owned());
+        spec.tag_ids = tag_ids;
+    }
+
+    if paths.is_empty() {
+        return Err(Error::validation(
+            "update_mask must be non-empty; set at least one field on UpdateAddressBookEntryParams",
+        ));
+    }
+
+    Ok(UpdateAddressBookEntryRequest {
+        address_book_entry_id: entry_id,
+        entry: spec.into(),
+        update_mask: FieldMask {
+            paths,
+            ..Default::default()
+        }
+        .into(),
+        expected_revision,
+        ..Default::default()
+    })
+}
+
+/// Build an `UpdateAddressBookTagRequest` from optional scalar params.
+pub fn build_update_address_book_tag_request(
+    tag_id: u64,
+    params: UpdateAddressBookTagParams,
+) -> crate::errors::Result<crate::proto::auth::v1::UpdateAddressBookTagRequest> {
+    use crate::errors::Error;
+    use crate::proto::auth::v1::UpdateAddressBookTagRequest;
+
+    if let Some(ref name) = params.name
+        && name.is_empty()
+    {
+        return Err(Error::validation("name cannot be empty when set"));
+    }
+
+    Ok(UpdateAddressBookTagRequest {
+        tag_id,
+        name: params.name,
+        color: params.color,
+        ..Default::default()
+    })
+}
+
+/// Build a durable-auth `UpdateSubaccountPolicyRequest` from pragmatic patch params.
+pub fn build_update_subaccount_policy_request(
+    policy_id: u64,
+    expected_revision: u64,
+    params: UpdateSubaccountPolicyParams,
+) -> crate::errors::Result<crate::proto::auth::v1::UpdateSubaccountPolicyRequest> {
+    use crate::errors::Error;
+    use crate::proto::auth::v1::{SpotMarketRule, SubaccountPolicySpec, UpdateSubaccountPolicyRequest};
+    use buffa_types::google::protobuf::FieldMask;
+
+    if expected_revision == 0 {
+        return Err(Error::validation(
+            "expected_revision must be a positive revision from a prior read",
+        ));
+    }
+
+    let mut spec = SubaccountPolicySpec::default();
+    let mut paths = Vec::new();
+
+    if let Some(name) = params.name {
+        paths.push("name".to_owned());
+        spec.name = name;
+    }
+    if let Some(description) = params.description {
+        paths.push("description".to_owned());
+        spec.description = description;
+    }
+    if let Some(actions) = params.actions {
+        paths.push("actions".to_owned());
+        spec.actions = actions.into_iter().map(Into::into).collect();
+    }
+    if let Some(symbols) = params.spot_markets {
+        paths.push("spot_markets".to_owned());
+        spec.spot_markets = symbols
+            .into_iter()
+            .map(|symbol| SpotMarketRule {
+                symbol,
+                ..Default::default()
+            })
+            .collect();
+    }
+    if let Some(trading_halted) = params.trading_halted {
+        paths.push("trading_halted".to_owned());
+        spec.trading_halted = trading_halted;
+    }
+    if let Some(global_notional_cap) = params.global_notional_cap {
+        paths.push("global_notional_cap".to_owned());
+        spec.global_notional_cap = global_notional_cap;
+    }
+    if let Some(max_order_notional) = params.max_order_notional {
+        paths.push("max_order_notional".to_owned());
+        spec.max_order_notional = max_order_notional;
+    }
+    if let Some(review_at) = params.review_at {
+        paths.push("review_at".to_owned());
+        match review_at {
+            Some(ts) => spec.review_at = ts.into(),
+            None => spec.review_at = buffa::MessageField::none(),
+        }
+    }
+    if let Some(expires_at) = params.expires_at {
+        paths.push("expires_at".to_owned());
+        match expires_at {
+            Some(ts) => spec.expires_at = ts.into(),
+            None => spec.expires_at = buffa::MessageField::none(),
+        }
+    }
+
+    if paths.is_empty() {
+        return Err(Error::validation(
+            "update_mask must be non-empty; set at least one field on UpdateSubaccountPolicyParams",
+        ));
+    }
+
+    Ok(UpdateSubaccountPolicyRequest {
+        policy_id,
+        policy: spec.into(),
+        update_mask: FieldMask {
+            paths,
+            ..Default::default()
+        }
+        .into(),
+        expected_revision,
+        ..Default::default()
+    })
+}
+
+/// Build a durable-auth `UpdateApiPolicyRequest` from pragmatic patch params.
+pub fn build_update_api_policy_request(
+    policy_id: u64,
+    expected_revision: u64,
+    params: UpdateApiPolicyParams,
+) -> crate::errors::Result<crate::proto::auth::v1::UpdateApiPolicyRequest> {
+    use crate::errors::Error;
+    use crate::proto::auth::v1::{ApiPolicySpec, UpdateApiPolicyRequest};
+    use buffa_types::google::protobuf::FieldMask;
+
+    if expected_revision == 0 {
+        return Err(Error::validation(
+            "expected_revision must be a positive revision from a prior read",
+        ));
+    }
+
+    let mut spec = ApiPolicySpec::default();
+    let mut paths = Vec::new();
+
+    if let Some(name) = params.name {
+        paths.push("name".to_owned());
+        spec.name = name;
+    }
+    if let Some(description) = params.description {
+        paths.push("description".to_owned());
+        spec.description = description;
+    }
+    if let Some(actions) = params.actions {
+        paths.push("actions".to_owned());
+        spec.actions = actions.into_iter().map(Into::into).collect();
+    }
+    if let Some(max_order_notional) = params.max_order_notional {
+        paths.push("max_order_notional".to_owned());
+        spec.max_order_notional = max_order_notional;
+    }
+
+    if paths.is_empty() {
+        return Err(Error::validation(
+            "update_mask must be non-empty; set at least one field on UpdateApiPolicyParams",
+        ));
+    }
+
+    Ok(UpdateApiPolicyRequest {
+        policy_id,
+        policy: spec.into(),
+        update_mask: FieldMask {
+            paths,
+            ..Default::default()
+        }
+        .into(),
+        expected_revision,
+        ..Default::default()
+    })
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::models::CreateInternalTransferParams;
     use crate::types::{AssetAmount, QuantityDomain};
 
@@ -2433,5 +2773,246 @@ mod tests {
 
         let err = client.internal_transfers.create(params).await.unwrap_err();
         assert!(err.to_string().contains("requires destination"));
+    }
+
+    #[test]
+    fn update_subaccount_request_builds_nested_spec_and_mask() {
+        let req = build_update_subaccount_request(
+            42,
+            3,
+            UpdateSubaccountParams {
+                label: Some(String::new()),
+                icon: None,
+                color: Some("#fff".into()),
+                status: Some("disabled".into()),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(req.subaccount_id, 42);
+        assert_eq!(req.expected_revision, 3);
+        assert_eq!(
+            req.update_mask.as_option().unwrap().paths,
+            vec!["label", "color", "status"]
+        );
+        let spec = req.subaccount.as_option().unwrap();
+        assert_eq!(spec.label, "");
+        assert_eq!(spec.color, "#fff");
+        assert_eq!(spec.status, "disabled");
+        assert!(spec.icon.is_empty());
+    }
+
+    #[test]
+    fn delete_subaccount_request_masks_status_only() {
+        let req = build_update_subaccount_request(
+            1,
+            2,
+            UpdateSubaccountParams {
+                status: Some("deleted".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(req.update_mask.as_option().unwrap().paths, vec!["status"]);
+        assert_eq!(req.subaccount.as_option().unwrap().status, "deleted");
+    }
+
+    #[test]
+    fn update_subaccount_request_rejects_zero_revision_and_empty_mask() {
+        let err = build_update_subaccount_request(1, 0, UpdateSubaccountParams {
+            label: Some("x".into()),
+            ..Default::default()
+        })
+        .unwrap_err();
+        assert!(err.to_string().contains("expected_revision"));
+
+        let err = build_update_subaccount_request(1, 1, UpdateSubaccountParams::default())
+            .unwrap_err();
+        assert!(err.to_string().contains("update_mask"));
+    }
+
+    #[test]
+    fn update_address_book_entry_clears_label_note_and_tag_ids() {
+        let req = build_update_address_book_entry_request(
+            110,
+            6,
+            UpdateAddressBookEntryParams {
+                label: Some(String::new()),
+                note: Some(String::new()),
+                tag_ids: Some(vec![]),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(req.address_book_entry_id, 110);
+        assert_eq!(req.expected_revision, 6);
+        assert_eq!(
+            req.update_mask.as_option().unwrap().paths,
+            vec!["label", "note", "tag_ids"]
+        );
+        let entry = req.entry.as_option().unwrap();
+        assert!(entry.label.is_empty());
+        assert!(entry.note.is_empty());
+        assert!(entry.tag_ids.is_empty());
+    }
+
+    #[test]
+    fn update_address_book_entry_rejects_zero_revision_and_empty_mask() {
+        let err = build_update_address_book_entry_request(
+            1,
+            0,
+            UpdateAddressBookEntryParams {
+                label: Some("x".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("expected_revision"));
+
+        let err = build_update_address_book_entry_request(
+            1,
+            1,
+            UpdateAddressBookEntryParams::default(),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("update_mask"));
+    }
+
+    #[test]
+    fn update_address_book_tag_clears_color_and_omits_name() {
+        let req = build_update_address_book_tag_request(
+            40,
+            UpdateAddressBookTagParams {
+                name: None,
+                color: Some(String::new()),
+            },
+        )
+        .unwrap();
+        assert_eq!(req.tag_id, 40);
+        assert!(req.name.is_none());
+        assert_eq!(req.color.as_deref(), Some(""));
+    }
+
+    #[test]
+    fn update_address_book_tag_sets_name_omits_color() {
+        let req = build_update_address_book_tag_request(
+            40,
+            UpdateAddressBookTagParams {
+                name: Some("friends".into()),
+                color: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(req.name.as_deref(), Some("friends"));
+        assert!(req.color.is_none());
+    }
+
+    #[test]
+    fn update_address_book_tag_rejects_empty_name() {
+        let err = build_update_address_book_tag_request(
+            1,
+            UpdateAddressBookTagParams {
+                name: Some(String::new()),
+                color: None,
+            },
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("name"));
+    }
+
+    #[test]
+    fn update_subaccount_policy_false_zero_empty_and_clear_timestamps() {
+        use crate::proto::auth::v1::PolicyAction;
+
+        let req = build_update_subaccount_policy_request(
+            50,
+            8,
+            UpdateSubaccountPolicyParams {
+                name: Some(String::new()),
+                actions: Some(vec![PolicyAction::READ_BALANCES, PolicyAction::READ_SPOT]),
+                spot_markets: Some(vec![]),
+                trading_halted: Some(false),
+                global_notional_cap: Some(0),
+                review_at: Some(None),
+                expires_at: Some(None),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(req.policy_id, 50);
+        assert_eq!(req.expected_revision, 8);
+        assert_eq!(
+            req.update_mask.as_option().unwrap().paths,
+            vec![
+                "name",
+                "actions",
+                "spot_markets",
+                "trading_halted",
+                "global_notional_cap",
+                "review_at",
+                "expires_at",
+            ]
+        );
+        let policy = req.policy.as_option().unwrap();
+        assert!(policy.name.is_empty());
+        assert_eq!(policy.actions.len(), 2);
+        assert!(policy.spot_markets.is_empty());
+        assert!(!policy.trading_halted);
+        assert_eq!(policy.global_notional_cap, 0);
+        assert!(!policy.review_at.is_set());
+        assert!(!policy.expires_at.is_set());
+    }
+
+    #[test]
+    fn update_api_policy_one_field_omits_others() {
+        let req = build_update_api_policy_request(
+            30,
+            2,
+            UpdateApiPolicyParams {
+                description: Some("only".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            req.update_mask.as_option().unwrap().paths,
+            vec!["description"]
+        );
+        let policy = req.policy.as_option().unwrap();
+        assert_eq!(policy.description, "only");
+        assert!(policy.name.is_empty());
+        assert_eq!(policy.max_order_notional, 0);
+    }
+
+    #[test]
+    fn create_policy_uses_nested_policy_spec() {
+        use crate::proto::auth::v1::{
+            ApiPolicySpec, CreateApiPolicyRequest, CreateSubaccountPolicyRequest,
+            SubaccountPolicySpec,
+        };
+
+        let sub = CreateSubaccountPolicyRequest {
+            policy: SubaccountPolicySpec {
+                name: "p".into(),
+                description: String::new(),
+                ..Default::default()
+            }
+            .into(),
+            subaccount_id: Some(1),
+            ..Default::default()
+        };
+        assert_eq!(sub.policy.as_option().unwrap().name, "p");
+        assert!(sub.policy.as_option().unwrap().description.is_empty());
+
+        let api = CreateApiPolicyRequest {
+            policy: ApiPolicySpec {
+                name: "k".into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        assert_eq!(api.policy.as_option().unwrap().name, "k");
     }
 }

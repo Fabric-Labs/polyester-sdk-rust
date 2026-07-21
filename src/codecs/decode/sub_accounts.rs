@@ -43,6 +43,7 @@ pub fn subaccount_from_proto(msg: &Subaccount) -> SubAccount {
         smart_account_address: msg.smart_account_address.clone(),
         status: msg.status.clone(),
         updated_at: msg.updated_at.as_option().cloned(),
+        revision: msg.revision,
     }
 }
 
@@ -150,6 +151,7 @@ mod tests {
                     ..Default::default()
                 }
                 .into(),
+                revision: 4,
                 ..Default::default()
             }],
             ..Default::default()
@@ -162,6 +164,7 @@ mod tests {
             result.subaccounts[0].updated_at.as_ref().unwrap().nanos,
             123_456_000
         );
+        assert_eq!(result.subaccounts[0].revision, 4);
     }
 
     #[test]

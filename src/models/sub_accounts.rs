@@ -9,6 +9,8 @@ pub struct SubAccount {
     pub smart_account_address: String,
     pub status: String,
     pub updated_at: Option<Timestamp>,
+    /// Monotonic resource revision for conditional updates.
+    pub revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
