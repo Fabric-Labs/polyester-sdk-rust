@@ -36,6 +36,7 @@ fn entry_from_proto(msg: &ProtoAddressBookEntry) -> AddressBookEntry {
         address_book_entry_id: format_uint64_id(msg.address_book_entry_id),
         label: msg.label.clone(),
         kind: enum_label(&msg.kind),
+        revision: msg.revision,
     }
 }
 
@@ -161,6 +162,7 @@ mod tests {
                 address_book_entry_id: 7,
                 label: "vault".into(),
                 kind: AddressBookEntryKind::INTERNAL_ACCOUNT.into(),
+                revision: 5,
                 ..Default::default()
             }],
             next_page_token: "t".into(),
@@ -171,6 +173,7 @@ mod tests {
         assert_eq!(result.entries[0].address_book_entry_id, format_uint64_id(7));
         assert_eq!(result.entries[0].label, "vault");
         assert!(!result.entries[0].kind.is_empty());
+        assert_eq!(result.entries[0].revision, 5);
         assert_eq!(result.next_page_token, "t");
     }
 
