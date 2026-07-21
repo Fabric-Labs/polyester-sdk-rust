@@ -373,11 +373,13 @@ impl MarketOverviewService {
         let by_symbol_id: Arc<Mutex<HashMap<u32, MarketOverviewEntry>>> =
             Arc::new(Mutex::new(HashMap::new()));
         let closed = Arc::new(AtomicBool::new(false));
+        let last_error: Arc<Mutex<Option<crate::Error>>> = Arc::new(Mutex::new(None));
         let (tx, rx) = mpsc::channel::<Vec<MarketOverviewEntry>>(50);
 
         let emit = {
             let by_symbol_id = by_symbol_id.clone();
             let closed = closed.clone();
+            let last_error = last_error.clone();
             let tx = tx.clone();
             Arc::new(move || {
                 if closed.load(std::sync::atomic::Ordering::SeqCst) {
@@ -389,7 +391,13 @@ impl MarketOverviewService {
                     .values()
                     .cloned()
                     .collect();
-                let _ = tx.try_send(rows);
+                let _ = crate::realtime::try_enqueue(
+                    &tx,
+                    rows,
+                    &closed,
+                    &last_error,
+                    "market overview subscription queue full; consumer too slow",
+                );
             }) as Arc<dyn Fn() + Send + Sync>
         };
 
@@ -448,9 +456,12 @@ impl MarketOverviewService {
                 })
             },
             max_buffered: 2000,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
         });
 
-        let subscription = crate::marketoverview::Subscription::new(rx, stream.clone(), closed);
+        let subscription =
+            crate::marketoverview::Subscription::new(rx, stream.clone(), closed, last_error);
         if let Err(err) = stream.start().await {
             subscription.close();
             return Err(err);
@@ -562,12 +573,14 @@ impl OrderbookService {
             book_seq: 0,
         }));
         let closed = Arc::new(AtomicBool::new(false));
+        let last_error: Arc<Mutex<Option<crate::Error>>> = Arc::new(Mutex::new(None));
         let (tx, rx) = mpsc::channel::<OrderbookData>(200);
 
         let emit = {
             let state = state.clone();
             let bucket_ticks = bucket_ticks.clone();
             let closed = closed.clone();
+            let last_error = last_error.clone();
             let tx = tx.clone();
             let symbol = symbol.clone();
             Arc::new(move || {
@@ -588,7 +601,13 @@ impl OrderbookService {
                     ticks,
                     quantity_scale,
                 );
-                let _ = tx.try_send(data);
+                let _ = crate::realtime::try_enqueue(
+                    &tx,
+                    data,
+                    &closed,
+                    &last_error,
+                    "orderbook subscription queue full; consumer too slow",
+                );
             }) as Arc<dyn Fn() + Send + Sync>
         };
 
@@ -667,11 +686,19 @@ impl OrderbookService {
                 })
             },
             max_buffered: 200,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
         });
         *stream_slot.lock().expect("stream slot") = Some(stream.clone());
 
-        let subscription =
-            crate::orderbook::Subscription::new(rx, stream.clone(), closed, bucket_ticks, emit);
+        let subscription = crate::orderbook::Subscription::new(
+            rx,
+            stream.clone(),
+            closed,
+            bucket_ticks,
+            emit,
+            last_error,
+        );
         if let Err(err) = stream.start().await {
             subscription.close();
             return Err(err);
