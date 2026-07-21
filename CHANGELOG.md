@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a5
+
+Package version: `0.1.0-alpha.5`. Git tag: `v0.1.0a5`.
+
 ### Breaking
 - Durable auth PATCH contract: API-key, subaccount, and address-book entry updates use nested mutable specs, a non-empty FieldMask, and a positive `expected_revision` (`UpdateApiKeyParams` / `UpdateSubaccountParams` / `UpdateAddressBookEntryParams`)
 - Soft-delete subaccount requires `expected_revision`; durable resource models expose `revision`

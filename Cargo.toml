@@ -1,6 +1,6 @@
 [package]
 name = "polyester-sdk"
-version = "0.1.0-alpha.4"
+version = "0.1.0-alpha.5"
 edition = "2024"
 rust-version = "1.88"
 description = "Official Rust SDK for Polyester APIs."
