@@ -9,6 +9,7 @@ mod account;
 mod account_admin;
 mod auth;
 mod balances;
+mod funded_chain_userop;
 mod funded_internal_transfer;
 mod funded_market_fill;
 mod funded_order_holds;
