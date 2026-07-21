@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.3`, git tag `v0.1.0a3`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.5`, git tag `v0.1.0a5`). Proprietary license
 (not open source). API-key only — no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -59,7 +59,7 @@ Full cross-language comparison:
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.4"
+polyester-sdk = "0.1.0-alpha.5"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included.
@@ -68,7 +68,7 @@ Git install (if you prefer pinning a tag before crates.io mirrors):
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a4" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a5" }
 ```
 
 For development from a git checkout:
