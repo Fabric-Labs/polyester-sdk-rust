@@ -13,6 +13,7 @@ pub fn subaccount_policy_from_proto(msg: &SubaccountPolicyView) -> SubaccountPol
         policy_id: format_uint64_id(msg.id),
         name: msg.name.clone(),
         description: msg.description.clone(),
+        revision: msg.revision,
     }
 }
 
@@ -51,6 +52,7 @@ pub fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
         policy_id: format_uint64_id(msg.id),
         name: msg.name.clone(),
         description: msg.description.clone(),
+        revision: msg.revision,
     }
 }
 
@@ -83,6 +85,7 @@ mod tests {
                 id: 42,
                 name: "default".into(),
                 description: "desc".into(),
+                revision: 3,
                 ..Default::default()
             }],
             ..Default::default()
@@ -91,6 +94,7 @@ mod tests {
         assert_eq!(result.policies.len(), 1);
         assert_eq!(result.policies[0].policy_id, format_uint64_id(42));
         assert_eq!(result.policies[0].name, "default");
+        assert_eq!(result.policies[0].revision, 3);
     }
 
     #[test]
@@ -99,6 +103,7 @@ mod tests {
             policies: vec![ApiPolicyView {
                 id: 7,
                 name: "read-only".into(),
+                revision: 2,
                 ..Default::default()
             }],
             ..Default::default()
@@ -106,5 +111,6 @@ mod tests {
         let result = api_policies_list_from_proto(&msg);
         assert_eq!(result.policies.len(), 1);
         assert_eq!(result.policies[0].policy_id, format_uint64_id(7));
+        assert_eq!(result.policies[0].revision, 2);
     }
 }

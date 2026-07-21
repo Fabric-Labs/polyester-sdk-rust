@@ -7,6 +7,8 @@ pub struct AddressBookEntry {
     pub address_book_entry_id: String,
     pub label: String,
     pub kind: String,
+    /// Monotonic resource revision for conditional updates.
+    pub revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
