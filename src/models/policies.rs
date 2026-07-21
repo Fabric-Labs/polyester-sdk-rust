@@ -5,6 +5,8 @@ pub struct SubaccountPolicy {
     pub policy_id: String,
     pub name: String,
     pub description: String,
+    /// Monotonic resource revision for conditional updates.
+    pub revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +19,8 @@ pub struct ApiPolicy {
     pub policy_id: String,
     pub name: String,
     pub description: String,
+    /// Monotonic resource revision for conditional updates.
+    pub revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

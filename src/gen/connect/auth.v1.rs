@@ -1599,7 +1599,7 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Replace an existing sub-account policy template.
+    /// Change selected fields on an existing sub-account policy template.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -1737,7 +1737,7 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Replace an existing API key policy template.
+    /// Change selected fields on an existing API key policy template.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

@@ -301,6 +301,15 @@ pub struct ApiKey {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Monotonic resource revision used for conditional updates.
+    ///
+    /// Field 26: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -322,6 +331,7 @@ impl ::core::fmt::Debug for ApiKey {
             .field("expires_at", &self.expires_at)
             .field("created_by_actor", &self.created_by_actor)
             .field("updated_at", &self.updated_at)
+            .field("revision", &self.revision)
             .finish()
     }
 }
@@ -435,6 +445,9 @@ impl ::buffa::Message for ApiKey {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.revision != 0u64 {
+            size += 2u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -493,6 +506,9 @@ impl ::buffa::Message for ApiKey {
         if self.updated_at.is_set() {
             ::buffa::types::put_len_delimited_header(25u32, __cache.consume_next(), buf);
             self.updated_at.write_to(__cache, buf);
+        }
+        if self.revision != 0u64 {
+            ::buffa::types::put_uint64_field(26u32, self.revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -627,6 +643,13 @@ impl ::buffa::Message for ApiKey {
                     ctx,
                 )?;
             }
+            26u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -649,6 +672,7 @@ impl ::buffa::Message for ApiKey {
         self.expires_at = ::buffa::MessageField::none();
         self.created_by_actor.clear();
         self.updated_at = ::buffa::MessageField::none();
+        self.revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -679,131 +703,6 @@ pub const __API_KEY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::ty
     type_url: "type.googleapis.com/auth.v1.ApiKey",
     to_json: ::buffa::type_registry::any_to_json::<ApiKey>,
     from_json: ::buffa::type_registry::any_from_json::<ApiKey>,
-    is_wkt: false,
-};
-/// IpWhitelist replaces or clears an API key IP whitelist during updates.
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct IpWhitelist {
-    /// CIDR strings, e.g. "1.2.3.4/32". Maximum 32 unique entries.
-    ///
-    /// Field 1: `cidrs`
-    #[serde(
-        rename = "cidrs",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub cidrs: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for IpWhitelist {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("IpWhitelist").field("cidrs", &self.cidrs).finish()
-    }
-}
-impl IpWhitelist {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.IpWhitelist";
-}
-::buffa::impl_default_instance!(IpWhitelist);
-impl ::buffa::MessageName for IpWhitelist {
-    const PACKAGE: &'static str = "auth.v1";
-    const NAME: &'static str = "IpWhitelist";
-    const FULL_NAME: &'static str = "auth.v1.IpWhitelist";
-    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.IpWhitelist";
-}
-impl ::buffa::Message for IpWhitelist {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// The result is a `u32`; the protobuf specification requires all
-    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
-    /// compliant message will never overflow this type.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u32;
-        for v in &self.cidrs {
-            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u32;
-        size
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::bytes::BufMut,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        for v in &self.cidrs {
-            ::buffa::types::put_string_field(1u32, v, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                self.cidrs.push(::buffa::types::decode_string(buf)?);
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.cidrs.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for IpWhitelist {
-    const PROTO_FQN: &'static str = "auth.v1.IpWhitelist";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for IpWhitelist {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __IP_WHITELIST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/auth.v1.IpWhitelist",
-    to_json: ::buffa::type_registry::any_to_json::<IpWhitelist>,
-    from_json: ::buffa::type_registry::any_from_json::<IpWhitelist>,
     is_wkt: false,
 };
 /// CreateApiKeyRequest creates a new API key. Clients generate the Ed25519 key
@@ -1973,7 +1872,273 @@ pub const __GET_API_KEY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
     from_json: ::buffa::type_registry::any_from_json::<GetApiKeyResponse>,
     is_wkt: false,
 };
-/// UpdateApiKeyRequest updates mutable metadata for an existing API key.
+/// ApiKeyUpdateSpec contains mutable API key configuration.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ApiKeyUpdateSpec {
+    /// Human-friendly label for the key. Empty clears the label when selected.
+    ///
+    /// Field 1: `label`
+    #[serde(
+        rename = "label",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub label: ::buffa::alloc::string::String,
+    /// User-chosen icon/emoji for UI display. Empty clears the icon when selected.
+    ///
+    /// Field 2: `icon`
+    #[serde(
+        rename = "icon",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub icon: ::buffa::alloc::string::String,
+    /// User-chosen color token for UI display. Empty clears the color when selected.
+    ///
+    /// Field 3: `color`
+    #[serde(
+        rename = "color",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub color: ::buffa::alloc::string::String,
+    /// New status. ACTIVE and DISABLED are allowed; revocation uses DeleteApiKey.
+    ///
+    /// Field 4: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<ApiKeyStatus>,
+    /// Complete replacement IP whitelist. Empty clears the restriction when selected.
+    ///
+    /// Field 5: `ip_whitelist`
+    #[serde(
+        rename = "ipWhitelist",
+        alias = "ip_whitelist",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub ip_whitelist: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Expiry time in UTC. When selected, omission or the epoch clears expiry.
+    ///
+    /// Field 6: `expires_at`
+    #[serde(
+        rename = "expiresAt",
+        alias = "expires_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ApiKeyUpdateSpec {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ApiKeyUpdateSpec")
+            .field("label", &self.label)
+            .field("icon", &self.icon)
+            .field("color", &self.color)
+            .field("status", &self.status)
+            .field("ip_whitelist", &self.ip_whitelist)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
+}
+impl ApiKeyUpdateSpec {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApiKeyUpdateSpec";
+}
+::buffa::impl_default_instance!(ApiKeyUpdateSpec);
+impl ::buffa::MessageName for ApiKeyUpdateSpec {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ApiKeyUpdateSpec";
+    const FULL_NAME: &'static str = "auth.v1.ApiKeyUpdateSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApiKeyUpdateSpec";
+}
+impl ::buffa::Message for ApiKeyUpdateSpec {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.label.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+        }
+        if !self.icon.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.icon) as u32;
+        }
+        if !self.color.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        for v in &self.ip_whitelist {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if self.expires_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expires_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.label.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.label, buf);
+        }
+        if !self.icon.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.icon, buf);
+        }
+        if !self.color.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.color, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        for v in &self.ip_whitelist {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if self.expires_at.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.expires_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.label, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.icon, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.color, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.ip_whitelist.push(::buffa::types::decode_string(buf)?);
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expires_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.label.clear();
+        self.icon.clear();
+        self.color.clear();
+        self.status = ::buffa::EnumValue::from(0);
+        self.ip_whitelist.clear();
+        self.expires_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ApiKeyUpdateSpec {
+    const PROTO_FQN: &'static str = "auth.v1.ApiKeyUpdateSpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ApiKeyUpdateSpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __API_KEY_UPDATE_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ApiKeyUpdateSpec",
+    to_json: ::buffa::type_registry::any_to_json::<ApiKeyUpdateSpec>,
+    from_json: ::buffa::type_registry::any_from_json::<ApiKeyUpdateSpec>,
+    is_wkt: false,
+};
+/// UpdateApiKeyRequest changes selected mutable fields on an existing API key.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -1988,68 +2153,35 @@ pub struct UpdateApiKeyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub key_id: ::buffa::alloc::string::String,
-    /// New human-friendly label for the key. If empty, label is left unchanged.
-    /// Maximum length is 64 characters.
+    /// Candidate values for fields selected by update_mask.
     ///
-    /// Field 2: `label`
+    /// Field 2: `api_key`
     #[serde(
-        rename = "label",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub label: ::buffa::alloc::string::String,
-    /// New user-chosen icon/emoji for UI display. If empty, left unchanged.
-    ///
-    /// Field 6: `icon`
-    #[serde(
-        rename = "icon",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub icon: ::buffa::alloc::string::String,
-    /// New user-chosen color token for UI display. If empty, left unchanged.
-    ///
-    /// Field 7: `color`
-    #[serde(
-        rename = "color",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub color: ::buffa::alloc::string::String,
-    /// Optional new status. ACTIVE and DISABLED are allowed; REVOKED must be done
-    /// via DeleteApiKey and is terminal.
-    ///
-    /// Field 3: `status`
-    #[serde(
-        rename = "status",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub status: ::buffa::EnumValue<ApiKeyStatus>,
-    /// Optional new IP whitelist. If this field is omitted, the whitelist is left
-    /// unchanged. If it is present:
-    /// - cidrs non-empty replaces the existing whitelist.
-    /// - cidrs empty clears the whitelist (no IP restriction).
-    ///
-    /// Field 4: `ip_whitelist`
-    #[serde(
-        rename = "ipWhitelist",
-        alias = "ip_whitelist",
+        rename = "apiKey",
+        alias = "api_key",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub ip_whitelist: ::buffa::MessageField<IpWhitelist>,
-    /// Optional new expiry time in UTC. If this field is present:
-    /// - Non-zero timestamp sets/updates the expiry.
-    /// - Zero/epoch timestamp clears the expiry (no automatic expiry).
-    /// If this field is omitted, the expiry is left unchanged.
+    pub api_key: ::buffa::MessageField<ApiKeyUpdateSpec>,
+    /// Mutable fields to apply. Paths are relative to api_key. The mask is required,
+    /// must be non-empty, and cannot contain "*".
     ///
-    /// Field 5: `expires_at`
+    /// Field 3: `update_mask`
     #[serde(
-        rename = "expiresAt",
-        alias = "expires_at",
+        rename = "updateMask",
+        alias = "update_mask",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    pub update_mask: ::buffa::MessageField<::buffa_types::google::protobuf::FieldMask>,
+    /// Revision returned by the latest successful read.
+    ///
+    /// Field 4: `expected_revision`
+    #[serde(
+        rename = "expectedRevision",
+        alias = "expected_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub expected_revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2058,12 +2190,9 @@ impl ::core::fmt::Debug for UpdateApiKeyRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateApiKeyRequest")
             .field("key_id", &self.key_id)
-            .field("label", &self.label)
-            .field("icon", &self.icon)
-            .field("color", &self.color)
-            .field("status", &self.status)
-            .field("ip_whitelist", &self.ip_whitelist)
-            .field("expires_at", &self.expires_at)
+            .field("api_key", &self.api_key)
+            .field("update_mask", &self.update_mask)
+            .field("expected_revision", &self.expected_revision)
             .finish()
     }
 }
@@ -2095,36 +2224,26 @@ impl ::buffa::Message for UpdateApiKeyRequest {
         if !self.key_id.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.key_id) as u32;
         }
-        if !self.label.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
-        }
-        {
-            let val = self.status.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        if self.ip_whitelist.is_set() {
+        if self.api_key.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.ip_whitelist.compute_size(__cache);
+            let inner_size = self.api_key.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if self.expires_at.is_set() {
+        if self.update_mask.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.expires_at.compute_size(__cache);
+            let inner_size = self.update_mask.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if !self.icon.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.icon) as u32;
-        }
-        if !self.color.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
+        if self.expected_revision != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.expected_revision) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -2139,28 +2258,16 @@ impl ::buffa::Message for UpdateApiKeyRequest {
         if !self.key_id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.key_id, buf);
         }
-        if !self.label.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.label, buf);
+        if self.api_key.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.api_key.write_to(__cache, buf);
         }
-        {
-            let val = self.status.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(3u32, val, buf);
-            }
+        if self.update_mask.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.update_mask.write_to(__cache, buf);
         }
-        if self.ip_whitelist.is_set() {
-            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
-            self.ip_whitelist.write_to(__cache, buf);
-        }
-        if self.expires_at.is_set() {
-            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
-            self.expires_at.write_to(__cache, buf);
-        }
-        if !self.icon.is_empty() {
-            ::buffa::types::put_string_field(6u32, &self.icon, buf);
-        }
-        if !self.color.is_empty() {
-            ::buffa::types::put_string_field(7u32, &self.color, buf);
+        if self.expected_revision != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.expected_revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2187,52 +2294,29 @@ impl ::buffa::Message for UpdateApiKeyRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.label, buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.api_key.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.status = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
+                ::buffa::Message::merge_length_delimited(
+                    self.update_mask.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.ip_whitelist.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.expires_at.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.icon, buf)?;
-            }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.color, buf)?;
+                self.expected_revision = ::buffa::types::decode_uint64(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -2243,12 +2327,9 @@ impl ::buffa::Message for UpdateApiKeyRequest {
     }
     fn clear(&mut self) {
         self.key_id.clear();
-        self.label.clear();
-        self.status = ::buffa::EnumValue::from(0);
-        self.ip_whitelist = ::buffa::MessageField::none();
-        self.expires_at = ::buffa::MessageField::none();
-        self.icon.clear();
-        self.color.clear();
+        self.api_key = ::buffa::MessageField::none();
+        self.update_mask = ::buffa::MessageField::none();
+        self.expected_revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3513,6 +3594,15 @@ pub struct SubaccountPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Monotonic resource revision used for conditional updates.
+    ///
+    /// Field 30: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3551,6 +3641,7 @@ impl ::core::fmt::Debug for SubaccountPolicyView {
             .field("expires_at", &self.expires_at)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
+            .field("revision", &self.revision)
             .finish()
     }
 }
@@ -3730,6 +3821,9 @@ impl ::buffa::Message for SubaccountPolicyView {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.revision != 0u64 {
+            size += 2u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3851,6 +3945,9 @@ impl ::buffa::Message for SubaccountPolicyView {
         if self.expires_at.is_set() {
             ::buffa::types::put_len_delimited_header(29u32, __cache.consume_next(), buf);
             self.expires_at.write_to(__cache, buf);
+        }
+        if self.revision != 0u64 {
+            ::buffa::types::put_uint64_field(30u32, self.revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4118,6 +4215,13 @@ impl ::buffa::Message for SubaccountPolicyView {
                     ctx,
                 )?;
             }
+            30u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4154,6 +4258,7 @@ impl ::buffa::Message for SubaccountPolicyView {
         self.locked = false;
         self.review_at = ::buffa::MessageField::none();
         self.expires_at = ::buffa::MessageField::none();
+        self.revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4765,13 +4870,13 @@ pub const __GET_SUBACCOUNT_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
     from_json: ::buffa::type_registry::any_from_json::<GetSubaccountPolicyResponse>,
     is_wkt: false,
 };
-/// CreateSubaccountPolicyRequest defines a new sub-account policy template, with
-/// an optional attach step for one target sub-account.
+/// SubaccountPolicySpec contains the mutable configuration of a sub-account policy.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct CreateSubaccountPolicyRequest {
-    /// Human-readable policy name. Required; 1 to 64 characters.
+pub struct SubaccountPolicySpec {
+    /// Human-readable policy name. Create requires a non-empty value; update
+    /// validates it after merging fields selected by update_mask.
     ///
     /// Field 1: `name`
     #[serde(
@@ -4789,18 +4894,6 @@ pub struct CreateSubaccountPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub description: ::buffa::alloc::string::String,
-    /// Optional: if set, the created policy will be immediately attached to this
-    /// sub-account (opaque ID) in the same request. Useful for "create
-    /// policy for this sub-account" flows. Omit to create reusable templates.
-    ///
-    /// Field 9: `subaccount_id`
-    #[serde(
-        rename = "subaccountId",
-        alias = "subaccount_id",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub subaccount_id: ::core::option::Option<u64>,
     /// Allowed spot markets for this policy.
     ///
     /// Field 3: `spot_markets`
@@ -5029,12 +5122,11 @@ pub struct CreateSubaccountPolicyRequest {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CreateSubaccountPolicyRequest {
+impl ::core::fmt::Debug for SubaccountPolicySpec {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CreateSubaccountPolicyRequest")
+        f.debug_struct("SubaccountPolicySpec")
             .field("name", &self.name)
             .field("description", &self.description)
-            .field("subaccount_id", &self.subaccount_id)
             .field("spot_markets", &self.spot_markets)
             .field("perp_markets", &self.perp_markets)
             .field("spot_market_scope", &self.spot_market_scope)
@@ -5062,30 +5154,21 @@ impl ::core::fmt::Debug for CreateSubaccountPolicyRequest {
             .finish()
     }
 }
-impl CreateSubaccountPolicyRequest {
+impl SubaccountPolicySpec {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountPolicyRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountPolicySpec";
 }
-impl CreateSubaccountPolicyRequest {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_subaccount_id(mut self, value: u64) -> Self {
-        self.subaccount_id = Some(value);
-        self
-    }
-}
-::buffa::impl_default_instance!(CreateSubaccountPolicyRequest);
-impl ::buffa::MessageName for CreateSubaccountPolicyRequest {
+::buffa::impl_default_instance!(SubaccountPolicySpec);
+impl ::buffa::MessageName for SubaccountPolicySpec {
     const PACKAGE: &'static str = "auth.v1";
-    const NAME: &'static str = "CreateSubaccountPolicyRequest";
-    const FULL_NAME: &'static str = "auth.v1.CreateSubaccountPolicyRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountPolicyRequest";
+    const NAME: &'static str = "SubaccountPolicySpec";
+    const FULL_NAME: &'static str = "auth.v1.SubaccountPolicySpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountPolicySpec";
 }
-impl ::buffa::Message for CreateSubaccountPolicyRequest {
+impl ::buffa::Message for SubaccountPolicySpec {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -5138,9 +5221,6 @@ impl ::buffa::Message for CreateSubaccountPolicyRequest {
                 .sum::<u32>();
             size
                 += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
-        }
-        if self.subaccount_id.is_some() {
-            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
         if self.global_notional_cap != 0u64 {
             size
@@ -5271,9 +5351,6 @@ impl ::buffa::Message for CreateSubaccountPolicyRequest {
             for v in &self.actions {
                 ::buffa::types::encode_int32(v.to_i32(), buf);
             }
-        }
-        if let Some(v) = self.subaccount_id {
-            ::buffa::types::put_fixed64_field(9u32, v, buf);
         }
         if self.global_notional_cap != 0u64 {
             ::buffa::types::put_uint64_field(12u32, self.global_notional_cap, buf);
@@ -5434,15 +5511,6 @@ impl ::buffa::Message for CreateSubaccountPolicyRequest {
                     );
                 }
             }
-            9u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Fixed64,
-                )?;
-                self.subaccount_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_fixed64(buf)?,
-                );
-            }
             12u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -5580,7 +5648,6 @@ impl ::buffa::Message for CreateSubaccountPolicyRequest {
         self.spot_market_scope = ::buffa::EnumValue::from(0);
         self.perp_market_scope = ::buffa::EnumValue::from(0);
         self.actions.clear();
-        self.subaccount_id = ::core::option::Option::None;
         self.global_notional_cap = 0u64;
         self.max_order_notional = 0u64;
         self.max_open_orders = 0u32;
@@ -5597,6 +5664,179 @@ impl ::buffa::Message for CreateSubaccountPolicyRequest {
         self.locked = false;
         self.review_at = ::buffa::MessageField::none();
         self.expires_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SubaccountPolicySpec {
+    const PROTO_FQN: &'static str = "auth.v1.SubaccountPolicySpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SubaccountPolicySpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SUBACCOUNT_POLICY_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.SubaccountPolicySpec",
+    to_json: ::buffa::type_registry::any_to_json::<SubaccountPolicySpec>,
+    from_json: ::buffa::type_registry::any_from_json::<SubaccountPolicySpec>,
+    is_wkt: false,
+};
+/// CreateSubaccountPolicyRequest defines a new sub-account policy template, with
+/// an optional attach step for one target sub-account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateSubaccountPolicyRequest {
+    /// Complete mutable policy configuration.
+    ///
+    /// Field 1: `policy`
+    #[serde(
+        rename = "policy",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub policy: ::buffa::MessageField<SubaccountPolicySpec>,
+    /// Optional target sub-account to attach atomically after creation.
+    ///
+    /// Field 2: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateSubaccountPolicyRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateSubaccountPolicyRequest")
+            .field("policy", &self.policy)
+            .field("subaccount_id", &self.subaccount_id)
+            .finish()
+    }
+}
+impl CreateSubaccountPolicyRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountPolicyRequest";
+}
+impl CreateSubaccountPolicyRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(CreateSubaccountPolicyRequest);
+impl ::buffa::MessageName for CreateSubaccountPolicyRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "CreateSubaccountPolicyRequest";
+    const FULL_NAME: &'static str = "auth.v1.CreateSubaccountPolicyRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountPolicyRequest";
+}
+impl ::buffa::Message for CreateSubaccountPolicyRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.policy.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.policy.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.policy.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.policy.write_to(__cache, buf);
+        }
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(2u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.policy.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.policy = ::buffa::MessageField::none();
+        self.subaccount_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5765,8 +6005,8 @@ pub const __CREATE_SUBACCOUNT_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::
     from_json: ::buffa::type_registry::any_from_json::<CreateSubaccountPolicyResponse>,
     is_wkt: false,
 };
-/// UpdateSubaccountPolicyRequest fully replaces an existing sub-account policy
-/// template.
+/// UpdateSubaccountPolicyRequest changes selected mutable fields on an existing
+/// sub-account policy.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -5781,248 +6021,35 @@ pub struct UpdateSubaccountPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub policy_id: u64,
-    /// Human-readable policy name. Required; 1 to 64 characters.
+    /// Candidate values for fields selected by update_mask.
     ///
-    /// Field 2: `name`
+    /// Field 2: `policy`
     #[serde(
-        rename = "name",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub name: ::buffa::alloc::string::String,
-    /// Optional policy description for dashboards and audits. Maximum 256 characters.
-    ///
-    /// Field 3: `description`
-    #[serde(
-        rename = "description",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub description: ::buffa::alloc::string::String,
-    /// Allowed spot markets for this policy.
-    ///
-    /// Field 4: `spot_markets`
-    #[serde(
-        rename = "spotMarkets",
-        alias = "spot_markets",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub spot_markets: ::buffa::alloc::vec::Vec<SpotMarketRule>,
-    /// Allowed perp markets and optional per-contract leverage caps.
-    ///
-    /// Field 5: `perp_markets`
-    #[serde(
-        rename = "perpMarkets",
-        alias = "perp_markets",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub perp_markets: ::buffa::alloc::vec::Vec<PerpMarketRule>,
-    /// Market-level scope for spot markets. When unspecified, defaults to ALL.
-    ///
-    /// Field 6: `spot_market_scope`
-    #[serde(
-        rename = "spotMarketScope",
-        alias = "spot_market_scope",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub spot_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-    ///
-    /// Field 7: `perp_market_scope`
-    #[serde(
-        rename = "perpMarketScope",
-        alias = "perp_market_scope",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub perp_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// High-level actions enabled for the sub-account policy. Up to 64 unique
-    /// explicit actions are allowed.
-    ///
-    /// Field 8: `actions`
-    #[serde(
-        rename = "actions",
-        with = "::buffa::json_helpers::repeated_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
-    )]
-    pub actions: ::buffa::alloc::vec::Vec<::buffa::EnumValue<PolicyAction>>,
-    /// Maximum total notional exposure across all positions for this sub-account,
-    /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-    /// 0 means no explicit cap.
-    ///
-    /// Field 12: `global_notional_cap`
-    #[serde(
-        rename = "globalNotionalCap",
-        alias = "global_notional_cap",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub global_notional_cap: u64,
-    /// Maximum notional size for any single order on this sub-account, expressed
-    /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-    /// no explicit cap.
-    ///
-    /// Field 13: `max_order_notional`
-    #[serde(
-        rename = "maxOrderNotional",
-        alias = "max_order_notional",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub max_order_notional: u64,
-    /// Maximum number of resting orders allowed on this sub-account at any time.
-    /// A value of 0 means no explicit cap.
-    ///
-    /// Field 14: `max_open_orders`
-    #[serde(
-        rename = "maxOpenOrders",
-        alias = "max_open_orders",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub max_open_orders: u32,
-    /// Maximum number of open perp positions allowed on this sub-account. A value
-    /// of 0 means no explicit cap.
-    ///
-    /// Field 15: `max_open_positions`
-    #[serde(
-        rename = "maxOpenPositions",
-        alias = "max_open_positions",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub max_open_positions: u32,
-    /// Optional global leverage cap across all perp contracts. Supported non-zero
-    /// values are 1, 3, 5, 10, 20, 50, and 100. A value of 0 means no explicit cap.
-    ///
-    /// Field 16: `global_perp_leverage_x`
-    #[serde(
-        rename = "globalPerpLeverageX",
-        alias = "global_perp_leverage_x",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub global_perp_leverage_x: u32,
-    /// Maximum total notional this sub-account can transfer out internally per
-    /// rolling day, expressed in the canonical quote unit (for example,
-    /// micro-USDT). A value of 0 means no explicit cap.
-    ///
-    /// Field 17: `daily_internal_transfer_out_limit`
-    #[serde(
-        rename = "dailyInternalTransferOutLimit",
-        alias = "daily_internal_transfer_out_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_internal_transfer_out_limit: u64,
-    /// Maximum total notional this sub-account can withdraw per rolling day,
-    /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-    /// 0 means no explicit cap.
-    ///
-    /// Field 18: `daily_withdraw_limit`
-    #[serde(
-        rename = "dailyWithdrawLimit",
-        alias = "daily_withdraw_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_withdraw_limit: u64,
-    /// When true, internal transfers from this sub-account may only target other
-    /// sub-accounts owned by the same root account.
-    ///
-    /// Field 19: `internal_transfers_own_only`
-    #[serde(
-        rename = "internalTransfersOwnOnly",
-        alias = "internal_transfers_own_only",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub internal_transfers_own_only: bool,
-    /// When true, external withdrawals from this sub-account must target an
-    /// approved withdrawal destination.
-    ///
-    /// Field 20: `enforce_withdraw_whitelist`
-    #[serde(
-        rename = "enforceWithdrawWhitelist",
-        alias = "enforce_withdraw_whitelist",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub enforce_withdraw_whitelist: bool,
-    /// When true, new orders for this sub-account are rejected regardless of other
-    /// policy settings.
-    ///
-    /// Field 21: `trading_halted`
-    #[serde(
-        rename = "tradingHalted",
-        alias = "trading_halted",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub trading_halted: bool,
-    /// When true, this sub-account may only reduce or close existing exposure.
-    ///
-    /// Field 22: `liquidation_only`
-    #[serde(
-        rename = "liquidationOnly",
-        alias = "liquidation_only",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub liquidation_only: bool,
-    /// Maximum realized loss over a rolling day before safety controls may halt
-    /// activity, expressed in the canonical quote unit (for example, micro-USDT).
-    /// A value of 0 means no explicit limit.
-    ///
-    /// Field 23: `daily_loss_limit`
-    #[serde(
-        rename = "dailyLossLimit",
-        alias = "daily_loss_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_loss_limit: u64,
-    /// Maximum drawdown from peak equity in basis points. One basis point is
-    /// 1/100 of one percent. A value of 0 means no explicit limit.
-    ///
-    /// Field 24: `intraday_drawdown_limit_bps`
-    #[serde(
-        rename = "intradayDrawdownLimitBps",
-        alias = "intraday_drawdown_limit_bps",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub intraday_drawdown_limit_bps: u32,
-    /// When true, the policy is write-protected and requires an elevated mutation path.
-    ///
-    /// Field 25: `locked`
-    #[serde(
-        rename = "locked",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub locked: bool,
-    /// Optional review time in UTC. This does not automatically disable the policy.
-    ///
-    /// Field 26: `review_at`
-    #[serde(
-        rename = "reviewAt",
-        alias = "review_at",
+        rename = "policy",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub review_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Optional expiry time in UTC. This does not automatically disable the policy.
+    pub policy: ::buffa::MessageField<SubaccountPolicySpec>,
+    /// Mutable fields to apply. Paths are relative to policy. The mask is required,
+    /// must be non-empty, and cannot contain "*".
     ///
-    /// Field 27: `expires_at`
+    /// Field 3: `update_mask`
     #[serde(
-        rename = "expiresAt",
-        alias = "expires_at",
+        rename = "updateMask",
+        alias = "update_mask",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    pub update_mask: ::buffa::MessageField<::buffa_types::google::protobuf::FieldMask>,
+    /// Revision returned by the latest successful read. Stale revisions fail with
+    /// a conflict before no-op detection.
+    ///
+    /// Field 4: `expected_revision`
+    #[serde(
+        rename = "expectedRevision",
+        alias = "expected_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub expected_revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -6031,32 +6058,9 @@ impl ::core::fmt::Debug for UpdateSubaccountPolicyRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateSubaccountPolicyRequest")
             .field("policy_id", &self.policy_id)
-            .field("name", &self.name)
-            .field("description", &self.description)
-            .field("spot_markets", &self.spot_markets)
-            .field("perp_markets", &self.perp_markets)
-            .field("spot_market_scope", &self.spot_market_scope)
-            .field("perp_market_scope", &self.perp_market_scope)
-            .field("actions", &self.actions)
-            .field("global_notional_cap", &self.global_notional_cap)
-            .field("max_order_notional", &self.max_order_notional)
-            .field("max_open_orders", &self.max_open_orders)
-            .field("max_open_positions", &self.max_open_positions)
-            .field("global_perp_leverage_x", &self.global_perp_leverage_x)
-            .field(
-                "daily_internal_transfer_out_limit",
-                &self.daily_internal_transfer_out_limit,
-            )
-            .field("daily_withdraw_limit", &self.daily_withdraw_limit)
-            .field("internal_transfers_own_only", &self.internal_transfers_own_only)
-            .field("enforce_withdraw_whitelist", &self.enforce_withdraw_whitelist)
-            .field("trading_halted", &self.trading_halted)
-            .field("liquidation_only", &self.liquidation_only)
-            .field("daily_loss_limit", &self.daily_loss_limit)
-            .field("intraday_drawdown_limit_bps", &self.intraday_drawdown_limit_bps)
-            .field("locked", &self.locked)
-            .field("review_at", &self.review_at)
-            .field("expires_at", &self.expires_at)
+            .field("policy", &self.policy)
+            .field("update_mask", &self.update_mask)
+            .field("expected_revision", &self.expected_revision)
             .finish()
     }
 }
@@ -6088,131 +6092,26 @@ impl ::buffa::Message for UpdateSubaccountPolicyRequest {
         if self.policy_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if !self.name.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
-        }
-        if !self.description.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.description) as u32;
-        }
-        for v in &self.spot_markets {
+        if self.policy.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
+            let inner_size = self.policy.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        for v in &self.perp_markets {
+        if self.update_mask.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
+            let inner_size = self.update_mask.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        {
-            let val = self.spot_market_scope.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        if !self.actions.is_empty() {
-            let payload: u32 = self
-                .actions
-                .iter()
-                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
-                .sum::<u32>();
-            size
-                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
-        }
-        if self.global_notional_cap != 0u64 {
+        if self.expected_revision != 0u64 {
             size
                 += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.global_notional_cap)
-                        as u32;
-        }
-        if self.max_order_notional != 0u64 {
-            size
-                += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.max_order_notional) as u32;
-        }
-        if self.max_open_orders != 0u32 {
-            size
-                += 1u32
-                    + ::buffa::types::uint32_encoded_len(self.max_open_orders) as u32;
-        }
-        if self.max_open_positions != 0u32 {
-            size
-                += 1u32
-                    + ::buffa::types::uint32_encoded_len(self.max_open_positions) as u32;
-        }
-        if self.global_perp_leverage_x != 0u32 {
-            size
-                += 2u32
-                    + ::buffa::types::uint32_encoded_len(self.global_perp_leverage_x)
-                        as u32;
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(
-                        self.daily_internal_transfer_out_limit,
-                    ) as u32;
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(self.daily_withdraw_limit)
-                        as u32;
-        }
-        if self.internal_transfers_own_only {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.enforce_withdraw_whitelist {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.trading_halted {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.liquidation_only {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.daily_loss_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(self.daily_loss_limit) as u32;
-        }
-        if self.intraday_drawdown_limit_bps != 0u32 {
-            size
-                += 2u32
-                    + ::buffa::types::uint32_encoded_len(
-                        self.intraday_drawdown_limit_bps,
-                    ) as u32;
-        }
-        if self.locked {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.review_at.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.review_at.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
-        }
-        if self.expires_at.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.expires_at.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
+                    + ::buffa::types::uint64_encoded_len(self.expected_revision) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -6227,100 +6126,16 @@ impl ::buffa::Message for UpdateSubaccountPolicyRequest {
         if self.policy_id != 0u64 {
             ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
         }
-        if !self.name.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        if self.policy.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.policy.write_to(__cache, buf);
         }
-        if !self.description.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.description, buf);
+        if self.update_mask.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.update_mask.write_to(__cache, buf);
         }
-        for v in &self.spot_markets {
-            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
-            v.write_to(__cache, buf);
-        }
-        for v in &self.perp_markets {
-            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
-            v.write_to(__cache, buf);
-        }
-        {
-            let val = self.spot_market_scope.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(6u32, val, buf);
-            }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(7u32, val, buf);
-            }
-        }
-        if !self.actions.is_empty() {
-            let payload: u32 = self
-                .actions
-                .iter()
-                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
-                .sum::<u32>();
-            ::buffa::types::put_len_delimited_header(8u32, payload, buf);
-            for v in &self.actions {
-                ::buffa::types::encode_int32(v.to_i32(), buf);
-            }
-        }
-        if self.global_notional_cap != 0u64 {
-            ::buffa::types::put_uint64_field(12u32, self.global_notional_cap, buf);
-        }
-        if self.max_order_notional != 0u64 {
-            ::buffa::types::put_uint64_field(13u32, self.max_order_notional, buf);
-        }
-        if self.max_open_orders != 0u32 {
-            ::buffa::types::put_uint32_field(14u32, self.max_open_orders, buf);
-        }
-        if self.max_open_positions != 0u32 {
-            ::buffa::types::put_uint32_field(15u32, self.max_open_positions, buf);
-        }
-        if self.global_perp_leverage_x != 0u32 {
-            ::buffa::types::put_uint32_field(16u32, self.global_perp_leverage_x, buf);
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            ::buffa::types::put_uint64_field(
-                17u32,
-                self.daily_internal_transfer_out_limit,
-                buf,
-            );
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            ::buffa::types::put_uint64_field(18u32, self.daily_withdraw_limit, buf);
-        }
-        if self.internal_transfers_own_only {
-            ::buffa::types::put_bool_field(19u32, self.internal_transfers_own_only, buf);
-        }
-        if self.enforce_withdraw_whitelist {
-            ::buffa::types::put_bool_field(20u32, self.enforce_withdraw_whitelist, buf);
-        }
-        if self.trading_halted {
-            ::buffa::types::put_bool_field(21u32, self.trading_halted, buf);
-        }
-        if self.liquidation_only {
-            ::buffa::types::put_bool_field(22u32, self.liquidation_only, buf);
-        }
-        if self.daily_loss_limit != 0u64 {
-            ::buffa::types::put_uint64_field(23u32, self.daily_loss_limit, buf);
-        }
-        if self.intraday_drawdown_limit_bps != 0u32 {
-            ::buffa::types::put_uint32_field(
-                24u32,
-                self.intraday_drawdown_limit_bps,
-                buf,
-            );
-        }
-        if self.locked {
-            ::buffa::types::put_bool_field(25u32, self.locked, buf);
-        }
-        if self.review_at.is_set() {
-            ::buffa::types::put_len_delimited_header(26u32, __cache.consume_next(), buf);
-            self.review_at.write_to(__cache, buf);
-        }
-        if self.expires_at.is_set() {
-            ::buffa::types::put_len_delimited_header(27u32, __cache.consume_next(), buf);
-            self.expires_at.write_to(__cache, buf);
+        if self.expected_revision != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.expected_revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6347,210 +6162,29 @@ impl ::buffa::Message for UpdateSubaccountPolicyRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.name, buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.policy.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.description, buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.update_mask.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.spot_markets.push(elem);
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.perp_markets.push(elem);
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.spot_market_scope = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.perp_market_scope = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            8u32 => {
-                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
-                    let len = ::buffa::encoding::decode_varint(buf)?;
-                    let len = usize::try_from(len)
-                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
-                    if buf.remaining() < len {
-                        return ::core::result::Result::Err(
-                            ::buffa::DecodeError::UnexpectedEof,
-                        );
-                    }
-                    self.actions.reserve(len);
-                    let mut limited = buf.take(len);
-                    while limited.has_remaining() {
-                        self.actions
-                            .push(
-                                ::buffa::EnumValue::from(
-                                    ::buffa::types::decode_int32(&mut limited)?,
-                                ),
-                            );
-                    }
-                    let leftover = limited.remaining();
-                    if leftover > 0 {
-                        limited.advance(leftover);
-                    }
-                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
-                    self.actions
-                        .push(
-                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
-                        );
-                } else {
-                    return ::core::result::Result::Err(
-                        ::buffa::encoding::wire_type_mismatch(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        ),
-                    );
-                }
-            }
-            12u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.global_notional_cap = ::buffa::types::decode_uint64(buf)?;
-            }
-            13u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_order_notional = ::buffa::types::decode_uint64(buf)?;
-            }
-            14u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_open_orders = ::buffa::types::decode_uint32(buf)?;
-            }
-            15u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_open_positions = ::buffa::types::decode_uint32(buf)?;
-            }
-            16u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.global_perp_leverage_x = ::buffa::types::decode_uint32(buf)?;
-            }
-            17u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                    buf,
-                )?;
-            }
-            18u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_withdraw_limit = ::buffa::types::decode_uint64(buf)?;
-            }
-            19u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.internal_transfers_own_only = ::buffa::types::decode_bool(buf)?;
-            }
-            20u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.enforce_withdraw_whitelist = ::buffa::types::decode_bool(buf)?;
-            }
-            21u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.trading_halted = ::buffa::types::decode_bool(buf)?;
-            }
-            22u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.liquidation_only = ::buffa::types::decode_bool(buf)?;
-            }
-            23u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_loss_limit = ::buffa::types::decode_uint64(buf)?;
-            }
-            24u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.intraday_drawdown_limit_bps = ::buffa::types::decode_uint32(buf)?;
-            }
-            25u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.locked = ::buffa::types::decode_bool(buf)?;
-            }
-            26u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.review_at.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            27u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.expires_at.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
+                self.expected_revision = ::buffa::types::decode_uint64(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -6561,29 +6195,9 @@ impl ::buffa::Message for UpdateSubaccountPolicyRequest {
     }
     fn clear(&mut self) {
         self.policy_id = 0u64;
-        self.name.clear();
-        self.description.clear();
-        self.spot_markets.clear();
-        self.perp_markets.clear();
-        self.spot_market_scope = ::buffa::EnumValue::from(0);
-        self.perp_market_scope = ::buffa::EnumValue::from(0);
-        self.actions.clear();
-        self.global_notional_cap = 0u64;
-        self.max_order_notional = 0u64;
-        self.max_open_orders = 0u32;
-        self.max_open_positions = 0u32;
-        self.global_perp_leverage_x = 0u32;
-        self.daily_internal_transfer_out_limit = 0u64;
-        self.daily_withdraw_limit = 0u64;
-        self.internal_transfers_own_only = false;
-        self.enforce_withdraw_whitelist = false;
-        self.trading_halted = false;
-        self.liquidation_only = false;
-        self.daily_loss_limit = 0u64;
-        self.intraday_drawdown_limit_bps = 0u32;
-        self.locked = false;
-        self.review_at = ::buffa::MessageField::none();
-        self.expires_at = ::buffa::MessageField::none();
+        self.policy = ::buffa::MessageField::none();
+        self.update_mask = ::buffa::MessageField::none();
+        self.expected_revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7407,6 +7021,15 @@ pub struct ApiPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Monotonic resource revision used for conditional updates.
+    ///
+    /// Field 23: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7432,6 +7055,7 @@ impl ::core::fmt::Debug for ApiPolicyView {
             .field("source_template_id", &self.source_template_id)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
+            .field("revision", &self.revision)
             .finish()
     }
 }
@@ -7546,6 +7170,9 @@ impl ::buffa::Message for ApiPolicyView {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.revision != 0u64 {
+            size += 2u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7622,6 +7249,9 @@ impl ::buffa::Message for ApiPolicyView {
         if self.updated_at.is_set() {
             ::buffa::types::put_len_delimited_header(22u32, __cache.consume_next(), buf);
             self.updated_at.write_to(__cache, buf);
+        }
+        if self.revision != 0u64 {
+            ::buffa::types::put_uint64_field(23u32, self.revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7790,6 +7420,13 @@ impl ::buffa::Message for ApiPolicyView {
                     ctx,
                 )?;
             }
+            23u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7813,6 +7450,7 @@ impl ::buffa::Message for ApiPolicyView {
         self.source_template_id = 0u64;
         self.created_at = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
+        self.revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8426,12 +8064,13 @@ pub const __GET_API_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     from_json: ::buffa::type_registry::any_from_json::<GetApiPolicyResponse>,
     is_wkt: false,
 };
-/// CreateApiPolicyRequest defines a new API key policy template.
+/// ApiPolicySpec contains the mutable configuration of an API key policy.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct CreateApiPolicyRequest {
-    /// Human-readable policy name. Required; 1 to 64 characters.
+pub struct ApiPolicySpec {
+    /// Human-readable policy name. Create requires a non-empty value; update
+    /// validates it after merging fields selected by update_mask.
     ///
     /// Field 1: `name`
     #[serde(
@@ -8545,25 +8184,13 @@ pub struct CreateApiPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_template: bool,
-    /// Optional API key identifier to bind this newly-created policy to
-    /// atomically. When set, the caller must be allowed to manage the key and the
-    /// create+assign operation consumes a single fresh step-up proof.
-    ///
-    /// Field 20: `assign_to_key_id`
-    #[serde(
-        rename = "assignToKeyId",
-        alias = "assign_to_key_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub assign_to_key_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CreateApiPolicyRequest {
+impl ::core::fmt::Debug for ApiPolicySpec {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CreateApiPolicyRequest")
+        f.debug_struct("ApiPolicySpec")
             .field("name", &self.name)
             .field("description", &self.description)
             .field("spot_markets", &self.spot_markets)
@@ -8578,25 +8205,24 @@ impl ::core::fmt::Debug for CreateApiPolicyRequest {
             )
             .field("daily_withdraw_limit", &self.daily_withdraw_limit)
             .field("is_template", &self.is_template)
-            .field("assign_to_key_id", &self.assign_to_key_id)
             .finish()
     }
 }
-impl CreateApiPolicyRequest {
+impl ApiPolicySpec {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateApiPolicyRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApiPolicySpec";
 }
-::buffa::impl_default_instance!(CreateApiPolicyRequest);
-impl ::buffa::MessageName for CreateApiPolicyRequest {
+::buffa::impl_default_instance!(ApiPolicySpec);
+impl ::buffa::MessageName for ApiPolicySpec {
     const PACKAGE: &'static str = "auth.v1";
-    const NAME: &'static str = "CreateApiPolicyRequest";
-    const FULL_NAME: &'static str = "auth.v1.CreateApiPolicyRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateApiPolicyRequest";
+    const NAME: &'static str = "ApiPolicySpec";
+    const FULL_NAME: &'static str = "auth.v1.ApiPolicySpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApiPolicySpec";
 }
-impl ::buffa::Message for CreateApiPolicyRequest {
+impl ::buffa::Message for ApiPolicySpec {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -8671,11 +8297,6 @@ impl ::buffa::Message for CreateApiPolicyRequest {
         if self.is_template {
             size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
-        if !self.assign_to_key_id.is_empty() {
-            size
-                += 2u32
-                    + ::buffa::types::string_encoded_len(&self.assign_to_key_id) as u32;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8738,9 +8359,6 @@ impl ::buffa::Message for CreateApiPolicyRequest {
         }
         if self.is_template {
             ::buffa::types::put_bool_field(19u32, self.is_template, buf);
-        }
-        if !self.assign_to_key_id.is_empty() {
-            ::buffa::types::put_string_field(20u32, &self.assign_to_key_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8873,13 +8491,6 @@ impl ::buffa::Message for CreateApiPolicyRequest {
                 )?;
                 self.is_template = ::buffa::types::decode_bool(buf)?;
             }
-            20u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.assign_to_key_id, buf)?;
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8899,6 +8510,170 @@ impl ::buffa::Message for CreateApiPolicyRequest {
         self.daily_internal_transfer_out_limit = 0u64;
         self.daily_withdraw_limit = 0u64;
         self.is_template = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ApiPolicySpec {
+    const PROTO_FQN: &'static str = "auth.v1.ApiPolicySpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ApiPolicySpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __API_POLICY_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ApiPolicySpec",
+    to_json: ::buffa::type_registry::any_to_json::<ApiPolicySpec>,
+    from_json: ::buffa::type_registry::any_from_json::<ApiPolicySpec>,
+    is_wkt: false,
+};
+/// CreateApiPolicyRequest defines a new API key policy template.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateApiPolicyRequest {
+    /// Complete mutable policy configuration.
+    ///
+    /// Field 1: `policy`
+    #[serde(
+        rename = "policy",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub policy: ::buffa::MessageField<ApiPolicySpec>,
+    /// Optional API key identifier to bind this newly-created policy to
+    /// atomically. When set, the caller must be allowed to manage the key and the
+    /// create+assign operation consumes a single fresh step-up proof.
+    ///
+    /// Field 2: `assign_to_key_id`
+    #[serde(
+        rename = "assignToKeyId",
+        alias = "assign_to_key_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub assign_to_key_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateApiPolicyRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateApiPolicyRequest")
+            .field("policy", &self.policy)
+            .field("assign_to_key_id", &self.assign_to_key_id)
+            .finish()
+    }
+}
+impl CreateApiPolicyRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateApiPolicyRequest";
+}
+::buffa::impl_default_instance!(CreateApiPolicyRequest);
+impl ::buffa::MessageName for CreateApiPolicyRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "CreateApiPolicyRequest";
+    const FULL_NAME: &'static str = "auth.v1.CreateApiPolicyRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateApiPolicyRequest";
+}
+impl ::buffa::Message for CreateApiPolicyRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.policy.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.policy.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.assign_to_key_id.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.assign_to_key_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.policy.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.policy.write_to(__cache, buf);
+        }
+        if !self.assign_to_key_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.assign_to_key_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.policy.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.assign_to_key_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.policy = ::buffa::MessageField::none();
         self.assign_to_key_id.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -9066,7 +8841,8 @@ pub const __CREATE_API_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
     from_json: ::buffa::type_registry::any_from_json::<CreateApiPolicyResponse>,
     is_wkt: false,
 };
-/// UpdateApiPolicyRequest replaces an existing API key policy template.
+/// UpdateApiPolicyRequest changes selected mutable fields on an existing API
+/// key policy.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -9081,120 +8857,35 @@ pub struct UpdateApiPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub policy_id: u64,
-    /// Human-readable policy name. Required; 1 to 64 characters.
+    /// Candidate values for fields selected by update_mask.
     ///
-    /// Field 2: `name`
+    /// Field 2: `policy`
     #[serde(
-        rename = "name",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "policy",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub name: ::buffa::alloc::string::String,
-    /// Optional policy description for dashboards and audits. Maximum 256 characters.
+    pub policy: ::buffa::MessageField<ApiPolicySpec>,
+    /// Mutable fields to apply. Paths are relative to policy. The mask is required,
+    /// must be non-empty, and cannot contain "*".
     ///
-    /// Field 3: `description`
+    /// Field 3: `update_mask`
     #[serde(
-        rename = "description",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "updateMask",
+        alias = "update_mask",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub description: ::buffa::alloc::string::String,
-    /// Allowed spot markets for this API key policy.
+    pub update_mask: ::buffa::MessageField<::buffa_types::google::protobuf::FieldMask>,
+    /// Revision returned by the latest successful read. Stale revisions fail with
+    /// a conflict before no-op detection.
     ///
-    /// Field 4: `spot_markets`
+    /// Field 4: `expected_revision`
     #[serde(
-        rename = "spotMarkets",
-        alias = "spot_markets",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub spot_markets: ::buffa::alloc::vec::Vec<SpotMarketRule>,
-    /// Allowed perp markets and optional per-contract leverage caps.
-    ///
-    /// Field 5: `perp_markets`
-    #[serde(
-        rename = "perpMarkets",
-        alias = "perp_markets",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub perp_markets: ::buffa::alloc::vec::Vec<PerpMarketRule>,
-    /// Market-level scope for spot markets. When unspecified, defaults to ALL.
-    ///
-    /// Field 6: `spot_market_scope`
-    #[serde(
-        rename = "spotMarketScope",
-        alias = "spot_market_scope",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub spot_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-    ///
-    /// Field 7: `perp_market_scope`
-    #[serde(
-        rename = "perpMarketScope",
-        alias = "perp_market_scope",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub perp_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// High-level actions enabled for the API key policy. Up to 64 unique explicit
-    /// actions are allowed.
-    ///
-    /// Field 8: `actions`
-    #[serde(
-        rename = "actions",
-        with = "::buffa::json_helpers::repeated_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
-    )]
-    pub actions: ::buffa::alloc::vec::Vec<::buffa::EnumValue<PolicyAction>>,
-    /// Maximum notional size for any single order submitted with this API key,
-    /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-    /// 0 means no additional cap beyond the sub-account policy.
-    ///
-    /// Field 13: `max_order_notional`
-    #[serde(
-        rename = "maxOrderNotional",
-        alias = "max_order_notional",
+        rename = "expectedRevision",
+        alias = "expected_revision",
         with = "::buffa::json_helpers::uint64",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
-    pub max_order_notional: u64,
-    /// Maximum total notional this API key can transfer out internally per rolling
-    /// day, expressed in the canonical quote unit (for example, micro-USDT). A
-    /// value of 0 means no additional cap beyond the sub-account policy.
-    ///
-    /// Field 17: `daily_internal_transfer_out_limit`
-    #[serde(
-        rename = "dailyInternalTransferOutLimit",
-        alias = "daily_internal_transfer_out_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_internal_transfer_out_limit: u64,
-    /// Maximum total notional this API key can withdraw per rolling day, expressed
-    /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-    /// no additional cap beyond the sub-account policy.
-    ///
-    /// Field 18: `daily_withdraw_limit`
-    #[serde(
-        rename = "dailyWithdrawLimit",
-        alias = "daily_withdraw_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_withdraw_limit: u64,
-    /// Whether this policy should be treated as a reusable template.
-    ///
-    /// Field 19: `is_template`
-    #[serde(
-        rename = "isTemplate",
-        alias = "is_template",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub is_template: bool,
+    pub expected_revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9203,20 +8894,9 @@ impl ::core::fmt::Debug for UpdateApiPolicyRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateApiPolicyRequest")
             .field("policy_id", &self.policy_id)
-            .field("name", &self.name)
-            .field("description", &self.description)
-            .field("spot_markets", &self.spot_markets)
-            .field("perp_markets", &self.perp_markets)
-            .field("spot_market_scope", &self.spot_market_scope)
-            .field("perp_market_scope", &self.perp_market_scope)
-            .field("actions", &self.actions)
-            .field("max_order_notional", &self.max_order_notional)
-            .field(
-                "daily_internal_transfer_out_limit",
-                &self.daily_internal_transfer_out_limit,
-            )
-            .field("daily_withdraw_limit", &self.daily_withdraw_limit)
-            .field("is_template", &self.is_template)
+            .field("policy", &self.policy)
+            .field("update_mask", &self.update_mask)
+            .field("expected_revision", &self.expected_revision)
             .finish()
     }
 }
@@ -9248,69 +8928,26 @@ impl ::buffa::Message for UpdateApiPolicyRequest {
         if self.policy_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if !self.name.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
-        }
-        if !self.description.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.description) as u32;
-        }
-        for v in &self.spot_markets {
+        if self.policy.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
+            let inner_size = self.policy.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        for v in &self.perp_markets {
+        if self.update_mask.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
+            let inner_size = self.update_mask.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        {
-            let val = self.spot_market_scope.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        if !self.actions.is_empty() {
-            let payload: u32 = self
-                .actions
-                .iter()
-                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
-                .sum::<u32>();
-            size
-                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
-        }
-        if self.max_order_notional != 0u64 {
+        if self.expected_revision != 0u64 {
             size
                 += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.max_order_notional) as u32;
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(
-                        self.daily_internal_transfer_out_limit,
-                    ) as u32;
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(self.daily_withdraw_limit)
-                        as u32;
-        }
-        if self.is_template {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                    + ::buffa::types::uint64_encoded_len(self.expected_revision) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -9325,58 +8962,16 @@ impl ::buffa::Message for UpdateApiPolicyRequest {
         if self.policy_id != 0u64 {
             ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
         }
-        if !self.name.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        if self.policy.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.policy.write_to(__cache, buf);
         }
-        if !self.description.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.description, buf);
+        if self.update_mask.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.update_mask.write_to(__cache, buf);
         }
-        for v in &self.spot_markets {
-            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
-            v.write_to(__cache, buf);
-        }
-        for v in &self.perp_markets {
-            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
-            v.write_to(__cache, buf);
-        }
-        {
-            let val = self.spot_market_scope.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(6u32, val, buf);
-            }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(7u32, val, buf);
-            }
-        }
-        if !self.actions.is_empty() {
-            let payload: u32 = self
-                .actions
-                .iter()
-                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
-                .sum::<u32>();
-            ::buffa::types::put_len_delimited_header(8u32, payload, buf);
-            for v in &self.actions {
-                ::buffa::types::encode_int32(v.to_i32(), buf);
-            }
-        }
-        if self.max_order_notional != 0u64 {
-            ::buffa::types::put_uint64_field(13u32, self.max_order_notional, buf);
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            ::buffa::types::put_uint64_field(
-                17u32,
-                self.daily_internal_transfer_out_limit,
-                buf,
-            );
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            ::buffa::types::put_uint64_field(18u32, self.daily_withdraw_limit, buf);
-        }
-        if self.is_template {
-            ::buffa::types::put_bool_field(19u32, self.is_template, buf);
+        if self.expected_revision != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.expected_revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9403,118 +8998,29 @@ impl ::buffa::Message for UpdateApiPolicyRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.name, buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.policy.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.description, buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.update_mask.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.spot_markets.push(elem);
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.perp_markets.push(elem);
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.spot_market_scope = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.perp_market_scope = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            8u32 => {
-                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
-                    let len = ::buffa::encoding::decode_varint(buf)?;
-                    let len = usize::try_from(len)
-                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
-                    if buf.remaining() < len {
-                        return ::core::result::Result::Err(
-                            ::buffa::DecodeError::UnexpectedEof,
-                        );
-                    }
-                    self.actions.reserve(len);
-                    let mut limited = buf.take(len);
-                    while limited.has_remaining() {
-                        self.actions
-                            .push(
-                                ::buffa::EnumValue::from(
-                                    ::buffa::types::decode_int32(&mut limited)?,
-                                ),
-                            );
-                    }
-                    let leftover = limited.remaining();
-                    if leftover > 0 {
-                        limited.advance(leftover);
-                    }
-                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
-                    self.actions
-                        .push(
-                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
-                        );
-                } else {
-                    return ::core::result::Result::Err(
-                        ::buffa::encoding::wire_type_mismatch(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        ),
-                    );
-                }
-            }
-            13u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_order_notional = ::buffa::types::decode_uint64(buf)?;
-            }
-            17u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                    buf,
-                )?;
-            }
-            18u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_withdraw_limit = ::buffa::types::decode_uint64(buf)?;
-            }
-            19u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.is_template = ::buffa::types::decode_bool(buf)?;
+                self.expected_revision = ::buffa::types::decode_uint64(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -9525,17 +9031,9 @@ impl ::buffa::Message for UpdateApiPolicyRequest {
     }
     fn clear(&mut self) {
         self.policy_id = 0u64;
-        self.name.clear();
-        self.description.clear();
-        self.spot_markets.clear();
-        self.perp_markets.clear();
-        self.spot_market_scope = ::buffa::EnumValue::from(0);
-        self.perp_market_scope = ::buffa::EnumValue::from(0);
-        self.actions.clear();
-        self.max_order_notional = 0u64;
-        self.daily_internal_transfer_out_limit = 0u64;
-        self.daily_withdraw_limit = 0u64;
-        self.is_template = false;
+        self.policy = ::buffa::MessageField::none();
+        self.update_mask = ::buffa::MessageField::none();
+        self.expected_revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -11736,6 +11234,15 @@ pub struct Subaccount {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Monotonic resource revision used for conditional updates.
+    ///
+    /// Field 15: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -11760,6 +11267,7 @@ impl ::core::fmt::Debug for Subaccount {
             .field("require_member_mfa", &self.require_member_mfa)
             .field("smart_account_salt_nonce", &self.smart_account_salt_nonce)
             .field("updated_at", &self.updated_at)
+            .field("revision", &self.revision)
             .finish()
     }
 }
@@ -11858,6 +11366,9 @@ impl ::buffa::Message for Subaccount {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.revision != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -11917,6 +11428,9 @@ impl ::buffa::Message for Subaccount {
         if self.updated_at.is_set() {
             ::buffa::types::put_len_delimited_header(14u32, __cache.consume_next(), buf);
             self.updated_at.write_to(__cache, buf);
+        }
+        if self.revision != 0u64 {
+            ::buffa::types::put_uint64_field(15u32, self.revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -12038,6 +11552,13 @@ impl ::buffa::Message for Subaccount {
                     ctx,
                 )?;
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -12060,6 +11581,7 @@ impl ::buffa::Message for Subaccount {
         self.require_member_mfa = false;
         self.smart_account_salt_nonce = ::core::option::Option::None;
         self.updated_at = ::buffa::MessageField::none();
+        self.revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -12861,7 +12383,206 @@ pub const __CREATE_SUBACCOUNT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
     from_json: ::buffa::type_registry::any_from_json::<CreateSubaccountResponse>,
     is_wkt: false,
 };
-/// Request to update mutable display and status fields for a sub-account.
+/// SubaccountUpdateSpec contains mutable display and status configuration.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SubaccountUpdateSpec {
+    /// Label for the sub-account. Empty clears the label when selected.
+    ///
+    /// Field 1: `label`
+    #[serde(
+        rename = "label",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub label: ::buffa::alloc::string::String,
+    /// User-chosen icon/emoji for UI display. Empty clears the icon when selected.
+    ///
+    /// Field 2: `icon`
+    #[serde(
+        rename = "icon",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub icon: ::buffa::alloc::string::String,
+    /// User-chosen color token for UI display. Empty clears the color when selected.
+    ///
+    /// Field 3: `color`
+    #[serde(
+        rename = "color",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub color: ::buffa::alloc::string::String,
+    /// Status for the sub-account, such as "active" or "disabled".
+    ///
+    /// Field 4: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub status: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SubaccountUpdateSpec {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SubaccountUpdateSpec")
+            .field("label", &self.label)
+            .field("icon", &self.icon)
+            .field("color", &self.color)
+            .field("status", &self.status)
+            .finish()
+    }
+}
+impl SubaccountUpdateSpec {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountUpdateSpec";
+}
+::buffa::impl_default_instance!(SubaccountUpdateSpec);
+impl ::buffa::MessageName for SubaccountUpdateSpec {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "SubaccountUpdateSpec";
+    const FULL_NAME: &'static str = "auth.v1.SubaccountUpdateSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountUpdateSpec";
+}
+impl ::buffa::Message for SubaccountUpdateSpec {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.label.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+        }
+        if !self.icon.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.icon) as u32;
+        }
+        if !self.color.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
+        }
+        if !self.status.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.label.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.label, buf);
+        }
+        if !self.icon.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.icon, buf);
+        }
+        if !self.color.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.color, buf);
+        }
+        if !self.status.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.status, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.label, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.icon, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.color, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.status, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.label.clear();
+        self.icon.clear();
+        self.color.clear();
+        self.status.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SubaccountUpdateSpec {
+    const PROTO_FQN: &'static str = "auth.v1.SubaccountUpdateSpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SubaccountUpdateSpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SUBACCOUNT_UPDATE_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.SubaccountUpdateSpec",
+    to_json: ::buffa::type_registry::any_to_json::<SubaccountUpdateSpec>,
+    from_json: ::buffa::type_registry::any_from_json::<SubaccountUpdateSpec>,
+    is_wkt: false,
+};
+/// Request to change selected mutable fields for a sub-account.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -12876,42 +12597,34 @@ pub struct UpdateSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub subaccount_id: u64,
-    /// New label for the sub-account. If empty, the label is left unchanged.
+    /// Candidate values for fields selected by update_mask.
     ///
-    /// Field 2: `label`
+    /// Field 2: `subaccount`
     #[serde(
-        rename = "label",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "subaccount",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub label: ::buffa::alloc::string::String,
-    /// New user-chosen icon/emoji for UI display. If empty, left unchanged.
+    pub subaccount: ::buffa::MessageField<SubaccountUpdateSpec>,
+    /// Mutable fields to apply. Paths are relative to subaccount. The mask is
+    /// required, must be non-empty, and cannot contain "*".
     ///
-    /// Field 4: `icon`
+    /// Field 3: `update_mask`
     #[serde(
-        rename = "icon",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "updateMask",
+        alias = "update_mask",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub icon: ::buffa::alloc::string::String,
-    /// New user-chosen color token for UI display. If empty, left unchanged. Tokens use lowercase letters, numbers, underscores, or hyphens.
+    pub update_mask: ::buffa::MessageField<::buffa_types::google::protobuf::FieldMask>,
+    /// Revision returned by the latest successful read.
     ///
-    /// Field 5: `color`
+    /// Field 4: `expected_revision`
     #[serde(
-        rename = "color",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "expectedRevision",
+        alias = "expected_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
-    pub color: ::buffa::alloc::string::String,
-    /// New status for the sub-account, such as "active" or "disabled". If empty, the status is left unchanged.
-    ///
-    /// Field 3: `status`
-    #[serde(
-        rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub status: ::buffa::alloc::string::String,
+    pub expected_revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -12920,10 +12633,9 @@ impl ::core::fmt::Debug for UpdateSubaccountRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateSubaccountRequest")
             .field("subaccount_id", &self.subaccount_id)
-            .field("label", &self.label)
-            .field("icon", &self.icon)
-            .field("color", &self.color)
-            .field("status", &self.status)
+            .field("subaccount", &self.subaccount)
+            .field("update_mask", &self.update_mask)
+            .field("expected_revision", &self.expected_revision)
             .finish()
     }
 }
@@ -12948,31 +12660,40 @@ impl ::buffa::Message for UpdateSubaccountRequest {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
         if self.subaccount_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if !self.label.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+        if self.subaccount.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.subaccount.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
         }
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        if self.update_mask.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.update_mask.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
         }
-        if !self.icon.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.icon) as u32;
-        }
-        if !self.color.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
+        if self.expected_revision != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.expected_revision) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -12980,17 +12701,16 @@ impl ::buffa::Message for UpdateSubaccountRequest {
         if self.subaccount_id != 0u64 {
             ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
         }
-        if !self.label.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.label, buf);
+        if self.subaccount.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.subaccount.write_to(__cache, buf);
         }
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.status, buf);
+        if self.update_mask.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.update_mask.write_to(__cache, buf);
         }
-        if !self.icon.is_empty() {
-            ::buffa::types::put_string_field(4u32, &self.icon, buf);
-        }
-        if !self.color.is_empty() {
-            ::buffa::types::put_string_field(5u32, &self.color, buf);
+        if self.expected_revision != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.expected_revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -13017,28 +12737,29 @@ impl ::buffa::Message for UpdateSubaccountRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.label, buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.subaccount.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.update_mask.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.icon, buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.color, buf)?;
+                self.expected_revision = ::buffa::types::decode_uint64(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -13049,10 +12770,9 @@ impl ::buffa::Message for UpdateSubaccountRequest {
     }
     fn clear(&mut self) {
         self.subaccount_id = 0u64;
-        self.label.clear();
-        self.status.clear();
-        self.icon.clear();
-        self.color.clear();
+        self.subaccount = ::buffa::MessageField::none();
+        self.update_mask = ::buffa::MessageField::none();
+        self.expected_revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -13085,18 +12805,28 @@ pub const __UPDATE_SUBACCOUNT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyE
     from_json: ::buffa::type_registry::any_from_json::<UpdateSubaccountRequest>,
     is_wkt: false,
 };
-/// Empty response returned after updating a sub-account.
+/// Response returned after updating a sub-account.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct UpdateSubaccountResponse {
+    /// Sub-account after applying the update.
+    ///
+    /// Field 1: `subaccount`
+    #[serde(
+        rename = "subaccount",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub subaccount: ::buffa::MessageField<Subaccount>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for UpdateSubaccountResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("UpdateSubaccountResponse").finish()
+        f.debug_struct("UpdateSubaccountResponse")
+            .field("subaccount", &self.subaccount)
+            .finish()
     }
 }
 impl UpdateSubaccountResponse {
@@ -13120,20 +12850,32 @@ impl ::buffa::Message for UpdateSubaccountResponse {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
+        if self.subaccount.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.subaccount.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
+        if self.subaccount.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.subaccount.write_to(__cache, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -13147,6 +12889,17 @@ impl ::buffa::Message for UpdateSubaccountResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.subaccount.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -13155,6 +12908,7 @@ impl ::buffa::Message for UpdateSubaccountResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
+        self.subaccount = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -19373,6 +19127,15 @@ pub struct AddressBookEntry {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub tags: ::buffa::alloc::vec::Vec<AddressBookTag>,
+    /// Monotonic resource revision used for conditional updates.
+    ///
+    /// Field 31: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub revision: u64,
     #[serde(flatten)]
     pub entry: ::core::option::Option<__buffa::oneof::address_book_entry::Entry>,
     #[serde(skip)]
@@ -19390,6 +19153,7 @@ impl ::core::fmt::Debug for AddressBookEntry {
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
             .field("tags", &self.tags)
+            .field("revision", &self.revision)
             .field("entry", &self.entry)
             .finish()
     }
@@ -19486,6 +19250,9 @@ impl ::buffa::Message for AddressBookEntry {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.revision != 0u64 {
+            size += 2u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -19546,6 +19313,9 @@ impl ::buffa::Message for AddressBookEntry {
         for v in &self.tags {
             ::buffa::types::put_len_delimited_header(30u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
+        }
+        if self.revision != 0u64 {
+            ::buffa::types::put_uint64_field(31u32, self.revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -19670,6 +19440,13 @@ impl ::buffa::Message for AddressBookEntry {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.tags.push(elem);
             }
+            31u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -19687,6 +19464,7 @@ impl ::buffa::Message for AddressBookEntry {
         self.updated_at = ::buffa::MessageField::none();
         self.entry = ::core::option::Option::None;
         self.tags.clear();
+        self.revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -19736,6 +19514,7 @@ impl<'de> serde::Deserialize<'de> for AddressBookEntry {
                 let mut __f_tags: ::core::option::Option<
                     ::buffa::alloc::vec::Vec<AddressBookTag>,
                 > = None;
+                let mut __f_revision: ::core::option::Option<u64> = None;
                 let mut __oneof_entry: ::core::option::Option<
                     __buffa::oneof::address_book_entry::Entry,
                 > = None;
@@ -19853,6 +19632,21 @@ impl<'de> serde::Deserialize<'de> for AddressBookEntry {
                                 map.next_value_seed(_S)?
                             });
                         }
+                        "revision" => {
+                            __f_revision = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u64, D::Error> {
+                                        ::buffa::json_helpers::uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
                         "external" => {
                             let v: ::core::option::Option<ExternalWithdrawAddress> = map
                                 .next_value_seed(
@@ -19930,6 +19724,9 @@ impl<'de> serde::Deserialize<'de> for AddressBookEntry {
                 }
                 if let ::core::option::Option::Some(v) = __f_tags {
                     __r.tags = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_revision {
+                    __r.revision = v;
                 }
                 __r.entry = __oneof_entry;
                 Ok(__r)
@@ -20229,6 +20026,15 @@ pub struct ExternalAddressBookEntry {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Monotonic resource revision used for conditional updates.
+    ///
+    /// Field 11: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -20246,6 +20052,7 @@ impl ::core::fmt::Debug for ExternalAddressBookEntry {
             .field("address", &self.address)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
+            .field("revision", &self.revision)
             .finish()
     }
 }
@@ -20327,6 +20134,9 @@ impl ::buffa::Message for ExternalAddressBookEntry {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.revision != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -20377,6 +20187,9 @@ impl ::buffa::Message for ExternalAddressBookEntry {
         if self.updated_at.is_set() {
             ::buffa::types::put_len_delimited_header(10u32, __cache.consume_next(), buf);
             self.updated_at.write_to(__cache, buf);
+        }
+        if self.revision != 0u64 {
+            ::buffa::types::put_uint64_field(11u32, self.revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -20498,6 +20311,13 @@ impl ::buffa::Message for ExternalAddressBookEntry {
                     ctx,
                 )?;
             }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -20516,6 +20336,7 @@ impl ::buffa::Message for ExternalAddressBookEntry {
         self.address.clear();
         self.created_at = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
+        self.revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -20686,6 +20507,15 @@ pub struct InternalAddressBookEntry {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Monotonic resource revision used for conditional updates.
+    ///
+    /// Field 15: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -20707,6 +20537,7 @@ impl ::core::fmt::Debug for InternalAddressBookEntry {
             .field("subaccount_label", &self.subaccount_label)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
+            .field("revision", &self.revision)
             .finish()
     }
 }
@@ -20807,6 +20638,9 @@ impl ::buffa::Message for InternalAddressBookEntry {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.revision != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -20872,6 +20706,9 @@ impl ::buffa::Message for InternalAddressBookEntry {
         if self.updated_at.is_set() {
             ::buffa::types::put_len_delimited_header(14u32, __cache.consume_next(), buf);
             self.updated_at.write_to(__cache, buf);
+        }
+        if self.revision != 0u64 {
+            ::buffa::types::put_uint64_field(15u32, self.revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -21023,6 +20860,13 @@ impl ::buffa::Message for InternalAddressBookEntry {
                     ctx,
                 )?;
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -21045,6 +20889,7 @@ impl ::buffa::Message for InternalAddressBookEntry {
         self.subaccount_label.clear();
         self.created_at = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
+        self.revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -25639,6 +25484,213 @@ pub const __CREATE_ADDRESS_BOOK_ENTRY_RESPONSE_JSON_ANY: ::buffa::type_registry:
     from_json: ::buffa::type_registry::any_from_json::<CreateAddressBookEntryResponse>,
     is_wkt: false,
 };
+/// AddressBookEntryUpdateSpec contains mutable saved-destination metadata.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AddressBookEntryUpdateSpec {
+    /// Display label. Empty clears the label when selected.
+    ///
+    /// Field 1: `label`
+    #[serde(
+        rename = "label",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub label: ::buffa::alloc::string::String,
+    /// User-defined note. Empty clears the note when selected.
+    ///
+    /// Field 2: `note`
+    #[serde(
+        rename = "note",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub note: ::buffa::alloc::string::String,
+    /// Complete replacement set of tag ids when selected.
+    ///
+    /// Field 3: `tag_ids`
+    #[serde(
+        rename = "tagIds",
+        alias = "tag_ids",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub tag_ids: ::buffa::alloc::vec::Vec<u64>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AddressBookEntryUpdateSpec {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AddressBookEntryUpdateSpec")
+            .field("label", &self.label)
+            .field("note", &self.note)
+            .field("tag_ids", &self.tag_ids)
+            .finish()
+    }
+}
+impl AddressBookEntryUpdateSpec {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AddressBookEntryUpdateSpec";
+}
+::buffa::impl_default_instance!(AddressBookEntryUpdateSpec);
+impl ::buffa::MessageName for AddressBookEntryUpdateSpec {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "AddressBookEntryUpdateSpec";
+    const FULL_NAME: &'static str = "auth.v1.AddressBookEntryUpdateSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AddressBookEntryUpdateSpec";
+}
+impl ::buffa::Message for AddressBookEntryUpdateSpec {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.label.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+        }
+        if !self.note.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.note) as u32;
+        }
+        if !self.tag_ids.is_empty() {
+            let payload: u32 = self.tag_ids.len() as u32
+                * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.label.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.label, buf);
+        }
+        if !self.note.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.note, buf);
+        }
+        if !self.tag_ids.is_empty() {
+            let payload: u32 = self.tag_ids.len() as u32
+                * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+            ::buffa::types::put_len_delimited_header(3u32, payload, buf);
+            for &v in &self.tag_ids {
+                ::buffa::types::encode_fixed64(v, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.label, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.note, buf)?;
+            }
+            3u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.tag_ids.reserve(len / 8usize);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.tag_ids.push(::buffa::types::decode_fixed64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Fixed64 {
+                    self.tag_ids.push(::buffa::types::decode_fixed64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.label.clear();
+        self.note.clear();
+        self.tag_ids.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AddressBookEntryUpdateSpec {
+    const PROTO_FQN: &'static str = "auth.v1.AddressBookEntryUpdateSpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AddressBookEntryUpdateSpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ADDRESS_BOOK_ENTRY_UPDATE_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.AddressBookEntryUpdateSpec",
+    to_json: ::buffa::type_registry::any_to_json::<AddressBookEntryUpdateSpec>,
+    from_json: ::buffa::type_registry::any_from_json::<AddressBookEntryUpdateSpec>,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -25653,44 +25705,34 @@ pub struct UpdateAddressBookEntryRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub address_book_entry_id: u64,
-    /// Replacement display label.
+    /// Candidate values for fields selected by update_mask.
     ///
-    /// Field 2: `label`
+    /// Field 2: `entry`
     #[serde(
-        rename = "label",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "entry",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub label: ::buffa::alloc::string::String,
-    /// Replacement note.
+    pub entry: ::buffa::MessageField<AddressBookEntryUpdateSpec>,
+    /// Mutable fields to apply. Paths are relative to entry. The mask is required,
+    /// must be non-empty, and cannot contain "*".
     ///
-    /// Field 3: `note`
+    /// Field 3: `update_mask`
     #[serde(
-        rename = "note",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "updateMask",
+        alias = "update_mask",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub note: ::buffa::alloc::string::String,
-    /// Complete replacement set of tag ids to attach to the entry.
+    pub update_mask: ::buffa::MessageField<::buffa_types::google::protobuf::FieldMask>,
+    /// Revision returned by the latest successful read.
     ///
-    /// Field 4: `tag_ids`
+    /// Field 4: `expected_revision`
     #[serde(
-        rename = "tagIds",
-        alias = "tag_ids",
-        with = "::buffa::json_helpers::proto_seq",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+        rename = "expectedRevision",
+        alias = "expected_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
-    pub tag_ids: ::buffa::alloc::vec::Vec<u64>,
-    /// New tags to create and attach with this entry update.
-    ///
-    /// Field 5: `new_tags`
-    #[serde(
-        rename = "newTags",
-        alias = "new_tags",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub new_tags: ::buffa::alloc::vec::Vec<AddressBookTagInput>,
+    pub expected_revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -25699,10 +25741,9 @@ impl ::core::fmt::Debug for UpdateAddressBookEntryRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("UpdateAddressBookEntryRequest")
             .field("address_book_entry_id", &self.address_book_entry_id)
-            .field("label", &self.label)
-            .field("note", &self.note)
-            .field("tag_ids", &self.tag_ids)
-            .field("new_tags", &self.new_tags)
+            .field("entry", &self.entry)
+            .field("update_mask", &self.update_mask)
+            .field("expected_revision", &self.expected_revision)
             .finish()
     }
 }
@@ -25734,25 +25775,26 @@ impl ::buffa::Message for UpdateAddressBookEntryRequest {
         if self.address_book_entry_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if !self.label.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
-        }
-        if !self.note.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.note) as u32;
-        }
-        if !self.tag_ids.is_empty() {
-            let payload: u32 = self.tag_ids.len() as u32
-                * ::buffa::types::FIXED64_ENCODED_LEN as u32;
-            size
-                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
-        }
-        for v in &self.new_tags {
+        if self.entry.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
+            let inner_size = self.entry.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
+        }
+        if self.update_mask.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.update_mask.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.expected_revision != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.expected_revision) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -25767,23 +25809,16 @@ impl ::buffa::Message for UpdateAddressBookEntryRequest {
         if self.address_book_entry_id != 0u64 {
             ::buffa::types::put_fixed64_field(1u32, self.address_book_entry_id, buf);
         }
-        if !self.label.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.label, buf);
+        if self.entry.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.entry.write_to(__cache, buf);
         }
-        if !self.note.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.note, buf);
+        if self.update_mask.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.update_mask.write_to(__cache, buf);
         }
-        if !self.tag_ids.is_empty() {
-            let payload: u32 = self.tag_ids.len() as u32
-                * ::buffa::types::FIXED64_ENCODED_LEN as u32;
-            ::buffa::types::put_len_delimited_header(4u32, payload, buf);
-            for &v in &self.tag_ids {
-                ::buffa::types::encode_fixed64(v, buf);
-            }
-        }
-        for v in &self.new_tags {
-            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
-            v.write_to(__cache, buf);
+        if self.expected_revision != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.expected_revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -25810,53 +25845,29 @@ impl ::buffa::Message for UpdateAddressBookEntryRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.label, buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.entry.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.note, buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.update_mask.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             4u32 => {
-                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
-                    let len = ::buffa::encoding::decode_varint(buf)?;
-                    let len = usize::try_from(len)
-                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
-                    if buf.remaining() < len {
-                        return ::core::result::Result::Err(
-                            ::buffa::DecodeError::UnexpectedEof,
-                        );
-                    }
-                    self.tag_ids.reserve(len / 8usize);
-                    let mut limited = buf.take(len);
-                    while limited.has_remaining() {
-                        self.tag_ids.push(::buffa::types::decode_fixed64(&mut limited)?);
-                    }
-                    let leftover = limited.remaining();
-                    if leftover > 0 {
-                        limited.advance(leftover);
-                    }
-                } else if tag.wire_type() == ::buffa::encoding::WireType::Fixed64 {
-                    self.tag_ids.push(::buffa::types::decode_fixed64(buf)?);
-                } else {
-                    return ::core::result::Result::Err(
-                        ::buffa::encoding::wire_type_mismatch(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        ),
-                    );
-                }
-            }
-            5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                let mut elem = ::core::default::Default::default();
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.new_tags.push(elem);
+                self.expected_revision = ::buffa::types::decode_uint64(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -25867,10 +25878,9 @@ impl ::buffa::Message for UpdateAddressBookEntryRequest {
     }
     fn clear(&mut self) {
         self.address_book_entry_id = 0u64;
-        self.label.clear();
-        self.note.clear();
-        self.tag_ids.clear();
-        self.new_tags.clear();
+        self.entry = ::buffa::MessageField::none();
+        self.update_mask = ::buffa::MessageField::none();
+        self.expected_revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -27025,24 +27035,16 @@ pub struct UpdateAddressBookTagRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub tag_id: u64,
-    /// Replacement tag name.
+    /// Replacement tag name. Omit to preserve the current name.
     ///
     /// Field 2: `name`
-    #[serde(
-        rename = "name",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub name: ::buffa::alloc::string::String,
-    /// Replacement UI color token.
+    #[serde(rename = "name", skip_serializing_if = "::core::option::Option::is_none")]
+    pub name: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Replacement UI color token. Omit to preserve; an empty value clears it.
     ///
     /// Field 3: `color`
-    #[serde(
-        rename = "color",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub color: ::buffa::alloc::string::String,
+    #[serde(rename = "color", skip_serializing_if = "::core::option::Option::is_none")]
+    pub color: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -27062,6 +27064,28 @@ impl UpdateAddressBookTagRequest {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.UpdateAddressBookTagRequest";
+}
+impl UpdateAddressBookTagRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::name`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_name(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.name = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::color`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_color(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.color = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(UpdateAddressBookTagRequest);
 impl ::buffa::MessageName for UpdateAddressBookTagRequest {
@@ -27084,11 +27108,11 @@ impl ::buffa::Message for UpdateAddressBookTagRequest {
         if self.tag_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if !self.name.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
+        if let Some(ref v) = self.name {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
-        if !self.color.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
+        if let Some(ref v) = self.color {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -27103,11 +27127,11 @@ impl ::buffa::Message for UpdateAddressBookTagRequest {
         if self.tag_id != 0u64 {
             ::buffa::types::put_fixed64_field(1u32, self.tag_id, buf);
         }
-        if !self.name.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        if let Some(ref v) = self.name {
+            ::buffa::types::put_string_field(2u32, v, buf);
         }
-        if !self.color.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.color, buf);
+        if let Some(ref v) = self.color {
+            ::buffa::types::put_string_field(3u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -27134,14 +27158,20 @@ impl ::buffa::Message for UpdateAddressBookTagRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.name, buf)?;
+                ::buffa::types::merge_string(
+                    self.name.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.color, buf)?;
+                ::buffa::types::merge_string(
+                    self.color.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -27152,8 +27182,8 @@ impl ::buffa::Message for UpdateAddressBookTagRequest {
     }
     fn clear(&mut self) {
         self.tag_id = 0u64;
-        self.name.clear();
-        self.color.clear();
+        self.name = ::core::option::Option::None;
+        self.color = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -35061,6 +35091,8 @@ pub enum AuthErrorCode {
     AUTH_POLICY_LOCKED = 35i32,
     /// The requested policy does not belong to the target account scope.
     AUTH_POLICY_SCOPE_MISMATCH = 36i32,
+    /// The resource changed after the caller read it.
+    AUTH_REVISION_CONFLICT = 37i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -35174,6 +35206,9 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_POLICY_SCOPE_MISMATCH`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthPolicyScopeMismatch: Self = Self::AUTH_POLICY_SCOPE_MISMATCH;
+    ///Idiomatic alias for [`Self::AUTH_REVISION_CONFLICT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthRevisionConflict: Self = Self::AUTH_REVISION_CONFLICT;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -35316,6 +35351,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             34i32 => ::core::option::Option::Some(Self::AUTH_POLICY_IN_USE),
             35i32 => ::core::option::Option::Some(Self::AUTH_POLICY_LOCKED),
             36i32 => ::core::option::Option::Some(Self::AUTH_POLICY_SCOPE_MISMATCH),
+            37i32 => ::core::option::Option::Some(Self::AUTH_REVISION_CONFLICT),
             _ => ::core::option::Option::None,
         }
     }
@@ -35369,6 +35405,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_POLICY_IN_USE => "AUTH_POLICY_IN_USE",
             Self::AUTH_POLICY_LOCKED => "AUTH_POLICY_LOCKED",
             Self::AUTH_POLICY_SCOPE_MISMATCH => "AUTH_POLICY_SCOPE_MISMATCH",
+            Self::AUTH_REVISION_CONFLICT => "AUTH_REVISION_CONFLICT",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -35482,6 +35519,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_POLICY_SCOPE_MISMATCH" => {
                 ::core::option::Option::Some(Self::AUTH_POLICY_SCOPE_MISMATCH)
             }
+            "AUTH_REVISION_CONFLICT" => {
+                ::core::option::Option::Some(Self::AUTH_REVISION_CONFLICT)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -35524,6 +35564,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_POLICY_IN_USE,
             Self::AUTH_POLICY_LOCKED,
             Self::AUTH_POLICY_SCOPE_MISMATCH,
+            Self::AUTH_REVISION_CONFLICT,
         ]
     }
 }
@@ -41414,6 +41455,10 @@ pub mod __buffa {
             pub updated_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 26: `revision`
+            pub revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ApiKeyView<'a> {
@@ -41616,6 +41661,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    26u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -41692,6 +41744,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    revision: self.revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -41781,6 +41834,11 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.revision != 0u64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -41860,6 +41918,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.updated_at.write_to(__cache, buf);
+                }
+                if self.revision != 0u64 {
+                    ::buffa::types::put_uint64_field(26u32, self.revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -41957,6 +42018,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("updatedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -42173,6 +42241,13 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().updated_at
             }
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 26: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u64 {
+                self.0.reborrow().revision
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<ApiKeyView<'static>>>
         for ApiKeyOwnedView {
@@ -42197,270 +42272,6 @@ pub mod __buffa {
             type ViewHandle = ApiKeyOwnedView;
         }
         impl ::serde::Serialize for ApiKeyOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        /// IpWhitelist replaces or clears an API key IP whitelist during updates.
-        #[derive(Clone, Debug, Default)]
-        pub struct IpWhitelistView<'a> {
-            /// CIDR strings, e.g. "1.2.3.4/32". Maximum 32 unique entries.
-            ///
-            /// Field 1: `cidrs`
-            pub cidrs: ::buffa::RepeatedView<'a, &'a str>,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for IpWhitelistView<'a> {
-            type Owned = super::super::IpWhitelist;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.cidrs.push(::buffa::types::borrow_str(&mut cur)?);
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::IpWhitelist,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::IpWhitelist,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::IpWhitelist {
-                    cidrs: self.cidrs.iter().map(|s| s.to_string()).collect(),
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for IpWhitelistView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u32;
-                for v in &self.cidrs {
-                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u32;
-                size
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::bytes::BufMut,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                for v in &self.cidrs {
-                    ::buffa::types::put_string_field(1u32, v, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for IpWhitelistView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !self.cidrs.is_empty() {
-                    __map.serialize_entry("cidrs", &*self.cidrs)?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for IpWhitelistView<'a> {
-            const PACKAGE: &'static str = "auth.v1";
-            const NAME: &'static str = "IpWhitelist";
-            const FULL_NAME: &'static str = "auth.v1.IpWhitelist";
-            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.IpWhitelist";
-        }
-        ::buffa::impl_default_view_instance!(IpWhitelistView);
-        ::buffa::impl_view_reborrow!(IpWhitelistView);
-        /** Self-contained, `'static` owned view of a `IpWhitelist` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`IpWhitelistView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`IpWhitelistView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct IpWhitelistOwnedView(::buffa::OwnedView<IpWhitelistView<'static>>);
-        impl IpWhitelistOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    IpWhitelistOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    IpWhitelistOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::IpWhitelist,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    IpWhitelistOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`IpWhitelistView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &IpWhitelistView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// # Errors
-            ///
-            /// Returns an error if re-materializing preserved unknown fields
-            /// fails (e.g. the unknown-field limit is exceeded).
-            pub fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::IpWhitelist,
-                ::buffa::DecodeError,
-            > {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// CIDR strings, e.g. "1.2.3.4/32". Maximum 32 unique entries.
-            ///
-            /// Field 1: `cidrs`
-            #[must_use]
-            pub fn cidrs(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
-                &self.0.reborrow().cidrs
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<IpWhitelistView<'static>>>
-        for IpWhitelistOwnedView {
-            fn from(inner: ::buffa::OwnedView<IpWhitelistView<'static>>) -> Self {
-                IpWhitelistOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<IpWhitelistOwnedView>
-        for ::buffa::OwnedView<IpWhitelistView<'static>> {
-            fn from(wrapper: IpWhitelistOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<::buffa::OwnedView<IpWhitelistView<'static>>>
-        for IpWhitelistOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<IpWhitelistView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::IpWhitelist {
-            type View<'a> = IpWhitelistView<'a>;
-            type ViewHandle = IpWhitelistOwnedView;
-        }
-        impl ::serde::Serialize for IpWhitelistOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -44882,49 +44693,496 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// UpdateApiKeyRequest updates mutable metadata for an existing API key.
+        /// ApiKeyUpdateSpec contains mutable API key configuration.
+        #[derive(Clone, Debug, Default)]
+        pub struct ApiKeyUpdateSpecView<'a> {
+            /// Human-friendly label for the key. Empty clears the label when selected.
+            ///
+            /// Field 1: `label`
+            pub label: &'a str,
+            /// User-chosen icon/emoji for UI display. Empty clears the icon when selected.
+            ///
+            /// Field 2: `icon`
+            pub icon: &'a str,
+            /// User-chosen color token for UI display. Empty clears the color when selected.
+            ///
+            /// Field 3: `color`
+            pub color: &'a str,
+            /// New status. ACTIVE and DISABLED are allowed; revocation uses DeleteApiKey.
+            ///
+            /// Field 4: `status`
+            pub status: ::buffa::EnumValue<super::super::ApiKeyStatus>,
+            /// Complete replacement IP whitelist. Empty clears the restriction when selected.
+            ///
+            /// Field 5: `ip_whitelist`
+            pub ip_whitelist: ::buffa::RepeatedView<'a, &'a str>,
+            /// Expiry time in UTC. When selected, omission or the epoch clears expiry.
+            ///
+            /// Field 6: `expires_at`
+            pub expires_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ApiKeyUpdateSpecView<'a> {
+            type Owned = super::super::ApiKeyUpdateSpec;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.label = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.icon = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.color = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expires_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expires_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.ip_whitelist.push(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ApiKeyUpdateSpec,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ApiKeyUpdateSpec,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ApiKeyUpdateSpec {
+                    label: self.label.to_string(),
+                    icon: self.icon.to_string(),
+                    color: self.color.to_string(),
+                    status: self.status,
+                    ip_whitelist: self
+                        .ip_whitelist
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                    expires_at: match self.expires_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ApiKeyUpdateSpecView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.label.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+                }
+                if !self.icon.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.icon) as u32;
+                }
+                if !self.color.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                for v in &self.ip_whitelist {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if self.expires_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expires_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.label.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.label, buf);
+                }
+                if !self.icon.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.icon, buf);
+                }
+                if !self.color.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.color, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                for v in &self.ip_whitelist {
+                    ::buffa::types::put_string_field(5u32, v, buf);
+                }
+                if self.expires_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expires_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ApiKeyUpdateSpecView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
+                    __map.serialize_entry("label", self.label)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.icon) {
+                    __map.serialize_entry("icon", self.icon)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.color) {
+                    __map.serialize_entry("color", self.color)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                if !self.ip_whitelist.is_empty() {
+                    __map.serialize_entry("ipWhitelist", &*self.ip_whitelist)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expires_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("expiresAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ApiKeyUpdateSpecView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ApiKeyUpdateSpec";
+            const FULL_NAME: &'static str = "auth.v1.ApiKeyUpdateSpec";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApiKeyUpdateSpec";
+        }
+        ::buffa::impl_default_view_instance!(ApiKeyUpdateSpecView);
+        ::buffa::impl_view_reborrow!(ApiKeyUpdateSpecView);
+        /** Self-contained, `'static` owned view of a `ApiKeyUpdateSpec` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ApiKeyUpdateSpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ApiKeyUpdateSpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ApiKeyUpdateSpecOwnedView(
+            ::buffa::OwnedView<ApiKeyUpdateSpecView<'static>>,
+        );
+        impl ApiKeyUpdateSpecOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ApiKeyUpdateSpecOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ApiKeyUpdateSpecOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ApiKeyUpdateSpec,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ApiKeyUpdateSpecOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ApiKeyUpdateSpecView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ApiKeyUpdateSpecView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ApiKeyUpdateSpec,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Human-friendly label for the key. Empty clears the label when selected.
+            ///
+            /// Field 1: `label`
+            #[must_use]
+            pub fn label(&self) -> &'_ str {
+                self.0.reborrow().label
+            }
+            /// User-chosen icon/emoji for UI display. Empty clears the icon when selected.
+            ///
+            /// Field 2: `icon`
+            #[must_use]
+            pub fn icon(&self) -> &'_ str {
+                self.0.reborrow().icon
+            }
+            /// User-chosen color token for UI display. Empty clears the color when selected.
+            ///
+            /// Field 3: `color`
+            #[must_use]
+            pub fn color(&self) -> &'_ str {
+                self.0.reborrow().color
+            }
+            /// New status. ACTIVE and DISABLED are allowed; revocation uses DeleteApiKey.
+            ///
+            /// Field 4: `status`
+            #[must_use]
+            pub fn status(&self) -> ::buffa::EnumValue<super::super::ApiKeyStatus> {
+                self.0.reborrow().status
+            }
+            /// Complete replacement IP whitelist. Empty clears the restriction when selected.
+            ///
+            /// Field 5: `ip_whitelist`
+            #[must_use]
+            pub fn ip_whitelist(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().ip_whitelist
+            }
+            /// Expiry time in UTC. When selected, omission or the epoch clears expiry.
+            ///
+            /// Field 6: `expires_at`
+            #[must_use]
+            pub fn expires_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expires_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ApiKeyUpdateSpecView<'static>>>
+        for ApiKeyUpdateSpecOwnedView {
+            fn from(inner: ::buffa::OwnedView<ApiKeyUpdateSpecView<'static>>) -> Self {
+                ApiKeyUpdateSpecOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ApiKeyUpdateSpecOwnedView>
+        for ::buffa::OwnedView<ApiKeyUpdateSpecView<'static>> {
+            fn from(wrapper: ApiKeyUpdateSpecOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ApiKeyUpdateSpecView<'static>>>
+        for ApiKeyUpdateSpecOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ApiKeyUpdateSpecView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ApiKeyUpdateSpec {
+            type View<'a> = ApiKeyUpdateSpecView<'a>;
+            type ViewHandle = ApiKeyUpdateSpecOwnedView;
+        }
+        impl ::serde::Serialize for ApiKeyUpdateSpecOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// UpdateApiKeyRequest changes selected mutable fields on an existing API key.
         #[derive(Clone, Debug, Default)]
         pub struct UpdateApiKeyRequestView<'a> {
             /// Opaque API key identifier to update.
             ///
             /// Field 1: `key_id`
             pub key_id: &'a str,
-            /// New human-friendly label for the key. If empty, label is left unchanged.
-            /// Maximum length is 64 characters.
+            /// Candidate values for fields selected by update_mask.
             ///
-            /// Field 2: `label`
-            pub label: &'a str,
-            /// New user-chosen icon/emoji for UI display. If empty, left unchanged.
-            ///
-            /// Field 6: `icon`
-            pub icon: &'a str,
-            /// New user-chosen color token for UI display. If empty, left unchanged.
-            ///
-            /// Field 7: `color`
-            pub color: &'a str,
-            /// Optional new status. ACTIVE and DISABLED are allowed; REVOKED must be done
-            /// via DeleteApiKey and is terminal.
-            ///
-            /// Field 3: `status`
-            pub status: ::buffa::EnumValue<super::super::ApiKeyStatus>,
-            /// Optional new IP whitelist. If this field is omitted, the whitelist is left
-            /// unchanged. If it is present:
-            /// - cidrs non-empty replaces the existing whitelist.
-            /// - cidrs empty clears the whitelist (no IP restriction).
-            ///
-            /// Field 4: `ip_whitelist`
-            pub ip_whitelist: ::buffa::MessageFieldView<
-                super::super::__buffa::view::IpWhitelistView<'a>,
+            /// Field 2: `api_key`
+            pub api_key: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ApiKeyUpdateSpecView<'a>,
             >,
-            /// Optional new expiry time in UTC. If this field is present:
-            /// - Non-zero timestamp sets/updates the expiry.
-            /// - Zero/epoch timestamp clears the expiry (no automatic expiry).
-            /// If this field is omitted, the expiry is left unchanged.
+            /// Mutable fields to apply. Paths are relative to api_key. The mask is required,
+            /// must be non-empty, and cannot contain "*".
             ///
-            /// Field 5: `expires_at`
-            pub expires_at: ::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            /// Field 3: `update_mask`
+            pub update_mask: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::FieldMaskView<'a>,
             >,
+            /// Revision returned by the latest successful read.
+            ///
+            /// Field 4: `expected_revision`
+            pub expected_revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UpdateApiKeyRequestView<'a> {
@@ -44970,80 +45228,59 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.label = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.icon = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.color = ::buffa::types::borrow_str(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.api_key.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.api_key = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ApiKeyUpdateSpecView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.status = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.update_mask.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.update_mask = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::FieldMaskView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.ip_whitelist.as_mut() {
-                            Some(existing) => {
-                                ::buffa::MessageView::merge_into_view(
-                                    existing,
-                                    sub,
-                                    __sub_ctx,
-                                )?
-                            }
-                            None => {
-                                view.ip_whitelist = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::IpWhitelistView as ::buffa::MessageView>::decode_view_ctx(
-                                        sub,
-                                        __sub_ctx,
-                                    )?,
-                                );
-                            }
-                        }
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                        view.expected_revision = ::buffa::types::decode_uint64(
+                            &mut cur,
                         )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.expires_at.as_mut() {
-                            Some(existing) => {
-                                ::buffa::MessageView::merge_into_view(
-                                    existing,
-                                    sub,
-                                    __sub_ctx,
-                                )?
-                            }
-                            None => {
-                                view.expires_at = ::buffa::MessageFieldView::set(
-                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
-                                        sub,
-                                        __sub_ctx,
-                                    )?,
-                                );
-                            }
-                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -45075,26 +45312,23 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateApiKeyRequest {
                     key_id: self.key_id.to_string(),
-                    label: self.label.to_string(),
-                    icon: self.icon.to_string(),
-                    color: self.color.to_string(),
-                    status: self.status,
-                    ip_whitelist: match self.ip_whitelist.as_option() {
+                    api_key: match self.api_key.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::IpWhitelist,
+                                super::super::ApiKeyUpdateSpec,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    expires_at: match self.expires_at.as_option() {
+                    update_mask: match self.update_mask.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa_types::google::protobuf::FieldMask,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    expected_revision: self.expected_revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -45114,38 +45348,27 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.key_id) as u32;
                 }
-                if !self.label.is_empty() {
-                    size
-                        += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
-                }
-                {
-                    let val = self.status.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if self.ip_whitelist.is_set() {
+                if self.api_key.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.ip_whitelist.compute_size(__cache);
+                    let inner_size = self.api_key.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if self.expires_at.is_set() {
+                if self.update_mask.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.expires_at.compute_size(__cache);
+                    let inner_size = self.update_mask.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if !self.icon.is_empty() {
-                    size += 1u32 + ::buffa::types::string_encoded_len(&self.icon) as u32;
-                }
-                if !self.color.is_empty() {
+                if self.expected_revision != 0u64 {
                     size
-                        += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.expected_revision)
+                                as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -45161,36 +45384,24 @@ pub mod __buffa {
                 if !self.key_id.is_empty() {
                     ::buffa::types::put_string_field(1u32, &self.key_id, buf);
                 }
-                if !self.label.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.label, buf);
-                }
-                {
-                    let val = self.status.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(3u32, val, buf);
-                    }
-                }
-                if self.ip_whitelist.is_set() {
+                if self.api_key.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        4u32,
+                        2u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    self.ip_whitelist.write_to(__cache, buf);
+                    self.api_key.write_to(__cache, buf);
                 }
-                if self.expires_at.is_set() {
+                if self.update_mask.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        5u32,
+                        3u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    self.expires_at.write_to(__cache, buf);
+                    self.update_mask.write_to(__cache, buf);
                 }
-                if !self.icon.is_empty() {
-                    ::buffa::types::put_string_field(6u32, &self.icon, buf);
-                }
-                if !self.color.is_empty() {
-                    ::buffa::types::put_string_field(7u32, &self.color, buf);
+                if self.expected_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.expected_revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -45216,33 +45427,27 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.key_id) {
                     __map.serialize_entry("keyId", self.key_id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
-                    __map.serialize_entry("label", self.label)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.icon) {
-                    __map.serialize_entry("icon", self.icon)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.color) {
-                    __map.serialize_entry("color", self.color)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
-                    __map.serialize_entry("status", &self.status)?;
-                }
                 {
-                    if let ::core::option::Option::Some(__v) = self
-                        .ip_whitelist
-                        .as_option()
-                    {
-                        __map.serialize_entry("ipWhitelist", __v)?;
+                    if let ::core::option::Option::Some(__v) = self.api_key.as_option() {
+                        __map.serialize_entry("apiKey", __v)?;
                     }
                 }
                 {
                     if let ::core::option::Option::Some(__v) = self
-                        .expires_at
+                        .update_mask
                         .as_option()
                     {
-                        __map.serialize_entry("expiresAt", __v)?;
+                        __map.serialize_entry("updateMask", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.expected_revision,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "expectedRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.expected_revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -45347,63 +45552,35 @@ pub mod __buffa {
             pub fn key_id(&self) -> &'_ str {
                 self.0.reborrow().key_id
             }
-            /// New human-friendly label for the key. If empty, label is left unchanged.
-            /// Maximum length is 64 characters.
+            /// Candidate values for fields selected by update_mask.
             ///
-            /// Field 2: `label`
+            /// Field 2: `api_key`
             #[must_use]
-            pub fn label(&self) -> &'_ str {
-                self.0.reborrow().label
-            }
-            /// New user-chosen icon/emoji for UI display. If empty, left unchanged.
-            ///
-            /// Field 6: `icon`
-            #[must_use]
-            pub fn icon(&self) -> &'_ str {
-                self.0.reborrow().icon
-            }
-            /// New user-chosen color token for UI display. If empty, left unchanged.
-            ///
-            /// Field 7: `color`
-            #[must_use]
-            pub fn color(&self) -> &'_ str {
-                self.0.reborrow().color
-            }
-            /// Optional new status. ACTIVE and DISABLED are allowed; REVOKED must be done
-            /// via DeleteApiKey and is terminal.
-            ///
-            /// Field 3: `status`
-            #[must_use]
-            pub fn status(&self) -> ::buffa::EnumValue<super::super::ApiKeyStatus> {
-                self.0.reborrow().status
-            }
-            /// Optional new IP whitelist. If this field is omitted, the whitelist is left
-            /// unchanged. If it is present:
-            /// - cidrs non-empty replaces the existing whitelist.
-            /// - cidrs empty clears the whitelist (no IP restriction).
-            ///
-            /// Field 4: `ip_whitelist`
-            #[must_use]
-            pub fn ip_whitelist(
+            pub fn api_key(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::IpWhitelistView<'_>,
+                super::super::__buffa::view::ApiKeyUpdateSpecView<'_>,
             > {
-                &self.0.reborrow().ip_whitelist
+                &self.0.reborrow().api_key
             }
-            /// Optional new expiry time in UTC. If this field is present:
-            /// - Non-zero timestamp sets/updates the expiry.
-            /// - Zero/epoch timestamp clears the expiry (no automatic expiry).
-            /// If this field is omitted, the expiry is left unchanged.
+            /// Mutable fields to apply. Paths are relative to api_key. The mask is required,
+            /// must be non-empty, and cannot contain "*".
             ///
-            /// Field 5: `expires_at`
+            /// Field 3: `update_mask`
             #[must_use]
-            pub fn expires_at(
+            pub fn update_mask(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+                ::buffa_types::google::protobuf::__buffa::view::FieldMaskView<'_>,
             > {
-                &self.0.reborrow().expires_at
+                &self.0.reborrow().update_mask
+            }
+            /// Revision returned by the latest successful read.
+            ///
+            /// Field 4: `expected_revision`
+            #[must_use]
+            pub fn expected_revision(&self) -> u64 {
+                self.0.reborrow().expected_revision
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<UpdateApiKeyRequestView<'static>>>
@@ -46732,6 +46909,10 @@ pub mod __buffa {
             pub updated_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 30: `revision`
+            pub revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SubaccountPolicyViewView<'a> {
@@ -47036,6 +47217,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    30u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -47193,6 +47381,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    revision: self.revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -47368,6 +47557,11 @@ pub mod __buffa {
                     size
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
+                }
+                if self.revision != 0u64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint64_encoded_len(self.revision) as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -47547,6 +47741,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.expires_at.write_to(__cache, buf);
+                }
+                if self.revision != 0u64 {
+                    ::buffa::types::put_uint64_field(30u32, self.revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -47752,6 +47949,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("updatedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -48118,6 +48322,13 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().updated_at
+            }
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 30: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u64 {
+                self.0.reborrow().revision
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SubaccountPolicyViewView<'static>>>
@@ -49381,11 +49592,11 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// CreateSubaccountPolicyRequest defines a new sub-account policy template, with
-        /// an optional attach step for one target sub-account.
+        /// SubaccountPolicySpec contains the mutable configuration of a sub-account policy.
         #[derive(Clone, Debug, Default)]
-        pub struct CreateSubaccountPolicyRequestView<'a> {
-            /// Human-readable policy name. Required; 1 to 64 characters.
+        pub struct SubaccountPolicySpecView<'a> {
+            /// Human-readable policy name. Create requires a non-empty value; update
+            /// validates it after merging fields selected by update_mask.
             ///
             /// Field 1: `name`
             pub name: &'a str,
@@ -49393,12 +49604,6 @@ pub mod __buffa {
             ///
             /// Field 2: `description`
             pub description: &'a str,
-            /// Optional: if set, the created policy will be immediately attached to this
-            /// sub-account (opaque ID) in the same request. Useful for "create
-            /// policy for this sub-account" flows. Omit to create reusable templates.
-            ///
-            /// Field 9: `subaccount_id`
-            pub subaccount_id: ::core::option::Option<u64>,
             /// Allowed spot markets for this policy.
             ///
             /// Field 3: `spot_markets`
@@ -49516,8 +49721,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for CreateSubaccountPolicyRequestView<'a> {
-            type Owned = super::super::CreateSubaccountPolicyRequest;
+        impl<'a> ::buffa::MessageView<'a> for SubaccountPolicySpecView<'a> {
+            type Owned = super::super::SubaccountPolicySpec;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -49560,15 +49765,6 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.description = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    9u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Fixed64,
-                        )?;
-                        view.subaccount_id = Some(
-                            ::buffa::types::decode_fixed64(&mut cur)?,
-                        );
                     }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -49829,7 +50025,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::CreateSubaccountPolicyRequest,
+                super::super::SubaccountPolicySpec,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -49839,16 +50035,15 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::CreateSubaccountPolicyRequest,
+                super::super::SubaccountPolicySpec,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::CreateSubaccountPolicyRequest {
+                ::core::result::Result::Ok(super::super::SubaccountPolicySpec {
                     name: self.name.to_string(),
                     description: self.description.to_string(),
-                    subaccount_id: self.subaccount_id,
                     spot_markets: self
                         .spot_markets
                         .iter()
@@ -49901,7 +50096,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for CreateSubaccountPolicyRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for SubaccountPolicySpecView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -49953,9 +50148,6 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
                             + payload;
-                }
-                if self.subaccount_id.is_some() {
-                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
                 if self.global_notional_cap != 0u64 {
                     size
@@ -50103,9 +50295,6 @@ pub mod __buffa {
                         ::buffa::types::encode_int32(v.to_i32(), buf);
                     }
                 }
-                if let Some(v) = self.subaccount_id {
-                    ::buffa::types::put_fixed64_field(9u32, v, buf);
-                }
                 if self.global_notional_cap != 0u64 {
                     ::buffa::types::put_uint64_field(
                         12u32,
@@ -50214,7 +50403,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for CreateSubaccountPolicyRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for SubaccountPolicySpecView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -50226,13 +50415,6 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.description) {
                     __map.serialize_entry("description", self.description)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.subaccount_id {
-                    __map
-                        .serialize_entry(
-                            "subaccountId",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
                 }
                 if !self.spot_markets.is_empty() {
                     __map.serialize_entry("spotMarkets", &*self.spot_markets)?;
@@ -50380,24 +50562,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for CreateSubaccountPolicyRequestView<'a> {
+        impl<'a> ::buffa::MessageName for SubaccountPolicySpecView<'a> {
             const PACKAGE: &'static str = "auth.v1";
-            const NAME: &'static str = "CreateSubaccountPolicyRequest";
-            const FULL_NAME: &'static str = "auth.v1.CreateSubaccountPolicyRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountPolicyRequest";
+            const NAME: &'static str = "SubaccountPolicySpec";
+            const FULL_NAME: &'static str = "auth.v1.SubaccountPolicySpec";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountPolicySpec";
         }
-        ::buffa::impl_default_view_instance!(CreateSubaccountPolicyRequestView);
-        ::buffa::impl_view_reborrow!(CreateSubaccountPolicyRequestView);
-        /** Self-contained, `'static` owned view of a `CreateSubaccountPolicyRequest` message.
+        ::buffa::impl_default_view_instance!(SubaccountPolicySpecView);
+        ::buffa::impl_view_reborrow!(SubaccountPolicySpecView);
+        /** Self-contained, `'static` owned view of a `SubaccountPolicySpec` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`CreateSubaccountPolicyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`SubaccountPolicySpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateSubaccountPolicyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SubaccountPolicySpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct CreateSubaccountPolicyRequestOwnedView(
-            ::buffa::OwnedView<CreateSubaccountPolicyRequestView<'static>>,
+        pub struct SubaccountPolicySpecOwnedView(
+            ::buffa::OwnedView<SubaccountPolicySpecView<'static>>,
         );
-        impl CreateSubaccountPolicyRequestOwnedView {
+        impl SubaccountPolicySpecOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -50411,9 +50593,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateSubaccountPolicyRequestOwnedView(
-                        ::buffa::OwnedView::decode(bytes)?,
-                    ),
+                    SubaccountPolicySpecOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -50428,7 +50608,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateSubaccountPolicyRequestOwnedView(
+                    SubaccountPolicySpecOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -50440,17 +50620,15 @@ pub mod __buffa {
             /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::CreateSubaccountPolicyRequest,
+                msg: &super::super::SubaccountPolicySpec,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateSubaccountPolicyRequestOwnedView(
-                        ::buffa::OwnedView::from_owned(msg)?,
-                    ),
+                    SubaccountPolicySpecOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`CreateSubaccountPolicyRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`SubaccountPolicySpecView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &CreateSubaccountPolicyRequestView<'_> {
+            pub fn view(&self) -> &SubaccountPolicySpecView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -50462,7 +50640,7 @@ pub mod __buffa {
             pub fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::CreateSubaccountPolicyRequest,
+                super::super::SubaccountPolicySpec,
                 ::buffa::DecodeError,
             > {
                 self.0.to_owned_message()
@@ -50477,7 +50655,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Human-readable policy name. Required; 1 to 64 characters.
+            /// Human-readable policy name. Create requires a non-empty value; update
+            /// validates it after merging fields selected by update_mask.
             ///
             /// Field 1: `name`
             #[must_use]
@@ -50490,15 +50669,6 @@ pub mod __buffa {
             #[must_use]
             pub fn description(&self) -> &'_ str {
                 self.0.reborrow().description
-            }
-            /// Optional: if set, the created policy will be immediately attached to this
-            /// sub-account (opaque ID) in the same request. Useful for "create
-            /// policy for this sub-account" flows. Omit to create reusable templates.
-            ///
-            /// Field 9: `subaccount_id`
-            #[must_use]
-            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().subaccount_id
             }
             /// Allowed spot markets for this policy.
             ///
@@ -50691,6 +50861,357 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().expires_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<SubaccountPolicySpecView<'static>>>
+        for SubaccountPolicySpecOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SubaccountPolicySpecView<'static>>,
+            ) -> Self {
+                SubaccountPolicySpecOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SubaccountPolicySpecOwnedView>
+        for ::buffa::OwnedView<SubaccountPolicySpecView<'static>> {
+            fn from(wrapper: SubaccountPolicySpecOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SubaccountPolicySpecView<'static>>,
+        > for SubaccountPolicySpecOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<SubaccountPolicySpecView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SubaccountPolicySpec {
+            type View<'a> = SubaccountPolicySpecView<'a>;
+            type ViewHandle = SubaccountPolicySpecOwnedView;
+        }
+        impl ::serde::Serialize for SubaccountPolicySpecOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CreateSubaccountPolicyRequest defines a new sub-account policy template, with
+        /// an optional attach step for one target sub-account.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateSubaccountPolicyRequestView<'a> {
+            /// Complete mutable policy configuration.
+            ///
+            /// Field 1: `policy`
+            pub policy: ::buffa::MessageFieldView<
+                super::super::__buffa::view::SubaccountPolicySpecView<'a>,
+            >,
+            /// Optional target sub-account to attach atomically after creation.
+            ///
+            /// Field 2: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateSubaccountPolicyRequestView<'a> {
+            type Owned = super::super::CreateSubaccountPolicyRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.policy.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.policy = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::SubaccountPolicySpecView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateSubaccountPolicyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateSubaccountPolicyRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateSubaccountPolicyRequest {
+                    policy: match self.policy.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::SubaccountPolicySpec,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    subaccount_id: self.subaccount_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateSubaccountPolicyRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.policy.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.policy.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.policy.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.policy.write_to(__cache, buf);
+                }
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(2u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateSubaccountPolicyRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.policy.as_option() {
+                        __map.serialize_entry("policy", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateSubaccountPolicyRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "CreateSubaccountPolicyRequest";
+            const FULL_NAME: &'static str = "auth.v1.CreateSubaccountPolicyRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountPolicyRequest";
+        }
+        ::buffa::impl_default_view_instance!(CreateSubaccountPolicyRequestView);
+        ::buffa::impl_view_reborrow!(CreateSubaccountPolicyRequestView);
+        /** Self-contained, `'static` owned view of a `CreateSubaccountPolicyRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateSubaccountPolicyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateSubaccountPolicyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateSubaccountPolicyRequestOwnedView(
+            ::buffa::OwnedView<CreateSubaccountPolicyRequestView<'static>>,
+        );
+        impl CreateSubaccountPolicyRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateSubaccountPolicyRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateSubaccountPolicyRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateSubaccountPolicyRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateSubaccountPolicyRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateSubaccountPolicyRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateSubaccountPolicyRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateSubaccountPolicyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Complete mutable policy configuration.
+            ///
+            /// Field 1: `policy`
+            #[must_use]
+            pub fn policy(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::SubaccountPolicySpecView<'_>,
+            > {
+                &self.0.reborrow().policy
+            }
+            /// Optional target sub-account to attach atomically after creation.
+            ///
+            /// Field 2: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
             }
         }
         impl ::core::convert::From<
@@ -51048,137 +51569,32 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// UpdateSubaccountPolicyRequest fully replaces an existing sub-account policy
-        /// template.
+        /// UpdateSubaccountPolicyRequest changes selected mutable fields on an existing
+        /// sub-account policy.
         #[derive(Clone, Debug, Default)]
         pub struct UpdateSubaccountPolicyRequestView<'a> {
             /// Policy identifier (opaque ID).
             ///
             /// Field 1: `policy_id`
             pub policy_id: u64,
-            /// Human-readable policy name. Required; 1 to 64 characters.
+            /// Candidate values for fields selected by update_mask.
             ///
-            /// Field 2: `name`
-            pub name: &'a str,
-            /// Optional policy description for dashboards and audits. Maximum 256 characters.
-            ///
-            /// Field 3: `description`
-            pub description: &'a str,
-            /// Allowed spot markets for this policy.
-            ///
-            /// Field 4: `spot_markets`
-            pub spot_markets: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::SpotMarketRuleView<'a>,
+            /// Field 2: `policy`
+            pub policy: ::buffa::MessageFieldView<
+                super::super::__buffa::view::SubaccountPolicySpecView<'a>,
             >,
-            /// Allowed perp markets and optional per-contract leverage caps.
+            /// Mutable fields to apply. Paths are relative to policy. The mask is required,
+            /// must be non-empty, and cannot contain "*".
             ///
-            /// Field 5: `perp_markets`
-            pub perp_markets: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::PerpMarketRuleView<'a>,
+            /// Field 3: `update_mask`
+            pub update_mask: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::FieldMaskView<'a>,
             >,
-            /// Market-level scope for spot markets. When unspecified, defaults to ALL.
+            /// Revision returned by the latest successful read. Stale revisions fail with
+            /// a conflict before no-op detection.
             ///
-            /// Field 6: `spot_market_scope`
-            pub spot_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-            ///
-            /// Field 7: `perp_market_scope`
-            pub perp_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// High-level actions enabled for the sub-account policy. Up to 64 unique
-            /// explicit actions are allowed.
-            ///
-            /// Field 8: `actions`
-            pub actions: ::buffa::RepeatedView<
-                'a,
-                ::buffa::EnumValue<super::super::PolicyAction>,
-            >,
-            /// Maximum total notional exposure across all positions for this sub-account,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no explicit cap.
-            ///
-            /// Field 12: `global_notional_cap`
-            pub global_notional_cap: u64,
-            /// Maximum notional size for any single order on this sub-account, expressed
-            /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-            /// no explicit cap.
-            ///
-            /// Field 13: `max_order_notional`
-            pub max_order_notional: u64,
-            /// Maximum number of resting orders allowed on this sub-account at any time.
-            /// A value of 0 means no explicit cap.
-            ///
-            /// Field 14: `max_open_orders`
-            pub max_open_orders: u32,
-            /// Maximum number of open perp positions allowed on this sub-account. A value
-            /// of 0 means no explicit cap.
-            ///
-            /// Field 15: `max_open_positions`
-            pub max_open_positions: u32,
-            /// Optional global leverage cap across all perp contracts. Supported non-zero
-            /// values are 1, 3, 5, 10, 20, 50, and 100. A value of 0 means no explicit cap.
-            ///
-            /// Field 16: `global_perp_leverage_x`
-            pub global_perp_leverage_x: u32,
-            /// Maximum total notional this sub-account can transfer out internally per
-            /// rolling day, expressed in the canonical quote unit (for example,
-            /// micro-USDT). A value of 0 means no explicit cap.
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            pub daily_internal_transfer_out_limit: u64,
-            /// Maximum total notional this sub-account can withdraw per rolling day,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no explicit cap.
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            pub daily_withdraw_limit: u64,
-            /// When true, internal transfers from this sub-account may only target other
-            /// sub-accounts owned by the same root account.
-            ///
-            /// Field 19: `internal_transfers_own_only`
-            pub internal_transfers_own_only: bool,
-            /// When true, external withdrawals from this sub-account must target an
-            /// approved withdrawal destination.
-            ///
-            /// Field 20: `enforce_withdraw_whitelist`
-            pub enforce_withdraw_whitelist: bool,
-            /// When true, new orders for this sub-account are rejected regardless of other
-            /// policy settings.
-            ///
-            /// Field 21: `trading_halted`
-            pub trading_halted: bool,
-            /// When true, this sub-account may only reduce or close existing exposure.
-            ///
-            /// Field 22: `liquidation_only`
-            pub liquidation_only: bool,
-            /// Maximum realized loss over a rolling day before safety controls may halt
-            /// activity, expressed in the canonical quote unit (for example, micro-USDT).
-            /// A value of 0 means no explicit limit.
-            ///
-            /// Field 23: `daily_loss_limit`
-            pub daily_loss_limit: u64,
-            /// Maximum drawdown from peak equity in basis points. One basis point is
-            /// 1/100 of one percent. A value of 0 means no explicit limit.
-            ///
-            /// Field 24: `intraday_drawdown_limit_bps`
-            pub intraday_drawdown_limit_bps: u32,
-            /// When true, the policy is write-protected and requires an elevated mutation path.
-            ///
-            /// Field 25: `locked`
-            pub locked: bool,
-            /// Optional review time in UTC. This does not automatically disable the policy.
-            ///
-            /// Field 26: `review_at`
-            pub review_at: ::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
-            >,
-            /// Optional expiry time in UTC. This does not automatically disable the policy.
-            ///
-            /// Field 27: `expires_at`
-            pub expires_at: ::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
-            >,
+            /// Field 4: `expected_revision`
+            pub expected_revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UpdateSubaccountPolicyRequestView<'a> {
@@ -51224,157 +51640,9 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.name = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.description = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.spot_market_scope = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.perp_market_scope = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    12u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.global_notional_cap = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    13u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_order_notional = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    14u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_open_orders = ::buffa::types::decode_uint32(&mut cur)?;
-                    }
-                    15u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_open_positions = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
-                    }
-                    16u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.global_perp_leverage_x = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
-                    }
-                    17u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    18u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_withdraw_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    19u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.internal_transfers_own_only = ::buffa::types::decode_bool(
-                            &mut cur,
-                        )?;
-                    }
-                    20u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.enforce_withdraw_whitelist = ::buffa::types::decode_bool(
-                            &mut cur,
-                        )?;
-                    }
-                    21u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.trading_halted = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    22u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.liquidation_only = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    23u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_loss_limit = ::buffa::types::decode_uint64(&mut cur)?;
-                    }
-                    24u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.intraday_drawdown_limit_bps = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
-                    }
-                    25u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.locked = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    26u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.review_at.as_mut() {
+                        match view.policy.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -51383,8 +51651,8 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.review_at = ::buffa::MessageFieldView::set(
-                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                view.policy = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::SubaccountPolicySpecView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -51392,14 +51660,14 @@ pub mod __buffa {
                             }
                         }
                     }
-                    27u32 => {
+                    3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.expires_at.as_mut() {
+                        match view.update_mask.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -51408,8 +51676,8 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.expires_at = ::buffa::MessageFieldView::set(
-                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                view.update_mask = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::FieldMaskView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -51420,65 +51688,11 @@ pub mod __buffa {
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        view.spot_markets
-                            .push(
-                                <super::super::__buffa::view::SpotMarketRuleView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                        view.expected_revision = ::buffa::types::decode_uint64(
+                            &mut cur,
                         )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        view.perp_markets
-                            .push(
-                                <super::super::__buffa::view::PerpMarketRuleView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    8u32 => {
-                        if tag.wire_type()
-                            == ::buffa::encoding::WireType::LengthDelimited
-                        {
-                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
-                            view.actions
-                                .reserve(::buffa::encoding::count_varints(payload));
-                            let mut pcur: &[u8] = payload;
-                            while !pcur.is_empty() {
-                                view.actions
-                                    .push(
-                                        ::buffa::EnumValue::from(
-                                            ::buffa::types::decode_int32(&mut pcur)?,
-                                        ),
-                                    );
-                            }
-                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
-                        {
-                            view.actions
-                                .push(
-                                    ::buffa::EnumValue::from(
-                                        ::buffa::types::decode_int32(&mut cur)?,
-                                    ),
-                                );
-                        } else {
-                            return Err(
-                                ::buffa::encoding::wire_type_mismatch(
-                                    tag,
-                                    ::buffa::encoding::WireType::LengthDelimited,
-                                ),
-                            );
-                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -51510,52 +51724,23 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateSubaccountPolicyRequest {
                     policy_id: self.policy_id,
-                    name: self.name.to_string(),
-                    description: self.description.to_string(),
-                    spot_markets: self
-                        .spot_markets
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    perp_markets: self
-                        .perp_markets
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    spot_market_scope: self.spot_market_scope,
-                    perp_market_scope: self.perp_market_scope,
-                    actions: self.actions.to_vec(),
-                    global_notional_cap: self.global_notional_cap,
-                    max_order_notional: self.max_order_notional,
-                    max_open_orders: self.max_open_orders,
-                    max_open_positions: self.max_open_positions,
-                    global_perp_leverage_x: self.global_perp_leverage_x,
-                    daily_internal_transfer_out_limit: self
-                        .daily_internal_transfer_out_limit,
-                    daily_withdraw_limit: self.daily_withdraw_limit,
-                    internal_transfers_own_only: self.internal_transfers_own_only,
-                    enforce_withdraw_whitelist: self.enforce_withdraw_whitelist,
-                    trading_halted: self.trading_halted,
-                    liquidation_only: self.liquidation_only,
-                    daily_loss_limit: self.daily_loss_limit,
-                    intraday_drawdown_limit_bps: self.intraday_drawdown_limit_bps,
-                    locked: self.locked,
-                    review_at: match self.review_at.as_option() {
+                    policy: match self.policy.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                ::buffa_types::google::protobuf::Timestamp,
+                                super::super::SubaccountPolicySpec,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    expires_at: match self.expires_at.as_option() {
+                    update_mask: match self.update_mask.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                ::buffa_types::google::protobuf::Timestamp,
+                                ::buffa_types::google::protobuf::FieldMask,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    expected_revision: self.expected_revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -51573,142 +51758,27 @@ pub mod __buffa {
                 if self.policy_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if !self.name.is_empty() {
-                    size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
-                }
-                if !self.description.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.description)
-                                as u32;
-                }
-                for v in &self.spot_markets {
+                if self.policy.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
+                    let inner_size = self.policy.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                for v in &self.perp_markets {
+                if self.update_mask.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
+                    let inner_size = self.update_mask.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                {
-                    let val = self.spot_market_scope.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if !self.actions.is_empty() {
-                    let payload: u32 = self
-                        .actions
-                        .iter()
-                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
-                        .sum::<u32>();
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
-                            + payload;
-                }
-                if self.global_notional_cap != 0u64 {
+                if self.expected_revision != 0u64 {
                     size
                         += 1u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.global_notional_cap,
-                            ) as u32;
-                }
-                if self.max_order_notional != 0u64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint64_encoded_len(self.max_order_notional)
+                            + ::buffa::types::uint64_encoded_len(self.expected_revision)
                                 as u32;
-                }
-                if self.max_open_orders != 0u32 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.max_open_orders)
-                                as u32;
-                }
-                if self.max_open_positions != 0u32 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.max_open_positions)
-                                as u32;
-                }
-                if self.global_perp_leverage_x != 0u32 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint32_encoded_len(
-                                self.global_perp_leverage_x,
-                            ) as u32;
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_internal_transfer_out_limit,
-                            ) as u32;
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_withdraw_limit,
-                            ) as u32;
-                }
-                if self.internal_transfers_own_only {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.enforce_withdraw_whitelist {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.trading_halted {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.liquidation_only {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.daily_loss_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(self.daily_loss_limit)
-                                as u32;
-                }
-                if self.intraday_drawdown_limit_bps != 0u32 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint32_encoded_len(
-                                self.intraday_drawdown_limit_bps,
-                            ) as u32;
-                }
-                if self.locked {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.review_at.is_set() {
-                    let __slot = __cache.reserve();
-                    let inner_size = self.review_at.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
-                }
-                if self.expires_at.is_set() {
-                    let __slot = __cache.reserve();
-                    let inner_size = self.expires_at.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -51724,144 +51794,24 @@ pub mod __buffa {
                 if self.policy_id != 0u64 {
                     ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
                 }
-                if !self.name.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.name, buf);
-                }
-                if !self.description.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.description, buf);
-                }
-                for v in &self.spot_markets {
+                if self.policy.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        4u32,
+                        2u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    v.write_to(__cache, buf);
+                    self.policy.write_to(__cache, buf);
                 }
-                for v in &self.perp_markets {
+                if self.update_mask.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        5u32,
+                        3u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    v.write_to(__cache, buf);
+                    self.update_mask.write_to(__cache, buf);
                 }
-                {
-                    let val = self.spot_market_scope.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(6u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(7u32, val, buf);
-                    }
-                }
-                if !self.actions.is_empty() {
-                    let payload: u32 = self
-                        .actions
-                        .iter()
-                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
-                        .sum::<u32>();
-                    ::buffa::types::put_len_delimited_header(8u32, payload, buf);
-                    for v in &self.actions {
-                        ::buffa::types::encode_int32(v.to_i32(), buf);
-                    }
-                }
-                if self.global_notional_cap != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        12u32,
-                        self.global_notional_cap,
-                        buf,
-                    );
-                }
-                if self.max_order_notional != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        13u32,
-                        self.max_order_notional,
-                        buf,
-                    );
-                }
-                if self.max_open_orders != 0u32 {
-                    ::buffa::types::put_uint32_field(14u32, self.max_open_orders, buf);
-                }
-                if self.max_open_positions != 0u32 {
-                    ::buffa::types::put_uint32_field(
-                        15u32,
-                        self.max_open_positions,
-                        buf,
-                    );
-                }
-                if self.global_perp_leverage_x != 0u32 {
-                    ::buffa::types::put_uint32_field(
-                        16u32,
-                        self.global_perp_leverage_x,
-                        buf,
-                    );
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        17u32,
-                        self.daily_internal_transfer_out_limit,
-                        buf,
-                    );
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        18u32,
-                        self.daily_withdraw_limit,
-                        buf,
-                    );
-                }
-                if self.internal_transfers_own_only {
-                    ::buffa::types::put_bool_field(
-                        19u32,
-                        self.internal_transfers_own_only,
-                        buf,
-                    );
-                }
-                if self.enforce_withdraw_whitelist {
-                    ::buffa::types::put_bool_field(
-                        20u32,
-                        self.enforce_withdraw_whitelist,
-                        buf,
-                    );
-                }
-                if self.trading_halted {
-                    ::buffa::types::put_bool_field(21u32, self.trading_halted, buf);
-                }
-                if self.liquidation_only {
-                    ::buffa::types::put_bool_field(22u32, self.liquidation_only, buf);
-                }
-                if self.daily_loss_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(23u32, self.daily_loss_limit, buf);
-                }
-                if self.intraday_drawdown_limit_bps != 0u32 {
-                    ::buffa::types::put_uint32_field(
-                        24u32,
-                        self.intraday_drawdown_limit_bps,
-                        buf,
-                    );
-                }
-                if self.locked {
-                    ::buffa::types::put_bool_field(25u32, self.locked, buf);
-                }
-                if self.review_at.is_set() {
-                    ::buffa::types::put_len_delimited_header(
-                        26u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    self.review_at.write_to(__cache, buf);
-                }
-                if self.expires_at.is_set() {
-                    ::buffa::types::put_len_delimited_header(
-                        27u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    self.expires_at.write_to(__cache, buf);
+                if self.expected_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.expected_revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -51891,154 +51841,27 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.policy_id),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
-                    __map.serialize_entry("name", self.name)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.description) {
-                    __map.serialize_entry("description", self.description)?;
-                }
-                if !self.spot_markets.is_empty() {
-                    __map.serialize_entry("spotMarkets", &*self.spot_markets)?;
-                }
-                if !self.perp_markets.is_empty() {
-                    __map.serialize_entry("perpMarkets", &*self.perp_markets)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.spot_market_scope,
-                ) {
-                    __map.serialize_entry("spotMarketScope", &self.spot_market_scope)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.perp_market_scope,
-                ) {
-                    __map.serialize_entry("perpMarketScope", &self.perp_market_scope)?;
-                }
-                if !self.actions.is_empty() {
-                    __map
-                        .serialize_entry(
-                            "actions",
-                            &::buffa::json_helpers::EnumSeqJson(&self.actions),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.global_notional_cap,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "globalNotionalCap",
-                            &::buffa::json_helpers::ProtoJson(&self.global_notional_cap),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.max_order_notional,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "maxOrderNotional",
-                            &::buffa::json_helpers::ProtoJson(&self.max_order_notional),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.max_open_orders) {
-                    __map
-                        .serialize_entry(
-                            "maxOpenOrders",
-                            &::buffa::json_helpers::ProtoJson(&self.max_open_orders),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.max_open_positions,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "maxOpenPositions",
-                            &::buffa::json_helpers::ProtoJson(&self.max_open_positions),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.global_perp_leverage_x,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "globalPerpLeverageX",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.global_perp_leverage_x,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_internal_transfer_out_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyInternalTransferOutLimit",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.daily_internal_transfer_out_limit,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_withdraw_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyWithdrawLimit",
-                            &::buffa::json_helpers::ProtoJson(&self.daily_withdraw_limit),
-                        )?;
-                }
-                if self.internal_transfers_own_only {
-                    __map
-                        .serialize_entry(
-                            "internalTransfersOwnOnly",
-                            &self.internal_transfers_own_only,
-                        )?;
-                }
-                if self.enforce_withdraw_whitelist {
-                    __map
-                        .serialize_entry(
-                            "enforceWithdrawWhitelist",
-                            &self.enforce_withdraw_whitelist,
-                        )?;
-                }
-                if self.trading_halted {
-                    __map.serialize_entry("tradingHalted", &self.trading_halted)?;
-                }
-                if self.liquidation_only {
-                    __map.serialize_entry("liquidationOnly", &self.liquidation_only)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.daily_loss_limit) {
-                    __map
-                        .serialize_entry(
-                            "dailyLossLimit",
-                            &::buffa::json_helpers::ProtoJson(&self.daily_loss_limit),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.intraday_drawdown_limit_bps,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "intradayDrawdownLimitBps",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.intraday_drawdown_limit_bps,
-                            ),
-                        )?;
-                }
-                if self.locked {
-                    __map.serialize_entry("locked", &self.locked)?;
-                }
                 {
-                    if let ::core::option::Option::Some(__v) = self.review_at.as_option()
-                    {
-                        __map.serialize_entry("reviewAt", __v)?;
+                    if let ::core::option::Option::Some(__v) = self.policy.as_option() {
+                        __map.serialize_entry("policy", __v)?;
                     }
                 }
                 {
                     if let ::core::option::Option::Some(__v) = self
-                        .expires_at
+                        .update_mask
                         .as_option()
                     {
-                        __map.serialize_entry("expiresAt", __v)?;
+                        __map.serialize_entry("updateMask", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.expected_revision,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "expectedRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.expected_revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -52147,211 +51970,36 @@ pub mod __buffa {
             pub fn policy_id(&self) -> u64 {
                 self.0.reborrow().policy_id
             }
-            /// Human-readable policy name. Required; 1 to 64 characters.
+            /// Candidate values for fields selected by update_mask.
             ///
-            /// Field 2: `name`
+            /// Field 2: `policy`
             #[must_use]
-            pub fn name(&self) -> &'_ str {
-                self.0.reborrow().name
-            }
-            /// Optional policy description for dashboards and audits. Maximum 256 characters.
-            ///
-            /// Field 3: `description`
-            #[must_use]
-            pub fn description(&self) -> &'_ str {
-                self.0.reborrow().description
-            }
-            /// Allowed spot markets for this policy.
-            ///
-            /// Field 4: `spot_markets`
-            #[must_use]
-            pub fn spot_markets(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::SpotMarketRuleView<'_>,
-            > {
-                &self.0.reborrow().spot_markets
-            }
-            /// Allowed perp markets and optional per-contract leverage caps.
-            ///
-            /// Field 5: `perp_markets`
-            #[must_use]
-            pub fn perp_markets(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::PerpMarketRuleView<'_>,
-            > {
-                &self.0.reborrow().perp_markets
-            }
-            /// Market-level scope for spot markets. When unspecified, defaults to ALL.
-            ///
-            /// Field 6: `spot_market_scope`
-            #[must_use]
-            pub fn spot_market_scope(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
-                self.0.reborrow().spot_market_scope
-            }
-            /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-            ///
-            /// Field 7: `perp_market_scope`
-            #[must_use]
-            pub fn perp_market_scope(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
-                self.0.reborrow().perp_market_scope
-            }
-            /// High-level actions enabled for the sub-account policy. Up to 64 unique
-            /// explicit actions are allowed.
-            ///
-            /// Field 8: `actions`
-            #[must_use]
-            pub fn actions(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                ::buffa::EnumValue<super::super::PolicyAction>,
-            > {
-                &self.0.reborrow().actions
-            }
-            /// Maximum total notional exposure across all positions for this sub-account,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no explicit cap.
-            ///
-            /// Field 12: `global_notional_cap`
-            #[must_use]
-            pub fn global_notional_cap(&self) -> u64 {
-                self.0.reborrow().global_notional_cap
-            }
-            /// Maximum notional size for any single order on this sub-account, expressed
-            /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-            /// no explicit cap.
-            ///
-            /// Field 13: `max_order_notional`
-            #[must_use]
-            pub fn max_order_notional(&self) -> u64 {
-                self.0.reborrow().max_order_notional
-            }
-            /// Maximum number of resting orders allowed on this sub-account at any time.
-            /// A value of 0 means no explicit cap.
-            ///
-            /// Field 14: `max_open_orders`
-            #[must_use]
-            pub fn max_open_orders(&self) -> u32 {
-                self.0.reborrow().max_open_orders
-            }
-            /// Maximum number of open perp positions allowed on this sub-account. A value
-            /// of 0 means no explicit cap.
-            ///
-            /// Field 15: `max_open_positions`
-            #[must_use]
-            pub fn max_open_positions(&self) -> u32 {
-                self.0.reborrow().max_open_positions
-            }
-            /// Optional global leverage cap across all perp contracts. Supported non-zero
-            /// values are 1, 3, 5, 10, 20, 50, and 100. A value of 0 means no explicit cap.
-            ///
-            /// Field 16: `global_perp_leverage_x`
-            #[must_use]
-            pub fn global_perp_leverage_x(&self) -> u32 {
-                self.0.reborrow().global_perp_leverage_x
-            }
-            /// Maximum total notional this sub-account can transfer out internally per
-            /// rolling day, expressed in the canonical quote unit (for example,
-            /// micro-USDT). A value of 0 means no explicit cap.
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            #[must_use]
-            pub fn daily_internal_transfer_out_limit(&self) -> u64 {
-                self.0.reborrow().daily_internal_transfer_out_limit
-            }
-            /// Maximum total notional this sub-account can withdraw per rolling day,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no explicit cap.
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            #[must_use]
-            pub fn daily_withdraw_limit(&self) -> u64 {
-                self.0.reborrow().daily_withdraw_limit
-            }
-            /// When true, internal transfers from this sub-account may only target other
-            /// sub-accounts owned by the same root account.
-            ///
-            /// Field 19: `internal_transfers_own_only`
-            #[must_use]
-            pub fn internal_transfers_own_only(&self) -> bool {
-                self.0.reborrow().internal_transfers_own_only
-            }
-            /// When true, external withdrawals from this sub-account must target an
-            /// approved withdrawal destination.
-            ///
-            /// Field 20: `enforce_withdraw_whitelist`
-            #[must_use]
-            pub fn enforce_withdraw_whitelist(&self) -> bool {
-                self.0.reborrow().enforce_withdraw_whitelist
-            }
-            /// When true, new orders for this sub-account are rejected regardless of other
-            /// policy settings.
-            ///
-            /// Field 21: `trading_halted`
-            #[must_use]
-            pub fn trading_halted(&self) -> bool {
-                self.0.reborrow().trading_halted
-            }
-            /// When true, this sub-account may only reduce or close existing exposure.
-            ///
-            /// Field 22: `liquidation_only`
-            #[must_use]
-            pub fn liquidation_only(&self) -> bool {
-                self.0.reborrow().liquidation_only
-            }
-            /// Maximum realized loss over a rolling day before safety controls may halt
-            /// activity, expressed in the canonical quote unit (for example, micro-USDT).
-            /// A value of 0 means no explicit limit.
-            ///
-            /// Field 23: `daily_loss_limit`
-            #[must_use]
-            pub fn daily_loss_limit(&self) -> u64 {
-                self.0.reborrow().daily_loss_limit
-            }
-            /// Maximum drawdown from peak equity in basis points. One basis point is
-            /// 1/100 of one percent. A value of 0 means no explicit limit.
-            ///
-            /// Field 24: `intraday_drawdown_limit_bps`
-            #[must_use]
-            pub fn intraday_drawdown_limit_bps(&self) -> u32 {
-                self.0.reborrow().intraday_drawdown_limit_bps
-            }
-            /// When true, the policy is write-protected and requires an elevated mutation path.
-            ///
-            /// Field 25: `locked`
-            #[must_use]
-            pub fn locked(&self) -> bool {
-                self.0.reborrow().locked
-            }
-            /// Optional review time in UTC. This does not automatically disable the policy.
-            ///
-            /// Field 26: `review_at`
-            #[must_use]
-            pub fn review_at(
+            pub fn policy(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+                super::super::__buffa::view::SubaccountPolicySpecView<'_>,
             > {
-                &self.0.reborrow().review_at
+                &self.0.reborrow().policy
             }
-            /// Optional expiry time in UTC. This does not automatically disable the policy.
+            /// Mutable fields to apply. Paths are relative to policy. The mask is required,
+            /// must be non-empty, and cannot contain "*".
             ///
-            /// Field 27: `expires_at`
+            /// Field 3: `update_mask`
             #[must_use]
-            pub fn expires_at(
+            pub fn update_mask(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+                ::buffa_types::google::protobuf::__buffa::view::FieldMaskView<'_>,
             > {
-                &self.0.reborrow().expires_at
+                &self.0.reborrow().update_mask
+            }
+            /// Revision returned by the latest successful read. Stale revisions fail with
+            /// a conflict before no-op detection.
+            ///
+            /// Field 4: `expected_revision`
+            #[must_use]
+            pub fn expected_revision(&self) -> u64 {
+                self.0.reborrow().expected_revision
             }
         }
         impl ::core::convert::From<
@@ -53895,6 +53543,10 @@ pub mod __buffa {
             pub updated_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 23: `revision`
+            pub revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ApiPolicyViewView<'a> {
@@ -54060,6 +53712,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    23u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -54190,6 +53849,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    revision: self.revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -54296,6 +53956,11 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.revision != 0u64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -54401,6 +54066,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.updated_at.write_to(__cache, buf);
+                }
+                if self.revision != 0u64 {
+                    ::buffa::types::put_uint64_field(23u32, self.revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -54515,6 +54183,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("updatedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -54760,6 +54435,13 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().updated_at
+            }
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 23: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u64 {
+                self.0.reborrow().revision
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ApiPolicyViewView<'static>>>
@@ -55987,10 +55669,11 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// CreateApiPolicyRequest defines a new API key policy template.
+        /// ApiPolicySpec contains the mutable configuration of an API key policy.
         #[derive(Clone, Debug, Default)]
-        pub struct CreateApiPolicyRequestView<'a> {
-            /// Human-readable policy name. Required; 1 to 64 characters.
+        pub struct ApiPolicySpecView<'a> {
+            /// Human-readable policy name. Create requires a non-empty value; update
+            /// validates it after merging fields selected by update_mask.
             ///
             /// Field 1: `name`
             pub name: &'a str,
@@ -56050,16 +55733,10 @@ pub mod __buffa {
             ///
             /// Field 19: `is_template`
             pub is_template: bool,
-            /// Optional API key identifier to bind this newly-created policy to
-            /// atomically. When set, the caller must be allowed to manage the key and the
-            /// create+assign operation consumes a single fresh step-up proof.
-            ///
-            /// Field 20: `assign_to_key_id`
-            pub assign_to_key_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for CreateApiPolicyRequestView<'a> {
-            type Owned = super::super::CreateApiPolicyRequest;
+        impl<'a> ::buffa::MessageView<'a> for ApiPolicySpecView<'a> {
+            type Owned = super::super::ApiPolicySpec;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -56155,13 +55832,6 @@ pub mod __buffa {
                         )?;
                         view.is_template = ::buffa::types::decode_bool(&mut cur)?;
                     }
-                    20u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.assign_to_key_id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -56237,7 +55907,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::CreateApiPolicyRequest,
+                super::super::ApiPolicySpec,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -56247,13 +55917,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::CreateApiPolicyRequest,
+                super::super::ApiPolicySpec,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::CreateApiPolicyRequest {
+                ::core::result::Result::Ok(super::super::ApiPolicySpec {
                     name: self.name.to_string(),
                     description: self.description.to_string(),
                     spot_markets: self
@@ -56274,7 +55944,6 @@ pub mod __buffa {
                         .daily_internal_transfer_out_limit,
                     daily_withdraw_limit: self.daily_withdraw_limit,
                     is_template: self.is_template,
-                    assign_to_key_id: self.assign_to_key_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -56283,7 +55952,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for CreateApiPolicyRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for ApiPolicySpecView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -56358,12 +56027,6 @@ pub mod __buffa {
                 }
                 if self.is_template {
                     size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if !self.assign_to_key_id.is_empty() {
-                    size
-                        += 2u32
-                            + ::buffa::types::string_encoded_len(&self.assign_to_key_id)
-                                as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -56445,9 +56108,6 @@ pub mod __buffa {
                 if self.is_template {
                     ::buffa::types::put_bool_field(19u32, self.is_template, buf);
                 }
-                if !self.assign_to_key_id.is_empty() {
-                    ::buffa::types::put_string_field(20u32, &self.assign_to_key_id, buf);
-                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -56462,7 +56122,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for CreateApiPolicyRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for ApiPolicySpecView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -56530,30 +56190,27 @@ pub mod __buffa {
                 if self.is_template {
                     __map.serialize_entry("isTemplate", &self.is_template)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.assign_to_key_id) {
-                    __map.serialize_entry("assignToKeyId", self.assign_to_key_id)?;
-                }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for CreateApiPolicyRequestView<'a> {
+        impl<'a> ::buffa::MessageName for ApiPolicySpecView<'a> {
             const PACKAGE: &'static str = "auth.v1";
-            const NAME: &'static str = "CreateApiPolicyRequest";
-            const FULL_NAME: &'static str = "auth.v1.CreateApiPolicyRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateApiPolicyRequest";
+            const NAME: &'static str = "ApiPolicySpec";
+            const FULL_NAME: &'static str = "auth.v1.ApiPolicySpec";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApiPolicySpec";
         }
-        ::buffa::impl_default_view_instance!(CreateApiPolicyRequestView);
-        ::buffa::impl_view_reborrow!(CreateApiPolicyRequestView);
-        /** Self-contained, `'static` owned view of a `CreateApiPolicyRequest` message.
+        ::buffa::impl_default_view_instance!(ApiPolicySpecView);
+        ::buffa::impl_view_reborrow!(ApiPolicySpecView);
+        /** Self-contained, `'static` owned view of a `ApiPolicySpec` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`CreateApiPolicyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`ApiPolicySpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateApiPolicyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ApiPolicySpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct CreateApiPolicyRequestOwnedView(
-            ::buffa::OwnedView<CreateApiPolicyRequestView<'static>>,
+        pub struct ApiPolicySpecOwnedView(
+            ::buffa::OwnedView<ApiPolicySpecView<'static>>,
         );
-        impl CreateApiPolicyRequestOwnedView {
+        impl ApiPolicySpecOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -56567,7 +56224,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateApiPolicyRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    ApiPolicySpecOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -56582,7 +56239,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateApiPolicyRequestOwnedView(
+                    ApiPolicySpecOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -56594,15 +56251,15 @@ pub mod __buffa {
             /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::CreateApiPolicyRequest,
+                msg: &super::super::ApiPolicySpec,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    CreateApiPolicyRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    ApiPolicySpecOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`CreateApiPolicyRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`ApiPolicySpecView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &CreateApiPolicyRequestView<'_> {
+            pub fn view(&self) -> &ApiPolicySpecView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -56614,7 +56271,7 @@ pub mod __buffa {
             pub fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::CreateApiPolicyRequest,
+                super::super::ApiPolicySpec,
                 ::buffa::DecodeError,
             > {
                 self.0.to_owned_message()
@@ -56629,7 +56286,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Human-readable policy name. Required; 1 to 64 characters.
+            /// Human-readable policy name. Create requires a non-empty value; update
+            /// validates it after merging fields selected by update_mask.
             ///
             /// Field 1: `name`
             #[must_use]
@@ -56732,11 +56390,346 @@ pub mod __buffa {
             pub fn is_template(&self) -> bool {
                 self.0.reborrow().is_template
             }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ApiPolicySpecView<'static>>>
+        for ApiPolicySpecOwnedView {
+            fn from(inner: ::buffa::OwnedView<ApiPolicySpecView<'static>>) -> Self {
+                ApiPolicySpecOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ApiPolicySpecOwnedView>
+        for ::buffa::OwnedView<ApiPolicySpecView<'static>> {
+            fn from(wrapper: ApiPolicySpecOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ApiPolicySpecView<'static>>>
+        for ApiPolicySpecOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ApiPolicySpecView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ApiPolicySpec {
+            type View<'a> = ApiPolicySpecView<'a>;
+            type ViewHandle = ApiPolicySpecOwnedView;
+        }
+        impl ::serde::Serialize for ApiPolicySpecOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CreateApiPolicyRequest defines a new API key policy template.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateApiPolicyRequestView<'a> {
+            /// Complete mutable policy configuration.
+            ///
+            /// Field 1: `policy`
+            pub policy: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ApiPolicySpecView<'a>,
+            >,
             /// Optional API key identifier to bind this newly-created policy to
             /// atomically. When set, the caller must be allowed to manage the key and the
             /// create+assign operation consumes a single fresh step-up proof.
             ///
-            /// Field 20: `assign_to_key_id`
+            /// Field 2: `assign_to_key_id`
+            pub assign_to_key_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateApiPolicyRequestView<'a> {
+            type Owned = super::super::CreateApiPolicyRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.policy.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.policy = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ApiPolicySpecView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.assign_to_key_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateApiPolicyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateApiPolicyRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateApiPolicyRequest {
+                    policy: match self.policy.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ApiPolicySpec,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    assign_to_key_id: self.assign_to_key_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateApiPolicyRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.policy.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.policy.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.assign_to_key_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.assign_to_key_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.policy.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.policy.write_to(__cache, buf);
+                }
+                if !self.assign_to_key_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.assign_to_key_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateApiPolicyRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.policy.as_option() {
+                        __map.serialize_entry("policy", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.assign_to_key_id) {
+                    __map.serialize_entry("assignToKeyId", self.assign_to_key_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateApiPolicyRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "CreateApiPolicyRequest";
+            const FULL_NAME: &'static str = "auth.v1.CreateApiPolicyRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateApiPolicyRequest";
+        }
+        ::buffa::impl_default_view_instance!(CreateApiPolicyRequestView);
+        ::buffa::impl_view_reborrow!(CreateApiPolicyRequestView);
+        /** Self-contained, `'static` owned view of a `CreateApiPolicyRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateApiPolicyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateApiPolicyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateApiPolicyRequestOwnedView(
+            ::buffa::OwnedView<CreateApiPolicyRequestView<'static>>,
+        );
+        impl CreateApiPolicyRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateApiPolicyRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateApiPolicyRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateApiPolicyRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateApiPolicyRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CreateApiPolicyRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateApiPolicyRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateApiPolicyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Complete mutable policy configuration.
+            ///
+            /// Field 1: `policy`
+            #[must_use]
+            pub fn policy(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ApiPolicySpecView<'_>,
+            > {
+                &self.0.reborrow().policy
+            }
+            /// Optional API key identifier to bind this newly-created policy to
+            /// atomically. When set, the caller must be allowed to manage the key and the
+            /// create+assign operation consumes a single fresh step-up proof.
+            ///
+            /// Field 2: `assign_to_key_id`
             #[must_use]
             pub fn assign_to_key_id(&self) -> &'_ str {
                 self.0.reborrow().assign_to_key_id
@@ -57095,73 +57088,32 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// UpdateApiPolicyRequest replaces an existing API key policy template.
+        /// UpdateApiPolicyRequest changes selected mutable fields on an existing API
+        /// key policy.
         #[derive(Clone, Debug, Default)]
         pub struct UpdateApiPolicyRequestView<'a> {
             /// Policy identifier (opaque ID).
             ///
             /// Field 1: `policy_id`
             pub policy_id: u64,
-            /// Human-readable policy name. Required; 1 to 64 characters.
+            /// Candidate values for fields selected by update_mask.
             ///
-            /// Field 2: `name`
-            pub name: &'a str,
-            /// Optional policy description for dashboards and audits. Maximum 256 characters.
-            ///
-            /// Field 3: `description`
-            pub description: &'a str,
-            /// Allowed spot markets for this API key policy.
-            ///
-            /// Field 4: `spot_markets`
-            pub spot_markets: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::SpotMarketRuleView<'a>,
+            /// Field 2: `policy`
+            pub policy: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ApiPolicySpecView<'a>,
             >,
-            /// Allowed perp markets and optional per-contract leverage caps.
+            /// Mutable fields to apply. Paths are relative to policy. The mask is required,
+            /// must be non-empty, and cannot contain "*".
             ///
-            /// Field 5: `perp_markets`
-            pub perp_markets: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::PerpMarketRuleView<'a>,
+            /// Field 3: `update_mask`
+            pub update_mask: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::FieldMaskView<'a>,
             >,
-            /// Market-level scope for spot markets. When unspecified, defaults to ALL.
+            /// Revision returned by the latest successful read. Stale revisions fail with
+            /// a conflict before no-op detection.
             ///
-            /// Field 6: `spot_market_scope`
-            pub spot_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-            ///
-            /// Field 7: `perp_market_scope`
-            pub perp_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// High-level actions enabled for the API key policy. Up to 64 unique explicit
-            /// actions are allowed.
-            ///
-            /// Field 8: `actions`
-            pub actions: ::buffa::RepeatedView<
-                'a,
-                ::buffa::EnumValue<super::super::PolicyAction>,
-            >,
-            /// Maximum notional size for any single order submitted with this API key,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no additional cap beyond the sub-account policy.
-            ///
-            /// Field 13: `max_order_notional`
-            pub max_order_notional: u64,
-            /// Maximum total notional this API key can transfer out internally per rolling
-            /// day, expressed in the canonical quote unit (for example, micro-USDT). A
-            /// value of 0 means no additional cap beyond the sub-account policy.
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            pub daily_internal_transfer_out_limit: u64,
-            /// Maximum total notional this API key can withdraw per rolling day, expressed
-            /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-            /// no additional cap beyond the sub-account policy.
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            pub daily_withdraw_limit: u64,
-            /// Whether this policy should be treated as a reusable template.
-            ///
-            /// Field 19: `is_template`
-            pub is_template: bool,
+            /// Field 4: `expected_revision`
+            pub expected_revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UpdateApiPolicyRequestView<'a> {
@@ -57207,129 +57159,59 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.policy.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.policy = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ApiPolicySpecView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.description = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.spot_market_scope = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.perp_market_scope = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    13u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_order_notional = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    17u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    18u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_withdraw_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    19u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.is_template = ::buffa::types::decode_bool(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.update_mask.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.update_mask = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::FieldMaskView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        view.spot_markets
-                            .push(
-                                <super::super::__buffa::view::SpotMarketRuleView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                        view.expected_revision = ::buffa::types::decode_uint64(
+                            &mut cur,
                         )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        view.perp_markets
-                            .push(
-                                <super::super::__buffa::view::PerpMarketRuleView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    8u32 => {
-                        if tag.wire_type()
-                            == ::buffa::encoding::WireType::LengthDelimited
-                        {
-                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
-                            view.actions
-                                .reserve(::buffa::encoding::count_varints(payload));
-                            let mut pcur: &[u8] = payload;
-                            while !pcur.is_empty() {
-                                view.actions
-                                    .push(
-                                        ::buffa::EnumValue::from(
-                                            ::buffa::types::decode_int32(&mut pcur)?,
-                                        ),
-                                    );
-                            }
-                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
-                        {
-                            view.actions
-                                .push(
-                                    ::buffa::EnumValue::from(
-                                        ::buffa::types::decode_int32(&mut cur)?,
-                                    ),
-                                );
-                        } else {
-                            return Err(
-                                ::buffa::encoding::wire_type_mismatch(
-                                    tag,
-                                    ::buffa::encoding::WireType::LengthDelimited,
-                                ),
-                            );
-                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -57361,26 +57243,23 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateApiPolicyRequest {
                     policy_id: self.policy_id,
-                    name: self.name.to_string(),
-                    description: self.description.to_string(),
-                    spot_markets: self
-                        .spot_markets
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    perp_markets: self
-                        .perp_markets
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    spot_market_scope: self.spot_market_scope,
-                    perp_market_scope: self.perp_market_scope,
-                    actions: self.actions.to_vec(),
-                    max_order_notional: self.max_order_notional,
-                    daily_internal_transfer_out_limit: self
-                        .daily_internal_transfer_out_limit,
-                    daily_withdraw_limit: self.daily_withdraw_limit,
-                    is_template: self.is_template,
+                    policy: match self.policy.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ApiPolicySpec,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    update_mask: match self.update_mask.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::FieldMask,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    expected_revision: self.expected_revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -57398,75 +57277,27 @@ pub mod __buffa {
                 if self.policy_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if !self.name.is_empty() {
-                    size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
-                }
-                if !self.description.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.description)
-                                as u32;
-                }
-                for v in &self.spot_markets {
+                if self.policy.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
+                    let inner_size = self.policy.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                for v in &self.perp_markets {
+                if self.update_mask.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
+                    let inner_size = self.update_mask.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                {
-                    let val = self.spot_market_scope.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if !self.actions.is_empty() {
-                    let payload: u32 = self
-                        .actions
-                        .iter()
-                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
-                        .sum::<u32>();
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
-                            + payload;
-                }
-                if self.max_order_notional != 0u64 {
+                if self.expected_revision != 0u64 {
                     size
                         += 1u32
-                            + ::buffa::types::uint64_encoded_len(self.max_order_notional)
+                            + ::buffa::types::uint64_encoded_len(self.expected_revision)
                                 as u32;
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_internal_transfer_out_limit,
-                            ) as u32;
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_withdraw_limit,
-                            ) as u32;
-                }
-                if self.is_template {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -57482,74 +57313,24 @@ pub mod __buffa {
                 if self.policy_id != 0u64 {
                     ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
                 }
-                if !self.name.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.name, buf);
-                }
-                if !self.description.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.description, buf);
-                }
-                for v in &self.spot_markets {
+                if self.policy.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        4u32,
+                        2u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    v.write_to(__cache, buf);
+                    self.policy.write_to(__cache, buf);
                 }
-                for v in &self.perp_markets {
+                if self.update_mask.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        5u32,
+                        3u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    v.write_to(__cache, buf);
+                    self.update_mask.write_to(__cache, buf);
                 }
-                {
-                    let val = self.spot_market_scope.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(6u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(7u32, val, buf);
-                    }
-                }
-                if !self.actions.is_empty() {
-                    let payload: u32 = self
-                        .actions
-                        .iter()
-                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
-                        .sum::<u32>();
-                    ::buffa::types::put_len_delimited_header(8u32, payload, buf);
-                    for v in &self.actions {
-                        ::buffa::types::encode_int32(v.to_i32(), buf);
-                    }
-                }
-                if self.max_order_notional != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        13u32,
-                        self.max_order_notional,
-                        buf,
-                    );
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        17u32,
-                        self.daily_internal_transfer_out_limit,
-                        buf,
-                    );
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        18u32,
-                        self.daily_withdraw_limit,
-                        buf,
-                    );
-                }
-                if self.is_template {
-                    ::buffa::types::put_bool_field(19u32, self.is_template, buf);
+                if self.expected_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.expected_revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -57579,66 +57360,27 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.policy_id),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
-                    __map.serialize_entry("name", self.name)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.policy.as_option() {
+                        __map.serialize_entry("policy", __v)?;
+                    }
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.description) {
-                    __map.serialize_entry("description", self.description)?;
-                }
-                if !self.spot_markets.is_empty() {
-                    __map.serialize_entry("spotMarkets", &*self.spot_markets)?;
-                }
-                if !self.perp_markets.is_empty() {
-                    __map.serialize_entry("perpMarkets", &*self.perp_markets)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.spot_market_scope,
-                ) {
-                    __map.serialize_entry("spotMarketScope", &self.spot_market_scope)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.perp_market_scope,
-                ) {
-                    __map.serialize_entry("perpMarketScope", &self.perp_market_scope)?;
-                }
-                if !self.actions.is_empty() {
-                    __map
-                        .serialize_entry(
-                            "actions",
-                            &::buffa::json_helpers::EnumSeqJson(&self.actions),
-                        )?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .update_mask
+                        .as_option()
+                    {
+                        __map.serialize_entry("updateMask", __v)?;
+                    }
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.max_order_notional,
+                    &self.expected_revision,
                 ) {
                     __map
                         .serialize_entry(
-                            "maxOrderNotional",
-                            &::buffa::json_helpers::ProtoJson(&self.max_order_notional),
+                            "expectedRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.expected_revision),
                         )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_internal_transfer_out_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyInternalTransferOutLimit",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.daily_internal_transfer_out_limit,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_withdraw_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyWithdrawLimit",
-                            &::buffa::json_helpers::ProtoJson(&self.daily_withdraw_limit),
-                        )?;
-                }
-                if self.is_template {
-                    __map.serialize_entry("isTemplate", &self.is_template)?;
                 }
                 __map.end()
             }
@@ -57743,108 +57485,36 @@ pub mod __buffa {
             pub fn policy_id(&self) -> u64 {
                 self.0.reborrow().policy_id
             }
-            /// Human-readable policy name. Required; 1 to 64 characters.
+            /// Candidate values for fields selected by update_mask.
             ///
-            /// Field 2: `name`
+            /// Field 2: `policy`
             #[must_use]
-            pub fn name(&self) -> &'_ str {
-                self.0.reborrow().name
-            }
-            /// Optional policy description for dashboards and audits. Maximum 256 characters.
-            ///
-            /// Field 3: `description`
-            #[must_use]
-            pub fn description(&self) -> &'_ str {
-                self.0.reborrow().description
-            }
-            /// Allowed spot markets for this API key policy.
-            ///
-            /// Field 4: `spot_markets`
-            #[must_use]
-            pub fn spot_markets(
+            pub fn policy(
                 &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::SpotMarketRuleView<'_>,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ApiPolicySpecView<'_>,
             > {
-                &self.0.reborrow().spot_markets
+                &self.0.reborrow().policy
             }
-            /// Allowed perp markets and optional per-contract leverage caps.
+            /// Mutable fields to apply. Paths are relative to policy. The mask is required,
+            /// must be non-empty, and cannot contain "*".
             ///
-            /// Field 5: `perp_markets`
+            /// Field 3: `update_mask`
             #[must_use]
-            pub fn perp_markets(
+            pub fn update_mask(
                 &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::PerpMarketRuleView<'_>,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::FieldMaskView<'_>,
             > {
-                &self.0.reborrow().perp_markets
+                &self.0.reborrow().update_mask
             }
-            /// Market-level scope for spot markets. When unspecified, defaults to ALL.
+            /// Revision returned by the latest successful read. Stale revisions fail with
+            /// a conflict before no-op detection.
             ///
-            /// Field 6: `spot_market_scope`
+            /// Field 4: `expected_revision`
             #[must_use]
-            pub fn spot_market_scope(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
-                self.0.reborrow().spot_market_scope
-            }
-            /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-            ///
-            /// Field 7: `perp_market_scope`
-            #[must_use]
-            pub fn perp_market_scope(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
-                self.0.reborrow().perp_market_scope
-            }
-            /// High-level actions enabled for the API key policy. Up to 64 unique explicit
-            /// actions are allowed.
-            ///
-            /// Field 8: `actions`
-            #[must_use]
-            pub fn actions(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                ::buffa::EnumValue<super::super::PolicyAction>,
-            > {
-                &self.0.reborrow().actions
-            }
-            /// Maximum notional size for any single order submitted with this API key,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no additional cap beyond the sub-account policy.
-            ///
-            /// Field 13: `max_order_notional`
-            #[must_use]
-            pub fn max_order_notional(&self) -> u64 {
-                self.0.reborrow().max_order_notional
-            }
-            /// Maximum total notional this API key can transfer out internally per rolling
-            /// day, expressed in the canonical quote unit (for example, micro-USDT). A
-            /// value of 0 means no additional cap beyond the sub-account policy.
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            #[must_use]
-            pub fn daily_internal_transfer_out_limit(&self) -> u64 {
-                self.0.reborrow().daily_internal_transfer_out_limit
-            }
-            /// Maximum total notional this API key can withdraw per rolling day, expressed
-            /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-            /// no additional cap beyond the sub-account policy.
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            #[must_use]
-            pub fn daily_withdraw_limit(&self) -> u64 {
-                self.0.reborrow().daily_withdraw_limit
-            }
-            /// Whether this policy should be treated as a reusable template.
-            ///
-            /// Field 19: `is_template`
-            #[must_use]
-            pub fn is_template(&self) -> bool {
-                self.0.reborrow().is_template
+            pub fn expected_revision(&self) -> u64 {
+                self.0.reborrow().expected_revision
             }
         }
         impl ::core::convert::From<
@@ -59656,6 +59326,10 @@ pub mod __buffa {
             pub updated_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 15: `revision`
+            pub revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SubaccountView<'a> {
@@ -59815,6 +59489,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -59861,6 +59542,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    revision: self.revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -59943,6 +59625,11 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.revision != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -60015,6 +59702,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.updated_at.write_to(__cache, buf);
+                }
+                if self.revision != 0u64 {
+                    ::buffa::types::put_uint64_field(15u32, self.revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -60110,6 +59800,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("updatedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -60312,6 +60009,13 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().updated_at
+            }
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 15: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u64 {
+                self.0.reborrow().revision
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SubaccountView<'static>>>
@@ -61798,29 +61502,387 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// Request to update mutable display and status fields for a sub-account.
+        /// SubaccountUpdateSpec contains mutable display and status configuration.
+        #[derive(Clone, Debug, Default)]
+        pub struct SubaccountUpdateSpecView<'a> {
+            /// Label for the sub-account. Empty clears the label when selected.
+            ///
+            /// Field 1: `label`
+            pub label: &'a str,
+            /// User-chosen icon/emoji for UI display. Empty clears the icon when selected.
+            ///
+            /// Field 2: `icon`
+            pub icon: &'a str,
+            /// User-chosen color token for UI display. Empty clears the color when selected.
+            ///
+            /// Field 3: `color`
+            pub color: &'a str,
+            /// Status for the sub-account, such as "active" or "disabled".
+            ///
+            /// Field 4: `status`
+            pub status: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SubaccountUpdateSpecView<'a> {
+            type Owned = super::super::SubaccountUpdateSpec;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.label = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.icon = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.color = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SubaccountUpdateSpec,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SubaccountUpdateSpec,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SubaccountUpdateSpec {
+                    label: self.label.to_string(),
+                    icon: self.icon.to_string(),
+                    color: self.color.to_string(),
+                    status: self.status.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SubaccountUpdateSpecView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.label.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+                }
+                if !self.icon.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.icon) as u32;
+                }
+                if !self.color.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
+                }
+                if !self.status.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.label.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.label, buf);
+                }
+                if !self.icon.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.icon, buf);
+                }
+                if !self.color.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.color, buf);
+                }
+                if !self.status.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.status, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SubaccountUpdateSpecView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
+                    __map.serialize_entry("label", self.label)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.icon) {
+                    __map.serialize_entry("icon", self.icon)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.color) {
+                    __map.serialize_entry("color", self.color)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
+                    __map.serialize_entry("status", self.status)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SubaccountUpdateSpecView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "SubaccountUpdateSpec";
+            const FULL_NAME: &'static str = "auth.v1.SubaccountUpdateSpec";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountUpdateSpec";
+        }
+        ::buffa::impl_default_view_instance!(SubaccountUpdateSpecView);
+        ::buffa::impl_view_reborrow!(SubaccountUpdateSpecView);
+        /** Self-contained, `'static` owned view of a `SubaccountUpdateSpec` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SubaccountUpdateSpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SubaccountUpdateSpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SubaccountUpdateSpecOwnedView(
+            ::buffa::OwnedView<SubaccountUpdateSpecView<'static>>,
+        );
+        impl SubaccountUpdateSpecOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SubaccountUpdateSpecOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SubaccountUpdateSpecOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SubaccountUpdateSpec,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SubaccountUpdateSpecOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`SubaccountUpdateSpecView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SubaccountUpdateSpecView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SubaccountUpdateSpec,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Label for the sub-account. Empty clears the label when selected.
+            ///
+            /// Field 1: `label`
+            #[must_use]
+            pub fn label(&self) -> &'_ str {
+                self.0.reborrow().label
+            }
+            /// User-chosen icon/emoji for UI display. Empty clears the icon when selected.
+            ///
+            /// Field 2: `icon`
+            #[must_use]
+            pub fn icon(&self) -> &'_ str {
+                self.0.reborrow().icon
+            }
+            /// User-chosen color token for UI display. Empty clears the color when selected.
+            ///
+            /// Field 3: `color`
+            #[must_use]
+            pub fn color(&self) -> &'_ str {
+                self.0.reborrow().color
+            }
+            /// Status for the sub-account, such as "active" or "disabled".
+            ///
+            /// Field 4: `status`
+            #[must_use]
+            pub fn status(&self) -> &'_ str {
+                self.0.reborrow().status
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<SubaccountUpdateSpecView<'static>>>
+        for SubaccountUpdateSpecOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SubaccountUpdateSpecView<'static>>,
+            ) -> Self {
+                SubaccountUpdateSpecOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SubaccountUpdateSpecOwnedView>
+        for ::buffa::OwnedView<SubaccountUpdateSpecView<'static>> {
+            fn from(wrapper: SubaccountUpdateSpecOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SubaccountUpdateSpecView<'static>>,
+        > for SubaccountUpdateSpecOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<SubaccountUpdateSpecView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SubaccountUpdateSpec {
+            type View<'a> = SubaccountUpdateSpecView<'a>;
+            type ViewHandle = SubaccountUpdateSpecOwnedView;
+        }
+        impl ::serde::Serialize for SubaccountUpdateSpecOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Request to change selected mutable fields for a sub-account.
         #[derive(Clone, Debug, Default)]
         pub struct UpdateSubaccountRequestView<'a> {
             /// Sub-account to update (opaque ID).
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: u64,
-            /// New label for the sub-account. If empty, the label is left unchanged.
+            /// Candidate values for fields selected by update_mask.
             ///
-            /// Field 2: `label`
-            pub label: &'a str,
-            /// New user-chosen icon/emoji for UI display. If empty, left unchanged.
+            /// Field 2: `subaccount`
+            pub subaccount: ::buffa::MessageFieldView<
+                super::super::__buffa::view::SubaccountUpdateSpecView<'a>,
+            >,
+            /// Mutable fields to apply. Paths are relative to subaccount. The mask is
+            /// required, must be non-empty, and cannot contain "*".
             ///
-            /// Field 4: `icon`
-            pub icon: &'a str,
-            /// New user-chosen color token for UI display. If empty, left unchanged. Tokens use lowercase letters, numbers, underscores, or hyphens.
+            /// Field 3: `update_mask`
+            pub update_mask: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::FieldMaskView<'a>,
+            >,
+            /// Revision returned by the latest successful read.
             ///
-            /// Field 5: `color`
-            pub color: &'a str,
-            /// New status for the sub-account, such as "active" or "disabled". If empty, the status is left unchanged.
-            ///
-            /// Field 3: `status`
-            pub status: &'a str,
+            /// Field 4: `expected_revision`
+            pub expected_revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UpdateSubaccountRequestView<'a> {
@@ -61866,28 +61928,59 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.label = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.icon = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.color = ::buffa::types::borrow_str(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.subaccount.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.subaccount = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::SubaccountUpdateSpecView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.update_mask.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.update_mask = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::FieldMaskView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.expected_revision = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -61919,10 +62012,23 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateSubaccountRequest {
                     subaccount_id: self.subaccount_id,
-                    label: self.label.to_string(),
-                    icon: self.icon.to_string(),
-                    color: self.color.to_string(),
-                    status: self.status.to_string(),
+                    subaccount: match self.subaccount.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::SubaccountUpdateSpec,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    update_mask: match self.update_mask.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::FieldMask,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    expected_revision: self.expected_revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -61933,28 +62039,34 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for UpdateSubaccountRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
                 if self.subaccount_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if !self.label.is_empty() {
+                if self.subaccount.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.subaccount.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
                     size
-                        += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
                 }
-                if !self.status.is_empty() {
+                if self.update_mask.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.update_mask.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.expected_revision != 0u64 {
                     size
                         += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
-                }
-                if !self.icon.is_empty() {
-                    size += 1u32 + ::buffa::types::string_encoded_len(&self.icon) as u32;
-                }
-                if !self.color.is_empty() {
-                    size
-                        += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
+                            + ::buffa::types::uint64_encoded_len(self.expected_revision)
+                                as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -61962,7 +62074,7 @@ pub mod __buffa {
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -61970,17 +62082,24 @@ pub mod __buffa {
                 if self.subaccount_id != 0u64 {
                     ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
                 }
-                if !self.label.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.label, buf);
+                if self.subaccount.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.subaccount.write_to(__cache, buf);
                 }
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.status, buf);
+                if self.update_mask.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.update_mask.write_to(__cache, buf);
                 }
-                if !self.icon.is_empty() {
-                    ::buffa::types::put_string_field(4u32, &self.icon, buf);
-                }
-                if !self.color.is_empty() {
-                    ::buffa::types::put_string_field(5u32, &self.color, buf);
+                if self.expected_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.expected_revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -62010,17 +62129,30 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
-                    __map.serialize_entry("label", self.label)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .subaccount
+                        .as_option()
+                    {
+                        __map.serialize_entry("subaccount", __v)?;
+                    }
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.icon) {
-                    __map.serialize_entry("icon", self.icon)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .update_mask
+                        .as_option()
+                    {
+                        __map.serialize_entry("updateMask", __v)?;
+                    }
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.color) {
-                    __map.serialize_entry("color", self.color)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.expected_revision,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "expectedRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.expected_revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -62127,33 +62259,35 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> u64 {
                 self.0.reborrow().subaccount_id
             }
-            /// New label for the sub-account. If empty, the label is left unchanged.
+            /// Candidate values for fields selected by update_mask.
             ///
-            /// Field 2: `label`
+            /// Field 2: `subaccount`
             #[must_use]
-            pub fn label(&self) -> &'_ str {
-                self.0.reborrow().label
+            pub fn subaccount(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::SubaccountUpdateSpecView<'_>,
+            > {
+                &self.0.reborrow().subaccount
             }
-            /// New user-chosen icon/emoji for UI display. If empty, left unchanged.
+            /// Mutable fields to apply. Paths are relative to subaccount. The mask is
+            /// required, must be non-empty, and cannot contain "*".
             ///
-            /// Field 4: `icon`
+            /// Field 3: `update_mask`
             #[must_use]
-            pub fn icon(&self) -> &'_ str {
-                self.0.reborrow().icon
+            pub fn update_mask(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::FieldMaskView<'_>,
+            > {
+                &self.0.reborrow().update_mask
             }
-            /// New user-chosen color token for UI display. If empty, left unchanged. Tokens use lowercase letters, numbers, underscores, or hyphens.
+            /// Revision returned by the latest successful read.
             ///
-            /// Field 5: `color`
+            /// Field 4: `expected_revision`
             #[must_use]
-            pub fn color(&self) -> &'_ str {
-                self.0.reborrow().color
-            }
-            /// New status for the sub-account, such as "active" or "disabled". If empty, the status is left unchanged.
-            ///
-            /// Field 3: `status`
-            #[must_use]
-            pub fn status(&self) -> &'_ str {
-                self.0.reborrow().status
+            pub fn expected_revision(&self) -> u64 {
+                self.0.reborrow().expected_revision
             }
         }
         impl ::core::convert::From<
@@ -62192,9 +62326,15 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// Empty response returned after updating a sub-account.
+        /// Response returned after updating a sub-account.
         #[derive(Clone, Debug, Default)]
         pub struct UpdateSubaccountResponseView<'a> {
+            /// Sub-account after applying the update.
+            ///
+            /// Field 1: `subaccount`
+            pub subaccount: ::buffa::MessageFieldView<
+                super::super::__buffa::view::SubaccountView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UpdateSubaccountResponseView<'a> {
@@ -62228,6 +62368,31 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.subaccount.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.subaccount = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::SubaccountView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -62257,6 +62422,14 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateSubaccountResponse {
+                    subaccount: match self.subaccount.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::Subaccount,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -62267,21 +62440,37 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for UpdateSubaccountResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
+                if self.subaccount.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.subaccount.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
+                if self.subaccount.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.subaccount.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -62303,6 +62492,14 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .subaccount
+                        .as_option()
+                    {
+                        __map.serialize_entry("subaccount", __v)?;
+                    }
+                }
                 __map.end()
             }
         }
@@ -62400,6 +62597,17 @@ pub mod __buffa {
             #[must_use]
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
+            }
+            /// Sub-account after applying the update.
+            ///
+            /// Field 1: `subaccount`
+            #[must_use]
+            pub fn subaccount(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::SubaccountView<'_>,
+            > {
+                &self.0.reborrow().subaccount
             }
         }
         impl ::core::convert::From<
@@ -72743,6 +72951,10 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::AddressBookTagView<'a>,
             >,
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 31: `revision`
+            pub revision: u64,
             pub entry: ::core::option::Option<
                 super::super::__buffa::view::oneof::address_book_entry::Entry<'a>,
             >,
@@ -72886,6 +73098,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    31u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     30u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -73025,6 +73244,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    revision: self.revision,
                     entry: match self.entry.as_ref() {
                         ::core::option::Option::Some(v) => {
                             ::core::option::Option::Some(
@@ -73138,6 +73358,11 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.revision != 0u64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -73224,6 +73449,9 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
+                if self.revision != 0u64 {
+                    ::buffa::types::put_uint64_field(31u32, self.revision, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -73288,6 +73516,13 @@ pub mod __buffa {
                 }
                 if !self.tags.is_empty() {
                     __map.serialize_entry("tags", &*self.tags)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.entry {
                     match __ov {
@@ -73473,6 +73708,13 @@ pub mod __buffa {
                 super::super::__buffa::view::AddressBookTagView<'_>,
             > {
                 &self.0.reborrow().tags
+            }
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 31: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u64 {
+                self.0.reborrow().revision
             }
             /// Oneof `entry`.
             #[must_use]
@@ -73923,6 +74165,10 @@ pub mod __buffa {
             pub updated_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 11: `revision`
+            pub revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ExternalAddressBookEntryView<'a> {
@@ -74079,6 +74325,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     5u32 => {
                         if tag.wire_type()
                             == ::buffa::encoding::WireType::LengthDelimited
@@ -74162,6 +74415,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    revision: self.revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -74234,6 +74488,11 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.revision != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -74301,6 +74560,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.updated_at.write_to(__cache, buf);
+                }
+                if self.revision != 0u64 {
+                    ::buffa::types::put_uint64_field(11u32, self.revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -74384,6 +74646,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("updatedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -74567,6 +74836,13 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().updated_at
             }
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 11: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u64 {
+                self.0.reborrow().revision
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<ExternalAddressBookEntryView<'static>>,
@@ -74670,6 +74946,10 @@ pub mod __buffa {
             pub updated_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 15: `revision`
+            pub revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for InternalAddressBookEntryView<'a> {
@@ -74858,6 +75138,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     5u32 => {
                         if tag.wire_type()
                             == ::buffa::encoding::WireType::LengthDelimited
@@ -74945,6 +75232,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    revision: self.revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -75037,6 +75325,11 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.revision != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.revision) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -75123,6 +75416,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.updated_at.write_to(__cache, buf);
+                }
+                if self.revision != 0u64 {
+                    ::buffa::types::put_uint64_field(15u32, self.revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -75230,6 +75526,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("updatedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
                 }
                 __map.end()
             }
@@ -75442,6 +75745,13 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().updated_at
+            }
+            /// Monotonic resource revision used for conditional updates.
+            ///
+            /// Field 15: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u64 {
+                self.0.reborrow().revision
             }
         }
         impl ::core::convert::From<
@@ -82925,31 +83235,391 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// AddressBookEntryUpdateSpec contains mutable saved-destination metadata.
+        #[derive(Clone, Debug, Default)]
+        pub struct AddressBookEntryUpdateSpecView<'a> {
+            /// Display label. Empty clears the label when selected.
+            ///
+            /// Field 1: `label`
+            pub label: &'a str,
+            /// User-defined note. Empty clears the note when selected.
+            ///
+            /// Field 2: `note`
+            pub note: &'a str,
+            /// Complete replacement set of tag ids when selected.
+            ///
+            /// Field 3: `tag_ids`
+            pub tag_ids: ::buffa::RepeatedView<'a, u64>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AddressBookEntryUpdateSpecView<'a> {
+            type Owned = super::super::AddressBookEntryUpdateSpec;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.label = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.note = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.tag_ids.reserve(payload.len() / 8usize);
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.tag_ids
+                                    .push(::buffa::types::decode_fixed64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Fixed64
+                        {
+                            view.tag_ids.push(::buffa::types::decode_fixed64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AddressBookEntryUpdateSpec,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AddressBookEntryUpdateSpec,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AddressBookEntryUpdateSpec {
+                    label: self.label.to_string(),
+                    note: self.note.to_string(),
+                    tag_ids: self.tag_ids.to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AddressBookEntryUpdateSpecView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.label.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+                }
+                if !self.note.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.note) as u32;
+                }
+                if !self.tag_ids.is_empty() {
+                    let payload: u32 = self.tag_ids.len() as u32
+                        * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.label.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.label, buf);
+                }
+                if !self.note.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.note, buf);
+                }
+                if !self.tag_ids.is_empty() {
+                    let payload: u32 = self.tag_ids.len() as u32
+                        * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                    ::buffa::types::put_len_delimited_header(3u32, payload, buf);
+                    for &v in &self.tag_ids {
+                        ::buffa::types::encode_fixed64(v, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AddressBookEntryUpdateSpecView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
+                    __map.serialize_entry("label", self.label)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.note) {
+                    __map.serialize_entry("note", self.note)?;
+                }
+                if !self.tag_ids.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "tagIds",
+                            &::buffa::json_helpers::RepeatedJson(&self.tag_ids),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AddressBookEntryUpdateSpecView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "AddressBookEntryUpdateSpec";
+            const FULL_NAME: &'static str = "auth.v1.AddressBookEntryUpdateSpec";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AddressBookEntryUpdateSpec";
+        }
+        ::buffa::impl_default_view_instance!(AddressBookEntryUpdateSpecView);
+        ::buffa::impl_view_reborrow!(AddressBookEntryUpdateSpecView);
+        /** Self-contained, `'static` owned view of a `AddressBookEntryUpdateSpec` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AddressBookEntryUpdateSpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AddressBookEntryUpdateSpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AddressBookEntryUpdateSpecOwnedView(
+            ::buffa::OwnedView<AddressBookEntryUpdateSpecView<'static>>,
+        );
+        impl AddressBookEntryUpdateSpecOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AddressBookEntryUpdateSpecOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AddressBookEntryUpdateSpecOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AddressBookEntryUpdateSpec,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AddressBookEntryUpdateSpecOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`AddressBookEntryUpdateSpecView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AddressBookEntryUpdateSpecView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AddressBookEntryUpdateSpec,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Display label. Empty clears the label when selected.
+            ///
+            /// Field 1: `label`
+            #[must_use]
+            pub fn label(&self) -> &'_ str {
+                self.0.reborrow().label
+            }
+            /// User-defined note. Empty clears the note when selected.
+            ///
+            /// Field 2: `note`
+            #[must_use]
+            pub fn note(&self) -> &'_ str {
+                self.0.reborrow().note
+            }
+            /// Complete replacement set of tag ids when selected.
+            ///
+            /// Field 3: `tag_ids`
+            #[must_use]
+            pub fn tag_ids(&self) -> &::buffa::RepeatedView<'_, u64> {
+                &self.0.reborrow().tag_ids
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AddressBookEntryUpdateSpecView<'static>>,
+        > for AddressBookEntryUpdateSpecOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AddressBookEntryUpdateSpecView<'static>>,
+            ) -> Self {
+                AddressBookEntryUpdateSpecOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AddressBookEntryUpdateSpecOwnedView>
+        for ::buffa::OwnedView<AddressBookEntryUpdateSpecView<'static>> {
+            fn from(wrapper: AddressBookEntryUpdateSpecOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AddressBookEntryUpdateSpecView<'static>>,
+        > for AddressBookEntryUpdateSpecOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AddressBookEntryUpdateSpecView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AddressBookEntryUpdateSpec {
+            type View<'a> = AddressBookEntryUpdateSpecView<'a>;
+            type ViewHandle = AddressBookEntryUpdateSpecOwnedView;
+        }
+        impl ::serde::Serialize for AddressBookEntryUpdateSpecOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         #[derive(Clone, Debug, Default)]
         pub struct UpdateAddressBookEntryRequestView<'a> {
             /// Address-book entry id to update.
             ///
             /// Field 1: `address_book_entry_id`
             pub address_book_entry_id: u64,
-            /// Replacement display label.
+            /// Candidate values for fields selected by update_mask.
             ///
-            /// Field 2: `label`
-            pub label: &'a str,
-            /// Replacement note.
-            ///
-            /// Field 3: `note`
-            pub note: &'a str,
-            /// Complete replacement set of tag ids to attach to the entry.
-            ///
-            /// Field 4: `tag_ids`
-            pub tag_ids: ::buffa::RepeatedView<'a, u64>,
-            /// New tags to create and attach with this entry update.
-            ///
-            /// Field 5: `new_tags`
-            pub new_tags: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::AddressBookTagInputView<'a>,
+            /// Field 2: `entry`
+            pub entry: ::buffa::MessageFieldView<
+                super::super::__buffa::view::AddressBookEntryUpdateSpecView<'a>,
             >,
+            /// Mutable fields to apply. Paths are relative to entry. The mask is required,
+            /// must be non-empty, and cannot contain "*".
+            ///
+            /// Field 3: `update_mask`
+            pub update_mask: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::FieldMaskView<'a>,
+            >,
+            /// Revision returned by the latest successful read.
+            ///
+            /// Field 4: `expected_revision`
+            pub expected_revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UpdateAddressBookEntryRequestView<'a> {
@@ -82997,52 +83667,59 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.label = ::buffa::types::borrow_str(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.entry.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.entry = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::AddressBookEntryUpdateSpecView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.note = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    4u32 => {
-                        if tag.wire_type()
-                            == ::buffa::encoding::WireType::LengthDelimited
-                        {
-                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
-                            view.tag_ids.reserve(payload.len() / 8usize);
-                            let mut pcur: &[u8] = payload;
-                            while !pcur.is_empty() {
-                                view.tag_ids
-                                    .push(::buffa::types::decode_fixed64(&mut pcur)?);
-                            }
-                        } else if tag.wire_type() == ::buffa::encoding::WireType::Fixed64
-                        {
-                            view.tag_ids.push(::buffa::types::decode_fixed64(&mut cur)?);
-                        } else {
-                            return Err(
-                                ::buffa::encoding::wire_type_mismatch(
-                                    tag,
-                                    ::buffa::encoding::WireType::LengthDelimited,
-                                ),
-                            );
-                        }
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        view.new_tags
-                            .push(
-                                <super::super::__buffa::view::AddressBookTagInputView as ::buffa::MessageView>::decode_view_ctx(
+                        match view.update_mask.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
                                     sub,
                                     __sub_ctx,
-                                )?,
-                            );
+                                )?
+                            }
+                            None => {
+                                view.update_mask = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::FieldMaskView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.expected_revision = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -83074,14 +83751,23 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateAddressBookEntryRequest {
                     address_book_entry_id: self.address_book_entry_id,
-                    label: self.label.to_string(),
-                    note: self.note.to_string(),
-                    tag_ids: self.tag_ids.to_vec(),
-                    new_tags: self
-                        .new_tags
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    entry: match self.entry.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::AddressBookEntryUpdateSpec,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    update_mask: match self.update_mask.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::FieldMask,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    expected_revision: self.expected_revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -83099,27 +83785,27 @@ pub mod __buffa {
                 if self.address_book_entry_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if !self.label.is_empty() {
-                    size
-                        += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
-                }
-                if !self.note.is_empty() {
-                    size += 1u32 + ::buffa::types::string_encoded_len(&self.note) as u32;
-                }
-                if !self.tag_ids.is_empty() {
-                    let payload: u32 = self.tag_ids.len() as u32
-                        * ::buffa::types::FIXED64_ENCODED_LEN as u32;
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
-                            + payload;
-                }
-                for v in &self.new_tags {
+                if self.entry.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
+                    let inner_size = self.entry.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
+                }
+                if self.update_mask.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.update_mask.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.expected_revision != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.expected_revision)
+                                as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -83139,27 +83825,24 @@ pub mod __buffa {
                         buf,
                     );
                 }
-                if !self.label.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.label, buf);
-                }
-                if !self.note.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.note, buf);
-                }
-                if !self.tag_ids.is_empty() {
-                    let payload: u32 = self.tag_ids.len() as u32
-                        * ::buffa::types::FIXED64_ENCODED_LEN as u32;
-                    ::buffa::types::put_len_delimited_header(4u32, payload, buf);
-                    for &v in &self.tag_ids {
-                        ::buffa::types::encode_fixed64(v, buf);
-                    }
-                }
-                for v in &self.new_tags {
+                if self.entry.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        5u32,
+                        2u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    v.write_to(__cache, buf);
+                    self.entry.write_to(__cache, buf);
+                }
+                if self.update_mask.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.update_mask.write_to(__cache, buf);
+                }
+                if self.expected_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.expected_revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -83193,21 +83876,27 @@ pub mod __buffa {
                             ),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
-                    __map.serialize_entry("label", self.label)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.entry.as_option() {
+                        __map.serialize_entry("entry", __v)?;
+                    }
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.note) {
-                    __map.serialize_entry("note", self.note)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .update_mask
+                        .as_option()
+                    {
+                        __map.serialize_entry("updateMask", __v)?;
+                    }
                 }
-                if !self.tag_ids.is_empty() {
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.expected_revision,
+                ) {
                     __map
                         .serialize_entry(
-                            "tagIds",
-                            &::buffa::json_helpers::RepeatedJson(&self.tag_ids),
+                            "expectedRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.expected_revision),
                         )?;
-                }
-                if !self.new_tags.is_empty() {
-                    __map.serialize_entry("newTags", &*self.new_tags)?;
                 }
                 __map.end()
             }
@@ -83316,38 +84005,35 @@ pub mod __buffa {
             pub fn address_book_entry_id(&self) -> u64 {
                 self.0.reborrow().address_book_entry_id
             }
-            /// Replacement display label.
+            /// Candidate values for fields selected by update_mask.
             ///
-            /// Field 2: `label`
+            /// Field 2: `entry`
             #[must_use]
-            pub fn label(&self) -> &'_ str {
-                self.0.reborrow().label
-            }
-            /// Replacement note.
-            ///
-            /// Field 3: `note`
-            #[must_use]
-            pub fn note(&self) -> &'_ str {
-                self.0.reborrow().note
-            }
-            /// Complete replacement set of tag ids to attach to the entry.
-            ///
-            /// Field 4: `tag_ids`
-            #[must_use]
-            pub fn tag_ids(&self) -> &::buffa::RepeatedView<'_, u64> {
-                &self.0.reborrow().tag_ids
-            }
-            /// New tags to create and attach with this entry update.
-            ///
-            /// Field 5: `new_tags`
-            #[must_use]
-            pub fn new_tags(
+            pub fn entry(
                 &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::AddressBookTagInputView<'_>,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::AddressBookEntryUpdateSpecView<'_>,
             > {
-                &self.0.reborrow().new_tags
+                &self.0.reborrow().entry
+            }
+            /// Mutable fields to apply. Paths are relative to entry. The mask is required,
+            /// must be non-empty, and cannot contain "*".
+            ///
+            /// Field 3: `update_mask`
+            #[must_use]
+            pub fn update_mask(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::FieldMaskView<'_>,
+            > {
+                &self.0.reborrow().update_mask
+            }
+            /// Revision returned by the latest successful read.
+            ///
+            /// Field 4: `expected_revision`
+            #[must_use]
+            pub fn expected_revision(&self) -> u64 {
+                self.0.reborrow().expected_revision
             }
         }
         impl ::core::convert::From<
@@ -85843,14 +86529,14 @@ pub mod __buffa {
             ///
             /// Field 1: `tag_id`
             pub tag_id: u64,
-            /// Replacement tag name.
+            /// Replacement tag name. Omit to preserve the current name.
             ///
             /// Field 2: `name`
-            pub name: &'a str,
-            /// Replacement UI color token.
+            pub name: ::core::option::Option<&'a str>,
+            /// Replacement UI color token. Omit to preserve; an empty value clears it.
             ///
             /// Field 3: `color`
-            pub color: &'a str,
+            pub color: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UpdateAddressBookTagRequestView<'a> {
@@ -85896,14 +86582,14 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                        view.name = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.color = ::buffa::types::borrow_str(&mut cur)?;
+                        view.color = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -85935,8 +86621,8 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::UpdateAddressBookTagRequest {
                     tag_id: self.tag_id,
-                    name: self.name.to_string(),
-                    color: self.color.to_string(),
+                    name: self.name.map(|s| s.to_string()),
+                    color: self.color.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -85954,12 +86640,11 @@ pub mod __buffa {
                 if self.tag_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if !self.name.is_empty() {
-                    size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
+                if let Some(ref v) = self.name {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
-                if !self.color.is_empty() {
-                    size
-                        += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
+                if let Some(ref v) = self.color {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -85975,11 +86660,11 @@ pub mod __buffa {
                 if self.tag_id != 0u64 {
                     ::buffa::types::put_fixed64_field(1u32, self.tag_id, buf);
                 }
-                if !self.name.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.name, buf);
+                if let Some(ref v) = self.name {
+                    ::buffa::types::put_string_field(2u32, v, buf);
                 }
-                if !self.color.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.color, buf);
+                if let Some(ref v) = self.color {
+                    ::buffa::types::put_string_field(3u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -86009,11 +86694,11 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.tag_id),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
-                    __map.serialize_entry("name", self.name)?;
+                if let ::core::option::Option::Some(__v) = self.name {
+                    __map.serialize_entry("name", __v)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.color) {
-                    __map.serialize_entry("color", self.color)?;
+                if let ::core::option::Option::Some(__v) = self.color {
+                    __map.serialize_entry("color", __v)?;
                 }
                 __map.end()
             }
@@ -86122,18 +86807,18 @@ pub mod __buffa {
             pub fn tag_id(&self) -> u64 {
                 self.0.reborrow().tag_id
             }
-            /// Replacement tag name.
+            /// Replacement tag name. Omit to preserve the current name.
             ///
             /// Field 2: `name`
             #[must_use]
-            pub fn name(&self) -> &'_ str {
+            pub fn name(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().name
             }
-            /// Replacement UI color token.
+            /// Replacement UI color token. Omit to preserve; an empty value clears it.
             ///
             /// Field 3: `color`
             #[must_use]
-            pub fn color(&self) -> &'_ str {
+            pub fn color(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().color
             }
         }
@@ -111123,7 +111808,6 @@ pub mod __buffa {
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
         reg.register_json_any(super::__API_KEY_JSON_ANY);
-        reg.register_json_any(super::__IP_WHITELIST_JSON_ANY);
         reg.register_json_any(super::__CREATE_API_KEY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_API_KEY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_API_KEYS_REQUEST_JSON_ANY);
@@ -111132,6 +111816,7 @@ pub mod __buffa {
         reg.register_json_any(super::__DELETE_API_KEY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_API_KEY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_API_KEY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__API_KEY_UPDATE_SPEC_JSON_ANY);
         reg.register_json_any(super::__UPDATE_API_KEY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPDATE_API_KEY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MARKET_SCOPE_JSON_ANY);
@@ -111142,6 +111827,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_SUBACCOUNT_POLICIES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_SUBACCOUNT_POLICY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_SUBACCOUNT_POLICY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SUBACCOUNT_POLICY_SPEC_JSON_ANY);
         reg.register_json_any(super::__CREATE_SUBACCOUNT_POLICY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_SUBACCOUNT_POLICY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__UPDATE_SUBACCOUNT_POLICY_REQUEST_JSON_ANY);
@@ -111155,6 +111841,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_API_POLICIES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_API_POLICY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_API_POLICY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__API_POLICY_SPEC_JSON_ANY);
         reg.register_json_any(super::__CREATE_API_POLICY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_API_POLICY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__UPDATE_API_POLICY_REQUEST_JSON_ANY);
@@ -111169,6 +111856,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_SUBACCOUNTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_SUBACCOUNT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_SUBACCOUNT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SUBACCOUNT_UPDATE_SPEC_JSON_ANY);
         reg.register_json_any(super::__UPDATE_SUBACCOUNT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPDATE_SUBACCOUNT_RESPONSE_JSON_ANY);
         reg.register_json_any(
@@ -111221,6 +111909,7 @@ pub mod __buffa {
         reg.register_json_any(super::__CREATE_ADDRESS_BOOK_ENTRY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__REQUESTED_INTERNAL_TRANSFER_ACCOUNT_JSON_ANY);
         reg.register_json_any(super::__CREATE_ADDRESS_BOOK_ENTRY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ADDRESS_BOOK_ENTRY_UPDATE_SPEC_JSON_ANY);
         reg.register_json_any(super::__UPDATE_ADDRESS_BOOK_ENTRY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPDATE_ADDRESS_BOOK_ENTRY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ADDRESS_BOOK_TAG_INPUT_JSON_ANY);
@@ -111311,10 +112000,6 @@ pub use self::__buffa::view::ApiKeyView;
 #[doc(inline)]
 pub use self::__buffa::view::ApiKeyOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::IpWhitelistView;
-#[doc(inline)]
-pub use self::__buffa::view::IpWhitelistOwnedView;
-#[doc(inline)]
 pub use self::__buffa::view::CreateApiKeyRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateApiKeyRequestOwnedView;
@@ -111346,6 +112031,10 @@ pub use self::__buffa::view::GetApiKeyRequestOwnedView;
 pub use self::__buffa::view::GetApiKeyResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetApiKeyResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ApiKeyUpdateSpecView;
+#[doc(inline)]
+pub use self::__buffa::view::ApiKeyUpdateSpecOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::UpdateApiKeyRequestView;
 #[doc(inline)]
@@ -111386,6 +112075,10 @@ pub use self::__buffa::view::GetSubaccountPolicyRequestOwnedView;
 pub use self::__buffa::view::GetSubaccountPolicyResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetSubaccountPolicyResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SubaccountPolicySpecView;
+#[doc(inline)]
+pub use self::__buffa::view::SubaccountPolicySpecOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateSubaccountPolicyRequestView;
 #[doc(inline)]
@@ -111438,6 +112131,10 @@ pub use self::__buffa::view::GetApiPolicyRequestOwnedView;
 pub use self::__buffa::view::GetApiPolicyResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetApiPolicyResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ApiPolicySpecView;
+#[doc(inline)]
+pub use self::__buffa::view::ApiPolicySpecOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateApiPolicyRequestView;
 #[doc(inline)]
@@ -111494,6 +112191,10 @@ pub use self::__buffa::view::CreateSubaccountRequestOwnedView;
 pub use self::__buffa::view::CreateSubaccountResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateSubaccountResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SubaccountUpdateSpecView;
+#[doc(inline)]
+pub use self::__buffa::view::SubaccountUpdateSpecOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::UpdateSubaccountRequestView;
 #[doc(inline)]
@@ -111686,6 +112387,10 @@ pub use self::__buffa::view::RequestedInternalTransferAccountOwnedView;
 pub use self::__buffa::view::CreateAddressBookEntryResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateAddressBookEntryResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AddressBookEntryUpdateSpecView;
+#[doc(inline)]
+pub use self::__buffa::view::AddressBookEntryUpdateSpecOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::UpdateAddressBookEntryRequestView;
 #[doc(inline)]
