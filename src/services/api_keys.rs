@@ -179,7 +179,6 @@ impl ApiKeysService {
     }
 
     /// Subscribe to private API key updates (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,

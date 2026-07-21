@@ -1,9 +1,7 @@
 //! Local orderbook helpers (Go `orderbook` package parity).
 
-#[cfg(feature = "realtime")]
 mod subscription;
 
-#[cfg(feature = "realtime")]
 pub use subscription::Subscription;
 
 use std::collections::BTreeMap;

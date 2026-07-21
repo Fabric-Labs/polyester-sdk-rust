@@ -179,6 +179,7 @@ fn decode_hex_bytes(value: &str) -> Result<Vec<u8>> {
 }
 
 /// EIP-712 SafeOp signature packed as uint48/uint48/bytes (single EOA owner).
+#[allow(clippy::too_many_arguments)]
 pub fn sign_safe_user_operation(
     signing_key: &SigningKey,
     environment: &PolyesterChainEnvironment,
@@ -572,22 +573,18 @@ impl PolyesterSmartAccount {
                     raw,
                 });
             }
-            match self
+            if let Ok(status) = self
                 .bundler
                 .request(
                     "pimlico_getUserOperationStatus",
                     json!([user_operation_hash]),
                 )
                 .await
+                && status.get("status").and_then(|v| v.as_str()) == Some("rejected")
             {
-                Ok(status) => {
-                    if status.get("status").and_then(|v| v.as_str()) == Some("rejected") {
-                        return Err(Error::transport(format!(
-                            "bundler rejected UserOperation {user_operation_hash}: {status}"
-                        )));
-                    }
-                }
-                Err(_) => {}
+                return Err(Error::transport(format!(
+                    "bundler rejected UserOperation {user_operation_hash}: {status}"
+                )));
             }
             tokio::time::sleep(poll_interval).await;
         }

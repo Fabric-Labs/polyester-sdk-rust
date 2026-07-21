@@ -25,10 +25,9 @@ name = "polyester"
 path = "src/lib.rs"
 
 [features]
-default = ["realtime"]
-realtime = ["dep:tokio-tungstenite"]
-# Optional on-chain Funding / smart-account helpers (POLY-3569). Not required for API-key trading.
-chain = ["dep:alloy-primitives", "dep:alloy-sol-types", "dep:k256"]
+# Always-on stubs so existing `features = ["realtime"]` / `["chain"]` keep working.
+realtime = []
+chain = []
 
 [dependencies]
 buffa = { version = "0.8.1", features = ["json"] }
@@ -60,14 +59,10 @@ hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["client-legacy", "tokio"] }
 hyper-rustls = { version = "0.27", features = ["http1", "native-tokio", "ring", "tls12"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-
-# Realtime (optional)
-tokio-tungstenite = { version = "0.26", optional = true, features = ["rustls-tls-webpki-roots"] }
-
-# Chain calldata / UserOps (optional) — FundingAccount ABI + Safe CREATE2 + EIP-712
-alloy-primitives = { version = "1", optional = true }
-alloy-sol-types = { version = "1", optional = true }
-k256 = { version = "0.13", optional = true, default-features = false, features = ["ecdsa", "std"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+alloy-primitives = { version = "1" }
+alloy-sol-types = { version = "1" }
+k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }

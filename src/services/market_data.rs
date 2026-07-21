@@ -13,7 +13,6 @@ use crate::models::{
     Candle, CandlesResult, GetCandlesOpts, GetTradesOpts, MarketOverviewList, MarketTradesResult,
     OrderbookData, SpotConfig,
 };
-#[cfg(feature = "realtime")]
 use crate::models::{MarketOverviewEntry, MarketTrade, OrderBookDeltaUpdate};
 use crate::proto::marketdata::v1::{
     GetCandlesColumnsRequest, GetCandlesRequest, GetSpotConfigRequest, GetTradesRequest, Timeframe,
@@ -207,7 +206,6 @@ impl MarketDataService {
     }
 
     /// Subscribe to public spot trades for a symbol (requires `realtime` feature + hydrated catalogs).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_trades(
         &self,
         symbol: &str,
@@ -229,7 +227,6 @@ impl MarketDataService {
     }
 
     /// Subscribe to public candle updates (requires `realtime` feature + hydrated catalogs).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_candles(
         &self,
         symbol: &str,
@@ -340,7 +337,6 @@ impl MarketOverviewService {
     }
 
     /// Subscribe to public market overview batches (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe(
         &self,
     ) -> Result<crate::realtime::TypedSubscription<MarketOverviewList>> {
@@ -354,7 +350,6 @@ impl MarketOverviewService {
     }
 
     /// Snapshot-then-stream merged overview rows (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn create_subscription(
         &self,
         opts: MarketOverviewCreateSubscriptionOptions,
@@ -521,7 +516,6 @@ impl OrderbookService {
     }
 
     /// Subscribe to public orderbook delta updates (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_deltas(
         &self,
         symbol_id: u32,
@@ -536,7 +530,6 @@ impl OrderbookService {
     }
 
     /// Snapshot-then-stream orderbook merging (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn create_subscription(
         &self,
         opts: CreateSubscriptionOptions,
@@ -707,7 +700,6 @@ impl OrderbookService {
     }
 }
 
-#[cfg(feature = "realtime")]
 struct BookState {
     bids: crate::orderbook::BookSide,
     asks: crate::orderbook::BookSide,

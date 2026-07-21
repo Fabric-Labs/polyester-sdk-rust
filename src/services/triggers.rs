@@ -339,7 +339,6 @@ impl TriggersService {
     }
 
     /// Subscribe to private trigger updates (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
@@ -353,7 +352,6 @@ impl TriggersService {
     }
 
     /// Subscribe to private trigger events (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe_events(
         &self,
         account_id: Option<&str>,

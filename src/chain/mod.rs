@@ -1,9 +1,8 @@
-//! Optional on-chain Funding / smart-account helpers (POLY-3569).
+//! On-chain Funding / smart-account helpers (POLY-3569).
 //!
-//! Enable with Cargo feature `chain`. This module encodes FundingAccount /
-//! TradingGateway calldata and can submit wallet-signed UserOperations
-//! (owner key → derive Polyester Safe → bundler). It is intentionally
-//! separate from the API-key Connect surface.
+//! Encodes FundingAccount / TradingGateway calldata and can submit wallet-signed
+//! UserOperations (owner key → derive Polyester Safe → bundler). Separate from
+//! the API-key Connect surface.
 
 mod calldata;
 mod destination;

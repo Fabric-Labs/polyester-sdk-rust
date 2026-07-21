@@ -109,7 +109,6 @@ impl BalancesService {
     }
 
     /// Subscribe to private balance updates (requires `realtime` feature).
-    #[cfg(feature = "realtime")]
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
