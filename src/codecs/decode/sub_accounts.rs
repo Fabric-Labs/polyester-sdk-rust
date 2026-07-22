@@ -62,6 +62,7 @@ pub fn get_subaccount_from_proto(msg: &GetSubaccountResponse) -> GetSubaccountRe
 pub fn create_subaccount_from_proto(msg: &CreateSubaccountResponse) -> CreateSubaccountResult {
     CreateSubaccountResult {
         subaccount_id: format_uint64_id(msg.subaccount_id),
+        revision: msg.revision,
     }
 }
 
@@ -197,5 +198,16 @@ mod tests {
         let result = subaccount_activity_list_from_proto(&msg);
         assert_eq!(result.events[0].event_type, "invite:created");
         assert_eq!(result.next_page_token, "n");
+    }
+
+    #[test]
+    fn create_subaccount_maps_revision() {
+        let result = create_subaccount_from_proto(&CreateSubaccountResponse {
+            subaccount_id: 42,
+            revision: 1,
+            ..Default::default()
+        });
+        assert_eq!(result.subaccount_id, format_uint64_id(42));
+        assert_eq!(result.revision, 1);
     }
 }
