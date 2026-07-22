@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a6
+
+Package version: `0.1.0-alpha.6`. Git tag: `v0.1.0a6`.
+
 ### Fixed
 - `CreateSubaccountResult.revision` is returned from create so clients can pass `expected_revision` on the next mutation without a follow-up read
 
