@@ -702,310 +702,35 @@ impl ::buffa::Enumeration for LadderDistribution {
 /// Create Trigger Request/Response
 /// =============================================================================
 ///
-/// CreateTriggerRequest creates a standalone trigger (stop order, TWAP, ladder,
-/// etc.). Standalone triggers have independent lifecycle and arm immediately
-/// after creation.
+/// TriggerMarketIoc configures an immediate market child.
 #[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct CreateTriggerRequest {
-    /// Target sub-account. When empty or omitted, uses the caller's root account.
-    ///
-    /// Field 1: `subaccount_id`
-    #[serde(
-        rename = "subaccountId",
-        alias = "subaccount_id",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub subaccount_id: ::core::option::Option<u64>,
-    /// Symbol, for example "BTC-USDT"; resolved to a numeric symbol ID.
-    ///
-    /// Field 2: `symbol`
-    #[serde(
-        rename = "symbol",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub symbol: ::buffa::alloc::string::String,
-    /// Type of trigger. Required.
-    ///
-    /// Field 3: `trigger_type`
-    #[serde(
-        rename = "triggerType",
-        alias = "trigger_type",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub trigger_type: ::buffa::EnumValue<TriggerType>,
-    /// --- Trigger Condition (for STOP_LOSS, TAKE_PROFIT, TRAILING_STOP) ---
-    ///
-    /// Trigger price in quote units scaled by 1e6. Required for
-    /// STOP_LOSS/TAKE_PROFIT.
-    ///
-    /// Field 10: `trigger_price_ticks`
-    #[serde(
-        rename = "triggerPriceTicks",
-        alias = "trigger_price_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub trigger_price_ticks: i64,
-    /// Price source for trigger evaluation. Defaults to LAST_PRICE.
-    ///
-    /// Field 11: `trigger_price_source`
-    #[serde(
-        rename = "triggerPriceSource",
-        alias = "trigger_price_source",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub trigger_price_source: ::buffa::EnumValue<
-        super::super::orders::v1::TriggerPriceSource,
-    >,
-    /// --- Child Order Template ---
-    ///
-    /// Side for the child order. Required.
-    ///
-    /// Field 20: `side`
-    #[serde(
-        rename = "side",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
-    /// Order type for the child order (LIMIT or MARKET). Defaults to MARKET.
-    ///
-    /// Field 21: `order_type`
-    #[serde(
-        rename = "orderType",
-        alias = "order_type",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub order_type: ::buffa::EnumValue<super::super::orders::v1::OrderType>,
-    /// Time-in-force for the child order. Defaults to GTC for LIMIT, IOC for
-    /// MARKET.
-    ///
-    /// Field 22: `time_in_force`
-    #[serde(
-        rename = "timeInForce",
-        alias = "time_in_force",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub time_in_force: ::buffa::EnumValue<super::super::orders::v1::TimeInForce>,
-    /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
-    /// Required.
-    ///
-    /// Field 23: `qty_scaled`
-    #[serde(
-        rename = "qtyScaled",
-        alias = "qty_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub qty_scaled: i64,
-    /// Limit price in quote units scaled by 1e6 for LIMIT child orders.
-    ///
-    /// Field 24: `limit_price_ticks`
-    #[serde(
-        rename = "limitPriceTicks",
-        alias = "limit_price_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub limit_price_ticks: i64,
-    /// Fee source selection for BUY child orders. SELL child orders always pay in
-    /// QUOTE.
-    ///
-    /// When omitted (UNSPECIFIED), defaults to QUOTE.
-    ///
-    /// Field 25: `fee_source`
-    #[serde(
-        rename = "feeSource",
-        alias = "fee_source",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub fee_source: ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
-    /// Self-trade prevention mode for child orders.
-    ///
-    /// When omitted (UNSPECIFIED), defaults to EXPIRE_MAKER.
-    ///
-    /// Field 26: `self_trade_prevention_mode`
-    #[serde(
-        rename = "selfTradePreventionMode",
-        alias = "self_trade_prevention_mode",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub self_trade_prevention_mode: ::buffa::EnumValue<
-        super::super::orders::v1::SelfTradePreventionMode,
-    >,
-    /// If true, child LIMIT orders are post-only (rejected if they would cross).
-    ///
-    /// Field 27: `post_only`
-    #[serde(
-        rename = "postOnly",
-        alias = "post_only",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub post_only: bool,
-    /// Optional activation price: trailing only starts after this price is
-    /// reached. Expressed in quote units scaled by 1e6.
-    ///
-    /// Field 32: `activation_price_ticks`
-    #[serde(
-        rename = "activationPriceTicks",
-        alias = "activation_price_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub activation_price_ticks: i64,
-    /// --- TWAP Specific ---
-    ///
-    /// Total duration of TWAP execution in milliseconds. Required for TWAP.
-    ///
-    /// Field 40: `twap_duration_ms`
-    #[serde(
-        rename = "twapDurationMs",
-        alias = "twap_duration_ms",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub twap_duration_ms: i64,
-    /// Interval between TWAP slices in milliseconds. Required for TWAP.
-    ///
-    /// Field 41: `twap_slice_interval_ms`
-    #[serde(
-        rename = "twapSliceIntervalMs",
-        alias = "twap_slice_interval_ms",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub twap_slice_interval_ms: i64,
-    /// --- Ladder/Scaled Specific ---
-    ///
-    /// Minimum price in quote units scaled by 1e6 for the ladder range.
-    ///
-    /// Field 50: `ladder_price_min_ticks`
-    #[serde(
-        rename = "ladderPriceMinTicks",
-        alias = "ladder_price_min_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub ladder_price_min_ticks: i64,
-    /// Maximum price in quote units scaled by 1e6 for the ladder range.
-    ///
-    /// Field 51: `ladder_price_max_ticks`
-    #[serde(
-        rename = "ladderPriceMaxTicks",
-        alias = "ladder_price_max_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub ladder_price_max_ticks: i64,
-    /// Number of price levels in the ladder.
-    /// Required for LADDER; valid range is 2..100.
-    ///
-    /// Field 52: `ladder_levels`
-    #[serde(
-        rename = "ladderLevels",
-        alias = "ladder_levels",
-        with = "::buffa::json_helpers::int32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
-    )]
-    pub ladder_levels: i32,
-    /// Distribution of quantity across levels.
-    ///
-    /// Field 53: `ladder_distribution`
-    #[serde(
-        rename = "ladderDistribution",
-        alias = "ladder_distribution",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub ladder_distribution: ::buffa::EnumValue<LadderDistribution>,
-    /// --- Client Idempotency ---
-    ///
-    /// Client-provided trigger ID for idempotency. Required.
-    ///
-    /// Field 60: `client_trigger_id`
-    #[serde(
-        rename = "clientTriggerId",
-        alias = "client_trigger_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub client_trigger_id: ::buffa::alloc::string::String,
-    #[serde(flatten)]
-    pub trailing_distance: ::core::option::Option<
-        __buffa::oneof::create_trigger_request::TrailingDistance,
-    >,
-    #[serde(flatten)]
-    pub max_slippage: ::core::option::Option<
-        __buffa::oneof::create_trigger_request::MaxSlippage,
-    >,
+pub struct TriggerMarketIoc {
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CreateTriggerRequest {
+impl ::core::fmt::Debug for TriggerMarketIoc {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CreateTriggerRequest")
-            .field("subaccount_id", &self.subaccount_id)
-            .field("symbol", &self.symbol)
-            .field("trigger_type", &self.trigger_type)
-            .field("trigger_price_ticks", &self.trigger_price_ticks)
-            .field("trigger_price_source", &self.trigger_price_source)
-            .field("side", &self.side)
-            .field("order_type", &self.order_type)
-            .field("time_in_force", &self.time_in_force)
-            .field("qty_scaled", &self.qty_scaled)
-            .field("limit_price_ticks", &self.limit_price_ticks)
-            .field("fee_source", &self.fee_source)
-            .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
-            .field("post_only", &self.post_only)
-            .field("activation_price_ticks", &self.activation_price_ticks)
-            .field("twap_duration_ms", &self.twap_duration_ms)
-            .field("twap_slice_interval_ms", &self.twap_slice_interval_ms)
-            .field("ladder_price_min_ticks", &self.ladder_price_min_ticks)
-            .field("ladder_price_max_ticks", &self.ladder_price_max_ticks)
-            .field("ladder_levels", &self.ladder_levels)
-            .field("ladder_distribution", &self.ladder_distribution)
-            .field("client_trigger_id", &self.client_trigger_id)
-            .field("trailing_distance", &self.trailing_distance)
-            .field("max_slippage", &self.max_slippage)
-            .finish()
+        f.debug_struct("TriggerMarketIoc").finish()
     }
 }
-impl CreateTriggerRequest {
+impl TriggerMarketIoc {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CreateTriggerRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerMarketIoc";
 }
-impl CreateTriggerRequest {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_subaccount_id(mut self, value: u64) -> Self {
-        self.subaccount_id = Some(value);
-        self
-    }
-}
-::buffa::impl_default_instance!(CreateTriggerRequest);
-impl ::buffa::MessageName for CreateTriggerRequest {
+::buffa::impl_default_instance!(TriggerMarketIoc);
+impl ::buffa::MessageName for TriggerMarketIoc {
     const PACKAGE: &'static str = "triggers.v1";
-    const NAME: &'static str = "CreateTriggerRequest";
-    const FULL_NAME: &'static str = "triggers.v1.CreateTriggerRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CreateTriggerRequest";
+    const NAME: &'static str = "TriggerMarketIoc";
+    const FULL_NAME: &'static str = "triggers.v1.TriggerMarketIoc";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerMarketIoc";
 }
-impl ::buffa::Message for CreateTriggerRequest {
+impl ::buffa::Message for TriggerMarketIoc {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -1016,140 +741,136 @@ impl ::buffa::Message for CreateTriggerRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if self.subaccount_id.is_some() {
-            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-        }
-        if !self.symbol.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
-        }
-        {
-            let val = self.trigger_type.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
             }
         }
-        if self.trigger_price_ticks != 0i64 {
-            size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(self.trigger_price_ticks) as u32;
-        }
-        {
-            let val = self.trigger_price_source.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.side.to_i32();
-            if val != 0 {
-                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.time_in_force.to_i32();
-            if val != 0 {
-                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        if self.qty_scaled != 0i64 {
-            size += 2u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
-        }
-        if self.limit_price_ticks != 0i64 {
-            size
-                += 2u32
-                    + ::buffa::types::int64_encoded_len(self.limit_price_ticks) as u32;
-        }
-        {
-            let val = self.fee_source.to_i32();
-            if val != 0 {
-                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.self_trade_prevention_mode.to_i32();
-            if val != 0 {
-                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TriggerMarketIoc {
+    const PROTO_FQN: &'static str = "triggers.v1.TriggerMarketIoc";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TriggerMarketIoc {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRIGGER_MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TriggerMarketIoc",
+    to_json: ::buffa::type_registry::any_to_json::<TriggerMarketIoc>,
+    from_json: ::buffa::type_registry::any_from_json::<TriggerMarketIoc>,
+    is_wkt: false,
+};
+/// TriggerLimitGtc configures a resting limit child.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TriggerLimitGtc {
+    /// Limit price in quote units scaled by 1e6.
+    ///
+    /// Field 1: `price_ticks`
+    #[serde(
+        rename = "priceTicks",
+        alias = "price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_ticks: i64,
+    /// Reject instead of taking liquidity.
+    ///
+    /// Field 2: `post_only`
+    #[serde(
+        rename = "postOnly",
+        alias = "post_only",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub post_only: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TriggerLimitGtc {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TriggerLimitGtc")
+            .field("price_ticks", &self.price_ticks)
+            .field("post_only", &self.post_only)
+            .finish()
+    }
+}
+impl TriggerLimitGtc {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerLimitGtc";
+}
+::buffa::impl_default_instance!(TriggerLimitGtc);
+impl ::buffa::MessageName for TriggerLimitGtc {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "TriggerLimitGtc";
+    const FULL_NAME: &'static str = "triggers.v1.TriggerLimitGtc";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerLimitGtc";
+}
+impl ::buffa::Message for TriggerLimitGtc {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.price_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
         }
         if self.post_only {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if let ::core::option::Option::Some(ref v) = self.trailing_distance {
-            match v {
-                __buffa::oneof::create_trigger_request::TrailingDistance::TrailingDistanceTicks(
-                    v,
-                ) => {
-                    size += 2u32 + ::buffa::types::int64_encoded_len(*v) as u32;
-                }
-                __buffa::oneof::create_trigger_request::TrailingDistance::TrailingDistanceBps(
-                    v,
-                ) => {
-                    size += 2u32 + ::buffa::types::int32_encoded_len(*v) as u32;
-                }
-            }
-        }
-        if self.activation_price_ticks != 0i64 {
-            size
-                += 2u32
-                    + ::buffa::types::int64_encoded_len(self.activation_price_ticks)
-                        as u32;
-        }
-        if let ::core::option::Option::Some(ref v) = self.max_slippage {
-            match v {
-                __buffa::oneof::create_trigger_request::MaxSlippage::MaxSlippageTicks(
-                    v,
-                ) => {
-                    size += 2u32 + ::buffa::types::int32_encoded_len(*v) as u32;
-                }
-                __buffa::oneof::create_trigger_request::MaxSlippage::MaxSlippageBps(
-                    v,
-                ) => {
-                    size += 2u32 + ::buffa::types::int32_encoded_len(*v) as u32;
-                }
-            }
-        }
-        if self.twap_duration_ms != 0i64 {
-            size
-                += 2u32
-                    + ::buffa::types::int64_encoded_len(self.twap_duration_ms) as u32;
-        }
-        if self.twap_slice_interval_ms != 0i64 {
-            size
-                += 2u32
-                    + ::buffa::types::int64_encoded_len(self.twap_slice_interval_ms)
-                        as u32;
-        }
-        if self.ladder_price_min_ticks != 0i64 {
-            size
-                += 2u32
-                    + ::buffa::types::int64_encoded_len(self.ladder_price_min_ticks)
-                        as u32;
-        }
-        if self.ladder_price_max_ticks != 0i64 {
-            size
-                += 2u32
-                    + ::buffa::types::int64_encoded_len(self.ladder_price_max_ticks)
-                        as u32;
-        }
-        if self.ladder_levels != 0i32 {
-            size += 2u32 + ::buffa::types::int32_encoded_len(self.ladder_levels) as u32;
-        }
-        {
-            let val = self.ladder_distribution.to_i32();
-            if val != 0 {
-                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        if !self.client_trigger_id.is_empty() {
-            size
-                += 2u32
-                    + ::buffa::types::string_encoded_len(&self.client_trigger_id) as u32;
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -1161,120 +882,11 @@ impl ::buffa::Message for CreateTriggerRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if let Some(v) = self.subaccount_id {
-            ::buffa::types::put_fixed64_field(1u32, v, buf);
-        }
-        if !self.symbol.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.symbol, buf);
-        }
-        {
-            let val = self.trigger_type.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(3u32, val, buf);
-            }
-        }
-        if self.trigger_price_ticks != 0i64 {
-            ::buffa::types::put_int64_field(10u32, self.trigger_price_ticks, buf);
-        }
-        {
-            let val = self.trigger_price_source.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(11u32, val, buf);
-            }
-        }
-        {
-            let val = self.side.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(20u32, val, buf);
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(21u32, val, buf);
-            }
-        }
-        {
-            let val = self.time_in_force.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(22u32, val, buf);
-            }
-        }
-        if self.qty_scaled != 0i64 {
-            ::buffa::types::put_int64_field(23u32, self.qty_scaled, buf);
-        }
-        if self.limit_price_ticks != 0i64 {
-            ::buffa::types::put_int64_field(24u32, self.limit_price_ticks, buf);
-        }
-        {
-            let val = self.fee_source.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(25u32, val, buf);
-            }
-        }
-        {
-            let val = self.self_trade_prevention_mode.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(26u32, val, buf);
-            }
+        if self.price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
         }
         if self.post_only {
-            ::buffa::types::put_bool_field(27u32, self.post_only, buf);
-        }
-        if let ::core::option::Option::Some(ref v) = self.trailing_distance {
-            match v {
-                __buffa::oneof::create_trigger_request::TrailingDistance::TrailingDistanceTicks(
-                    x,
-                ) => {
-                    ::buffa::types::put_int64_field(30u32, *x, buf);
-                }
-                __buffa::oneof::create_trigger_request::TrailingDistance::TrailingDistanceBps(
-                    x,
-                ) => {
-                    ::buffa::types::put_int32_field(31u32, *x, buf);
-                }
-            }
-        }
-        if self.activation_price_ticks != 0i64 {
-            ::buffa::types::put_int64_field(32u32, self.activation_price_ticks, buf);
-        }
-        if let ::core::option::Option::Some(ref v) = self.max_slippage {
-            match v {
-                __buffa::oneof::create_trigger_request::MaxSlippage::MaxSlippageTicks(
-                    x,
-                ) => {
-                    ::buffa::types::put_int32_field(33u32, *x, buf);
-                }
-                __buffa::oneof::create_trigger_request::MaxSlippage::MaxSlippageBps(
-                    x,
-                ) => {
-                    ::buffa::types::put_int32_field(34u32, *x, buf);
-                }
-            }
-        }
-        if self.twap_duration_ms != 0i64 {
-            ::buffa::types::put_int64_field(40u32, self.twap_duration_ms, buf);
-        }
-        if self.twap_slice_interval_ms != 0i64 {
-            ::buffa::types::put_int64_field(41u32, self.twap_slice_interval_ms, buf);
-        }
-        if self.ladder_price_min_ticks != 0i64 {
-            ::buffa::types::put_int64_field(50u32, self.ladder_price_min_ticks, buf);
-        }
-        if self.ladder_price_max_ticks != 0i64 {
-            ::buffa::types::put_int64_field(51u32, self.ladder_price_max_ticks, buf);
-        }
-        if self.ladder_levels != 0i32 {
-            ::buffa::types::put_int32_field(52u32, self.ladder_levels, buf);
-        }
-        {
-            let val = self.ladder_distribution.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(53u32, val, buf);
-            }
-        }
-        if !self.client_trigger_id.is_empty() {
-            ::buffa::types::put_string_field(60u32, &self.client_trigger_id, buf);
+            ::buffa::types::put_bool_field(2u32, self.post_only, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1292,209 +904,16 @@ impl ::buffa::Message for CreateTriggerRequest {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Fixed64,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                self.subaccount_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_fixed64(buf)?,
-                );
+                self.price_ticks = ::buffa::types::decode_int64(buf)?;
             }
             2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.symbol, buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.trigger_type = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            10u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.trigger_price_ticks = ::buffa::types::decode_int64(buf)?;
-            }
-            11u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.trigger_price_source = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            20u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
-            }
-            21u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.order_type = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            22u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.time_in_force = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            23u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.qty_scaled = ::buffa::types::decode_int64(buf)?;
-            }
-            24u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.limit_price_ticks = ::buffa::types::decode_int64(buf)?;
-            }
-            25u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.fee_source = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            26u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.self_trade_prevention_mode = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            27u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.post_only = ::buffa::types::decode_bool(buf)?;
-            }
-            30u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.trailing_distance = ::core::option::Option::Some(
-                    __buffa::oneof::create_trigger_request::TrailingDistance::TrailingDistanceTicks(
-                        ::buffa::types::decode_int64(buf)?,
-                    ),
-                );
-            }
-            31u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.trailing_distance = ::core::option::Option::Some(
-                    __buffa::oneof::create_trigger_request::TrailingDistance::TrailingDistanceBps(
-                        ::buffa::types::decode_int32(buf)?,
-                    ),
-                );
-            }
-            32u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.activation_price_ticks = ::buffa::types::decode_int64(buf)?;
-            }
-            33u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_slippage = ::core::option::Option::Some(
-                    __buffa::oneof::create_trigger_request::MaxSlippage::MaxSlippageTicks(
-                        ::buffa::types::decode_int32(buf)?,
-                    ),
-                );
-            }
-            34u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_slippage = ::core::option::Option::Some(
-                    __buffa::oneof::create_trigger_request::MaxSlippage::MaxSlippageBps(
-                        ::buffa::types::decode_int32(buf)?,
-                    ),
-                );
-            }
-            40u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.twap_duration_ms = ::buffa::types::decode_int64(buf)?;
-            }
-            41u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.twap_slice_interval_ms = ::buffa::types::decode_int64(buf)?;
-            }
-            50u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.ladder_price_min_ticks = ::buffa::types::decode_int64(buf)?;
-            }
-            51u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.ladder_price_max_ticks = ::buffa::types::decode_int64(buf)?;
-            }
-            52u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.ladder_levels = ::buffa::types::decode_int32(buf)?;
-            }
-            53u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.ladder_distribution = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            60u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.client_trigger_id, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -1504,34 +923,13 @@ impl ::buffa::Message for CreateTriggerRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.subaccount_id = ::core::option::Option::None;
-        self.symbol.clear();
-        self.trigger_type = ::buffa::EnumValue::from(0);
-        self.trigger_price_ticks = 0i64;
-        self.trigger_price_source = ::buffa::EnumValue::from(0);
-        self.side = ::buffa::EnumValue::from(0);
-        self.order_type = ::buffa::EnumValue::from(0);
-        self.time_in_force = ::buffa::EnumValue::from(0);
-        self.qty_scaled = 0i64;
-        self.limit_price_ticks = 0i64;
-        self.fee_source = ::buffa::EnumValue::from(0);
-        self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
+        self.price_ticks = 0i64;
         self.post_only = false;
-        self.trailing_distance = ::core::option::Option::None;
-        self.activation_price_ticks = 0i64;
-        self.max_slippage = ::core::option::Option::None;
-        self.twap_duration_ms = 0i64;
-        self.twap_slice_interval_ms = 0i64;
-        self.ladder_price_min_ticks = 0i64;
-        self.ladder_price_max_ticks = 0i64;
-        self.ladder_levels = 0i32;
-        self.ladder_distribution = ::buffa::EnumValue::from(0);
-        self.client_trigger_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for CreateTriggerRequest {
-    const PROTO_FQN: &'static str = "triggers.v1.CreateTriggerRequest";
+impl ::buffa::ExtensionSet for TriggerLimitGtc {
+    const PROTO_FQN: &'static str = "triggers.v1.TriggerLimitGtc";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -1539,128 +937,1132 @@ impl ::buffa::ExtensionSet for CreateTriggerRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl<'de> serde::Deserialize<'de> for CreateTriggerRequest {
+impl ::buffa::json_helpers::ProtoElemJson for TriggerLimitGtc {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRIGGER_LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TriggerLimitGtc",
+    to_json: ::buffa::type_registry::any_to_json::<TriggerLimitGtc>,
+    from_json: ::buffa::type_registry::any_from_json::<TriggerLimitGtc>,
+    is_wkt: false,
+};
+/// TriggerLimitIoc configures an immediate-or-cancel limit child.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TriggerLimitIoc {
+    /// Limit price in quote units scaled by 1e6.
+    ///
+    /// Field 1: `price_ticks`
+    #[serde(
+        rename = "priceTicks",
+        alias = "price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_ticks: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TriggerLimitIoc {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TriggerLimitIoc")
+            .field("price_ticks", &self.price_ticks)
+            .finish()
+    }
+}
+impl TriggerLimitIoc {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerLimitIoc";
+}
+::buffa::impl_default_instance!(TriggerLimitIoc);
+impl ::buffa::MessageName for TriggerLimitIoc {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "TriggerLimitIoc";
+    const FULL_NAME: &'static str = "triggers.v1.TriggerLimitIoc";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerLimitIoc";
+}
+impl ::buffa::Message for TriggerLimitIoc {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.price_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.price_ticks = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TriggerLimitIoc {
+    const PROTO_FQN: &'static str = "triggers.v1.TriggerLimitIoc";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TriggerLimitIoc {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRIGGER_LIMIT_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TriggerLimitIoc",
+    to_json: ::buffa::type_registry::any_to_json::<TriggerLimitIoc>,
+    from_json: ::buffa::type_registry::any_from_json::<TriggerLimitIoc>,
+    is_wkt: false,
+};
+/// TriggerLimitFok configures a fill-or-kill limit child.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TriggerLimitFok {
+    /// Limit price in quote units scaled by 1e6.
+    ///
+    /// Field 1: `price_ticks`
+    #[serde(
+        rename = "priceTicks",
+        alias = "price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_ticks: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TriggerLimitFok {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TriggerLimitFok")
+            .field("price_ticks", &self.price_ticks)
+            .finish()
+    }
+}
+impl TriggerLimitFok {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerLimitFok";
+}
+::buffa::impl_default_instance!(TriggerLimitFok);
+impl ::buffa::MessageName for TriggerLimitFok {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "TriggerLimitFok";
+    const FULL_NAME: &'static str = "triggers.v1.TriggerLimitFok";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerLimitFok";
+}
+impl ::buffa::Message for TriggerLimitFok {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.price_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.price_ticks = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TriggerLimitFok {
+    const PROTO_FQN: &'static str = "triggers.v1.TriggerLimitFok";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TriggerLimitFok {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRIGGER_LIMIT_FOK_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TriggerLimitFok",
+    to_json: ::buffa::type_registry::any_to_json::<TriggerLimitFok>,
+    from_json: ::buffa::type_registry::any_from_json::<TriggerLimitFok>,
+    is_wkt: false,
+};
+/// ConditionalChildExecution selects the child submitted by a stop-loss or
+/// take-profit trigger. BUY market children are not supported in spot.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct ConditionalChildExecution {
+    #[serde(flatten)]
+    pub execution: ::core::option::Option<
+        __buffa::oneof::conditional_child_execution::Execution,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ConditionalChildExecution {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ConditionalChildExecution")
+            .field("execution", &self.execution)
+            .finish()
+    }
+}
+impl ConditionalChildExecution {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.ConditionalChildExecution";
+}
+::buffa::impl_default_instance!(ConditionalChildExecution);
+impl ::buffa::MessageName for ConditionalChildExecution {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "ConditionalChildExecution";
+    const FULL_NAME: &'static str = "triggers.v1.ConditionalChildExecution";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.ConditionalChildExecution";
+}
+impl ::buffa::Message for ConditionalChildExecution {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if let ::core::option::Option::Some(ref v) = self.execution {
+            match v {
+                __buffa::oneof::conditional_child_execution::Execution::MarketIoc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::conditional_child_execution::Execution::LimitGtc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::conditional_child_execution::Execution::LimitIoc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::conditional_child_execution::Execution::LimitFok(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.execution {
+            match v {
+                __buffa::oneof::conditional_child_execution::Execution::MarketIoc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::conditional_child_execution::Execution::LimitGtc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::conditional_child_execution::Execution::LimitIoc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::conditional_child_execution::Execution::LimitFok(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::conditional_child_execution::Execution::MarketIoc(
+                        ref mut existing,
+                    ),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::conditional_child_execution::Execution::MarketIoc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::conditional_child_execution::Execution::LimitGtc(
+                        ref mut existing,
+                    ),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::conditional_child_execution::Execution::LimitGtc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::conditional_child_execution::Execution::LimitIoc(
+                        ref mut existing,
+                    ),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::conditional_child_execution::Execution::LimitIoc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::conditional_child_execution::Execution::LimitFok(
+                        ref mut existing,
+                    ),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::conditional_child_execution::Execution::LimitFok(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.execution = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ConditionalChildExecution {
+    const PROTO_FQN: &'static str = "triggers.v1.ConditionalChildExecution";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for ConditionalChildExecution {
     fn deserialize<D: serde::Deserializer<'de>>(
         d: D,
     ) -> ::core::result::Result<Self, D::Error> {
         struct _V;
         impl<'de> serde::de::Visitor<'de> for _V {
-            type Value = CreateTriggerRequest;
+            type Value = ConditionalChildExecution;
             fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                f.write_str("struct CreateTriggerRequest")
+                f.write_str("struct ConditionalChildExecution")
             }
             #[allow(clippy::field_reassign_with_default)]
             fn visit_map<A: serde::de::MapAccess<'de>>(
                 self,
                 mut map: A,
-            ) -> ::core::result::Result<CreateTriggerRequest, A::Error> {
-                let mut __f_subaccount_id: ::core::option::Option<
-                    ::core::option::Option<u64>,
-                > = None;
-                let mut __f_symbol: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __f_trigger_type: ::core::option::Option<
-                    ::buffa::EnumValue<TriggerType>,
-                > = None;
-                let mut __f_trigger_price_ticks: ::core::option::Option<i64> = None;
-                let mut __f_trigger_price_source: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::TriggerPriceSource>,
-                > = None;
-                let mut __f_side: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::Side>,
-                > = None;
-                let mut __f_order_type: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::OrderType>,
-                > = None;
-                let mut __f_time_in_force: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::TimeInForce>,
-                > = None;
-                let mut __f_qty_scaled: ::core::option::Option<i64> = None;
-                let mut __f_limit_price_ticks: ::core::option::Option<i64> = None;
-                let mut __f_fee_source: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
-                > = None;
-                let mut __f_self_trade_prevention_mode: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::SelfTradePreventionMode>,
-                > = None;
-                let mut __f_post_only: ::core::option::Option<bool> = None;
-                let mut __f_activation_price_ticks: ::core::option::Option<i64> = None;
-                let mut __f_twap_duration_ms: ::core::option::Option<i64> = None;
-                let mut __f_twap_slice_interval_ms: ::core::option::Option<i64> = None;
-                let mut __f_ladder_price_min_ticks: ::core::option::Option<i64> = None;
-                let mut __f_ladder_price_max_ticks: ::core::option::Option<i64> = None;
-                let mut __f_ladder_levels: ::core::option::Option<i32> = None;
-                let mut __f_ladder_distribution: ::core::option::Option<
-                    ::buffa::EnumValue<LadderDistribution>,
-                > = None;
-                let mut __f_client_trigger_id: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __oneof_trailing_distance: ::core::option::Option<
-                    __buffa::oneof::create_trigger_request::TrailingDistance,
-                > = None;
-                let mut __oneof_max_slippage: ::core::option::Option<
-                    __buffa::oneof::create_trigger_request::MaxSlippage,
+            ) -> ::core::result::Result<ConditionalChildExecution, A::Error> {
+                let mut __oneof_execution: ::core::option::Option<
+                    __buffa::oneof::conditional_child_execution::Execution,
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
-                        "subaccountId" | "subaccount_id" => {
-                            __f_subaccount_id = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::core::option::Option<u64>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::core::option::Option<u64>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::opt_uint64::deserialize(d)
-                                    }
+                        "marketIoc" | "market_ioc" => {
+                            let v: ::core::option::Option<TriggerMarketIoc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TriggerMarketIoc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
                                 }
-                                map.next_value_seed(_S)?
-                            });
+                                __oneof_execution = Some(
+                                    __buffa::oneof::conditional_child_execution::Execution::MarketIoc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
                         }
-                        "symbol" => {
-                            __f_symbol = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
+                        "limitGtc" | "limit_gtc" => {
+                            let v: ::core::option::Option<TriggerLimitGtc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TriggerLimitGtc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
                                 }
-                                map.next_value_seed(_S)?
-                            });
+                                __oneof_execution = Some(
+                                    __buffa::oneof::conditional_child_execution::Execution::LimitGtc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
                         }
-                        "triggerType" | "trigger_type" => {
-                            __f_trigger_type = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<TriggerType>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<TriggerType>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
+                        "limitIoc" | "limit_ioc" => {
+                            let v: ::core::option::Option<TriggerLimitIoc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TriggerLimitIoc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
                                 }
-                                map.next_value_seed(_S)?
-                            });
+                                __oneof_execution = Some(
+                                    __buffa::oneof::conditional_child_execution::Execution::LimitIoc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
                         }
-                        "triggerPriceTicks" | "trigger_price_ticks" => {
-                            __f_trigger_price_ticks = Some({
+                        "limitFok" | "limit_fok" => {
+                            let v: ::core::option::Option<TriggerLimitFok> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TriggerLimitFok,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::conditional_child_execution::Execution::LimitFok(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <ConditionalChildExecution as ::core::default::Default>::default();
+                __r.execution = __oneof_execution;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ConditionalChildExecution {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CONDITIONAL_CHILD_EXECUTION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.ConditionalChildExecution",
+    to_json: ::buffa::type_registry::any_to_json::<ConditionalChildExecution>,
+    from_json: ::buffa::type_registry::any_from_json::<ConditionalChildExecution>,
+    is_wkt: false,
+};
+pub mod conditional_child_execution {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::conditional_child_execution::Execution;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::conditional_child_execution::Execution as ExecutionView;
+}
+/// ConditionalTrigger configures a standalone stop-loss or take-profit.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ConditionalTrigger {
+    /// Trigger threshold in quote units scaled by 1e6.
+    ///
+    /// Field 1: `trigger_price_ticks`
+    #[serde(
+        rename = "triggerPriceTicks",
+        alias = "trigger_price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub trigger_price_ticks: i64,
+    /// Child order side.
+    ///
+    /// Field 2: `side`
+    #[serde(
+        rename = "side",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
+    /// Child execution.
+    ///
+    /// Field 3: `child`
+    #[serde(
+        rename = "child",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub child: ::buffa::MessageField<ConditionalChildExecution>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ConditionalTrigger {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ConditionalTrigger")
+            .field("trigger_price_ticks", &self.trigger_price_ticks)
+            .field("side", &self.side)
+            .field("child", &self.child)
+            .finish()
+    }
+}
+impl ConditionalTrigger {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.ConditionalTrigger";
+}
+::buffa::impl_default_instance!(ConditionalTrigger);
+impl ::buffa::MessageName for ConditionalTrigger {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "ConditionalTrigger";
+    const FULL_NAME: &'static str = "triggers.v1.ConditionalTrigger";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.ConditionalTrigger";
+}
+impl ::buffa::Message for ConditionalTrigger {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.trigger_price_ticks != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.trigger_price_ticks) as u32;
+        }
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.child.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.child.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.trigger_price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.trigger_price_ticks, buf);
+        }
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if self.child.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.child.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.child.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.trigger_price_ticks = 0i64;
+        self.side = ::buffa::EnumValue::from(0);
+        self.child = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ConditionalTrigger {
+    const PROTO_FQN: &'static str = "triggers.v1.ConditionalTrigger";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ConditionalTrigger {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CONDITIONAL_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.ConditionalTrigger",
+    to_json: ::buffa::type_registry::any_to_json::<ConditionalTrigger>,
+    from_json: ::buffa::type_registry::any_from_json::<ConditionalTrigger>,
+    is_wkt: false,
+};
+/// TrailingStopTrigger configures the supported spot trailing-stop strategy.
+/// It tracks last trade price and submits a SELL market-IOC child when fired.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct TrailingStopTrigger {
+    /// Optional activation price in quote units scaled by 1e6.
+    ///
+    /// Field 3: `activation_price_ticks`
+    #[serde(
+        rename = "activationPriceTicks",
+        alias = "activation_price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub activation_price_ticks: i64,
+    #[serde(flatten)]
+    pub trailing_distance: ::core::option::Option<
+        __buffa::oneof::trailing_stop_trigger::TrailingDistance,
+    >,
+    #[serde(flatten)]
+    pub max_slippage: ::core::option::Option<
+        __buffa::oneof::trailing_stop_trigger::MaxSlippage,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TrailingStopTrigger {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TrailingStopTrigger")
+            .field("activation_price_ticks", &self.activation_price_ticks)
+            .field("trailing_distance", &self.trailing_distance)
+            .field("max_slippage", &self.max_slippage)
+            .finish()
+    }
+}
+impl TrailingStopTrigger {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TrailingStopTrigger";
+}
+::buffa::impl_default_instance!(TrailingStopTrigger);
+impl ::buffa::MessageName for TrailingStopTrigger {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "TrailingStopTrigger";
+    const FULL_NAME: &'static str = "triggers.v1.TrailingStopTrigger";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TrailingStopTrigger";
+}
+impl ::buffa::Message for TrailingStopTrigger {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if let ::core::option::Option::Some(ref v) = self.trailing_distance {
+            match v {
+                __buffa::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(
+                    v,
+                ) => {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                }
+                __buffa::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                    v,
+                ) => {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                }
+            }
+        }
+        if self.activation_price_ticks != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.activation_price_ticks)
+                        as u32;
+        }
+        if let ::core::option::Option::Some(ref v) = self.max_slippage {
+            match v {
+                __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
+                    v,
+                ) => {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                }
+                __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
+                    v,
+                ) => {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.trailing_distance {
+            match v {
+                __buffa::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(
+                    x,
+                ) => {
+                    ::buffa::types::put_int64_field(1u32, *x, buf);
+                }
+                __buffa::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                    x,
+                ) => {
+                    ::buffa::types::put_int32_field(2u32, *x, buf);
+                }
+            }
+        }
+        if self.activation_price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(3u32, self.activation_price_ticks, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.max_slippage {
+            match v {
+                __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
+                    x,
+                ) => {
+                    ::buffa::types::put_int32_field(4u32, *x, buf);
+                }
+                __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
+                    x,
+                ) => {
+                    ::buffa::types::put_int32_field(5u32, *x, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trailing_distance = ::core::option::Option::Some(
+                    __buffa::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(
+                        ::buffa::types::decode_int64(buf)?,
+                    ),
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trailing_distance = ::core::option::Option::Some(
+                    __buffa::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                        ::buffa::types::decode_int32(buf)?,
+                    ),
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.activation_price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_slippage = ::core::option::Option::Some(
+                    __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
+                        ::buffa::types::decode_int32(buf)?,
+                    ),
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_slippage = ::core::option::Option::Some(
+                    __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
+                        ::buffa::types::decode_int32(buf)?,
+                    ),
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.trailing_distance = ::core::option::Option::None;
+        self.activation_price_ticks = 0i64;
+        self.max_slippage = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TrailingStopTrigger {
+    const PROTO_FQN: &'static str = "triggers.v1.TrailingStopTrigger";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = TrailingStopTrigger;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct TrailingStopTrigger")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<TrailingStopTrigger, A::Error> {
+                let mut __f_activation_price_ticks: ::core::option::Option<i64> = None;
+                let mut __oneof_trailing_distance: ::core::option::Option<
+                    __buffa::oneof::trailing_stop_trigger::TrailingDistance,
+                > = None;
+                let mut __oneof_max_slippage: ::core::option::Option<
+                    __buffa::oneof::trailing_stop_trigger::MaxSlippage,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "activationPriceTicks" | "activation_price_ticks" => {
+                            __f_activation_price_ticks = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = i64;
@@ -1674,28 +2076,678 @@ impl<'de> serde::Deserialize<'de> for CreateTriggerRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "triggerPriceSource" | "trigger_price_source" => {
-                            __f_trigger_price_source = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<
-                                        super::super::orders::v1::TriggerPriceSource,
-                                    >;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<
-                                            super::super::orders::v1::TriggerPriceSource,
-                                        >,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
+                        "trailingDistanceTicks" | "trailing_distance_ticks" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
                                 }
-                                map.next_value_seed(_S)?
-                            });
+                            }
+                            let v: ::core::option::Option<i64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_trailing_distance.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'trailing_distance'",
+                                        ),
+                                    );
+                                }
+                                __oneof_trailing_distance = Some(
+                                    __buffa::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(
+                                        v,
+                                    ),
+                                );
+                            }
                         }
+                        "trailingDistanceBps" | "trailing_distance_bps" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i32;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i32, D::Error> {
+                                    ::buffa::json_helpers::int32::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i32> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_trailing_distance.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'trailing_distance'",
+                                        ),
+                                    );
+                                }
+                                __oneof_trailing_distance = Some(
+                                    __buffa::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "maxSlippageTicks" | "max_slippage_ticks" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i32;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i32, D::Error> {
+                                    ::buffa::json_helpers::int32::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i32> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_max_slippage.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'max_slippage'",
+                                        ),
+                                    );
+                                }
+                                __oneof_max_slippage = Some(
+                                    __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "maxSlippageBps" | "max_slippage_bps" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i32;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i32, D::Error> {
+                                    ::buffa::json_helpers::int32::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i32> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_max_slippage.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'max_slippage'",
+                                        ),
+                                    );
+                                }
+                                __oneof_max_slippage = Some(
+                                    __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <TrailingStopTrigger as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_activation_price_ticks {
+                    __r.activation_price_ticks = v;
+                }
+                __r.trailing_distance = __oneof_trailing_distance;
+                __r.max_slippage = __oneof_max_slippage;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TrailingStopTrigger {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRAILING_STOP_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TrailingStopTrigger",
+    to_json: ::buffa::type_registry::any_to_json::<TrailingStopTrigger>,
+    from_json: ::buffa::type_registry::any_from_json::<TrailingStopTrigger>,
+    is_wkt: false,
+};
+pub mod trailing_stop_trigger {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::trailing_stop_trigger::TrailingDistance;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::trailing_stop_trigger::MaxSlippage;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance as TrailingDistanceView;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage as MaxSlippageView;
+}
+/// TwapMarketIoc configures server-priced market-IOC slices.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TwapMarketIoc {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TwapMarketIoc {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TwapMarketIoc").finish()
+    }
+}
+impl TwapMarketIoc {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TwapMarketIoc";
+}
+::buffa::impl_default_instance!(TwapMarketIoc);
+impl ::buffa::MessageName for TwapMarketIoc {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "TwapMarketIoc";
+    const FULL_NAME: &'static str = "triggers.v1.TwapMarketIoc";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TwapMarketIoc";
+}
+impl ::buffa::Message for TwapMarketIoc {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TwapMarketIoc {
+    const PROTO_FQN: &'static str = "triggers.v1.TwapMarketIoc";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TwapMarketIoc {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TWAP_MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TwapMarketIoc",
+    to_json: ::buffa::type_registry::any_to_json::<TwapMarketIoc>,
+    from_json: ::buffa::type_registry::any_from_json::<TwapMarketIoc>,
+    is_wkt: false,
+};
+/// TwapLimitGtc configures one resting limit slice at a time. A previous open
+/// slice is canceled before the next interval.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TwapLimitGtc {
+    /// Slice limit price in quote units scaled by 1e6.
+    ///
+    /// Field 1: `price_ticks`
+    #[serde(
+        rename = "priceTicks",
+        alias = "price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_ticks: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TwapLimitGtc {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TwapLimitGtc").field("price_ticks", &self.price_ticks).finish()
+    }
+}
+impl TwapLimitGtc {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TwapLimitGtc";
+}
+::buffa::impl_default_instance!(TwapLimitGtc);
+impl ::buffa::MessageName for TwapLimitGtc {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "TwapLimitGtc";
+    const FULL_NAME: &'static str = "triggers.v1.TwapLimitGtc";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TwapLimitGtc";
+}
+impl ::buffa::Message for TwapLimitGtc {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.price_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.price_ticks = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TwapLimitGtc {
+    const PROTO_FQN: &'static str = "triggers.v1.TwapLimitGtc";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TwapLimitGtc {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TWAP_LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TwapLimitGtc",
+    to_json: ::buffa::type_registry::any_to_json::<TwapLimitGtc>,
+    from_json: ::buffa::type_registry::any_from_json::<TwapLimitGtc>,
+    is_wkt: false,
+};
+/// TwapTrigger configures a proven TWAP execution mode.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct TwapTrigger {
+    /// Child side.
+    ///
+    /// Field 1: `side`
+    #[serde(
+        rename = "side",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
+    /// Total execution duration in milliseconds.
+    ///
+    /// Field 2: `duration_ms`
+    #[serde(
+        rename = "durationMs",
+        alias = "duration_ms",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub duration_ms: i64,
+    /// Interval between slices in milliseconds.
+    ///
+    /// Field 3: `slice_interval_ms`
+    #[serde(
+        rename = "sliceIntervalMs",
+        alias = "slice_interval_ms",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub slice_interval_ms: i64,
+    #[serde(flatten)]
+    pub execution: ::core::option::Option<__buffa::oneof::twap_trigger::Execution>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TwapTrigger {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TwapTrigger")
+            .field("side", &self.side)
+            .field("duration_ms", &self.duration_ms)
+            .field("slice_interval_ms", &self.slice_interval_ms)
+            .field("execution", &self.execution)
+            .finish()
+    }
+}
+impl TwapTrigger {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TwapTrigger";
+}
+::buffa::impl_default_instance!(TwapTrigger);
+impl ::buffa::MessageName for TwapTrigger {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "TwapTrigger";
+    const FULL_NAME: &'static str = "triggers.v1.TwapTrigger";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TwapTrigger";
+}
+impl ::buffa::Message for TwapTrigger {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.duration_ms != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.duration_ms) as u32;
+        }
+        if self.slice_interval_ms != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.slice_interval_ms) as u32;
+        }
+        if let ::core::option::Option::Some(ref v) = self.execution {
+            match v {
+                __buffa::oneof::twap_trigger::Execution::MarketIoc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::twap_trigger::Execution::LimitGtc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.duration_ms != 0i64 {
+            ::buffa::types::put_int64_field(2u32, self.duration_ms, buf);
+        }
+        if self.slice_interval_ms != 0i64 {
+            ::buffa::types::put_int64_field(3u32, self.slice_interval_ms, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.execution {
+            match v {
+                __buffa::oneof::twap_trigger::Execution::MarketIoc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::twap_trigger::Execution::LimitGtc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.duration_ms = ::buffa::types::decode_int64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.slice_interval_ms = ::buffa::types::decode_int64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::twap_trigger::Execution::MarketIoc(ref mut existing),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::twap_trigger::Execution::MarketIoc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::twap_trigger::Execution::LimitGtc(ref mut existing),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::twap_trigger::Execution::LimitGtc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.side = ::buffa::EnumValue::from(0);
+        self.duration_ms = 0i64;
+        self.slice_interval_ms = 0i64;
+        self.execution = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TwapTrigger {
+    const PROTO_FQN: &'static str = "triggers.v1.TwapTrigger";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for TwapTrigger {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = TwapTrigger;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct TwapTrigger")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<TwapTrigger, A::Error> {
+                let mut __f_side: ::core::option::Option<
+                    ::buffa::EnumValue<super::super::orders::v1::Side>,
+                > = None;
+                let mut __f_duration_ms: ::core::option::Option<i64> = None;
+                let mut __f_slice_interval_ms: ::core::option::Option<i64> = None;
+                let mut __oneof_execution: ::core::option::Option<
+                    __buffa::oneof::twap_trigger::Execution,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
                         "side" => {
                             __f_side = Some({
                                 struct _S;
@@ -1716,48 +2768,8 @@ impl<'de> serde::Deserialize<'de> for CreateTriggerRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "orderType" | "order_type" => {
-                            __f_order_type = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<
-                                        super::super::orders::v1::OrderType,
-                                    >;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<super::super::orders::v1::OrderType>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "timeInForce" | "time_in_force" => {
-                            __f_time_in_force = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<
-                                        super::super::orders::v1::TimeInForce,
-                                    >;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<super::super::orders::v1::TimeInForce>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "qtyScaled" | "qty_scaled" => {
-                            __f_qty_scaled = Some({
+                        "durationMs" | "duration_ms" => {
+                            __f_duration_ms = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = i64;
@@ -1771,8 +2783,830 @@ impl<'de> serde::Deserialize<'de> for CreateTriggerRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "limitPriceTicks" | "limit_price_ticks" => {
-                            __f_limit_price_ticks = Some({
+                        "sliceIntervalMs" | "slice_interval_ms" => {
+                            __f_slice_interval_ms = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = i64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<i64, D::Error> {
+                                        ::buffa::json_helpers::int64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "marketIoc" | "market_ioc" => {
+                            let v: ::core::option::Option<TwapMarketIoc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TwapMarketIoc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::twap_trigger::Execution::MarketIoc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "limitGtc" | "limit_gtc" => {
+                            let v: ::core::option::Option<TwapLimitGtc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TwapLimitGtc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::twap_trigger::Execution::LimitGtc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <TwapTrigger as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_side {
+                    __r.side = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_duration_ms {
+                    __r.duration_ms = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_slice_interval_ms {
+                    __r.slice_interval_ms = v;
+                }
+                __r.execution = __oneof_execution;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TwapTrigger {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TWAP_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TwapTrigger",
+    to_json: ::buffa::type_registry::any_to_json::<TwapTrigger>,
+    from_json: ::buffa::type_registry::any_from_json::<TwapTrigger>,
+    is_wkt: false,
+};
+pub mod twap_trigger {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::twap_trigger::Execution;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::twap_trigger::Execution as ExecutionView;
+}
+/// LadderTrigger configures the supported LINEAR limit-GTC ladder. All levels
+/// are admitted immediately and may rest concurrently.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct LadderTrigger {
+    /// Child side.
+    ///
+    /// Field 1: `side`
+    #[serde(
+        rename = "side",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
+    /// Minimum generated level price in quote units scaled by 1e6.
+    ///
+    /// Field 2: `price_min_ticks`
+    #[serde(
+        rename = "priceMinTicks",
+        alias = "price_min_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_min_ticks: i64,
+    /// Maximum generated level price in quote units scaled by 1e6.
+    ///
+    /// Field 3: `price_max_ticks`
+    #[serde(
+        rename = "priceMaxTicks",
+        alias = "price_max_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_max_ticks: i64,
+    /// Number of linearly distributed levels.
+    ///
+    /// Field 4: `levels`
+    #[serde(
+        rename = "levels",
+        with = "::buffa::json_helpers::int32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
+    )]
+    pub levels: i32,
+    /// Reject each level instead of taking liquidity.
+    ///
+    /// Field 5: `post_only`
+    #[serde(
+        rename = "postOnly",
+        alias = "post_only",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub post_only: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for LadderTrigger {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("LadderTrigger")
+            .field("side", &self.side)
+            .field("price_min_ticks", &self.price_min_ticks)
+            .field("price_max_ticks", &self.price_max_ticks)
+            .field("levels", &self.levels)
+            .field("post_only", &self.post_only)
+            .finish()
+    }
+}
+impl LadderTrigger {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.LadderTrigger";
+}
+::buffa::impl_default_instance!(LadderTrigger);
+impl ::buffa::MessageName for LadderTrigger {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "LadderTrigger";
+    const FULL_NAME: &'static str = "triggers.v1.LadderTrigger";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.LadderTrigger";
+}
+impl ::buffa::Message for LadderTrigger {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.price_min_ticks != 0i64 {
+            size
+                += 1u32 + ::buffa::types::int64_encoded_len(self.price_min_ticks) as u32;
+        }
+        if self.price_max_ticks != 0i64 {
+            size
+                += 1u32 + ::buffa::types::int64_encoded_len(self.price_max_ticks) as u32;
+        }
+        if self.levels != 0i32 {
+            size += 1u32 + ::buffa::types::int32_encoded_len(self.levels) as u32;
+        }
+        if self.post_only {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.price_min_ticks != 0i64 {
+            ::buffa::types::put_int64_field(2u32, self.price_min_ticks, buf);
+        }
+        if self.price_max_ticks != 0i64 {
+            ::buffa::types::put_int64_field(3u32, self.price_max_ticks, buf);
+        }
+        if self.levels != 0i32 {
+            ::buffa::types::put_int32_field(4u32, self.levels, buf);
+        }
+        if self.post_only {
+            ::buffa::types::put_bool_field(5u32, self.post_only, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_min_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_max_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.levels = ::buffa::types::decode_int32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.post_only = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.side = ::buffa::EnumValue::from(0);
+        self.price_min_ticks = 0i64;
+        self.price_max_ticks = 0i64;
+        self.levels = 0i32;
+        self.post_only = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for LadderTrigger {
+    const PROTO_FQN: &'static str = "triggers.v1.LadderTrigger";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for LadderTrigger {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LADDER_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.LadderTrigger",
+    to_json: ::buffa::type_registry::any_to_json::<LadderTrigger>,
+    from_json: ::buffa::type_registry::any_from_json::<LadderTrigger>,
+    is_wkt: false,
+};
+/// TriggerIntent contains one standalone trigger's immutable configuration.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct TriggerIntent {
+    /// Symbol, for example "BTC-USDT".
+    ///
+    /// Field 1: `symbol`
+    #[serde(
+        rename = "symbol",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub symbol: ::buffa::alloc::string::String,
+    /// Total quantity scaled by the pair's base_quantity_scale.
+    ///
+    /// Field 2: `qty_scaled`
+    #[serde(
+        rename = "qtyScaled",
+        alias = "qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub qty_scaled: i64,
+    /// Fee source for BUY children. SELL children must use QUOTE.
+    ///
+    /// Field 3: `fee_source`
+    #[serde(
+        rename = "feeSource",
+        alias = "fee_source",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub fee_source: ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
+    /// Child self-trade prevention mode. Defaults to EXPIRE_MAKER.
+    ///
+    /// Field 4: `self_trade_prevention_mode`
+    #[serde(
+        rename = "selfTradePreventionMode",
+        alias = "self_trade_prevention_mode",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub self_trade_prevention_mode: ::buffa::EnumValue<
+        super::super::orders::v1::SelfTradePreventionMode,
+    >,
+    /// Client-provided trigger ID for idempotency.
+    ///
+    /// Field 5: `client_trigger_id`
+    #[serde(
+        rename = "clientTriggerId",
+        alias = "client_trigger_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub client_trigger_id: ::buffa::alloc::string::String,
+    #[serde(flatten)]
+    pub strategy: ::core::option::Option<__buffa::oneof::trigger_intent::Strategy>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TriggerIntent {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TriggerIntent")
+            .field("symbol", &self.symbol)
+            .field("qty_scaled", &self.qty_scaled)
+            .field("fee_source", &self.fee_source)
+            .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
+            .field("client_trigger_id", &self.client_trigger_id)
+            .field("strategy", &self.strategy)
+            .finish()
+    }
+}
+impl TriggerIntent {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerIntent";
+}
+::buffa::impl_default_instance!(TriggerIntent);
+impl ::buffa::MessageName for TriggerIntent {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "TriggerIntent";
+    const FULL_NAME: &'static str = "triggers.v1.TriggerIntent";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerIntent";
+}
+impl ::buffa::Message for TriggerIntent {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.symbol.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+        }
+        if self.qty_scaled != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+        }
+        {
+            let val = self.fee_source.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.self_trade_prevention_mode.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.client_trigger_id.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.client_trigger_id) as u32;
+        }
+        if let ::core::option::Option::Some(ref v) = self.strategy {
+            match v {
+                __buffa::oneof::trigger_intent::Strategy::StopLoss(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::trigger_intent::Strategy::TakeProfit(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::trigger_intent::Strategy::TrailingStop(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::trigger_intent::Strategy::Twap(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::trigger_intent::Strategy::Ladder(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.symbol.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.symbol, buf);
+        }
+        if self.qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(2u32, self.qty_scaled, buf);
+        }
+        {
+            let val = self.fee_source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        {
+            let val = self.self_trade_prevention_mode.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        if !self.client_trigger_id.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.client_trigger_id, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.strategy {
+            match v {
+                __buffa::oneof::trigger_intent::Strategy::StopLoss(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::trigger_intent::Strategy::TakeProfit(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::trigger_intent::Strategy::TrailingStop(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::trigger_intent::Strategy::Twap(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        13u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::trigger_intent::Strategy::Ladder(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        14u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.symbol, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fee_source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.self_trade_prevention_mode = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.client_trigger_id, buf)?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::trigger_intent::Strategy::StopLoss(ref mut existing),
+                ) = self.strategy
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.strategy = ::core::option::Option::Some(
+                        __buffa::oneof::trigger_intent::Strategy::StopLoss(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::trigger_intent::Strategy::TakeProfit(
+                        ref mut existing,
+                    ),
+                ) = self.strategy
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.strategy = ::core::option::Option::Some(
+                        __buffa::oneof::trigger_intent::Strategy::TakeProfit(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::trigger_intent::Strategy::TrailingStop(
+                        ref mut existing,
+                    ),
+                ) = self.strategy
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.strategy = ::core::option::Option::Some(
+                        __buffa::oneof::trigger_intent::Strategy::TrailingStop(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::trigger_intent::Strategy::Twap(ref mut existing),
+                ) = self.strategy
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.strategy = ::core::option::Option::Some(
+                        __buffa::oneof::trigger_intent::Strategy::Twap(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::trigger_intent::Strategy::Ladder(ref mut existing),
+                ) = self.strategy
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.strategy = ::core::option::Option::Some(
+                        __buffa::oneof::trigger_intent::Strategy::Ladder(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.symbol.clear();
+        self.qty_scaled = 0i64;
+        self.fee_source = ::buffa::EnumValue::from(0);
+        self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
+        self.client_trigger_id.clear();
+        self.strategy = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TriggerIntent {
+    const PROTO_FQN: &'static str = "triggers.v1.TriggerIntent";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for TriggerIntent {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = TriggerIntent;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct TriggerIntent")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<TriggerIntent, A::Error> {
+                let mut __f_symbol: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_qty_scaled: ::core::option::Option<i64> = None;
+                let mut __f_fee_source: ::core::option::Option<
+                    ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
+                > = None;
+                let mut __f_self_trade_prevention_mode: ::core::option::Option<
+                    ::buffa::EnumValue<super::super::orders::v1::SelfTradePreventionMode>,
+                > = None;
+                let mut __f_client_trigger_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __oneof_strategy: ::core::option::Option<
+                    __buffa::oneof::trigger_intent::Strategy,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "symbol" => {
+                            __f_symbol = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "qtyScaled" | "qty_scaled" => {
+                            __f_qty_scaled = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = i64;
@@ -1828,129 +3662,6 @@ impl<'de> serde::Deserialize<'de> for CreateTriggerRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "postOnly" | "post_only" => {
-                            __f_post_only = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = bool;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<bool, D::Error> {
-                                        ::buffa::json_helpers::proto_bool::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "activationPriceTicks" | "activation_price_ticks" => {
-                            __f_activation_price_ticks = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i64, D::Error> {
-                                        ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "twapDurationMs" | "twap_duration_ms" => {
-                            __f_twap_duration_ms = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i64, D::Error> {
-                                        ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "twapSliceIntervalMs" | "twap_slice_interval_ms" => {
-                            __f_twap_slice_interval_ms = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i64, D::Error> {
-                                        ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "ladderPriceMinTicks" | "ladder_price_min_ticks" => {
-                            __f_ladder_price_min_ticks = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i64, D::Error> {
-                                        ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "ladderPriceMaxTicks" | "ladder_price_max_ticks" => {
-                            __f_ladder_price_max_ticks = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i64, D::Error> {
-                                        ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "ladderLevels" | "ladder_levels" => {
-                            __f_ladder_levels = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i32;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i32, D::Error> {
-                                        ::buffa::json_helpers::int32::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "ladderDistribution" | "ladder_distribution" => {
-                            __f_ladder_distribution = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<LadderDistribution>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<LadderDistribution>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
                         "clientTriggerId" | "client_trigger_id" => {
                             __f_client_trigger_id = Some({
                                 struct _S;
@@ -1969,122 +3680,122 @@ impl<'de> serde::Deserialize<'de> for CreateTriggerRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "trailingDistanceTicks" | "trailing_distance_ticks" => {
-                            struct _DeserSeed;
-                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i64;
-                                fn deserialize<D: serde::Deserializer<'de>>(
-                                    self,
-                                    d: D,
-                                ) -> ::core::result::Result<i64, D::Error> {
-                                    ::buffa::json_helpers::int64::deserialize(d)
-                                }
-                            }
-                            let v: ::core::option::Option<i64> = map
+                        "stopLoss" | "stop_loss" => {
+                            let v: ::core::option::Option<ConditionalTrigger> = map
                                 .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ConditionalTrigger,
+                                        >::new(),
+                                    ),
                                 )?;
                             if let Some(v) = v {
-                                if __oneof_trailing_distance.is_some() {
+                                if __oneof_strategy.is_some() {
                                     return Err(
                                         serde::de::Error::custom(
-                                            "multiple oneof fields set for 'trailing_distance'",
+                                            "multiple oneof fields set for 'strategy'",
                                         ),
                                     );
                                 }
-                                __oneof_trailing_distance = Some(
-                                    __buffa::oneof::create_trigger_request::TrailingDistance::TrailingDistanceTicks(
-                                        v,
+                                __oneof_strategy = Some(
+                                    __buffa::oneof::trigger_intent::Strategy::StopLoss(
+                                        ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
                             }
                         }
-                        "trailingDistanceBps" | "trailing_distance_bps" => {
-                            struct _DeserSeed;
-                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
-                                fn deserialize<D: serde::Deserializer<'de>>(
-                                    self,
-                                    d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
-                                }
-                            }
-                            let v: ::core::option::Option<i32> = map
+                        "takeProfit" | "take_profit" => {
+                            let v: ::core::option::Option<ConditionalTrigger> = map
                                 .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ConditionalTrigger,
+                                        >::new(),
+                                    ),
                                 )?;
                             if let Some(v) = v {
-                                if __oneof_trailing_distance.is_some() {
+                                if __oneof_strategy.is_some() {
                                     return Err(
                                         serde::de::Error::custom(
-                                            "multiple oneof fields set for 'trailing_distance'",
+                                            "multiple oneof fields set for 'strategy'",
                                         ),
                                     );
                                 }
-                                __oneof_trailing_distance = Some(
-                                    __buffa::oneof::create_trigger_request::TrailingDistance::TrailingDistanceBps(
-                                        v,
+                                __oneof_strategy = Some(
+                                    __buffa::oneof::trigger_intent::Strategy::TakeProfit(
+                                        ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
                             }
                         }
-                        "maxSlippageTicks" | "max_slippage_ticks" => {
-                            struct _DeserSeed;
-                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
-                                fn deserialize<D: serde::Deserializer<'de>>(
-                                    self,
-                                    d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
-                                }
-                            }
-                            let v: ::core::option::Option<i32> = map
+                        "trailingStop" | "trailing_stop" => {
+                            let v: ::core::option::Option<TrailingStopTrigger> = map
                                 .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TrailingStopTrigger,
+                                        >::new(),
+                                    ),
                                 )?;
                             if let Some(v) = v {
-                                if __oneof_max_slippage.is_some() {
+                                if __oneof_strategy.is_some() {
                                     return Err(
                                         serde::de::Error::custom(
-                                            "multiple oneof fields set for 'max_slippage'",
+                                            "multiple oneof fields set for 'strategy'",
                                         ),
                                     );
                                 }
-                                __oneof_max_slippage = Some(
-                                    __buffa::oneof::create_trigger_request::MaxSlippage::MaxSlippageTicks(
-                                        v,
+                                __oneof_strategy = Some(
+                                    __buffa::oneof::trigger_intent::Strategy::TrailingStop(
+                                        ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
                             }
                         }
-                        "maxSlippageBps" | "max_slippage_bps" => {
-                            struct _DeserSeed;
-                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
-                                fn deserialize<D: serde::Deserializer<'de>>(
-                                    self,
-                                    d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
-                                }
-                            }
-                            let v: ::core::option::Option<i32> = map
+                        "twap" => {
+                            let v: ::core::option::Option<TwapTrigger> = map
                                 .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TwapTrigger,
+                                        >::new(),
+                                    ),
                                 )?;
                             if let Some(v) = v {
-                                if __oneof_max_slippage.is_some() {
+                                if __oneof_strategy.is_some() {
                                     return Err(
                                         serde::de::Error::custom(
-                                            "multiple oneof fields set for 'max_slippage'",
+                                            "multiple oneof fields set for 'strategy'",
                                         ),
                                     );
                                 }
-                                __oneof_max_slippage = Some(
-                                    __buffa::oneof::create_trigger_request::MaxSlippage::MaxSlippageBps(
-                                        v,
+                                __oneof_strategy = Some(
+                                    __buffa::oneof::trigger_intent::Strategy::Twap(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "ladder" => {
+                            let v: ::core::option::Option<LadderTrigger> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            LadderTrigger,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_strategy.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'strategy'",
+                                        ),
+                                    );
+                                }
+                                __oneof_strategy = Some(
+                                    __buffa::oneof::trigger_intent::Strategy::Ladder(
+                                        ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
                             }
@@ -2094,36 +3805,12 @@ impl<'de> serde::Deserialize<'de> for CreateTriggerRequest {
                         }
                     }
                 }
-                let mut __r = <CreateTriggerRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_subaccount_id {
-                    __r.subaccount_id = v;
-                }
+                let mut __r = <TriggerIntent as ::core::default::Default>::default();
                 if let ::core::option::Option::Some(v) = __f_symbol {
                     __r.symbol = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_trigger_type {
-                    __r.trigger_type = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_trigger_price_ticks {
-                    __r.trigger_price_ticks = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_trigger_price_source {
-                    __r.trigger_price_source = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_side {
-                    __r.side = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_order_type {
-                    __r.order_type = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_time_in_force {
-                    __r.time_in_force = v;
-                }
                 if let ::core::option::Option::Some(v) = __f_qty_scaled {
                     __r.qty_scaled = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_limit_price_ticks {
-                    __r.limit_price_ticks = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_fee_source {
                     __r.fee_source = v;
@@ -2131,39 +3818,194 @@ impl<'de> serde::Deserialize<'de> for CreateTriggerRequest {
                 if let ::core::option::Option::Some(v) = __f_self_trade_prevention_mode {
                     __r.self_trade_prevention_mode = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_post_only {
-                    __r.post_only = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_activation_price_ticks {
-                    __r.activation_price_ticks = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_twap_duration_ms {
-                    __r.twap_duration_ms = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_twap_slice_interval_ms {
-                    __r.twap_slice_interval_ms = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_ladder_price_min_ticks {
-                    __r.ladder_price_min_ticks = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_ladder_price_max_ticks {
-                    __r.ladder_price_max_ticks = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_ladder_levels {
-                    __r.ladder_levels = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_ladder_distribution {
-                    __r.ladder_distribution = v;
-                }
                 if let ::core::option::Option::Some(v) = __f_client_trigger_id {
                     __r.client_trigger_id = v;
                 }
-                __r.trailing_distance = __oneof_trailing_distance;
-                __r.max_slippage = __oneof_max_slippage;
+                __r.strategy = __oneof_strategy;
                 Ok(__r)
             }
         }
         d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TriggerIntent {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRIGGER_INTENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TriggerIntent",
+    to_json: ::buffa::type_registry::any_to_json::<TriggerIntent>,
+    from_json: ::buffa::type_registry::any_from_json::<TriggerIntent>,
+    is_wkt: false,
+};
+pub mod trigger_intent {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::trigger_intent::Strategy;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::trigger_intent::Strategy as StrategyView;
+}
+/// CreateTriggerRequest submits one standalone trigger intent for admission.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateTriggerRequest {
+    /// Target sub-account. When omitted, uses the caller's root account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    /// Trigger to admit.
+    ///
+    /// Field 2: `trigger`
+    #[serde(
+        rename = "trigger",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub trigger: ::buffa::MessageField<TriggerIntent>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateTriggerRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateTriggerRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("trigger", &self.trigger)
+            .finish()
+    }
+}
+impl CreateTriggerRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CreateTriggerRequest";
+}
+impl CreateTriggerRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(CreateTriggerRequest);
+impl ::buffa::MessageName for CreateTriggerRequest {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "CreateTriggerRequest";
+    const FULL_NAME: &'static str = "triggers.v1.CreateTriggerRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CreateTriggerRequest";
+}
+impl ::buffa::Message for CreateTriggerRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.trigger.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.trigger.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
+        if self.trigger.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.trigger.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.trigger.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = ::core::option::Option::None;
+        self.trigger = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateTriggerRequest {
+    const PROTO_FQN: &'static str = "triggers.v1.CreateTriggerRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for CreateTriggerRequest {
@@ -2186,24 +4028,13 @@ pub const __CREATE_TRIGGER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
     from_json: ::buffa::type_registry::any_from_json::<CreateTriggerRequest>,
     is_wkt: false,
 };
-pub mod create_trigger_request {
-    #[allow(unused_imports)]
-    use super::*;
-    #[doc(inline)]
-    pub use super::__buffa::oneof::create_trigger_request::TrailingDistance;
-    #[doc(inline)]
-    pub use super::__buffa::oneof::create_trigger_request::MaxSlippage;
-    #[doc(inline)]
-    pub use super::__buffa::view::oneof::create_trigger_request::TrailingDistance as TrailingDistanceView;
-    #[doc(inline)]
-    pub use super::__buffa::view::oneof::create_trigger_request::MaxSlippage as MaxSlippageView;
-}
-/// CreateTriggerResponse returns the accepted trigger identifier and status.
+/// CreateTriggerResponse acknowledges trigger creation only. Arming and child
+/// execution happen asynchronously and are visible through trigger reads/events.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateTriggerResponse {
-    /// Unique trigger ID assigned by the system.
+    /// Assigned trigger ID.
     ///
     /// Field 1: `trigger_id`
     #[serde(
@@ -2213,18 +4044,9 @@ pub struct CreateTriggerResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub trigger_id: u64,
-    /// Current status of the trigger.
+    /// Echoed client trigger ID.
     ///
-    /// Field 2: `status`
-    #[serde(
-        rename = "status",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub status: ::buffa::EnumValue<TriggerStatus>,
-    /// Echoed back if provided in request.
-    ///
-    /// Field 3: `client_trigger_id`
+    /// Field 2: `client_trigger_id`
     #[serde(
         rename = "clientTriggerId",
         alias = "client_trigger_id",
@@ -2232,24 +4054,25 @@ pub struct CreateTriggerResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub client_trigger_id: ::buffa::alloc::string::String,
-    /// Server timestamp.
+    /// Time creation admission completed.
     ///
-    /// Field 4: `ts`
+    /// Field 3: `accepted_at`
     #[serde(
-        rename = "ts",
+        rename = "acceptedAt",
+        alias = "accepted_at",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub ts: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Server timestamp in nanoseconds since epoch (UTC).
+    pub accepted_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Admission completion time in nanoseconds since epoch (UTC).
     ///
-    /// Field 5: `ts_ns`
+    /// Field 4: `accepted_at_ts_ns`
     #[serde(
-        rename = "tsNs",
-        alias = "ts_ns",
+        rename = "acceptedAtTsNs",
+        alias = "accepted_at_ts_ns",
         with = "::buffa::json_helpers::uint64",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
-    pub ts_ns: u64,
+    pub accepted_at_ts_ns: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2258,10 +4081,9 @@ impl ::core::fmt::Debug for CreateTriggerResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateTriggerResponse")
             .field("trigger_id", &self.trigger_id)
-            .field("status", &self.status)
             .field("client_trigger_id", &self.client_trigger_id)
-            .field("ts", &self.ts)
-            .field("ts_ns", &self.ts_ns)
+            .field("accepted_at", &self.accepted_at)
+            .field("accepted_at_ts_ns", &self.accepted_at_ts_ns)
             .finish()
     }
 }
@@ -2293,27 +4115,23 @@ impl ::buffa::Message for CreateTriggerResponse {
         if self.trigger_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        {
-            let val = self.status.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
         if !self.client_trigger_id.is_empty() {
             size
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.client_trigger_id) as u32;
         }
-        if self.ts.is_set() {
+        if self.accepted_at.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.ts.compute_size(__cache);
+            let inner_size = self.accepted_at.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if self.ts_ns != 0u64 {
-            size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+        if self.accepted_at_ts_ns != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -2328,21 +4146,15 @@ impl ::buffa::Message for CreateTriggerResponse {
         if self.trigger_id != 0u64 {
             ::buffa::types::put_fixed64_field(1u32, self.trigger_id, buf);
         }
-        {
-            let val = self.status.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(2u32, val, buf);
-            }
-        }
         if !self.client_trigger_id.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.client_trigger_id, buf);
+            ::buffa::types::put_string_field(2u32, &self.client_trigger_id, buf);
         }
-        if self.ts.is_set() {
-            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
-            self.ts.write_to(__cache, buf);
+        if self.accepted_at.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.accepted_at.write_to(__cache, buf);
         }
-        if self.ts_ns != 0u64 {
-            ::buffa::types::put_uint64_field(5u32, self.ts_ns, buf);
+        if self.accepted_at_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.accepted_at_ts_ns, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2367,36 +4179,27 @@ impl ::buffa::Message for CreateTriggerResponse {
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.status = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
+                ::buffa::types::merge_string(&mut self.client_trigger_id, buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.client_trigger_id, buf)?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.ts.get_or_insert_default(),
+                    self.accepted_at.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
             }
-            5u32 => {
+            4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.ts_ns = ::buffa::types::decode_uint64(buf)?;
+                self.accepted_at_ts_ns = ::buffa::types::decode_uint64(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -2407,10 +4210,9 @@ impl ::buffa::Message for CreateTriggerResponse {
     }
     fn clear(&mut self) {
         self.trigger_id = 0u64;
-        self.status = ::buffa::EnumValue::from(0);
         self.client_trigger_id.clear();
-        self.ts = ::buffa::MessageField::none();
-        self.ts_ns = 0u64;
+        self.accepted_at = ::buffa::MessageField::none();
+        self.accepted_at_ts_ns = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7120,19 +8922,9 @@ pub struct Trigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub symbol: ::buffa::alloc::string::String,
-    /// Trigger category.
-    ///
-    /// Field 5: `trigger_type`
-    #[serde(
-        rename = "triggerType",
-        alias = "trigger_type",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub trigger_type: ::buffa::EnumValue<TriggerType>,
     /// Current trigger lifecycle status.
     ///
-    /// Field 6: `status`
+    /// Field 5: `status`
     #[serde(
         rename = "status",
         with = "::buffa::json_helpers::proto_enum",
@@ -7141,7 +8933,7 @@ pub struct Trigger {
     pub status: ::buffa::EnumValue<TriggerStatus>,
     /// Parent order ID for attached-risk triggers; empty for standalone triggers.
     ///
-    /// Field 7: `parent_order_id`
+    /// Field 6: `parent_order_id`
     #[serde(
         rename = "parentOrderId",
         alias = "parent_order_id",
@@ -7149,39 +8941,9 @@ pub struct Trigger {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub parent_order_id: ::core::option::Option<u64>,
-    /// Child order side.
+    /// Child quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
     ///
-    /// Field 20: `side`
-    #[serde(
-        rename = "side",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
-    /// Child order type.
-    ///
-    /// Field 21: `order_type`
-    #[serde(
-        rename = "orderType",
-        alias = "order_type",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub order_type: ::buffa::EnumValue<super::super::orders::v1::OrderType>,
-    /// Child order time-in-force policy.
-    ///
-    /// Field 22: `time_in_force`
-    #[serde(
-        rename = "timeInForce",
-        alias = "time_in_force",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub time_in_force: ::buffa::EnumValue<super::super::orders::v1::TimeInForce>,
-    /// Child order quantity scaled by the pair's base_quantity_scale from
-    /// GetSpotConfig.
-    ///
-    /// Field 23: `qty_scaled`
+    /// Field 20: `qty_scaled`
     #[serde(
         rename = "qtyScaled",
         alias = "qty_scaled",
@@ -7189,20 +8951,9 @@ pub struct Trigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub qty_scaled: i64,
-    /// Child LIMIT order price in quote units scaled by 1e6. Zero for MARKET
-    /// child orders.
-    ///
-    /// Field 24: `limit_price_ticks`
-    #[serde(
-        rename = "limitPriceTicks",
-        alias = "limit_price_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub limit_price_ticks: i64,
     /// Fee source for BUY child orders.
     ///
-    /// Field 25: `fee_source`
+    /// Field 21: `fee_source`
     #[serde(
         rename = "feeSource",
         alias = "fee_source",
@@ -7212,7 +8963,7 @@ pub struct Trigger {
     pub fee_source: ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
     /// Self-trade prevention mode for child orders.
     ///
-    /// Field 26: `self_trade_prevention_mode`
+    /// Field 22: `self_trade_prevention_mode`
     #[serde(
         rename = "selfTradePreventionMode",
         alias = "self_trade_prevention_mode",
@@ -7222,16 +8973,6 @@ pub struct Trigger {
     pub self_trade_prevention_mode: ::buffa::EnumValue<
         super::super::orders::v1::SelfTradePreventionMode,
     >,
-    /// True if child LIMIT orders are post-only.
-    ///
-    /// Field 27: `post_only`
-    #[serde(
-        rename = "postOnly",
-        alias = "post_only",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub post_only: bool,
     /// Client-provided trigger ID for idempotency and correlation.
     ///
     /// Field 60: `client_trigger_id`
@@ -7289,7 +9030,9 @@ pub struct Trigger {
     )]
     pub child_order_ids: ::buffa::alloc::vec::Vec<u64>,
     #[serde(flatten)]
-    pub details: ::core::option::Option<__buffa::oneof::trigger::Details>,
+    pub configuration: ::core::option::Option<__buffa::oneof::trigger::Configuration>,
+    #[serde(flatten)]
+    pub runtime_details: ::core::option::Option<__buffa::oneof::trigger::RuntimeDetails>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7301,24 +9044,19 @@ impl ::core::fmt::Debug for Trigger {
             .field("subaccount_id", &self.subaccount_id)
             .field("symbol_id", &self.symbol_id)
             .field("symbol", &self.symbol)
-            .field("trigger_type", &self.trigger_type)
             .field("status", &self.status)
             .field("parent_order_id", &self.parent_order_id)
-            .field("side", &self.side)
-            .field("order_type", &self.order_type)
-            .field("time_in_force", &self.time_in_force)
             .field("qty_scaled", &self.qty_scaled)
-            .field("limit_price_ticks", &self.limit_price_ticks)
             .field("fee_source", &self.fee_source)
             .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
-            .field("post_only", &self.post_only)
             .field("client_trigger_id", &self.client_trigger_id)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
             .field("armed_at", &self.armed_at)
             .field("completed_at", &self.completed_at)
             .field("child_order_ids", &self.child_order_ids)
-            .field("details", &self.details)
+            .field("configuration", &self.configuration)
+            .field("runtime_details", &self.runtime_details)
             .finish()
     }
 }
@@ -7369,12 +9107,6 @@ impl ::buffa::Message for Trigger {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
         }
         {
-            let val = self.trigger_type.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
             let val = self.status.to_i32();
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
@@ -7383,31 +9115,8 @@ impl ::buffa::Message for Trigger {
         if self.parent_order_id.is_some() {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        {
-            let val = self.side.to_i32();
-            if val != 0 {
-                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.time_in_force.to_i32();
-            if val != 0 {
-                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
         if self.qty_scaled != 0i64 {
             size += 2u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
-        }
-        if self.limit_price_ticks != 0i64 {
-            size
-                += 2u32
-                    + ::buffa::types::int64_encoded_len(self.limit_price_ticks) as u32;
         }
         {
             let val = self.fee_source.to_i32();
@@ -7421,8 +9130,49 @@ impl ::buffa::Message for Trigger {
                 size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
-        if self.post_only {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        if let ::core::option::Option::Some(ref v) = self.configuration {
+            match v {
+                __buffa::oneof::trigger::Configuration::StopLoss(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::trigger::Configuration::TakeProfit(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::trigger::Configuration::TrailingStop(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::trigger::Configuration::Twap(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::trigger::Configuration::Ladder(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+            }
         }
         if !self.client_trigger_id.is_empty() {
             size
@@ -7467,9 +9217,9 @@ impl ::buffa::Message for Trigger {
             size
                 += 2u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
         }
-        if let ::core::option::Option::Some(ref v) = self.details {
+        if let ::core::option::Option::Some(ref v) = self.runtime_details {
             match v {
-                __buffa::oneof::trigger::Details::Stop(x) => {
+                __buffa::oneof::trigger::RuntimeDetails::Stop(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
                     __cache.set(__slot, inner);
@@ -7477,7 +9227,7 @@ impl ::buffa::Message for Trigger {
                         += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
-                __buffa::oneof::trigger::Details::Trailing(x) => {
+                __buffa::oneof::trigger::RuntimeDetails::Trailing(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
                     __cache.set(__slot, inner);
@@ -7485,7 +9235,7 @@ impl ::buffa::Message for Trigger {
                         += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
-                __buffa::oneof::trigger::Details::Twap(x) => {
+                __buffa::oneof::trigger::RuntimeDetails::TwapState(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
                     __cache.set(__slot, inner);
@@ -7493,7 +9243,7 @@ impl ::buffa::Message for Trigger {
                         += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
-                __buffa::oneof::trigger::Details::Ladder(x) => {
+                __buffa::oneof::trigger::RuntimeDetails::LadderState(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
                     __cache.set(__slot, inner);
@@ -7526,58 +9276,72 @@ impl ::buffa::Message for Trigger {
             ::buffa::types::put_string_field(4u32, &self.symbol, buf);
         }
         {
-            let val = self.trigger_type.to_i32();
+            let val = self.status.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(5u32, val, buf);
             }
         }
-        {
-            let val = self.status.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(6u32, val, buf);
-            }
-        }
         if let Some(v) = self.parent_order_id {
-            ::buffa::types::put_fixed64_field(7u32, v, buf);
+            ::buffa::types::put_fixed64_field(6u32, v, buf);
+        }
+        if self.qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(20u32, self.qty_scaled, buf);
         }
         {
-            let val = self.side.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(20u32, val, buf);
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
+            let val = self.fee_source.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(21u32, val, buf);
             }
         }
         {
-            let val = self.time_in_force.to_i32();
+            let val = self.self_trade_prevention_mode.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(22u32, val, buf);
             }
         }
-        if self.qty_scaled != 0i64 {
-            ::buffa::types::put_int64_field(23u32, self.qty_scaled, buf);
-        }
-        if self.limit_price_ticks != 0i64 {
-            ::buffa::types::put_int64_field(24u32, self.limit_price_ticks, buf);
-        }
-        {
-            let val = self.fee_source.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(25u32, val, buf);
+        if let ::core::option::Option::Some(ref v) = self.configuration {
+            match v {
+                __buffa::oneof::trigger::Configuration::StopLoss(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        30u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::trigger::Configuration::TakeProfit(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        31u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::trigger::Configuration::TrailingStop(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        32u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::trigger::Configuration::Twap(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        33u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::trigger::Configuration::Ladder(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        34u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
             }
-        }
-        {
-            let val = self.self_trade_prevention_mode.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(26u32, val, buf);
-            }
-        }
-        if self.post_only {
-            ::buffa::types::put_bool_field(27u32, self.post_only, buf);
         }
         if !self.client_trigger_id.is_empty() {
             ::buffa::types::put_string_field(60u32, &self.client_trigger_id, buf);
@@ -7606,9 +9370,9 @@ impl ::buffa::Message for Trigger {
                 ::buffa::types::encode_fixed64(v, buf);
             }
         }
-        if let ::core::option::Option::Some(ref v) = self.details {
+        if let ::core::option::Option::Some(ref v) = self.runtime_details {
             match v {
-                __buffa::oneof::trigger::Details::Stop(x) => {
+                __buffa::oneof::trigger::RuntimeDetails::Stop(x) => {
                     ::buffa::types::put_len_delimited_header(
                         100u32,
                         __cache.consume_next(),
@@ -7616,7 +9380,7 @@ impl ::buffa::Message for Trigger {
                     );
                     x.write_to(__cache, buf);
                 }
-                __buffa::oneof::trigger::Details::Trailing(x) => {
+                __buffa::oneof::trigger::RuntimeDetails::Trailing(x) => {
                     ::buffa::types::put_len_delimited_header(
                         101u32,
                         __cache.consume_next(),
@@ -7624,7 +9388,7 @@ impl ::buffa::Message for Trigger {
                     );
                     x.write_to(__cache, buf);
                 }
-                __buffa::oneof::trigger::Details::Twap(x) => {
+                __buffa::oneof::trigger::RuntimeDetails::TwapState(x) => {
                     ::buffa::types::put_len_delimited_header(
                         102u32,
                         __cache.consume_next(),
@@ -7632,7 +9396,7 @@ impl ::buffa::Message for Trigger {
                     );
                     x.write_to(__cache, buf);
                 }
-                __buffa::oneof::trigger::Details::Ladder(x) => {
+                __buffa::oneof::trigger::RuntimeDetails::LadderState(x) => {
                     ::buffa::types::put_len_delimited_header(
                         103u32,
                         __cache.consume_next(),
@@ -7688,20 +9452,11 @@ impl ::buffa::Message for Trigger {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.trigger_type = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
                 self.status = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
-            7u32 => {
+            6u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Fixed64,
@@ -7715,41 +9470,9 @@ impl ::buffa::Message for Trigger {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
-            }
-            21u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.order_type = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            22u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.time_in_force = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            23u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
                 self.qty_scaled = ::buffa::types::decode_int64(buf)?;
             }
-            24u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.limit_price_ticks = ::buffa::types::decode_int64(buf)?;
-            }
-            25u32 => {
+            21u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
@@ -7758,7 +9481,7 @@ impl ::buffa::Message for Trigger {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
-            26u32 => {
+            22u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
@@ -7767,12 +9490,107 @@ impl ::buffa::Message for Trigger {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
-            27u32 => {
+            30u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.post_only = ::buffa::types::decode_bool(buf)?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::trigger::Configuration::StopLoss(ref mut existing),
+                ) = self.configuration
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.configuration = ::core::option::Option::Some(
+                        __buffa::oneof::trigger::Configuration::StopLoss(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            31u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::trigger::Configuration::TakeProfit(ref mut existing),
+                ) = self.configuration
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.configuration = ::core::option::Option::Some(
+                        __buffa::oneof::trigger::Configuration::TakeProfit(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            32u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::trigger::Configuration::TrailingStop(
+                        ref mut existing,
+                    ),
+                ) = self.configuration
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.configuration = ::core::option::Option::Some(
+                        __buffa::oneof::trigger::Configuration::TrailingStop(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            33u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::trigger::Configuration::Twap(ref mut existing),
+                ) = self.configuration
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.configuration = ::core::option::Option::Some(
+                        __buffa::oneof::trigger::Configuration::Twap(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            34u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::trigger::Configuration::Ladder(ref mut existing),
+                ) = self.configuration
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.configuration = ::core::option::Option::Some(
+                        __buffa::oneof::trigger::Configuration::Ladder(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
             }
             60u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -7862,15 +9680,15 @@ impl ::buffa::Message for Trigger {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 if let ::core::option::Option::Some(
-                    __buffa::oneof::trigger::Details::Stop(ref mut existing),
-                ) = self.details
+                    __buffa::oneof::trigger::RuntimeDetails::Stop(ref mut existing),
+                ) = self.runtime_details
                 {
                     ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
                 } else {
                     let mut val = ::core::default::Default::default();
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.details = ::core::option::Option::Some(
-                        __buffa::oneof::trigger::Details::Stop(
+                    self.runtime_details = ::core::option::Option::Some(
+                        __buffa::oneof::trigger::RuntimeDetails::Stop(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -7882,15 +9700,15 @@ impl ::buffa::Message for Trigger {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 if let ::core::option::Option::Some(
-                    __buffa::oneof::trigger::Details::Trailing(ref mut existing),
-                ) = self.details
+                    __buffa::oneof::trigger::RuntimeDetails::Trailing(ref mut existing),
+                ) = self.runtime_details
                 {
                     ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
                 } else {
                     let mut val = ::core::default::Default::default();
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.details = ::core::option::Option::Some(
-                        __buffa::oneof::trigger::Details::Trailing(
+                    self.runtime_details = ::core::option::Option::Some(
+                        __buffa::oneof::trigger::RuntimeDetails::Trailing(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -7902,15 +9720,15 @@ impl ::buffa::Message for Trigger {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 if let ::core::option::Option::Some(
-                    __buffa::oneof::trigger::Details::Twap(ref mut existing),
-                ) = self.details
+                    __buffa::oneof::trigger::RuntimeDetails::TwapState(ref mut existing),
+                ) = self.runtime_details
                 {
                     ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
                 } else {
                     let mut val = ::core::default::Default::default();
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.details = ::core::option::Option::Some(
-                        __buffa::oneof::trigger::Details::Twap(
+                    self.runtime_details = ::core::option::Option::Some(
+                        __buffa::oneof::trigger::RuntimeDetails::TwapState(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -7922,15 +9740,17 @@ impl ::buffa::Message for Trigger {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 if let ::core::option::Option::Some(
-                    __buffa::oneof::trigger::Details::Ladder(ref mut existing),
-                ) = self.details
+                    __buffa::oneof::trigger::RuntimeDetails::LadderState(
+                        ref mut existing,
+                    ),
+                ) = self.runtime_details
                 {
                     ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
                 } else {
                     let mut val = ::core::default::Default::default();
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.details = ::core::option::Option::Some(
-                        __buffa::oneof::trigger::Details::Ladder(
+                    self.runtime_details = ::core::option::Option::Some(
+                        __buffa::oneof::trigger::RuntimeDetails::LadderState(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -7948,24 +9768,19 @@ impl ::buffa::Message for Trigger {
         self.subaccount_id = 0u64;
         self.symbol_id = 0u32;
         self.symbol.clear();
-        self.trigger_type = ::buffa::EnumValue::from(0);
         self.status = ::buffa::EnumValue::from(0);
         self.parent_order_id = ::core::option::Option::None;
-        self.side = ::buffa::EnumValue::from(0);
-        self.order_type = ::buffa::EnumValue::from(0);
-        self.time_in_force = ::buffa::EnumValue::from(0);
         self.qty_scaled = 0i64;
-        self.limit_price_ticks = 0i64;
         self.fee_source = ::buffa::EnumValue::from(0);
         self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
-        self.post_only = false;
+        self.configuration = ::core::option::Option::None;
         self.client_trigger_id.clear();
         self.created_at = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
         self.armed_at = ::buffa::MessageField::none();
         self.completed_at = ::buffa::MessageField::none();
         self.child_order_ids.clear();
-        self.details = ::core::option::Option::None;
+        self.runtime_details = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7999,33 +9814,19 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 let mut __f_symbol: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
-                let mut __f_trigger_type: ::core::option::Option<
-                    ::buffa::EnumValue<TriggerType>,
-                > = None;
                 let mut __f_status: ::core::option::Option<
                     ::buffa::EnumValue<TriggerStatus>,
                 > = None;
                 let mut __f_parent_order_id: ::core::option::Option<
                     ::core::option::Option<u64>,
                 > = None;
-                let mut __f_side: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::Side>,
-                > = None;
-                let mut __f_order_type: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::OrderType>,
-                > = None;
-                let mut __f_time_in_force: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::TimeInForce>,
-                > = None;
                 let mut __f_qty_scaled: ::core::option::Option<i64> = None;
-                let mut __f_limit_price_ticks: ::core::option::Option<i64> = None;
                 let mut __f_fee_source: ::core::option::Option<
                     ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
                 > = None;
                 let mut __f_self_trade_prevention_mode: ::core::option::Option<
                     ::buffa::EnumValue<super::super::orders::v1::SelfTradePreventionMode>,
                 > = None;
-                let mut __f_post_only: ::core::option::Option<bool> = None;
                 let mut __f_client_trigger_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
@@ -8044,8 +9845,11 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 let mut __f_child_order_ids: ::core::option::Option<
                     ::buffa::alloc::vec::Vec<u64>,
                 > = None;
-                let mut __oneof_details: ::core::option::Option<
-                    __buffa::oneof::trigger::Details,
+                let mut __oneof_configuration: ::core::option::Option<
+                    __buffa::oneof::trigger::Configuration,
+                > = None;
+                let mut __oneof_runtime_details: ::core::option::Option<
+                    __buffa::oneof::trigger::RuntimeDetails,
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
@@ -8112,24 +9916,6 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "triggerType" | "trigger_type" => {
-                            __f_trigger_type = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<TriggerType>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<TriggerType>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
                         "status" => {
                             __f_status = Some({
                                 struct _S;
@@ -8166,83 +9952,8 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "side" => {
-                            __f_side = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<
-                                        super::super::orders::v1::Side,
-                                    >;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<super::super::orders::v1::Side>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "orderType" | "order_type" => {
-                            __f_order_type = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<
-                                        super::super::orders::v1::OrderType,
-                                    >;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<super::super::orders::v1::OrderType>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "timeInForce" | "time_in_force" => {
-                            __f_time_in_force = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<
-                                        super::super::orders::v1::TimeInForce,
-                                    >;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<super::super::orders::v1::TimeInForce>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
                         "qtyScaled" | "qty_scaled" => {
                             __f_qty_scaled = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i64, D::Error> {
-                                        ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "limitPriceTicks" | "limit_price_ticks" => {
-                            __f_limit_price_ticks = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = i64;
@@ -8293,21 +10004,6 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "postOnly" | "post_only" => {
-                            __f_post_only = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = bool;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<bool, D::Error> {
-                                        ::buffa::json_helpers::proto_bool::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -8389,6 +10085,126 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                 map.next_value_seed(_S)?
                             });
                         }
+                        "stopLoss" | "stop_loss" => {
+                            let v: ::core::option::Option<ConditionalTrigger> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ConditionalTrigger,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_configuration.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'configuration'",
+                                        ),
+                                    );
+                                }
+                                __oneof_configuration = Some(
+                                    __buffa::oneof::trigger::Configuration::StopLoss(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "takeProfit" | "take_profit" => {
+                            let v: ::core::option::Option<ConditionalTrigger> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ConditionalTrigger,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_configuration.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'configuration'",
+                                        ),
+                                    );
+                                }
+                                __oneof_configuration = Some(
+                                    __buffa::oneof::trigger::Configuration::TakeProfit(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "trailingStop" | "trailing_stop" => {
+                            let v: ::core::option::Option<TrailingStopTrigger> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TrailingStopTrigger,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_configuration.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'configuration'",
+                                        ),
+                                    );
+                                }
+                                __oneof_configuration = Some(
+                                    __buffa::oneof::trigger::Configuration::TrailingStop(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "twap" => {
+                            let v: ::core::option::Option<TwapTrigger> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TwapTrigger,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_configuration.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'configuration'",
+                                        ),
+                                    );
+                                }
+                                __oneof_configuration = Some(
+                                    __buffa::oneof::trigger::Configuration::Twap(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "ladder" => {
+                            let v: ::core::option::Option<LadderTrigger> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            LadderTrigger,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_configuration.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'configuration'",
+                                        ),
+                                    );
+                                }
+                                __oneof_configuration = Some(
+                                    __buffa::oneof::trigger::Configuration::Ladder(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
                         "stop" => {
                             let v: ::core::option::Option<StopDetails> = map
                                 .next_value_seed(
@@ -8399,15 +10215,15 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                     ),
                                 )?;
                             if let Some(v) = v {
-                                if __oneof_details.is_some() {
+                                if __oneof_runtime_details.is_some() {
                                     return Err(
                                         serde::de::Error::custom(
-                                            "multiple oneof fields set for 'details'",
+                                            "multiple oneof fields set for 'runtime_details'",
                                         ),
                                     );
                                 }
-                                __oneof_details = Some(
-                                    __buffa::oneof::trigger::Details::Stop(
+                                __oneof_runtime_details = Some(
+                                    __buffa::oneof::trigger::RuntimeDetails::Stop(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -8423,21 +10239,21 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                     ),
                                 )?;
                             if let Some(v) = v {
-                                if __oneof_details.is_some() {
+                                if __oneof_runtime_details.is_some() {
                                     return Err(
                                         serde::de::Error::custom(
-                                            "multiple oneof fields set for 'details'",
+                                            "multiple oneof fields set for 'runtime_details'",
                                         ),
                                     );
                                 }
-                                __oneof_details = Some(
-                                    __buffa::oneof::trigger::Details::Trailing(
+                                __oneof_runtime_details = Some(
+                                    __buffa::oneof::trigger::RuntimeDetails::Trailing(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
                             }
                         }
-                        "twap" => {
+                        "twapState" | "twap_state" => {
                             let v: ::core::option::Option<TwapDetails> = map
                                 .next_value_seed(
                                     ::buffa::json_helpers::NullableDeserializeSeed(
@@ -8447,21 +10263,21 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                     ),
                                 )?;
                             if let Some(v) = v {
-                                if __oneof_details.is_some() {
+                                if __oneof_runtime_details.is_some() {
                                     return Err(
                                         serde::de::Error::custom(
-                                            "multiple oneof fields set for 'details'",
+                                            "multiple oneof fields set for 'runtime_details'",
                                         ),
                                     );
                                 }
-                                __oneof_details = Some(
-                                    __buffa::oneof::trigger::Details::Twap(
+                                __oneof_runtime_details = Some(
+                                    __buffa::oneof::trigger::RuntimeDetails::TwapState(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
                             }
                         }
-                        "ladder" => {
+                        "ladderState" | "ladder_state" => {
                             let v: ::core::option::Option<LadderDetails> = map
                                 .next_value_seed(
                                     ::buffa::json_helpers::NullableDeserializeSeed(
@@ -8471,15 +10287,15 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                     ),
                                 )?;
                             if let Some(v) = v {
-                                if __oneof_details.is_some() {
+                                if __oneof_runtime_details.is_some() {
                                     return Err(
                                         serde::de::Error::custom(
-                                            "multiple oneof fields set for 'details'",
+                                            "multiple oneof fields set for 'runtime_details'",
                                         ),
                                     );
                                 }
-                                __oneof_details = Some(
-                                    __buffa::oneof::trigger::Details::Ladder(
+                                __oneof_runtime_details = Some(
+                                    __buffa::oneof::trigger::RuntimeDetails::LadderState(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -8503,38 +10319,20 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 if let ::core::option::Option::Some(v) = __f_symbol {
                     __r.symbol = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_trigger_type {
-                    __r.trigger_type = v;
-                }
                 if let ::core::option::Option::Some(v) = __f_status {
                     __r.status = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_parent_order_id {
                     __r.parent_order_id = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_side {
-                    __r.side = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_order_type {
-                    __r.order_type = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_time_in_force {
-                    __r.time_in_force = v;
-                }
                 if let ::core::option::Option::Some(v) = __f_qty_scaled {
                     __r.qty_scaled = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_limit_price_ticks {
-                    __r.limit_price_ticks = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_fee_source {
                     __r.fee_source = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_self_trade_prevention_mode {
                     __r.self_trade_prevention_mode = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_post_only {
-                    __r.post_only = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_client_trigger_id {
                     __r.client_trigger_id = v;
@@ -8554,7 +10352,8 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 if let ::core::option::Option::Some(v) = __f_child_order_ids {
                     __r.child_order_ids = v;
                 }
-                __r.details = __oneof_details;
+                __r.configuration = __oneof_configuration;
+                __r.runtime_details = __oneof_runtime_details;
                 Ok(__r)
             }
         }
@@ -8585,9 +10384,13 @@ pub mod trigger {
     #[allow(unused_imports)]
     use super::*;
     #[doc(inline)]
-    pub use super::__buffa::oneof::trigger::Details;
+    pub use super::__buffa::oneof::trigger::Configuration;
     #[doc(inline)]
-    pub use super::__buffa::view::oneof::trigger::Details as DetailsView;
+    pub use super::__buffa::oneof::trigger::RuntimeDetails;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::trigger::Configuration as ConfigurationView;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::trigger::RuntimeDetails as RuntimeDetailsView;
 }
 #[allow(
     non_camel_case_types,
@@ -8610,132 +10413,4732 @@ pub mod __buffa {
         /// Create Trigger Request/Response
         /// =============================================================================
         ///
-        /// CreateTriggerRequest creates a standalone trigger (stop order, TWAP, ladder,
-        /// etc.). Standalone triggers have independent lifecycle and arm immediately
-        /// after creation.
+        /// TriggerMarketIoc configures an immediate market child.
         #[derive(Clone, Debug, Default)]
-        pub struct CreateTriggerRequestView<'a> {
-            /// Target sub-account. When empty or omitted, uses the caller's root account.
+        pub struct TriggerMarketIocView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TriggerMarketIocView<'a> {
+            type Owned = super::super::TriggerMarketIoc;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerMarketIoc,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TriggerMarketIoc,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TriggerMarketIoc {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TriggerMarketIocView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TriggerMarketIocView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TriggerMarketIocView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TriggerMarketIoc";
+            const FULL_NAME: &'static str = "triggers.v1.TriggerMarketIoc";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerMarketIoc";
+        }
+        ::buffa::impl_default_view_instance!(TriggerMarketIocView);
+        ::buffa::impl_view_reborrow!(TriggerMarketIocView);
+        /** Self-contained, `'static` owned view of a `TriggerMarketIoc` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TriggerMarketIocView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TriggerMarketIocView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TriggerMarketIocOwnedView(
+            ::buffa::OwnedView<TriggerMarketIocView<'static>>,
+        );
+        impl TriggerMarketIocOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
-            /// Field 1: `subaccount_id`
-            pub subaccount_id: ::core::option::Option<u64>,
-            /// Symbol, for example "BTC-USDT"; resolved to a numeric symbol ID.
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
             ///
-            /// Field 2: `symbol`
-            pub symbol: &'a str,
-            /// Type of trigger. Required.
+            /// # Errors
             ///
-            /// Field 3: `trigger_type`
-            pub trigger_type: ::buffa::EnumValue<super::super::TriggerType>,
-            /// --- Trigger Condition (for STOP_LOSS, TAKE_PROFIT, TRAILING_STOP) ---
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerMarketIocOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
             ///
-            /// Trigger price in quote units scaled by 1e6. Required for
-            /// STOP_LOSS/TAKE_PROFIT.
+            /// # Errors
             ///
-            /// Field 10: `trigger_price_ticks`
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerMarketIocOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TriggerMarketIoc,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerMarketIocOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TriggerMarketIocView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TriggerMarketIocView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerMarketIoc,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TriggerMarketIocView<'static>>>
+        for TriggerMarketIocOwnedView {
+            fn from(inner: ::buffa::OwnedView<TriggerMarketIocView<'static>>) -> Self {
+                TriggerMarketIocOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TriggerMarketIocOwnedView>
+        for ::buffa::OwnedView<TriggerMarketIocView<'static>> {
+            fn from(wrapper: TriggerMarketIocOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TriggerMarketIocView<'static>>>
+        for TriggerMarketIocOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TriggerMarketIocView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TriggerMarketIoc {
+            type View<'a> = TriggerMarketIocView<'a>;
+            type ViewHandle = TriggerMarketIocOwnedView;
+        }
+        impl ::serde::Serialize for TriggerMarketIocOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TriggerLimitGtc configures a resting limit child.
+        #[derive(Clone, Debug, Default)]
+        pub struct TriggerLimitGtcView<'a> {
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            pub price_ticks: i64,
+            /// Reject instead of taking liquidity.
+            ///
+            /// Field 2: `post_only`
+            pub post_only: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TriggerLimitGtcView<'a> {
+            type Owned = super::super::TriggerLimitGtc;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.post_only = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerLimitGtc,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TriggerLimitGtc,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TriggerLimitGtc {
+                    price_ticks: self.price_ticks,
+                    post_only: self.post_only,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TriggerLimitGtcView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+                }
+                if self.post_only {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+                }
+                if self.post_only {
+                    ::buffa::types::put_bool_field(2u32, self.post_only, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TriggerLimitGtcView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
+                        )?;
+                }
+                if self.post_only {
+                    __map.serialize_entry("postOnly", &self.post_only)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TriggerLimitGtcView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TriggerLimitGtc";
+            const FULL_NAME: &'static str = "triggers.v1.TriggerLimitGtc";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerLimitGtc";
+        }
+        ::buffa::impl_default_view_instance!(TriggerLimitGtcView);
+        ::buffa::impl_view_reborrow!(TriggerLimitGtcView);
+        /** Self-contained, `'static` owned view of a `TriggerLimitGtc` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TriggerLimitGtcView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TriggerLimitGtcView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TriggerLimitGtcOwnedView(
+            ::buffa::OwnedView<TriggerLimitGtcView<'static>>,
+        );
+        impl TriggerLimitGtcOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerLimitGtcOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerLimitGtcOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TriggerLimitGtc,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerLimitGtcOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TriggerLimitGtcView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TriggerLimitGtcView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerLimitGtc,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            #[must_use]
+            pub fn price_ticks(&self) -> i64 {
+                self.0.reborrow().price_ticks
+            }
+            /// Reject instead of taking liquidity.
+            ///
+            /// Field 2: `post_only`
+            #[must_use]
+            pub fn post_only(&self) -> bool {
+                self.0.reborrow().post_only
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TriggerLimitGtcView<'static>>>
+        for TriggerLimitGtcOwnedView {
+            fn from(inner: ::buffa::OwnedView<TriggerLimitGtcView<'static>>) -> Self {
+                TriggerLimitGtcOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TriggerLimitGtcOwnedView>
+        for ::buffa::OwnedView<TriggerLimitGtcView<'static>> {
+            fn from(wrapper: TriggerLimitGtcOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TriggerLimitGtcView<'static>>>
+        for TriggerLimitGtcOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TriggerLimitGtcView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TriggerLimitGtc {
+            type View<'a> = TriggerLimitGtcView<'a>;
+            type ViewHandle = TriggerLimitGtcOwnedView;
+        }
+        impl ::serde::Serialize for TriggerLimitGtcOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TriggerLimitIoc configures an immediate-or-cancel limit child.
+        #[derive(Clone, Debug, Default)]
+        pub struct TriggerLimitIocView<'a> {
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            pub price_ticks: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TriggerLimitIocView<'a> {
+            type Owned = super::super::TriggerLimitIoc;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerLimitIoc,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TriggerLimitIoc,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TriggerLimitIoc {
+                    price_ticks: self.price_ticks,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TriggerLimitIocView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TriggerLimitIocView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TriggerLimitIocView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TriggerLimitIoc";
+            const FULL_NAME: &'static str = "triggers.v1.TriggerLimitIoc";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerLimitIoc";
+        }
+        ::buffa::impl_default_view_instance!(TriggerLimitIocView);
+        ::buffa::impl_view_reborrow!(TriggerLimitIocView);
+        /** Self-contained, `'static` owned view of a `TriggerLimitIoc` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TriggerLimitIocView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TriggerLimitIocView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TriggerLimitIocOwnedView(
+            ::buffa::OwnedView<TriggerLimitIocView<'static>>,
+        );
+        impl TriggerLimitIocOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerLimitIocOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerLimitIocOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TriggerLimitIoc,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerLimitIocOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TriggerLimitIocView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TriggerLimitIocView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerLimitIoc,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            #[must_use]
+            pub fn price_ticks(&self) -> i64 {
+                self.0.reborrow().price_ticks
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TriggerLimitIocView<'static>>>
+        for TriggerLimitIocOwnedView {
+            fn from(inner: ::buffa::OwnedView<TriggerLimitIocView<'static>>) -> Self {
+                TriggerLimitIocOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TriggerLimitIocOwnedView>
+        for ::buffa::OwnedView<TriggerLimitIocView<'static>> {
+            fn from(wrapper: TriggerLimitIocOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TriggerLimitIocView<'static>>>
+        for TriggerLimitIocOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TriggerLimitIocView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TriggerLimitIoc {
+            type View<'a> = TriggerLimitIocView<'a>;
+            type ViewHandle = TriggerLimitIocOwnedView;
+        }
+        impl ::serde::Serialize for TriggerLimitIocOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TriggerLimitFok configures a fill-or-kill limit child.
+        #[derive(Clone, Debug, Default)]
+        pub struct TriggerLimitFokView<'a> {
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            pub price_ticks: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TriggerLimitFokView<'a> {
+            type Owned = super::super::TriggerLimitFok;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerLimitFok,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TriggerLimitFok,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TriggerLimitFok {
+                    price_ticks: self.price_ticks,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TriggerLimitFokView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TriggerLimitFokView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TriggerLimitFokView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TriggerLimitFok";
+            const FULL_NAME: &'static str = "triggers.v1.TriggerLimitFok";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerLimitFok";
+        }
+        ::buffa::impl_default_view_instance!(TriggerLimitFokView);
+        ::buffa::impl_view_reborrow!(TriggerLimitFokView);
+        /** Self-contained, `'static` owned view of a `TriggerLimitFok` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TriggerLimitFokView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TriggerLimitFokView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TriggerLimitFokOwnedView(
+            ::buffa::OwnedView<TriggerLimitFokView<'static>>,
+        );
+        impl TriggerLimitFokOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerLimitFokOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerLimitFokOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TriggerLimitFok,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerLimitFokOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TriggerLimitFokView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TriggerLimitFokView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerLimitFok,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            #[must_use]
+            pub fn price_ticks(&self) -> i64 {
+                self.0.reborrow().price_ticks
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TriggerLimitFokView<'static>>>
+        for TriggerLimitFokOwnedView {
+            fn from(inner: ::buffa::OwnedView<TriggerLimitFokView<'static>>) -> Self {
+                TriggerLimitFokOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TriggerLimitFokOwnedView>
+        for ::buffa::OwnedView<TriggerLimitFokView<'static>> {
+            fn from(wrapper: TriggerLimitFokOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TriggerLimitFokView<'static>>>
+        for TriggerLimitFokOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TriggerLimitFokView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TriggerLimitFok {
+            type View<'a> = TriggerLimitFokView<'a>;
+            type ViewHandle = TriggerLimitFokOwnedView;
+        }
+        impl ::serde::Serialize for TriggerLimitFokOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ConditionalChildExecution selects the child submitted by a stop-loss or
+        /// take-profit trigger. BUY market children are not supported in spot.
+        #[derive(Clone, Debug, Default)]
+        pub struct ConditionalChildExecutionView<'a> {
+            pub execution: ::core::option::Option<
+                super::super::__buffa::view::oneof::conditional_child_execution::Execution<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ConditionalChildExecutionView<'a> {
+            type Owned = super::super::ConditionalChildExecution;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::conditional_child_execution::Execution::MarketIoc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::conditional_child_execution::Execution::MarketIoc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TriggerMarketIocView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitGtc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitGtc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TriggerLimitGtcView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitIoc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitIoc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TriggerLimitIocView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitFok(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitFok(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TriggerLimitFokView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConditionalChildExecution,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ConditionalChildExecution,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ConditionalChildExecution {
+                    execution: match self.execution.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::conditional_child_execution::Execution::MarketIoc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::conditional_child_execution::Execution::MarketIoc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitGtc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::conditional_child_execution::Execution::LimitGtc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitIoc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::conditional_child_execution::Execution::LimitIoc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitFok(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::conditional_child_execution::Execution::LimitFok(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ConditionalChildExecutionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if let ::core::option::Option::Some(ref v) = self.execution {
+                    match v {
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::MarketIoc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitGtc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitIoc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitFok(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let ::core::option::Option::Some(ref v) = self.execution {
+                    match v {
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::MarketIoc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                1u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitGtc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                2u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitIoc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                3u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitFok(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                4u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ConditionalChildExecutionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(ref __ov) = self.execution {
+                    match __ov {
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::MarketIoc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("marketIoc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitGtc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitGtc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitIoc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitIoc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::conditional_child_execution::Execution::LimitFok(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitFok", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ConditionalChildExecutionView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "ConditionalChildExecution";
+            const FULL_NAME: &'static str = "triggers.v1.ConditionalChildExecution";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.ConditionalChildExecution";
+        }
+        ::buffa::impl_default_view_instance!(ConditionalChildExecutionView);
+        ::buffa::impl_view_reborrow!(ConditionalChildExecutionView);
+        /** Self-contained, `'static` owned view of a `ConditionalChildExecution` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ConditionalChildExecutionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ConditionalChildExecutionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ConditionalChildExecutionOwnedView(
+            ::buffa::OwnedView<ConditionalChildExecutionView<'static>>,
+        );
+        impl ConditionalChildExecutionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConditionalChildExecutionOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConditionalChildExecutionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ConditionalChildExecution,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConditionalChildExecutionOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ConditionalChildExecutionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ConditionalChildExecutionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConditionalChildExecution,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Oneof `execution`.
+            #[must_use]
+            pub fn execution(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::conditional_child_execution::Execution<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().execution.as_ref()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ConditionalChildExecutionView<'static>>,
+        > for ConditionalChildExecutionOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ConditionalChildExecutionView<'static>>,
+            ) -> Self {
+                ConditionalChildExecutionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ConditionalChildExecutionOwnedView>
+        for ::buffa::OwnedView<ConditionalChildExecutionView<'static>> {
+            fn from(wrapper: ConditionalChildExecutionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ConditionalChildExecutionView<'static>>,
+        > for ConditionalChildExecutionOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ConditionalChildExecutionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ConditionalChildExecution {
+            type View<'a> = ConditionalChildExecutionView<'a>;
+            type ViewHandle = ConditionalChildExecutionOwnedView;
+        }
+        impl ::serde::Serialize for ConditionalChildExecutionOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ConditionalTrigger configures a standalone stop-loss or take-profit.
+        #[derive(Clone, Debug, Default)]
+        pub struct ConditionalTriggerView<'a> {
+            /// Trigger threshold in quote units scaled by 1e6.
+            ///
+            /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
-            /// Price source for trigger evaluation. Defaults to LAST_PRICE.
+            /// Child order side.
             ///
-            /// Field 11: `trigger_price_source`
-            pub trigger_price_source: ::buffa::EnumValue<
-                super::super::super::super::orders::v1::TriggerPriceSource,
-            >,
-            /// --- Child Order Template ---
-            ///
-            /// Side for the child order. Required.
-            ///
-            /// Field 20: `side`
+            /// Field 2: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
-            /// Order type for the child order (LIMIT or MARKET). Defaults to MARKET.
+            /// Child execution.
             ///
-            /// Field 21: `order_type`
-            pub order_type: ::buffa::EnumValue<
-                super::super::super::super::orders::v1::OrderType,
+            /// Field 3: `child`
+            pub child: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ConditionalChildExecutionView<'a>,
             >,
-            /// Time-in-force for the child order. Defaults to GTC for LIMIT, IOC for
-            /// MARKET.
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ConditionalTriggerView<'a> {
+            type Owned = super::super::ConditionalTrigger;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_ticks = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.side = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.child.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.child = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ConditionalChildExecutionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConditionalTrigger,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ConditionalTrigger,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ConditionalTrigger {
+                    trigger_price_ticks: self.trigger_price_ticks,
+                    side: self.side,
+                    child: match self.child.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ConditionalChildExecution,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ConditionalTriggerView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.trigger_price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.trigger_price_ticks)
+                                as u32;
+                }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.child.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.child.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.trigger_price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.trigger_price_ticks, buf);
+                }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if self.child.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.child.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ConditionalTriggerView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.trigger_price_ticks,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.trigger_price_ticks),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
+                    __map.serialize_entry("side", &self.side)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.child.as_option() {
+                        __map.serialize_entry("child", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ConditionalTriggerView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "ConditionalTrigger";
+            const FULL_NAME: &'static str = "triggers.v1.ConditionalTrigger";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.ConditionalTrigger";
+        }
+        ::buffa::impl_default_view_instance!(ConditionalTriggerView);
+        ::buffa::impl_view_reborrow!(ConditionalTriggerView);
+        /** Self-contained, `'static` owned view of a `ConditionalTrigger` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ConditionalTriggerView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ConditionalTriggerView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ConditionalTriggerOwnedView(
+            ::buffa::OwnedView<ConditionalTriggerView<'static>>,
+        );
+        impl ConditionalTriggerOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
-            /// Field 22: `time_in_force`
-            pub time_in_force: ::buffa::EnumValue<
-                super::super::super::super::orders::v1::TimeInForce,
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConditionalTriggerOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConditionalTriggerOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ConditionalTrigger,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConditionalTriggerOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ConditionalTriggerView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ConditionalTriggerView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConditionalTrigger,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Trigger threshold in quote units scaled by 1e6.
+            ///
+            /// Field 1: `trigger_price_ticks`
+            #[must_use]
+            pub fn trigger_price_ticks(&self) -> i64 {
+                self.0.reborrow().trigger_price_ticks
+            }
+            /// Child order side.
+            ///
+            /// Field 2: `side`
+            #[must_use]
+            pub fn side(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
+                self.0.reborrow().side
+            }
+            /// Child execution.
+            ///
+            /// Field 3: `child`
+            #[must_use]
+            pub fn child(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ConditionalChildExecutionView<'_>,
+            > {
+                &self.0.reborrow().child
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ConditionalTriggerView<'static>>>
+        for ConditionalTriggerOwnedView {
+            fn from(inner: ::buffa::OwnedView<ConditionalTriggerView<'static>>) -> Self {
+                ConditionalTriggerOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ConditionalTriggerOwnedView>
+        for ::buffa::OwnedView<ConditionalTriggerView<'static>> {
+            fn from(wrapper: ConditionalTriggerOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ConditionalTriggerView<'static>>>
+        for ConditionalTriggerOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ConditionalTriggerView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ConditionalTrigger {
+            type View<'a> = ConditionalTriggerView<'a>;
+            type ViewHandle = ConditionalTriggerOwnedView;
+        }
+        impl ::serde::Serialize for ConditionalTriggerOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TrailingStopTrigger configures the supported spot trailing-stop strategy.
+        /// It tracks last trade price and submits a SELL market-IOC child when fired.
+        #[derive(Clone, Debug, Default)]
+        pub struct TrailingStopTriggerView<'a> {
+            /// Optional activation price in quote units scaled by 1e6.
+            ///
+            /// Field 3: `activation_price_ticks`
+            pub activation_price_ticks: i64,
+            pub trailing_distance: ::core::option::Option<
+                super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance,
             >,
-            /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
-            /// Required.
+            pub max_slippage: ::core::option::Option<
+                super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TrailingStopTriggerView<'a> {
+            type Owned = super::super::TrailingStopTrigger;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.activation_price_ticks = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trailing_distance = Some(
+                            super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(
+                                ::buffa::types::decode_int64(&mut cur)?,
+                            ),
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trailing_distance = Some(
+                            super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_slippage = Some(
+                            super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_slippage = Some(
+                            super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TrailingStopTrigger,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TrailingStopTrigger,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TrailingStopTrigger {
+                    activation_price_ticks: self.activation_price_ticks,
+                    trailing_distance: self
+                        .trailing_distance
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                                    *v,
+                                )
+                            }
+                        }),
+                    max_slippage: self
+                        .max_slippage
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
+                                    *v,
+                                )
+                            }
+                        }),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TrailingStopTriggerView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if let ::core::option::Option::Some(ref v) = self.trailing_distance {
+                    match v {
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                        }
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                        }
+                    }
+                }
+                if self.activation_price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(
+                                self.activation_price_ticks,
+                            ) as u32;
+                }
+                if let ::core::option::Option::Some(ref v) = self.max_slippage {
+                    match v {
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                        }
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let ::core::option::Option::Some(ref v) = self.trailing_distance {
+                    match v {
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int64_field(1u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(2u32, *x, buf);
+                        }
+                    }
+                }
+                if self.activation_price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(
+                        3u32,
+                        self.activation_price_ticks,
+                        buf,
+                    );
+                }
+                if let ::core::option::Option::Some(ref v) = self.max_slippage {
+                    match v {
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(4u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(5u32, *x, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TrailingStopTriggerView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.activation_price_ticks,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "activationPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.activation_price_ticks,
+                            ),
+                        )?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.trailing_distance {
+                    match __ov {
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "trailingDistanceTicks",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "trailingDistanceBps",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                    }
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.max_slippage {
+                    match __ov {
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "maxSlippageTicks",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "maxSlippageBps",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TrailingStopTriggerView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TrailingStopTrigger";
+            const FULL_NAME: &'static str = "triggers.v1.TrailingStopTrigger";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TrailingStopTrigger";
+        }
+        ::buffa::impl_default_view_instance!(TrailingStopTriggerView);
+        ::buffa::impl_view_reborrow!(TrailingStopTriggerView);
+        /** Self-contained, `'static` owned view of a `TrailingStopTrigger` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TrailingStopTriggerView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TrailingStopTriggerView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TrailingStopTriggerOwnedView(
+            ::buffa::OwnedView<TrailingStopTriggerView<'static>>,
+        );
+        impl TrailingStopTriggerOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
-            /// Field 23: `qty_scaled`
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TrailingStopTriggerOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TrailingStopTriggerOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TrailingStopTrigger,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TrailingStopTriggerOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TrailingStopTriggerView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TrailingStopTriggerView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TrailingStopTrigger,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional activation price in quote units scaled by 1e6.
+            ///
+            /// Field 3: `activation_price_ticks`
+            #[must_use]
+            pub fn activation_price_ticks(&self) -> i64 {
+                self.0.reborrow().activation_price_ticks
+            }
+            /// Oneof `trailing_distance`.
+            #[must_use]
+            pub fn trailing_distance(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance,
+            > {
+                self.0.reborrow().trailing_distance.as_ref()
+            }
+            /// Oneof `max_slippage`.
+            #[must_use]
+            pub fn max_slippage(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage,
+            > {
+                self.0.reborrow().max_slippage.as_ref()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TrailingStopTriggerView<'static>>>
+        for TrailingStopTriggerOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<TrailingStopTriggerView<'static>>,
+            ) -> Self {
+                TrailingStopTriggerOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TrailingStopTriggerOwnedView>
+        for ::buffa::OwnedView<TrailingStopTriggerView<'static>> {
+            fn from(wrapper: TrailingStopTriggerOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TrailingStopTriggerView<'static>>>
+        for TrailingStopTriggerOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TrailingStopTriggerView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TrailingStopTrigger {
+            type View<'a> = TrailingStopTriggerView<'a>;
+            type ViewHandle = TrailingStopTriggerOwnedView;
+        }
+        impl ::serde::Serialize for TrailingStopTriggerOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TwapMarketIoc configures server-priced market-IOC slices.
+        #[derive(Clone, Debug, Default)]
+        pub struct TwapMarketIocView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TwapMarketIocView<'a> {
+            type Owned = super::super::TwapMarketIoc;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TwapMarketIoc,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TwapMarketIoc,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TwapMarketIoc {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TwapMarketIocView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TwapMarketIocView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TwapMarketIocView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TwapMarketIoc";
+            const FULL_NAME: &'static str = "triggers.v1.TwapMarketIoc";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TwapMarketIoc";
+        }
+        ::buffa::impl_default_view_instance!(TwapMarketIocView);
+        ::buffa::impl_view_reborrow!(TwapMarketIocView);
+        /** Self-contained, `'static` owned view of a `TwapMarketIoc` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TwapMarketIocView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TwapMarketIocView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TwapMarketIocOwnedView(
+            ::buffa::OwnedView<TwapMarketIocView<'static>>,
+        );
+        impl TwapMarketIocOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TwapMarketIocOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TwapMarketIocOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TwapMarketIoc,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TwapMarketIocOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TwapMarketIocView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TwapMarketIocView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TwapMarketIoc,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TwapMarketIocView<'static>>>
+        for TwapMarketIocOwnedView {
+            fn from(inner: ::buffa::OwnedView<TwapMarketIocView<'static>>) -> Self {
+                TwapMarketIocOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TwapMarketIocOwnedView>
+        for ::buffa::OwnedView<TwapMarketIocView<'static>> {
+            fn from(wrapper: TwapMarketIocOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TwapMarketIocView<'static>>>
+        for TwapMarketIocOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TwapMarketIocView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TwapMarketIoc {
+            type View<'a> = TwapMarketIocView<'a>;
+            type ViewHandle = TwapMarketIocOwnedView;
+        }
+        impl ::serde::Serialize for TwapMarketIocOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TwapLimitGtc configures one resting limit slice at a time. A previous open
+        /// slice is canceled before the next interval.
+        #[derive(Clone, Debug, Default)]
+        pub struct TwapLimitGtcView<'a> {
+            /// Slice limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            pub price_ticks: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TwapLimitGtcView<'a> {
+            type Owned = super::super::TwapLimitGtc;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TwapLimitGtc,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TwapLimitGtc,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TwapLimitGtc {
+                    price_ticks: self.price_ticks,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TwapLimitGtcView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TwapLimitGtcView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TwapLimitGtcView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TwapLimitGtc";
+            const FULL_NAME: &'static str = "triggers.v1.TwapLimitGtc";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TwapLimitGtc";
+        }
+        ::buffa::impl_default_view_instance!(TwapLimitGtcView);
+        ::buffa::impl_view_reborrow!(TwapLimitGtcView);
+        /** Self-contained, `'static` owned view of a `TwapLimitGtc` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TwapLimitGtcView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TwapLimitGtcView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TwapLimitGtcOwnedView(::buffa::OwnedView<TwapLimitGtcView<'static>>);
+        impl TwapLimitGtcOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TwapLimitGtcOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TwapLimitGtcOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TwapLimitGtc,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TwapLimitGtcOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TwapLimitGtcView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TwapLimitGtcView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TwapLimitGtc,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Slice limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            #[must_use]
+            pub fn price_ticks(&self) -> i64 {
+                self.0.reborrow().price_ticks
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TwapLimitGtcView<'static>>>
+        for TwapLimitGtcOwnedView {
+            fn from(inner: ::buffa::OwnedView<TwapLimitGtcView<'static>>) -> Self {
+                TwapLimitGtcOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TwapLimitGtcOwnedView>
+        for ::buffa::OwnedView<TwapLimitGtcView<'static>> {
+            fn from(wrapper: TwapLimitGtcOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TwapLimitGtcView<'static>>>
+        for TwapLimitGtcOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TwapLimitGtcView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TwapLimitGtc {
+            type View<'a> = TwapLimitGtcView<'a>;
+            type ViewHandle = TwapLimitGtcOwnedView;
+        }
+        impl ::serde::Serialize for TwapLimitGtcOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TwapTrigger configures a proven TWAP execution mode.
+        #[derive(Clone, Debug, Default)]
+        pub struct TwapTriggerView<'a> {
+            /// Child side.
+            ///
+            /// Field 1: `side`
+            pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
+            /// Total execution duration in milliseconds.
+            ///
+            /// Field 2: `duration_ms`
+            pub duration_ms: i64,
+            /// Interval between slices in milliseconds.
+            ///
+            /// Field 3: `slice_interval_ms`
+            pub slice_interval_ms: i64,
+            pub execution: ::core::option::Option<
+                super::super::__buffa::view::oneof::twap_trigger::Execution<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TwapTriggerView<'a> {
+            type Owned = super::super::TwapTrigger;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.side = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.duration_ms = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.slice_interval_ms = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::twap_trigger::Execution::MarketIoc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::twap_trigger::Execution::MarketIoc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TwapMarketIocView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::twap_trigger::Execution::LimitGtc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::twap_trigger::Execution::LimitGtc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TwapLimitGtcView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TwapTrigger,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TwapTrigger,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TwapTrigger {
+                    side: self.side,
+                    duration_ms: self.duration_ms,
+                    slice_interval_ms: self.slice_interval_ms,
+                    execution: match self.execution.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::twap_trigger::Execution::MarketIoc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::twap_trigger::Execution::MarketIoc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::twap_trigger::Execution::LimitGtc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::twap_trigger::Execution::LimitGtc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TwapTriggerView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.duration_ms != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.duration_ms) as u32;
+                }
+                if self.slice_interval_ms != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.slice_interval_ms)
+                                as u32;
+                }
+                if let ::core::option::Option::Some(ref v) = self.execution {
+                    match v {
+                        super::super::__buffa::view::oneof::twap_trigger::Execution::MarketIoc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::twap_trigger::Execution::LimitGtc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if self.duration_ms != 0i64 {
+                    ::buffa::types::put_int64_field(2u32, self.duration_ms, buf);
+                }
+                if self.slice_interval_ms != 0i64 {
+                    ::buffa::types::put_int64_field(3u32, self.slice_interval_ms, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.execution {
+                    match v {
+                        super::super::__buffa::view::oneof::twap_trigger::Execution::MarketIoc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                4u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::twap_trigger::Execution::LimitGtc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                5u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TwapTriggerView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
+                    __map.serialize_entry("side", &self.side)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.duration_ms) {
+                    __map
+                        .serialize_entry(
+                            "durationMs",
+                            &::buffa::json_helpers::ProtoJson(&self.duration_ms),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.slice_interval_ms,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "sliceIntervalMs",
+                            &::buffa::json_helpers::ProtoJson(&self.slice_interval_ms),
+                        )?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.execution {
+                    match __ov {
+                        super::super::__buffa::view::oneof::twap_trigger::Execution::MarketIoc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("marketIoc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::twap_trigger::Execution::LimitGtc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitGtc", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TwapTriggerView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TwapTrigger";
+            const FULL_NAME: &'static str = "triggers.v1.TwapTrigger";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TwapTrigger";
+        }
+        ::buffa::impl_default_view_instance!(TwapTriggerView);
+        ::buffa::impl_view_reborrow!(TwapTriggerView);
+        /** Self-contained, `'static` owned view of a `TwapTrigger` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TwapTriggerView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TwapTriggerView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TwapTriggerOwnedView(::buffa::OwnedView<TwapTriggerView<'static>>);
+        impl TwapTriggerOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TwapTriggerOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TwapTriggerOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TwapTrigger,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TwapTriggerOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TwapTriggerView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TwapTriggerView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TwapTrigger,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Child side.
+            ///
+            /// Field 1: `side`
+            #[must_use]
+            pub fn side(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
+                self.0.reborrow().side
+            }
+            /// Total execution duration in milliseconds.
+            ///
+            /// Field 2: `duration_ms`
+            #[must_use]
+            pub fn duration_ms(&self) -> i64 {
+                self.0.reborrow().duration_ms
+            }
+            /// Interval between slices in milliseconds.
+            ///
+            /// Field 3: `slice_interval_ms`
+            #[must_use]
+            pub fn slice_interval_ms(&self) -> i64 {
+                self.0.reborrow().slice_interval_ms
+            }
+            /// Oneof `execution`.
+            #[must_use]
+            pub fn execution(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::twap_trigger::Execution<'_>,
+            > {
+                self.0.reborrow().execution.as_ref()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TwapTriggerView<'static>>>
+        for TwapTriggerOwnedView {
+            fn from(inner: ::buffa::OwnedView<TwapTriggerView<'static>>) -> Self {
+                TwapTriggerOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TwapTriggerOwnedView>
+        for ::buffa::OwnedView<TwapTriggerView<'static>> {
+            fn from(wrapper: TwapTriggerOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TwapTriggerView<'static>>>
+        for TwapTriggerOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TwapTriggerView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TwapTrigger {
+            type View<'a> = TwapTriggerView<'a>;
+            type ViewHandle = TwapTriggerOwnedView;
+        }
+        impl ::serde::Serialize for TwapTriggerOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// LadderTrigger configures the supported LINEAR limit-GTC ladder. All levels
+        /// are admitted immediately and may rest concurrently.
+        #[derive(Clone, Debug, Default)]
+        pub struct LadderTriggerView<'a> {
+            /// Child side.
+            ///
+            /// Field 1: `side`
+            pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
+            /// Minimum generated level price in quote units scaled by 1e6.
+            ///
+            /// Field 2: `price_min_ticks`
+            pub price_min_ticks: i64,
+            /// Maximum generated level price in quote units scaled by 1e6.
+            ///
+            /// Field 3: `price_max_ticks`
+            pub price_max_ticks: i64,
+            /// Number of linearly distributed levels.
+            ///
+            /// Field 4: `levels`
+            pub levels: i32,
+            /// Reject each level instead of taking liquidity.
+            ///
+            /// Field 5: `post_only`
+            pub post_only: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for LadderTriggerView<'a> {
+            type Owned = super::super::LadderTrigger;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.side = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_min_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_max_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.levels = ::buffa::types::decode_int32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.post_only = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::LadderTrigger,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::LadderTrigger,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::LadderTrigger {
+                    side: self.side,
+                    price_min_ticks: self.price_min_ticks,
+                    price_max_ticks: self.price_max_ticks,
+                    levels: self.levels,
+                    post_only: self.post_only,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for LadderTriggerView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.price_min_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_min_ticks)
+                                as u32;
+                }
+                if self.price_max_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_max_ticks)
+                                as u32;
+                }
+                if self.levels != 0i32 {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(self.levels) as u32;
+                }
+                if self.post_only {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if self.price_min_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(2u32, self.price_min_ticks, buf);
+                }
+                if self.price_max_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(3u32, self.price_max_ticks, buf);
+                }
+                if self.levels != 0i32 {
+                    ::buffa::types::put_int32_field(4u32, self.levels, buf);
+                }
+                if self.post_only {
+                    ::buffa::types::put_bool_field(5u32, self.post_only, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for LadderTriggerView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
+                    __map.serialize_entry("side", &self.side)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_min_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceMinTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_min_ticks),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_max_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceMaxTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_max_ticks),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i32(&self.levels) {
+                    __map
+                        .serialize_entry(
+                            "levels",
+                            &::buffa::json_helpers::ProtoJson(&self.levels),
+                        )?;
+                }
+                if self.post_only {
+                    __map.serialize_entry("postOnly", &self.post_only)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for LadderTriggerView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "LadderTrigger";
+            const FULL_NAME: &'static str = "triggers.v1.LadderTrigger";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.LadderTrigger";
+        }
+        ::buffa::impl_default_view_instance!(LadderTriggerView);
+        ::buffa::impl_view_reborrow!(LadderTriggerView);
+        /** Self-contained, `'static` owned view of a `LadderTrigger` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`LadderTriggerView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LadderTriggerView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct LadderTriggerOwnedView(
+            ::buffa::OwnedView<LadderTriggerView<'static>>,
+        );
+        impl LadderTriggerOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LadderTriggerOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LadderTriggerOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::LadderTrigger,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LadderTriggerOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`LadderTriggerView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &LadderTriggerView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::LadderTrigger,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Child side.
+            ///
+            /// Field 1: `side`
+            #[must_use]
+            pub fn side(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
+                self.0.reborrow().side
+            }
+            /// Minimum generated level price in quote units scaled by 1e6.
+            ///
+            /// Field 2: `price_min_ticks`
+            #[must_use]
+            pub fn price_min_ticks(&self) -> i64 {
+                self.0.reborrow().price_min_ticks
+            }
+            /// Maximum generated level price in quote units scaled by 1e6.
+            ///
+            /// Field 3: `price_max_ticks`
+            #[must_use]
+            pub fn price_max_ticks(&self) -> i64 {
+                self.0.reborrow().price_max_ticks
+            }
+            /// Number of linearly distributed levels.
+            ///
+            /// Field 4: `levels`
+            #[must_use]
+            pub fn levels(&self) -> i32 {
+                self.0.reborrow().levels
+            }
+            /// Reject each level instead of taking liquidity.
+            ///
+            /// Field 5: `post_only`
+            #[must_use]
+            pub fn post_only(&self) -> bool {
+                self.0.reborrow().post_only
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<LadderTriggerView<'static>>>
+        for LadderTriggerOwnedView {
+            fn from(inner: ::buffa::OwnedView<LadderTriggerView<'static>>) -> Self {
+                LadderTriggerOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<LadderTriggerOwnedView>
+        for ::buffa::OwnedView<LadderTriggerView<'static>> {
+            fn from(wrapper: LadderTriggerOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<LadderTriggerView<'static>>>
+        for LadderTriggerOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<LadderTriggerView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::LadderTrigger {
+            type View<'a> = LadderTriggerView<'a>;
+            type ViewHandle = LadderTriggerOwnedView;
+        }
+        impl ::serde::Serialize for LadderTriggerOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TriggerIntent contains one standalone trigger's immutable configuration.
+        #[derive(Clone, Debug, Default)]
+        pub struct TriggerIntentView<'a> {
+            /// Symbol, for example "BTC-USDT".
+            ///
+            /// Field 1: `symbol`
+            pub symbol: &'a str,
+            /// Total quantity scaled by the pair's base_quantity_scale.
+            ///
+            /// Field 2: `qty_scaled`
             pub qty_scaled: i64,
-            /// Limit price in quote units scaled by 1e6 for LIMIT child orders.
+            /// Fee source for BUY children. SELL children must use QUOTE.
             ///
-            /// Field 24: `limit_price_ticks`
-            pub limit_price_ticks: i64,
-            /// Fee source selection for BUY child orders. SELL child orders always pay in
-            /// QUOTE.
-            ///
-            /// When omitted (UNSPECIFIED), defaults to QUOTE.
-            ///
-            /// Field 25: `fee_source`
+            /// Field 3: `fee_source`
             pub fee_source: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::FeeSource,
             >,
-            /// Self-trade prevention mode for child orders.
+            /// Child self-trade prevention mode. Defaults to EXPIRE_MAKER.
             ///
-            /// When omitted (UNSPECIFIED), defaults to EXPIRE_MAKER.
-            ///
-            /// Field 26: `self_trade_prevention_mode`
+            /// Field 4: `self_trade_prevention_mode`
             pub self_trade_prevention_mode: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::SelfTradePreventionMode,
             >,
-            /// If true, child LIMIT orders are post-only (rejected if they would cross).
+            /// Client-provided trigger ID for idempotency.
             ///
-            /// Field 27: `post_only`
-            pub post_only: bool,
-            /// Optional activation price: trailing only starts after this price is
-            /// reached. Expressed in quote units scaled by 1e6.
-            ///
-            /// Field 32: `activation_price_ticks`
-            pub activation_price_ticks: i64,
-            /// --- TWAP Specific ---
-            ///
-            /// Total duration of TWAP execution in milliseconds. Required for TWAP.
-            ///
-            /// Field 40: `twap_duration_ms`
-            pub twap_duration_ms: i64,
-            /// Interval between TWAP slices in milliseconds. Required for TWAP.
-            ///
-            /// Field 41: `twap_slice_interval_ms`
-            pub twap_slice_interval_ms: i64,
-            /// --- Ladder/Scaled Specific ---
-            ///
-            /// Minimum price in quote units scaled by 1e6 for the ladder range.
-            ///
-            /// Field 50: `ladder_price_min_ticks`
-            pub ladder_price_min_ticks: i64,
-            /// Maximum price in quote units scaled by 1e6 for the ladder range.
-            ///
-            /// Field 51: `ladder_price_max_ticks`
-            pub ladder_price_max_ticks: i64,
-            /// Number of price levels in the ladder.
-            /// Required for LADDER; valid range is 2..100.
-            ///
-            /// Field 52: `ladder_levels`
-            pub ladder_levels: i32,
-            /// Distribution of quantity across levels.
-            ///
-            /// Field 53: `ladder_distribution`
-            pub ladder_distribution: ::buffa::EnumValue<
-                super::super::LadderDistribution,
-            >,
-            /// --- Client Idempotency ---
-            ///
-            /// Client-provided trigger ID for idempotency. Required.
-            ///
-            /// Field 60: `client_trigger_id`
+            /// Field 5: `client_trigger_id`
             pub client_trigger_id: &'a str,
-            pub trailing_distance: ::core::option::Option<
-                super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance,
+            pub strategy: ::core::option::Option<
+                super::super::__buffa::view::oneof::trigger_intent::Strategy<'a>,
             >,
-            pub max_slippage: ::core::option::Option<
-                super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TriggerIntentView<'a> {
+            type Owned = super::super::TriggerIntent;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fee_source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.self_trade_prevention_mode = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_trigger_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::trigger_intent::Strategy::StopLoss(
+                                ref mut existing,
+                            ),
+                        ) = view.strategy
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.strategy = Some(
+                                super::super::__buffa::view::oneof::trigger_intent::Strategy::StopLoss(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::ConditionalTriggerView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::trigger_intent::Strategy::TakeProfit(
+                                ref mut existing,
+                            ),
+                        ) = view.strategy
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.strategy = Some(
+                                super::super::__buffa::view::oneof::trigger_intent::Strategy::TakeProfit(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::ConditionalTriggerView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::trigger_intent::Strategy::TrailingStop(
+                                ref mut existing,
+                            ),
+                        ) = view.strategy
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.strategy = Some(
+                                super::super::__buffa::view::oneof::trigger_intent::Strategy::TrailingStop(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TrailingStopTriggerView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::trigger_intent::Strategy::Twap(
+                                ref mut existing,
+                            ),
+                        ) = view.strategy
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.strategy = Some(
+                                super::super::__buffa::view::oneof::trigger_intent::Strategy::Twap(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TwapTriggerView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::trigger_intent::Strategy::Ladder(
+                                ref mut existing,
+                            ),
+                        ) = view.strategy
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.strategy = Some(
+                                super::super::__buffa::view::oneof::trigger_intent::Strategy::Ladder(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::LadderTriggerView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerIntent,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TriggerIntent,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TriggerIntent {
+                    symbol: self.symbol.to_string(),
+                    qty_scaled: self.qty_scaled,
+                    fee_source: self.fee_source,
+                    self_trade_prevention_mode: self.self_trade_prevention_mode,
+                    client_trigger_id: self.client_trigger_id.to_string(),
+                    strategy: match self.strategy.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::trigger_intent::Strategy::StopLoss(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::trigger_intent::Strategy::StopLoss(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::trigger_intent::Strategy::TakeProfit(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::trigger_intent::Strategy::TakeProfit(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::trigger_intent::Strategy::TrailingStop(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::trigger_intent::Strategy::TrailingStop(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::trigger_intent::Strategy::Twap(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::trigger_intent::Strategy::Twap(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::trigger_intent::Strategy::Ladder(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::trigger_intent::Strategy::Ladder(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TriggerIntentView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.symbol.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+                }
+                if self.qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+                }
+                {
+                    let val = self.fee_source.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.self_trade_prevention_mode.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.client_trigger_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.client_trigger_id)
+                                as u32;
+                }
+                if let ::core::option::Option::Some(ref v) = self.strategy {
+                    match v {
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::StopLoss(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::TakeProfit(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::TrailingStop(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::Twap(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::Ladder(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.symbol.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.symbol, buf);
+                }
+                if self.qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(2u32, self.qty_scaled, buf);
+                }
+                {
+                    let val = self.fee_source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.self_trade_prevention_mode.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                if !self.client_trigger_id.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.client_trigger_id, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.strategy {
+                    match v {
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::StopLoss(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                10u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::TakeProfit(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                11u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::TrailingStop(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                12u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::Twap(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                13u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::Ladder(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                14u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TriggerIntentView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
+                    __map.serialize_entry("symbol", self.symbol)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
+                    __map
+                        .serialize_entry(
+                            "qtyScaled",
+                            &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.fee_source,
+                ) {
+                    __map.serialize_entry("feeSource", &self.fee_source)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.self_trade_prevention_mode,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "selfTradePreventionMode",
+                            &self.self_trade_prevention_mode,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.client_trigger_id,
+                ) {
+                    __map.serialize_entry("clientTriggerId", self.client_trigger_id)?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.strategy {
+                    match __ov {
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::StopLoss(
+                            v,
+                        ) => {
+                            __map.serialize_entry("stopLoss", v)?;
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::TakeProfit(
+                            v,
+                        ) => {
+                            __map.serialize_entry("takeProfit", v)?;
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::TrailingStop(
+                            v,
+                        ) => {
+                            __map.serialize_entry("trailingStop", v)?;
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::Twap(
+                            v,
+                        ) => {
+                            __map.serialize_entry("twap", v)?;
+                        }
+                        super::super::__buffa::view::oneof::trigger_intent::Strategy::Ladder(
+                            v,
+                        ) => {
+                            __map.serialize_entry("ladder", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TriggerIntentView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TriggerIntent";
+            const FULL_NAME: &'static str = "triggers.v1.TriggerIntent";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerIntent";
+        }
+        ::buffa::impl_default_view_instance!(TriggerIntentView);
+        ::buffa::impl_view_reborrow!(TriggerIntentView);
+        /** Self-contained, `'static` owned view of a `TriggerIntent` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TriggerIntentView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TriggerIntentView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TriggerIntentOwnedView(
+            ::buffa::OwnedView<TriggerIntentView<'static>>,
+        );
+        impl TriggerIntentOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerIntentOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerIntentOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TriggerIntent,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerIntentOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TriggerIntentView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TriggerIntentView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerIntent,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Symbol, for example "BTC-USDT".
+            ///
+            /// Field 1: `symbol`
+            #[must_use]
+            pub fn symbol(&self) -> &'_ str {
+                self.0.reborrow().symbol
+            }
+            /// Total quantity scaled by the pair's base_quantity_scale.
+            ///
+            /// Field 2: `qty_scaled`
+            #[must_use]
+            pub fn qty_scaled(&self) -> i64 {
+                self.0.reborrow().qty_scaled
+            }
+            /// Fee source for BUY children. SELL children must use QUOTE.
+            ///
+            /// Field 3: `fee_source`
+            #[must_use]
+            pub fn fee_source(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::FeeSource> {
+                self.0.reborrow().fee_source
+            }
+            /// Child self-trade prevention mode. Defaults to EXPIRE_MAKER.
+            ///
+            /// Field 4: `self_trade_prevention_mode`
+            #[must_use]
+            pub fn self_trade_prevention_mode(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::orders::v1::SelfTradePreventionMode,
+            > {
+                self.0.reborrow().self_trade_prevention_mode
+            }
+            /// Client-provided trigger ID for idempotency.
+            ///
+            /// Field 5: `client_trigger_id`
+            #[must_use]
+            pub fn client_trigger_id(&self) -> &'_ str {
+                self.0.reborrow().client_trigger_id
+            }
+            /// Oneof `strategy`.
+            #[must_use]
+            pub fn strategy(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::trigger_intent::Strategy<'_>,
+            > {
+                self.0.reborrow().strategy.as_ref()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TriggerIntentView<'static>>>
+        for TriggerIntentOwnedView {
+            fn from(inner: ::buffa::OwnedView<TriggerIntentView<'static>>) -> Self {
+                TriggerIntentOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TriggerIntentOwnedView>
+        for ::buffa::OwnedView<TriggerIntentView<'static>> {
+            fn from(wrapper: TriggerIntentOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TriggerIntentView<'static>>>
+        for TriggerIntentOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TriggerIntentView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TriggerIntent {
+            type View<'a> = TriggerIntentView<'a>;
+            type ViewHandle = TriggerIntentOwnedView;
+        }
+        impl ::serde::Serialize for TriggerIntentOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CreateTriggerRequest submits one standalone trigger intent for admission.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateTriggerRequestView<'a> {
+            /// Target sub-account. When omitted, uses the caller's root account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
+            /// Trigger to admit.
+            ///
+            /// Field 2: `trigger`
+            pub trigger: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TriggerIntentView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -8784,210 +15187,25 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.trigger_type = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    10u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.trigger_price_ticks = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
-                    }
-                    11u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.trigger_price_source = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    20u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.side = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    21u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.order_type = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    22u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.time_in_force = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    23u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
-                    }
-                    24u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.limit_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
-                    }
-                    25u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.fee_source = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    26u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.self_trade_prevention_mode = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    27u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.post_only = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    32u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.activation_price_ticks = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
-                    }
-                    40u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.twap_duration_ms = ::buffa::types::decode_int64(&mut cur)?;
-                    }
-                    41u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.twap_slice_interval_ms = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
-                    }
-                    50u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.ladder_price_min_ticks = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
-                    }
-                    51u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.ladder_price_max_ticks = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
-                    }
-                    52u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.ladder_levels = ::buffa::types::decode_int32(&mut cur)?;
-                    }
-                    53u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.ladder_distribution = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    60u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.client_trigger_id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    30u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.trailing_distance = Some(
-                            super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance::TrailingDistanceTicks(
-                                ::buffa::types::decode_int64(&mut cur)?,
-                            ),
-                        );
-                    }
-                    31u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.trailing_distance = Some(
-                            super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance::TrailingDistanceBps(
-                                ::buffa::types::decode_int32(&mut cur)?,
-                            ),
-                        );
-                    }
-                    33u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_slippage = Some(
-                            super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage::MaxSlippageTicks(
-                                ::buffa::types::decode_int32(&mut cur)?,
-                            ),
-                        );
-                    }
-                    34u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_slippage = Some(
-                            super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage::MaxSlippageBps(
-                                ::buffa::types::decode_int32(&mut cur)?,
-                            ),
-                        );
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.trigger.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.trigger = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TriggerIntentView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -9019,64 +15237,14 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateTriggerRequest {
                     subaccount_id: self.subaccount_id,
-                    symbol: self.symbol.to_string(),
-                    trigger_type: self.trigger_type,
-                    trigger_price_ticks: self.trigger_price_ticks,
-                    trigger_price_source: self.trigger_price_source,
-                    side: self.side,
-                    order_type: self.order_type,
-                    time_in_force: self.time_in_force,
-                    qty_scaled: self.qty_scaled,
-                    limit_price_ticks: self.limit_price_ticks,
-                    fee_source: self.fee_source,
-                    self_trade_prevention_mode: self.self_trade_prevention_mode,
-                    post_only: self.post_only,
-                    activation_price_ticks: self.activation_price_ticks,
-                    twap_duration_ms: self.twap_duration_ms,
-                    twap_slice_interval_ms: self.twap_slice_interval_ms,
-                    ladder_price_min_ticks: self.ladder_price_min_ticks,
-                    ladder_price_max_ticks: self.ladder_price_max_ticks,
-                    ladder_levels: self.ladder_levels,
-                    ladder_distribution: self.ladder_distribution,
-                    client_trigger_id: self.client_trigger_id.to_string(),
-                    trailing_distance: self
-                        .trailing_distance
-                        .as_ref()
-                        .map(|v| match v {
-                            super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance::TrailingDistanceTicks(
-                                v,
-                            ) => {
-                                super::super::__buffa::oneof::create_trigger_request::TrailingDistance::TrailingDistanceTicks(
-                                    *v,
-                                )
-                            }
-                            super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance::TrailingDistanceBps(
-                                v,
-                            ) => {
-                                super::super::__buffa::oneof::create_trigger_request::TrailingDistance::TrailingDistanceBps(
-                                    *v,
-                                )
-                            }
-                        }),
-                    max_slippage: self
-                        .max_slippage
-                        .as_ref()
-                        .map(|v| match v {
-                            super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage::MaxSlippageTicks(
-                                v,
-                            ) => {
-                                super::super::__buffa::oneof::create_trigger_request::MaxSlippage::MaxSlippageTicks(
-                                    *v,
-                                )
-                            }
-                            super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage::MaxSlippageBps(
-                                v,
-                            ) => {
-                                super::super::__buffa::oneof::create_trigger_request::MaxSlippage::MaxSlippageBps(
-                                    *v,
-                                )
-                            }
-                        }),
+                    trigger: match self.trigger.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::TriggerIntent,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -9087,159 +15255,20 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for CreateTriggerRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
                 if self.subaccount_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if !self.symbol.is_empty() {
+                if self.trigger.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.trigger.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
                     size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
-                }
-                {
-                    let val = self.trigger_type.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if self.trigger_price_ticks != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.trigger_price_ticks)
-                                as u32;
-                }
-                {
-                    let val = self.trigger_price_source.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.side.to_i32();
-                    if val != 0 {
-                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.time_in_force.to_i32();
-                    if val != 0 {
-                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if self.qty_scaled != 0i64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
-                }
-                if self.limit_price_ticks != 0i64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::int64_encoded_len(self.limit_price_ticks)
-                                as u32;
-                }
-                {
-                    let val = self.fee_source.to_i32();
-                    if val != 0 {
-                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.self_trade_prevention_mode.to_i32();
-                    if val != 0 {
-                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if self.post_only {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if let ::core::option::Option::Some(ref v) = self.trailing_distance {
-                    match v {
-                        super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance::TrailingDistanceTicks(
-                            v,
-                        ) => {
-                            size += 2u32 + ::buffa::types::int64_encoded_len(*v) as u32;
-                        }
-                        super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance::TrailingDistanceBps(
-                            v,
-                        ) => {
-                            size += 2u32 + ::buffa::types::int32_encoded_len(*v) as u32;
-                        }
-                    }
-                }
-                if self.activation_price_ticks != 0i64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.activation_price_ticks,
-                            ) as u32;
-                }
-                if let ::core::option::Option::Some(ref v) = self.max_slippage {
-                    match v {
-                        super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage::MaxSlippageTicks(
-                            v,
-                        ) => {
-                            size += 2u32 + ::buffa::types::int32_encoded_len(*v) as u32;
-                        }
-                        super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage::MaxSlippageBps(
-                            v,
-                        ) => {
-                            size += 2u32 + ::buffa::types::int32_encoded_len(*v) as u32;
-                        }
-                    }
-                }
-                if self.twap_duration_ms != 0i64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::int64_encoded_len(self.twap_duration_ms)
-                                as u32;
-                }
-                if self.twap_slice_interval_ms != 0i64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.twap_slice_interval_ms,
-                            ) as u32;
-                }
-                if self.ladder_price_min_ticks != 0i64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.ladder_price_min_ticks,
-                            ) as u32;
-                }
-                if self.ladder_price_max_ticks != 0i64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.ladder_price_max_ticks,
-                            ) as u32;
-                }
-                if self.ladder_levels != 0i32 {
-                    size
-                        += 2u32
-                            + ::buffa::types::int32_encoded_len(self.ladder_levels)
-                                as u32;
-                }
-                {
-                    let val = self.ladder_distribution.to_i32();
-                    if val != 0 {
-                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if !self.client_trigger_id.is_empty() {
-                    size
-                        += 2u32
-                            + ::buffa::types::string_encoded_len(&self.client_trigger_id)
-                                as u32;
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -9247,7 +15276,7 @@ pub mod __buffa {
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -9255,141 +15284,13 @@ pub mod __buffa {
                 if let Some(v) = self.subaccount_id {
                     ::buffa::types::put_fixed64_field(1u32, v, buf);
                 }
-                if !self.symbol.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.symbol, buf);
-                }
-                {
-                    let val = self.trigger_type.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(3u32, val, buf);
-                    }
-                }
-                if self.trigger_price_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        10u32,
-                        self.trigger_price_ticks,
+                if self.trigger.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
                         buf,
                     );
-                }
-                {
-                    let val = self.trigger_price_source.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(11u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.side.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(20u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(21u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.time_in_force.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(22u32, val, buf);
-                    }
-                }
-                if self.qty_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(23u32, self.qty_scaled, buf);
-                }
-                if self.limit_price_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(24u32, self.limit_price_ticks, buf);
-                }
-                {
-                    let val = self.fee_source.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(25u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.self_trade_prevention_mode.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(26u32, val, buf);
-                    }
-                }
-                if self.post_only {
-                    ::buffa::types::put_bool_field(27u32, self.post_only, buf);
-                }
-                if let ::core::option::Option::Some(ref v) = self.trailing_distance {
-                    match v {
-                        super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance::TrailingDistanceTicks(
-                            x,
-                        ) => {
-                            ::buffa::types::put_int64_field(30u32, *x, buf);
-                        }
-                        super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance::TrailingDistanceBps(
-                            x,
-                        ) => {
-                            ::buffa::types::put_int32_field(31u32, *x, buf);
-                        }
-                    }
-                }
-                if self.activation_price_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        32u32,
-                        self.activation_price_ticks,
-                        buf,
-                    );
-                }
-                if let ::core::option::Option::Some(ref v) = self.max_slippage {
-                    match v {
-                        super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage::MaxSlippageTicks(
-                            x,
-                        ) => {
-                            ::buffa::types::put_int32_field(33u32, *x, buf);
-                        }
-                        super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage::MaxSlippageBps(
-                            x,
-                        ) => {
-                            ::buffa::types::put_int32_field(34u32, *x, buf);
-                        }
-                    }
-                }
-                if self.twap_duration_ms != 0i64 {
-                    ::buffa::types::put_int64_field(40u32, self.twap_duration_ms, buf);
-                }
-                if self.twap_slice_interval_ms != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        41u32,
-                        self.twap_slice_interval_ms,
-                        buf,
-                    );
-                }
-                if self.ladder_price_min_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        50u32,
-                        self.ladder_price_min_ticks,
-                        buf,
-                    );
-                }
-                if self.ladder_price_max_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        51u32,
-                        self.ladder_price_max_ticks,
-                        buf,
-                    );
-                }
-                if self.ladder_levels != 0i32 {
-                    ::buffa::types::put_int32_field(52u32, self.ladder_levels, buf);
-                }
-                {
-                    let val = self.ladder_distribution.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(53u32, val, buf);
-                    }
-                }
-                if !self.client_trigger_id.is_empty() {
-                    ::buffa::types::put_string_field(
-                        60u32,
-                        &self.client_trigger_id,
-                        buf,
-                    );
+                    self.trigger.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -9419,192 +15320,9 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
-                    __map.serialize_entry("symbol", self.symbol)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.trigger_type,
-                ) {
-                    __map.serialize_entry("triggerType", &self.trigger_type)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.trigger_price_ticks,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "triggerPriceTicks",
-                            &::buffa::json_helpers::ProtoJson(&self.trigger_price_ticks),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.trigger_price_source,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "triggerPriceSource",
-                            &self.trigger_price_source,
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
-                    __map.serialize_entry("side", &self.side)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.order_type,
-                ) {
-                    __map.serialize_entry("orderType", &self.order_type)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.time_in_force,
-                ) {
-                    __map.serialize_entry("timeInForce", &self.time_in_force)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
-                    __map
-                        .serialize_entry(
-                            "qtyScaled",
-                            &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.limit_price_ticks,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "limitPriceTicks",
-                            &::buffa::json_helpers::ProtoJson(&self.limit_price_ticks),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.fee_source,
-                ) {
-                    __map.serialize_entry("feeSource", &self.fee_source)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.self_trade_prevention_mode,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "selfTradePreventionMode",
-                            &self.self_trade_prevention_mode,
-                        )?;
-                }
-                if self.post_only {
-                    __map.serialize_entry("postOnly", &self.post_only)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.activation_price_ticks,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "activationPriceTicks",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.activation_price_ticks,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.twap_duration_ms) {
-                    __map
-                        .serialize_entry(
-                            "twapDurationMs",
-                            &::buffa::json_helpers::ProtoJson(&self.twap_duration_ms),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.twap_slice_interval_ms,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "twapSliceIntervalMs",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.twap_slice_interval_ms,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.ladder_price_min_ticks,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "ladderPriceMinTicks",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.ladder_price_min_ticks,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.ladder_price_max_ticks,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "ladderPriceMaxTicks",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.ladder_price_max_ticks,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i32(&self.ladder_levels) {
-                    __map
-                        .serialize_entry(
-                            "ladderLevels",
-                            &::buffa::json_helpers::ProtoJson(&self.ladder_levels),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.ladder_distribution,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "ladderDistribution",
-                            &self.ladder_distribution,
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(
-                    self.client_trigger_id,
-                ) {
-                    __map.serialize_entry("clientTriggerId", self.client_trigger_id)?;
-                }
-                if let ::core::option::Option::Some(ref __ov) = self.trailing_distance {
-                    match __ov {
-                        super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance::TrailingDistanceTicks(
-                            v,
-                        ) => {
-                            __map
-                                .serialize_entry(
-                                    "trailingDistanceTicks",
-                                    &::buffa::json_helpers::ProtoJson(v),
-                                )?;
-                        }
-                        super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance::TrailingDistanceBps(
-                            v,
-                        ) => {
-                            __map
-                                .serialize_entry(
-                                    "trailingDistanceBps",
-                                    &::buffa::json_helpers::ProtoJson(v),
-                                )?;
-                        }
-                    }
-                }
-                if let ::core::option::Option::Some(ref __ov) = self.max_slippage {
-                    match __ov {
-                        super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage::MaxSlippageTicks(
-                            v,
-                        ) => {
-                            __map
-                                .serialize_entry(
-                                    "maxSlippageTicks",
-                                    &::buffa::json_helpers::ProtoJson(v),
-                                )?;
-                        }
-                        super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage::MaxSlippageBps(
-                            v,
-                        ) => {
-                            __map
-                                .serialize_entry(
-                                    "maxSlippageBps",
-                                    &::buffa::json_helpers::ProtoJson(v),
-                                )?;
-                        }
+                {
+                    if let ::core::option::Option::Some(__v) = self.trigger.as_option() {
+                        __map.serialize_entry("trigger", __v)?;
                     }
                 }
                 __map.end()
@@ -9703,210 +15421,23 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account. When empty or omitted, uses the caller's root account.
+            /// Target sub-account. When omitted, uses the caller's root account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Symbol, for example "BTC-USDT"; resolved to a numeric symbol ID.
+            /// Trigger to admit.
             ///
-            /// Field 2: `symbol`
+            /// Field 2: `trigger`
             #[must_use]
-            pub fn symbol(&self) -> &'_ str {
-                self.0.reborrow().symbol
-            }
-            /// Type of trigger. Required.
-            ///
-            /// Field 3: `trigger_type`
-            #[must_use]
-            pub fn trigger_type(&self) -> ::buffa::EnumValue<super::super::TriggerType> {
-                self.0.reborrow().trigger_type
-            }
-            /// --- Trigger Condition (for STOP_LOSS, TAKE_PROFIT, TRAILING_STOP) ---
-            ///
-            /// Trigger price in quote units scaled by 1e6. Required for
-            /// STOP_LOSS/TAKE_PROFIT.
-            ///
-            /// Field 10: `trigger_price_ticks`
-            #[must_use]
-            pub fn trigger_price_ticks(&self) -> i64 {
-                self.0.reborrow().trigger_price_ticks
-            }
-            /// Price source for trigger evaluation. Defaults to LAST_PRICE.
-            ///
-            /// Field 11: `trigger_price_source`
-            #[must_use]
-            pub fn trigger_price_source(
+            pub fn trigger(
                 &self,
-            ) -> ::buffa::EnumValue<
-                super::super::super::super::orders::v1::TriggerPriceSource,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::TriggerIntentView<'_>,
             > {
-                self.0.reborrow().trigger_price_source
-            }
-            /// --- Child Order Template ---
-            ///
-            /// Side for the child order. Required.
-            ///
-            /// Field 20: `side`
-            #[must_use]
-            pub fn side(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
-                self.0.reborrow().side
-            }
-            /// Order type for the child order (LIMIT or MARKET). Defaults to MARKET.
-            ///
-            /// Field 21: `order_type`
-            #[must_use]
-            pub fn order_type(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::OrderType> {
-                self.0.reborrow().order_type
-            }
-            /// Time-in-force for the child order. Defaults to GTC for LIMIT, IOC for
-            /// MARKET.
-            ///
-            /// Field 22: `time_in_force`
-            #[must_use]
-            pub fn time_in_force(
-                &self,
-            ) -> ::buffa::EnumValue<
-                super::super::super::super::orders::v1::TimeInForce,
-            > {
-                self.0.reborrow().time_in_force
-            }
-            /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
-            /// Required.
-            ///
-            /// Field 23: `qty_scaled`
-            #[must_use]
-            pub fn qty_scaled(&self) -> i64 {
-                self.0.reborrow().qty_scaled
-            }
-            /// Limit price in quote units scaled by 1e6 for LIMIT child orders.
-            ///
-            /// Field 24: `limit_price_ticks`
-            #[must_use]
-            pub fn limit_price_ticks(&self) -> i64 {
-                self.0.reborrow().limit_price_ticks
-            }
-            /// Fee source selection for BUY child orders. SELL child orders always pay in
-            /// QUOTE.
-            ///
-            /// When omitted (UNSPECIFIED), defaults to QUOTE.
-            ///
-            /// Field 25: `fee_source`
-            #[must_use]
-            pub fn fee_source(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::FeeSource> {
-                self.0.reborrow().fee_source
-            }
-            /// Self-trade prevention mode for child orders.
-            ///
-            /// When omitted (UNSPECIFIED), defaults to EXPIRE_MAKER.
-            ///
-            /// Field 26: `self_trade_prevention_mode`
-            #[must_use]
-            pub fn self_trade_prevention_mode(
-                &self,
-            ) -> ::buffa::EnumValue<
-                super::super::super::super::orders::v1::SelfTradePreventionMode,
-            > {
-                self.0.reborrow().self_trade_prevention_mode
-            }
-            /// If true, child LIMIT orders are post-only (rejected if they would cross).
-            ///
-            /// Field 27: `post_only`
-            #[must_use]
-            pub fn post_only(&self) -> bool {
-                self.0.reborrow().post_only
-            }
-            /// Optional activation price: trailing only starts after this price is
-            /// reached. Expressed in quote units scaled by 1e6.
-            ///
-            /// Field 32: `activation_price_ticks`
-            #[must_use]
-            pub fn activation_price_ticks(&self) -> i64 {
-                self.0.reborrow().activation_price_ticks
-            }
-            /// --- TWAP Specific ---
-            ///
-            /// Total duration of TWAP execution in milliseconds. Required for TWAP.
-            ///
-            /// Field 40: `twap_duration_ms`
-            #[must_use]
-            pub fn twap_duration_ms(&self) -> i64 {
-                self.0.reborrow().twap_duration_ms
-            }
-            /// Interval between TWAP slices in milliseconds. Required for TWAP.
-            ///
-            /// Field 41: `twap_slice_interval_ms`
-            #[must_use]
-            pub fn twap_slice_interval_ms(&self) -> i64 {
-                self.0.reborrow().twap_slice_interval_ms
-            }
-            /// --- Ladder/Scaled Specific ---
-            ///
-            /// Minimum price in quote units scaled by 1e6 for the ladder range.
-            ///
-            /// Field 50: `ladder_price_min_ticks`
-            #[must_use]
-            pub fn ladder_price_min_ticks(&self) -> i64 {
-                self.0.reborrow().ladder_price_min_ticks
-            }
-            /// Maximum price in quote units scaled by 1e6 for the ladder range.
-            ///
-            /// Field 51: `ladder_price_max_ticks`
-            #[must_use]
-            pub fn ladder_price_max_ticks(&self) -> i64 {
-                self.0.reborrow().ladder_price_max_ticks
-            }
-            /// Number of price levels in the ladder.
-            /// Required for LADDER; valid range is 2..100.
-            ///
-            /// Field 52: `ladder_levels`
-            #[must_use]
-            pub fn ladder_levels(&self) -> i32 {
-                self.0.reborrow().ladder_levels
-            }
-            /// Distribution of quantity across levels.
-            ///
-            /// Field 53: `ladder_distribution`
-            #[must_use]
-            pub fn ladder_distribution(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::LadderDistribution> {
-                self.0.reborrow().ladder_distribution
-            }
-            /// --- Client Idempotency ---
-            ///
-            /// Client-provided trigger ID for idempotency. Required.
-            ///
-            /// Field 60: `client_trigger_id`
-            #[must_use]
-            pub fn client_trigger_id(&self) -> &'_ str {
-                self.0.reborrow().client_trigger_id
-            }
-            /// Oneof `trailing_distance`.
-            #[must_use]
-            pub fn trailing_distance(
-                &self,
-            ) -> ::core::option::Option<
-                &super::super::__buffa::view::oneof::create_trigger_request::TrailingDistance,
-            > {
-                self.0.reborrow().trailing_distance.as_ref()
-            }
-            /// Oneof `max_slippage`.
-            #[must_use]
-            pub fn max_slippage(
-                &self,
-            ) -> ::core::option::Option<
-                &super::super::__buffa::view::oneof::create_trigger_request::MaxSlippage,
-            > {
-                self.0.reborrow().max_slippage.as_ref()
+                &self.0.reborrow().trigger
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<CreateTriggerRequestView<'static>>>
@@ -9942,31 +15473,28 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// CreateTriggerResponse returns the accepted trigger identifier and status.
+        /// CreateTriggerResponse acknowledges trigger creation only. Arming and child
+        /// execution happen asynchronously and are visible through trigger reads/events.
         #[derive(Clone, Debug, Default)]
         pub struct CreateTriggerResponseView<'a> {
-            /// Unique trigger ID assigned by the system.
+            /// Assigned trigger ID.
             ///
             /// Field 1: `trigger_id`
             pub trigger_id: u64,
-            /// Current status of the trigger.
+            /// Echoed client trigger ID.
             ///
-            /// Field 2: `status`
-            pub status: ::buffa::EnumValue<super::super::TriggerStatus>,
-            /// Echoed back if provided in request.
-            ///
-            /// Field 3: `client_trigger_id`
+            /// Field 2: `client_trigger_id`
             pub client_trigger_id: &'a str,
-            /// Server timestamp.
+            /// Time creation admission completed.
             ///
-            /// Field 4: `ts`
-            pub ts: ::buffa::MessageFieldView<
+            /// Field 3: `accepted_at`
+            pub accepted_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Server timestamp in nanoseconds since epoch (UTC).
+            /// Admission completion time in nanoseconds since epoch (UTC).
             ///
-            /// Field 5: `ts_ns`
-            pub ts_ns: u64,
+            /// Field 4: `accepted_at_ts_ns`
+            pub accepted_at_ts_ns: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CreateTriggerResponseView<'a> {
@@ -10010,27 +15538,18 @@ pub mod __buffa {
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.status = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
+                        view.client_trigger_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.client_trigger_id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.ts.as_mut() {
+                        match view.accepted_at.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -10039,7 +15558,7 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.ts = ::buffa::MessageFieldView::set(
+                                view.accepted_at = ::buffa::MessageFieldView::set(
                                     <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
@@ -10048,12 +15567,14 @@ pub mod __buffa {
                             }
                         }
                     }
-                    5u32 => {
+                    4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                        view.accepted_at_ts_ns = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -10085,9 +15606,8 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateTriggerResponse {
                     trigger_id: self.trigger_id,
-                    status: self.status,
                     client_trigger_id: self.client_trigger_id.to_string(),
-                    ts: match self.ts.as_option() {
+                    accepted_at: match self.accepted_at.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
                                 ::buffa_types::google::protobuf::Timestamp,
@@ -10095,7 +15615,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    ts_ns: self.ts_ns,
+                    accepted_at_ts_ns: self.accepted_at_ts_ns,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -10113,28 +15633,25 @@ pub mod __buffa {
                 if self.trigger_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                {
-                    let val = self.status.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
                 if !self.client_trigger_id.is_empty() {
                     size
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.client_trigger_id)
                                 as u32;
                 }
-                if self.ts.is_set() {
+                if self.accepted_at.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.ts.compute_size(__cache);
+                    let inner_size = self.accepted_at.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if self.ts_ns != 0u64 {
-                    size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+                if self.accepted_at_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns)
+                                as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -10150,25 +15667,19 @@ pub mod __buffa {
                 if self.trigger_id != 0u64 {
                     ::buffa::types::put_fixed64_field(1u32, self.trigger_id, buf);
                 }
-                {
-                    let val = self.status.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(2u32, val, buf);
-                    }
-                }
                 if !self.client_trigger_id.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.client_trigger_id, buf);
+                    ::buffa::types::put_string_field(2u32, &self.client_trigger_id, buf);
                 }
-                if self.ts.is_set() {
+                if self.accepted_at.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        4u32,
+                        3u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    self.ts.write_to(__cache, buf);
+                    self.accepted_at.write_to(__cache, buf);
                 }
-                if self.ts_ns != 0u64 {
-                    ::buffa::types::put_uint64_field(5u32, self.ts_ns, buf);
+                if self.accepted_at_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.accepted_at_ts_ns, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -10198,24 +15709,26 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.trigger_id),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
-                    __map.serialize_entry("status", &self.status)?;
-                }
                 if !::buffa::json_helpers::skip_if::is_empty_str(
                     self.client_trigger_id,
                 ) {
                     __map.serialize_entry("clientTriggerId", self.client_trigger_id)?;
                 }
                 {
-                    if let ::core::option::Option::Some(__v) = self.ts.as_option() {
-                        __map.serialize_entry("ts", __v)?;
+                    if let ::core::option::Option::Some(__v) = self
+                        .accepted_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("acceptedAt", __v)?;
                     }
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.ts_ns) {
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.accepted_at_ts_ns,
+                ) {
                     __map
                         .serialize_entry(
-                            "tsNs",
-                            &::buffa::json_helpers::ProtoJson(&self.ts_ns),
+                            "acceptedAtTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.accepted_at_ts_ns),
                         )?;
                 }
                 __map.end()
@@ -10314,44 +15827,37 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Unique trigger ID assigned by the system.
+            /// Assigned trigger ID.
             ///
             /// Field 1: `trigger_id`
             #[must_use]
             pub fn trigger_id(&self) -> u64 {
                 self.0.reborrow().trigger_id
             }
-            /// Current status of the trigger.
+            /// Echoed client trigger ID.
             ///
-            /// Field 2: `status`
-            #[must_use]
-            pub fn status(&self) -> ::buffa::EnumValue<super::super::TriggerStatus> {
-                self.0.reborrow().status
-            }
-            /// Echoed back if provided in request.
-            ///
-            /// Field 3: `client_trigger_id`
+            /// Field 2: `client_trigger_id`
             #[must_use]
             pub fn client_trigger_id(&self) -> &'_ str {
                 self.0.reborrow().client_trigger_id
             }
-            /// Server timestamp.
+            /// Time creation admission completed.
             ///
-            /// Field 4: `ts`
+            /// Field 3: `accepted_at`
             #[must_use]
-            pub fn ts(
+            pub fn accepted_at(
                 &self,
             ) -> &::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
-                &self.0.reborrow().ts
+                &self.0.reborrow().accepted_at
             }
-            /// Server timestamp in nanoseconds since epoch (UTC).
+            /// Admission completion time in nanoseconds since epoch (UTC).
             ///
-            /// Field 5: `ts_ns`
+            /// Field 4: `accepted_at_ts_ns`
             #[must_use]
-            pub fn ts_ns(&self) -> u64 {
-                self.0.reborrow().ts_ns
+            pub fn accepted_at_ts_ns(&self) -> u64 {
+                self.0.reborrow().accepted_at_ts_ns
             }
         }
         impl ::core::convert::From<
@@ -18210,60 +23716,30 @@ pub mod __buffa {
             ///
             /// Field 4: `symbol`
             pub symbol: &'a str,
-            /// Trigger category.
-            ///
-            /// Field 5: `trigger_type`
-            pub trigger_type: ::buffa::EnumValue<super::super::TriggerType>,
             /// Current trigger lifecycle status.
             ///
-            /// Field 6: `status`
+            /// Field 5: `status`
             pub status: ::buffa::EnumValue<super::super::TriggerStatus>,
             /// Parent order ID for attached-risk triggers; empty for standalone triggers.
             ///
-            /// Field 7: `parent_order_id`
+            /// Field 6: `parent_order_id`
             pub parent_order_id: ::core::option::Option<u64>,
-            /// Child order side.
+            /// Child quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
             ///
-            /// Field 20: `side`
-            pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
-            /// Child order type.
-            ///
-            /// Field 21: `order_type`
-            pub order_type: ::buffa::EnumValue<
-                super::super::super::super::orders::v1::OrderType,
-            >,
-            /// Child order time-in-force policy.
-            ///
-            /// Field 22: `time_in_force`
-            pub time_in_force: ::buffa::EnumValue<
-                super::super::super::super::orders::v1::TimeInForce,
-            >,
-            /// Child order quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig.
-            ///
-            /// Field 23: `qty_scaled`
+            /// Field 20: `qty_scaled`
             pub qty_scaled: i64,
-            /// Child LIMIT order price in quote units scaled by 1e6. Zero for MARKET
-            /// child orders.
-            ///
-            /// Field 24: `limit_price_ticks`
-            pub limit_price_ticks: i64,
             /// Fee source for BUY child orders.
             ///
-            /// Field 25: `fee_source`
+            /// Field 21: `fee_source`
             pub fee_source: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::FeeSource,
             >,
             /// Self-trade prevention mode for child orders.
             ///
-            /// Field 26: `self_trade_prevention_mode`
+            /// Field 22: `self_trade_prevention_mode`
             pub self_trade_prevention_mode: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::SelfTradePreventionMode,
             >,
-            /// True if child LIMIT orders are post-only.
-            ///
-            /// Field 27: `post_only`
-            pub post_only: bool,
             /// Client-provided trigger ID for idempotency and correlation.
             ///
             /// Field 60: `client_trigger_id`
@@ -18296,8 +23772,11 @@ pub mod __buffa {
             ///
             /// Field 70: `child_order_ids`
             pub child_order_ids: ::buffa::RepeatedView<'a, u64>,
-            pub details: ::core::option::Option<
-                super::super::__buffa::view::oneof::trigger::Details<'a>,
+            pub configuration: ::core::option::Option<
+                super::super::__buffa::view::oneof::trigger::Configuration<'a>,
+            >,
+            pub runtime_details: ::core::option::Option<
+                super::super::__buffa::view::oneof::trigger::RuntimeDetails<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -18365,20 +23844,11 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.trigger_type = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
                         view.status = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
-                    7u32 => {
+                    6u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Fixed64,
@@ -18392,43 +23862,9 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.side = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    21u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.order_type = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    22u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.time_in_force = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    23u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
                         view.qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
                     }
-                    24u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.limit_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
-                    }
-                    25u32 => {
+                    21u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
@@ -18437,7 +23873,7 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
-                    26u32 => {
+                    22u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
@@ -18445,13 +23881,6 @@ pub mod __buffa {
                         view.self_trade_prevention_mode = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
-                    }
-                    27u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.post_only = ::buffa::types::decode_bool(&mut cur)?;
                     }
                     60u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -18584,6 +24013,161 @@ pub mod __buffa {
                             );
                         }
                     }
+                    30u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::trigger::Configuration::StopLoss(
+                                ref mut existing,
+                            ),
+                        ) = view.configuration
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.configuration = Some(
+                                super::super::__buffa::view::oneof::trigger::Configuration::StopLoss(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::ConditionalTriggerView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    31u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::trigger::Configuration::TakeProfit(
+                                ref mut existing,
+                            ),
+                        ) = view.configuration
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.configuration = Some(
+                                super::super::__buffa::view::oneof::trigger::Configuration::TakeProfit(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::ConditionalTriggerView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    32u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::trigger::Configuration::TrailingStop(
+                                ref mut existing,
+                            ),
+                        ) = view.configuration
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.configuration = Some(
+                                super::super::__buffa::view::oneof::trigger::Configuration::TrailingStop(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TrailingStopTriggerView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    33u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::trigger::Configuration::Twap(
+                                ref mut existing,
+                            ),
+                        ) = view.configuration
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.configuration = Some(
+                                super::super::__buffa::view::oneof::trigger::Configuration::Twap(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TwapTriggerView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    34u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::trigger::Configuration::Ladder(
+                                ref mut existing,
+                            ),
+                        ) = view.configuration
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.configuration = Some(
+                                super::super::__buffa::view::oneof::trigger::Configuration::Ladder(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::LadderTriggerView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     100u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -18592,10 +24176,10 @@ pub mod __buffa {
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         if let Some(
-                            super::super::__buffa::view::oneof::trigger::Details::Stop(
+                            super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
                                 ref mut existing,
                             ),
-                        ) = view.details
+                        ) = view.runtime_details
                         {
                             ::buffa::MessageView::merge_into_view(
                                 &mut **existing,
@@ -18603,8 +24187,8 @@ pub mod __buffa {
                                 __sub_ctx,
                             )?;
                         } else {
-                            view.details = Some(
-                                super::super::__buffa::view::oneof::trigger::Details::Stop(
+                            view.runtime_details = Some(
+                                super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
                                     ::buffa::alloc::boxed::Box::new(
                                         <super::super::__buffa::view::StopDetailsView as ::buffa::MessageView>::decode_view_ctx(
                                             sub,
@@ -18623,10 +24207,10 @@ pub mod __buffa {
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         if let Some(
-                            super::super::__buffa::view::oneof::trigger::Details::Trailing(
+                            super::super::__buffa::view::oneof::trigger::RuntimeDetails::Trailing(
                                 ref mut existing,
                             ),
-                        ) = view.details
+                        ) = view.runtime_details
                         {
                             ::buffa::MessageView::merge_into_view(
                                 &mut **existing,
@@ -18634,8 +24218,8 @@ pub mod __buffa {
                                 __sub_ctx,
                             )?;
                         } else {
-                            view.details = Some(
-                                super::super::__buffa::view::oneof::trigger::Details::Trailing(
+                            view.runtime_details = Some(
+                                super::super::__buffa::view::oneof::trigger::RuntimeDetails::Trailing(
                                     ::buffa::alloc::boxed::Box::new(
                                         <super::super::__buffa::view::TrailingDetailsView as ::buffa::MessageView>::decode_view_ctx(
                                             sub,
@@ -18654,10 +24238,10 @@ pub mod __buffa {
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         if let Some(
-                            super::super::__buffa::view::oneof::trigger::Details::Twap(
+                            super::super::__buffa::view::oneof::trigger::RuntimeDetails::TwapState(
                                 ref mut existing,
                             ),
-                        ) = view.details
+                        ) = view.runtime_details
                         {
                             ::buffa::MessageView::merge_into_view(
                                 &mut **existing,
@@ -18665,8 +24249,8 @@ pub mod __buffa {
                                 __sub_ctx,
                             )?;
                         } else {
-                            view.details = Some(
-                                super::super::__buffa::view::oneof::trigger::Details::Twap(
+                            view.runtime_details = Some(
+                                super::super::__buffa::view::oneof::trigger::RuntimeDetails::TwapState(
                                     ::buffa::alloc::boxed::Box::new(
                                         <super::super::__buffa::view::TwapDetailsView as ::buffa::MessageView>::decode_view_ctx(
                                             sub,
@@ -18685,10 +24269,10 @@ pub mod __buffa {
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         if let Some(
-                            super::super::__buffa::view::oneof::trigger::Details::Ladder(
+                            super::super::__buffa::view::oneof::trigger::RuntimeDetails::LadderState(
                                 ref mut existing,
                             ),
-                        ) = view.details
+                        ) = view.runtime_details
                         {
                             ::buffa::MessageView::merge_into_view(
                                 &mut **existing,
@@ -18696,8 +24280,8 @@ pub mod __buffa {
                                 __sub_ctx,
                             )?;
                         } else {
-                            view.details = Some(
-                                super::super::__buffa::view::oneof::trigger::Details::Ladder(
+                            view.runtime_details = Some(
+                                super::super::__buffa::view::oneof::trigger::RuntimeDetails::LadderState(
                                     ::buffa::alloc::boxed::Box::new(
                                         <super::super::__buffa::view::LadderDetailsView as ::buffa::MessageView>::decode_view_ctx(
                                             sub,
@@ -18735,17 +24319,11 @@ pub mod __buffa {
                     subaccount_id: self.subaccount_id,
                     symbol_id: self.symbol_id,
                     symbol: self.symbol.to_string(),
-                    trigger_type: self.trigger_type,
                     status: self.status,
                     parent_order_id: self.parent_order_id,
-                    side: self.side,
-                    order_type: self.order_type,
-                    time_in_force: self.time_in_force,
                     qty_scaled: self.qty_scaled,
-                    limit_price_ticks: self.limit_price_ticks,
                     fee_source: self.fee_source,
                     self_trade_prevention_mode: self.self_trade_prevention_mode,
-                    post_only: self.post_only,
                     client_trigger_id: self.client_trigger_id.to_string(),
                     created_at: match self.created_at.as_option() {
                         Some(v) => {
@@ -18780,41 +24358,95 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     child_order_ids: self.child_order_ids.to_vec(),
-                    details: match self.details.as_ref() {
+                    configuration: match self.configuration.as_ref() {
                         ::core::option::Option::Some(v) => {
                             ::core::option::Option::Some(
                                 match v {
-                                    super::super::__buffa::view::oneof::trigger::Details::Stop(
+                                    super::super::__buffa::view::oneof::trigger::Configuration::StopLoss(
                                         v,
                                     ) => {
-                                        super::super::__buffa::oneof::trigger::Details::Stop(
+                                        super::super::__buffa::oneof::trigger::Configuration::StopLoss(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
                                         )
                                     }
-                                    super::super::__buffa::view::oneof::trigger::Details::Trailing(
+                                    super::super::__buffa::view::oneof::trigger::Configuration::TakeProfit(
                                         v,
                                     ) => {
-                                        super::super::__buffa::oneof::trigger::Details::Trailing(
+                                        super::super::__buffa::oneof::trigger::Configuration::TakeProfit(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
                                         )
                                     }
-                                    super::super::__buffa::view::oneof::trigger::Details::Twap(
+                                    super::super::__buffa::view::oneof::trigger::Configuration::TrailingStop(
                                         v,
                                     ) => {
-                                        super::super::__buffa::oneof::trigger::Details::Twap(
+                                        super::super::__buffa::oneof::trigger::Configuration::TrailingStop(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
                                         )
                                     }
-                                    super::super::__buffa::view::oneof::trigger::Details::Ladder(
+                                    super::super::__buffa::view::oneof::trigger::Configuration::Twap(
                                         v,
                                     ) => {
-                                        super::super::__buffa::oneof::trigger::Details::Ladder(
+                                        super::super::__buffa::oneof::trigger::Configuration::Twap(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::trigger::Configuration::Ladder(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::trigger::Configuration::Ladder(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    runtime_details: match self.runtime_details.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::trigger::RuntimeDetails::Stop(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::trigger::RuntimeDetails::Trailing(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::trigger::RuntimeDetails::Trailing(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::trigger::RuntimeDetails::TwapState(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::trigger::RuntimeDetails::TwapState(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::trigger::RuntimeDetails::LadderState(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::trigger::RuntimeDetails::LadderState(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
@@ -18856,12 +24488,6 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.symbol) as u32;
                 }
                 {
-                    let val = self.trigger_type.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
                     let val = self.status.to_i32();
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
@@ -18870,34 +24496,10 @@ pub mod __buffa {
                 if self.parent_order_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                {
-                    let val = self.side.to_i32();
-                    if val != 0 {
-                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.time_in_force.to_i32();
-                    if val != 0 {
-                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
                 if self.qty_scaled != 0i64 {
                     size
                         += 2u32
                             + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
-                }
-                if self.limit_price_ticks != 0i64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::int64_encoded_len(self.limit_price_ticks)
-                                as u32;
                 }
                 {
                     let val = self.fee_source.to_i32();
@@ -18911,8 +24513,59 @@ pub mod __buffa {
                         size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
-                if self.post_only {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                if let ::core::option::Option::Some(ref v) = self.configuration {
+                    match v {
+                        super::super::__buffa::view::oneof::trigger::Configuration::StopLoss(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::trigger::Configuration::TakeProfit(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::trigger::Configuration::TrailingStop(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::trigger::Configuration::Twap(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::trigger::Configuration::Ladder(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                    }
                 }
                 if !self.client_trigger_id.is_empty() {
                     size
@@ -18959,9 +24612,9 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(payload as u64) as u32
                             + payload;
                 }
-                if let ::core::option::Option::Some(ref v) = self.details {
+                if let ::core::option::Option::Some(ref v) = self.runtime_details {
                     match v {
-                        super::super::__buffa::view::oneof::trigger::Details::Stop(
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -18971,7 +24624,7 @@ pub mod __buffa {
                                 += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
-                        super::super::__buffa::view::oneof::trigger::Details::Trailing(
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::Trailing(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -18981,7 +24634,7 @@ pub mod __buffa {
                                 += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
-                        super::super::__buffa::view::oneof::trigger::Details::Twap(
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::TwapState(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -18991,7 +24644,7 @@ pub mod __buffa {
                                 += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
-                        super::super::__buffa::view::oneof::trigger::Details::Ladder(
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::LadderState(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -19027,58 +24680,82 @@ pub mod __buffa {
                     ::buffa::types::put_string_field(4u32, &self.symbol, buf);
                 }
                 {
-                    let val = self.trigger_type.to_i32();
+                    let val = self.status.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(5u32, val, buf);
                     }
                 }
-                {
-                    let val = self.status.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(6u32, val, buf);
-                    }
-                }
                 if let Some(v) = self.parent_order_id {
-                    ::buffa::types::put_fixed64_field(7u32, v, buf);
+                    ::buffa::types::put_fixed64_field(6u32, v, buf);
+                }
+                if self.qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(20u32, self.qty_scaled, buf);
                 }
                 {
-                    let val = self.side.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(20u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
+                    let val = self.fee_source.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(21u32, val, buf);
                     }
                 }
                 {
-                    let val = self.time_in_force.to_i32();
+                    let val = self.self_trade_prevention_mode.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(22u32, val, buf);
                     }
                 }
-                if self.qty_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(23u32, self.qty_scaled, buf);
-                }
-                if self.limit_price_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(24u32, self.limit_price_ticks, buf);
-                }
-                {
-                    let val = self.fee_source.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(25u32, val, buf);
+                if let ::core::option::Option::Some(ref v) = self.configuration {
+                    match v {
+                        super::super::__buffa::view::oneof::trigger::Configuration::StopLoss(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                30u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger::Configuration::TakeProfit(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                31u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger::Configuration::TrailingStop(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                32u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger::Configuration::Twap(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                33u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger::Configuration::Ladder(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                34u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
-                }
-                {
-                    let val = self.self_trade_prevention_mode.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(26u32, val, buf);
-                    }
-                }
-                if self.post_only {
-                    ::buffa::types::put_bool_field(27u32, self.post_only, buf);
                 }
                 if !self.client_trigger_id.is_empty() {
                     ::buffa::types::put_string_field(
@@ -19127,9 +24804,9 @@ pub mod __buffa {
                         ::buffa::types::encode_fixed64(v, buf);
                     }
                 }
-                if let ::core::option::Option::Some(ref v) = self.details {
+                if let ::core::option::Option::Some(ref v) = self.runtime_details {
                     match v {
-                        super::super::__buffa::view::oneof::trigger::Details::Stop(
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
                             x,
                         ) => {
                             ::buffa::types::put_len_delimited_header(
@@ -19139,7 +24816,7 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
-                        super::super::__buffa::view::oneof::trigger::Details::Trailing(
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::Trailing(
                             x,
                         ) => {
                             ::buffa::types::put_len_delimited_header(
@@ -19149,7 +24826,7 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
-                        super::super::__buffa::view::oneof::trigger::Details::Twap(
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::TwapState(
                             x,
                         ) => {
                             ::buffa::types::put_len_delimited_header(
@@ -19159,7 +24836,7 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
-                        super::super::__buffa::view::oneof::trigger::Details::Ladder(
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::LadderState(
                             x,
                         ) => {
                             ::buffa::types::put_len_delimited_header(
@@ -19216,11 +24893,6 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
                     __map.serialize_entry("symbol", self.symbol)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.trigger_type,
-                ) {
-                    __map.serialize_entry("triggerType", &self.trigger_type)?;
-                }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
                     __map.serialize_entry("status", &self.status)?;
                 }
@@ -19231,33 +24903,11 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
-                    __map.serialize_entry("side", &self.side)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.order_type,
-                ) {
-                    __map.serialize_entry("orderType", &self.order_type)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.time_in_force,
-                ) {
-                    __map.serialize_entry("timeInForce", &self.time_in_force)?;
-                }
                 if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
                     __map
                         .serialize_entry(
                             "qtyScaled",
                             &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.limit_price_ticks,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "limitPriceTicks",
-                            &::buffa::json_helpers::ProtoJson(&self.limit_price_ticks),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
@@ -19273,9 +24923,6 @@ pub mod __buffa {
                             "selfTradePreventionMode",
                             &self.self_trade_prevention_mode,
                         )?;
-                }
-                if self.post_only {
-                    __map.serialize_entry("postOnly", &self.post_only)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(
                     self.client_trigger_id,
@@ -19319,27 +24966,56 @@ pub mod __buffa {
                             &::buffa::json_helpers::RepeatedJson(&self.child_order_ids),
                         )?;
                 }
-                if let ::core::option::Option::Some(ref __ov) = self.details {
+                if let ::core::option::Option::Some(ref __ov) = self.configuration {
                     match __ov {
-                        super::super::__buffa::view::oneof::trigger::Details::Stop(
+                        super::super::__buffa::view::oneof::trigger::Configuration::StopLoss(
                             v,
                         ) => {
-                            __map.serialize_entry("stop", v)?;
+                            __map.serialize_entry("stopLoss", v)?;
                         }
-                        super::super::__buffa::view::oneof::trigger::Details::Trailing(
+                        super::super::__buffa::view::oneof::trigger::Configuration::TakeProfit(
                             v,
                         ) => {
-                            __map.serialize_entry("trailing", v)?;
+                            __map.serialize_entry("takeProfit", v)?;
                         }
-                        super::super::__buffa::view::oneof::trigger::Details::Twap(
+                        super::super::__buffa::view::oneof::trigger::Configuration::TrailingStop(
+                            v,
+                        ) => {
+                            __map.serialize_entry("trailingStop", v)?;
+                        }
+                        super::super::__buffa::view::oneof::trigger::Configuration::Twap(
                             v,
                         ) => {
                             __map.serialize_entry("twap", v)?;
                         }
-                        super::super::__buffa::view::oneof::trigger::Details::Ladder(
+                        super::super::__buffa::view::oneof::trigger::Configuration::Ladder(
                             v,
                         ) => {
                             __map.serialize_entry("ladder", v)?;
+                        }
+                    }
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.runtime_details {
+                    match __ov {
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
+                            v,
+                        ) => {
+                            __map.serialize_entry("stop", v)?;
+                        }
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::Trailing(
+                            v,
+                        ) => {
+                            __map.serialize_entry("trailing", v)?;
+                        }
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::TwapState(
+                            v,
+                        ) => {
+                            __map.serialize_entry("twapState", v)?;
+                        }
+                        super::super::__buffa::view::oneof::trigger::RuntimeDetails::LadderState(
+                            v,
+                        ) => {
+                            __map.serialize_entry("ladderState", v)?;
                         }
                     }
                 }
@@ -19462,75 +25138,30 @@ pub mod __buffa {
             pub fn symbol(&self) -> &'_ str {
                 self.0.reborrow().symbol
             }
-            /// Trigger category.
-            ///
-            /// Field 5: `trigger_type`
-            #[must_use]
-            pub fn trigger_type(&self) -> ::buffa::EnumValue<super::super::TriggerType> {
-                self.0.reborrow().trigger_type
-            }
             /// Current trigger lifecycle status.
             ///
-            /// Field 6: `status`
+            /// Field 5: `status`
             #[must_use]
             pub fn status(&self) -> ::buffa::EnumValue<super::super::TriggerStatus> {
                 self.0.reborrow().status
             }
             /// Parent order ID for attached-risk triggers; empty for standalone triggers.
             ///
-            /// Field 7: `parent_order_id`
+            /// Field 6: `parent_order_id`
             #[must_use]
             pub fn parent_order_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().parent_order_id
             }
-            /// Child order side.
+            /// Child quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
             ///
-            /// Field 20: `side`
-            #[must_use]
-            pub fn side(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
-                self.0.reborrow().side
-            }
-            /// Child order type.
-            ///
-            /// Field 21: `order_type`
-            #[must_use]
-            pub fn order_type(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::OrderType> {
-                self.0.reborrow().order_type
-            }
-            /// Child order time-in-force policy.
-            ///
-            /// Field 22: `time_in_force`
-            #[must_use]
-            pub fn time_in_force(
-                &self,
-            ) -> ::buffa::EnumValue<
-                super::super::super::super::orders::v1::TimeInForce,
-            > {
-                self.0.reborrow().time_in_force
-            }
-            /// Child order quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig.
-            ///
-            /// Field 23: `qty_scaled`
+            /// Field 20: `qty_scaled`
             #[must_use]
             pub fn qty_scaled(&self) -> i64 {
                 self.0.reborrow().qty_scaled
             }
-            /// Child LIMIT order price in quote units scaled by 1e6. Zero for MARKET
-            /// child orders.
-            ///
-            /// Field 24: `limit_price_ticks`
-            #[must_use]
-            pub fn limit_price_ticks(&self) -> i64 {
-                self.0.reborrow().limit_price_ticks
-            }
             /// Fee source for BUY child orders.
             ///
-            /// Field 25: `fee_source`
+            /// Field 21: `fee_source`
             #[must_use]
             pub fn fee_source(
                 &self,
@@ -19539,7 +25170,7 @@ pub mod __buffa {
             }
             /// Self-trade prevention mode for child orders.
             ///
-            /// Field 26: `self_trade_prevention_mode`
+            /// Field 22: `self_trade_prevention_mode`
             #[must_use]
             pub fn self_trade_prevention_mode(
                 &self,
@@ -19547,13 +25178,6 @@ pub mod __buffa {
                 super::super::super::super::orders::v1::SelfTradePreventionMode,
             > {
                 self.0.reborrow().self_trade_prevention_mode
-            }
-            /// True if child LIMIT orders are post-only.
-            ///
-            /// Field 27: `post_only`
-            #[must_use]
-            pub fn post_only(&self) -> bool {
-                self.0.reborrow().post_only
             }
             /// Client-provided trigger ID for idempotency and correlation.
             ///
@@ -19613,14 +25237,23 @@ pub mod __buffa {
             pub fn child_order_ids(&self) -> &::buffa::RepeatedView<'_, u64> {
                 &self.0.reborrow().child_order_ids
             }
-            /// Oneof `details`.
+            /// Oneof `configuration`.
             #[must_use]
-            pub fn details(
+            pub fn configuration(
                 &self,
             ) -> ::core::option::Option<
-                &super::super::__buffa::view::oneof::trigger::Details<'_>,
+                &super::super::__buffa::view::oneof::trigger::Configuration<'_>,
             > {
-                self.0.reborrow().details.as_ref()
+                self.0.reborrow().configuration.as_ref()
+            }
+            /// Oneof `runtime_details`.
+            #[must_use]
+            pub fn runtime_details(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::trigger::RuntimeDetails<'_>,
+            > {
+                self.0.reborrow().runtime_details.as_ref()
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<TriggerView<'static>>>
@@ -19656,7 +25289,42 @@ pub mod __buffa {
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
-            pub mod create_trigger_request {
+            pub mod conditional_child_execution {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Execution<'a> {
+                    MarketIoc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TriggerMarketIocView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    LimitGtc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TriggerLimitGtcView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    LimitIoc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TriggerLimitIocView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    LimitFok(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TriggerLimitFokView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                }
+            }
+            pub mod trailing_stop_trigger {
                 #[allow(unused_imports)]
                 use super::*;
                 #[derive(Clone, Debug)]
@@ -19668,6 +25336,69 @@ pub mod __buffa {
                 pub enum MaxSlippage {
                     MaxSlippageTicks(i32),
                     MaxSlippageBps(i32),
+                }
+            }
+            pub mod twap_trigger {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Execution<'a> {
+                    MarketIoc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TwapMarketIocView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    LimitGtc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TwapLimitGtcView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                }
+            }
+            pub mod trigger_intent {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Strategy<'a> {
+                    StopLoss(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::ConditionalTriggerView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    TakeProfit(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::ConditionalTriggerView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    TrailingStop(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TrailingStopTriggerView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Twap(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TwapTriggerView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Ladder(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::LadderTriggerView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
             pub mod modify_trigger_request {
@@ -19688,7 +25419,45 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use super::*;
                 #[derive(Clone, Debug)]
-                pub enum Details<'a> {
+                pub enum Configuration<'a> {
+                    StopLoss(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::ConditionalTriggerView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    TakeProfit(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::ConditionalTriggerView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    TrailingStop(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TrailingStopTriggerView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Twap(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TwapTriggerView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Ladder(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::LadderTriggerView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                }
+                #[derive(Clone, Debug)]
+                pub enum RuntimeDetails<'a> {
                     Stop(
                         ::buffa::alloc::boxed::Box<
                             super::super::super::super::__buffa::view::StopDetailsView<
@@ -19703,14 +25472,14 @@ pub mod __buffa {
                             >,
                         >,
                     ),
-                    Twap(
+                    TwapState(
                         ::buffa::alloc::boxed::Box<
                             super::super::super::super::__buffa::view::TwapDetailsView<
                                 'a,
                             >,
                         >,
                     ),
-                    Ladder(
+                    LadderState(
                         ::buffa::alloc::boxed::Box<
                             super::super::super::super::__buffa::view::LadderDetailsView<
                                 'a,
@@ -19724,12 +25493,98 @@ pub mod __buffa {
     pub mod oneof {
         #[allow(unused_imports)]
         use super::*;
-        pub mod create_trigger_request {
+        pub mod conditional_child_execution {
             #[allow(unused_imports)]
             use super::*;
-            /// --- Trailing Stop Specific ---
-            ///
-            /// Trailing distance. Exactly one of these should be set for TRAILING_STOP.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Execution {
+                MarketIoc(
+                    ::buffa::alloc::boxed::Box<super::super::super::TriggerMarketIoc>,
+                ),
+                LimitGtc(
+                    ::buffa::alloc::boxed::Box<super::super::super::TriggerLimitGtc>,
+                ),
+                LimitIoc(
+                    ::buffa::alloc::boxed::Box<super::super::super::TriggerLimitIoc>,
+                ),
+                LimitFok(
+                    ::buffa::alloc::boxed::Box<super::super::super::TriggerLimitFok>,
+                ),
+            }
+            impl ::buffa::Oneof for Execution {}
+            impl From<super::super::super::TriggerMarketIoc> for Execution {
+                fn from(v: super::super::super::TriggerMarketIoc) -> Self {
+                    Self::MarketIoc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TriggerMarketIoc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::TriggerMarketIoc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::TriggerLimitGtc> for Execution {
+                fn from(v: super::super::super::TriggerLimitGtc) -> Self {
+                    Self::LimitGtc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TriggerLimitGtc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::TriggerLimitGtc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::TriggerLimitIoc> for Execution {
+                fn from(v: super::super::super::TriggerLimitIoc) -> Self {
+                    Self::LimitIoc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TriggerLimitIoc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::TriggerLimitIoc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::TriggerLimitFok> for Execution {
+                fn from(v: super::super::super::TriggerLimitFok) -> Self {
+                    Self::LimitFok(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TriggerLimitFok>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::TriggerLimitFok) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl serde::Serialize for Execution {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::MarketIoc(v) => {
+                            map.serialize_entry("marketIoc", v)?;
+                        }
+                        Self::LimitGtc(v) => {
+                            map.serialize_entry("limitGtc", v)?;
+                        }
+                        Self::LimitIoc(v) => {
+                            map.serialize_entry("limitIoc", v)?;
+                        }
+                        Self::LimitFok(v) => {
+                            map.serialize_entry("limitFok", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
+        pub mod trailing_stop_trigger {
+            #[allow(unused_imports)]
+            use super::*;
+            /// Required trailing distance.
             #[derive(Clone, PartialEq, Debug)]
             pub enum TrailingDistance {
                 TrailingDistanceTicks(i64),
@@ -19760,11 +25615,7 @@ pub mod __buffa {
                     map.end()
                 }
             }
-            /// Optional price protection. If set, when the trailing stop triggers we place
-            /// an IOC LIMIT order at stop_price ± max_slippage (instead of an unprotected
-            /// MARKET order).
-            ///
-            /// Exactly one of these should be set (or neither for unprotected behavior).
+            /// Optional protection applied when the market child fires.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
                 MaxSlippageTicks(i32),
@@ -19790,6 +25641,139 @@ pub mod __buffa {
                                 "maxSlippageBps",
                                 &::buffa::json_helpers::ProtoJson(v),
                             )?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
+        pub mod twap_trigger {
+            #[allow(unused_imports)]
+            use super::*;
+            /// Proven slice execution behavior.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Execution {
+                MarketIoc(
+                    ::buffa::alloc::boxed::Box<super::super::super::TwapMarketIoc>,
+                ),
+                LimitGtc(::buffa::alloc::boxed::Box<super::super::super::TwapLimitGtc>),
+            }
+            impl ::buffa::Oneof for Execution {}
+            impl From<super::super::super::TwapMarketIoc> for Execution {
+                fn from(v: super::super::super::TwapMarketIoc) -> Self {
+                    Self::MarketIoc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TwapMarketIoc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::TwapMarketIoc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::TwapLimitGtc> for Execution {
+                fn from(v: super::super::super::TwapLimitGtc) -> Self {
+                    Self::LimitGtc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TwapLimitGtc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::TwapLimitGtc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl serde::Serialize for Execution {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::MarketIoc(v) => {
+                            map.serialize_entry("marketIoc", v)?;
+                        }
+                        Self::LimitGtc(v) => {
+                            map.serialize_entry("limitGtc", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
+        pub mod trigger_intent {
+            #[allow(unused_imports)]
+            use super::*;
+            /// Required trigger strategy.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Strategy {
+                StopLoss(
+                    ::buffa::alloc::boxed::Box<super::super::super::ConditionalTrigger>,
+                ),
+                TakeProfit(
+                    ::buffa::alloc::boxed::Box<super::super::super::ConditionalTrigger>,
+                ),
+                TrailingStop(
+                    ::buffa::alloc::boxed::Box<super::super::super::TrailingStopTrigger>,
+                ),
+                Twap(::buffa::alloc::boxed::Box<super::super::super::TwapTrigger>),
+                Ladder(::buffa::alloc::boxed::Box<super::super::super::LadderTrigger>),
+            }
+            impl ::buffa::Oneof for Strategy {}
+            impl From<super::super::super::TrailingStopTrigger> for Strategy {
+                fn from(v: super::super::super::TrailingStopTrigger) -> Self {
+                    Self::TrailingStop(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TrailingStopTrigger>
+            for ::core::option::Option<Strategy> {
+                fn from(v: super::super::super::TrailingStopTrigger) -> Self {
+                    Self::Some(Strategy::from(v))
+                }
+            }
+            impl From<super::super::super::TwapTrigger> for Strategy {
+                fn from(v: super::super::super::TwapTrigger) -> Self {
+                    Self::Twap(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TwapTrigger>
+            for ::core::option::Option<Strategy> {
+                fn from(v: super::super::super::TwapTrigger) -> Self {
+                    Self::Some(Strategy::from(v))
+                }
+            }
+            impl From<super::super::super::LadderTrigger> for Strategy {
+                fn from(v: super::super::super::LadderTrigger) -> Self {
+                    Self::Ladder(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::LadderTrigger>
+            for ::core::option::Option<Strategy> {
+                fn from(v: super::super::super::LadderTrigger) -> Self {
+                    Self::Some(Strategy::from(v))
+                }
+            }
+            impl serde::Serialize for Strategy {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::StopLoss(v) => {
+                            map.serialize_entry("stopLoss", v)?;
+                        }
+                        Self::TakeProfit(v) => {
+                            map.serialize_entry("takeProfit", v)?;
+                        }
+                        Self::TrailingStop(v) => {
+                            map.serialize_entry("trailingStop", v)?;
+                        }
+                        Self::Twap(v) => {
+                            map.serialize_entry("twap", v)?;
+                        }
+                        Self::Ladder(v) => {
+                            map.serialize_entry("ladder", v)?;
                         }
                     }
                     map.end()
@@ -19865,62 +25849,141 @@ pub mod __buffa {
         pub mod trigger {
             #[allow(unused_imports)]
             use super::*;
-            /// Type-specific fields.
+            /// Immutable strategy configuration. The selected variant is the trigger
+            /// category and uses the same shape accepted by CreateTrigger.
             #[derive(Clone, PartialEq, Debug)]
-            pub enum Details {
+            pub enum Configuration {
+                StopLoss(
+                    ::buffa::alloc::boxed::Box<super::super::super::ConditionalTrigger>,
+                ),
+                TakeProfit(
+                    ::buffa::alloc::boxed::Box<super::super::super::ConditionalTrigger>,
+                ),
+                TrailingStop(
+                    ::buffa::alloc::boxed::Box<super::super::super::TrailingStopTrigger>,
+                ),
+                Twap(::buffa::alloc::boxed::Box<super::super::super::TwapTrigger>),
+                Ladder(::buffa::alloc::boxed::Box<super::super::super::LadderTrigger>),
+            }
+            impl ::buffa::Oneof for Configuration {}
+            impl From<super::super::super::TrailingStopTrigger> for Configuration {
+                fn from(v: super::super::super::TrailingStopTrigger) -> Self {
+                    Self::TrailingStop(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TrailingStopTrigger>
+            for ::core::option::Option<Configuration> {
+                fn from(v: super::super::super::TrailingStopTrigger) -> Self {
+                    Self::Some(Configuration::from(v))
+                }
+            }
+            impl From<super::super::super::TwapTrigger> for Configuration {
+                fn from(v: super::super::super::TwapTrigger) -> Self {
+                    Self::Twap(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TwapTrigger>
+            for ::core::option::Option<Configuration> {
+                fn from(v: super::super::super::TwapTrigger) -> Self {
+                    Self::Some(Configuration::from(v))
+                }
+            }
+            impl From<super::super::super::LadderTrigger> for Configuration {
+                fn from(v: super::super::super::LadderTrigger) -> Self {
+                    Self::Ladder(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::LadderTrigger>
+            for ::core::option::Option<Configuration> {
+                fn from(v: super::super::super::LadderTrigger) -> Self {
+                    Self::Some(Configuration::from(v))
+                }
+            }
+            impl serde::Serialize for Configuration {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::StopLoss(v) => {
+                            map.serialize_entry("stopLoss", v)?;
+                        }
+                        Self::TakeProfit(v) => {
+                            map.serialize_entry("takeProfit", v)?;
+                        }
+                        Self::TrailingStop(v) => {
+                            map.serialize_entry("trailingStop", v)?;
+                        }
+                        Self::Twap(v) => {
+                            map.serialize_entry("twap", v)?;
+                        }
+                        Self::Ladder(v) => {
+                            map.serialize_entry("ladder", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+            /// Type-specific runtime state.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum RuntimeDetails {
                 Stop(::buffa::alloc::boxed::Box<super::super::super::StopDetails>),
                 Trailing(
                     ::buffa::alloc::boxed::Box<super::super::super::TrailingDetails>,
                 ),
-                Twap(::buffa::alloc::boxed::Box<super::super::super::TwapDetails>),
-                Ladder(::buffa::alloc::boxed::Box<super::super::super::LadderDetails>),
+                TwapState(::buffa::alloc::boxed::Box<super::super::super::TwapDetails>),
+                LadderState(
+                    ::buffa::alloc::boxed::Box<super::super::super::LadderDetails>,
+                ),
             }
-            impl ::buffa::Oneof for Details {}
-            impl From<super::super::super::StopDetails> for Details {
+            impl ::buffa::Oneof for RuntimeDetails {}
+            impl From<super::super::super::StopDetails> for RuntimeDetails {
                 fn from(v: super::super::super::StopDetails) -> Self {
                     Self::Stop(::buffa::alloc::boxed::Box::new(v))
                 }
             }
             impl From<super::super::super::StopDetails>
-            for ::core::option::Option<Details> {
+            for ::core::option::Option<RuntimeDetails> {
                 fn from(v: super::super::super::StopDetails) -> Self {
-                    Self::Some(Details::from(v))
+                    Self::Some(RuntimeDetails::from(v))
                 }
             }
-            impl From<super::super::super::TrailingDetails> for Details {
+            impl From<super::super::super::TrailingDetails> for RuntimeDetails {
                 fn from(v: super::super::super::TrailingDetails) -> Self {
                     Self::Trailing(::buffa::alloc::boxed::Box::new(v))
                 }
             }
             impl From<super::super::super::TrailingDetails>
-            for ::core::option::Option<Details> {
+            for ::core::option::Option<RuntimeDetails> {
                 fn from(v: super::super::super::TrailingDetails) -> Self {
-                    Self::Some(Details::from(v))
+                    Self::Some(RuntimeDetails::from(v))
                 }
             }
-            impl From<super::super::super::TwapDetails> for Details {
+            impl From<super::super::super::TwapDetails> for RuntimeDetails {
                 fn from(v: super::super::super::TwapDetails) -> Self {
-                    Self::Twap(::buffa::alloc::boxed::Box::new(v))
+                    Self::TwapState(::buffa::alloc::boxed::Box::new(v))
                 }
             }
             impl From<super::super::super::TwapDetails>
-            for ::core::option::Option<Details> {
+            for ::core::option::Option<RuntimeDetails> {
                 fn from(v: super::super::super::TwapDetails) -> Self {
-                    Self::Some(Details::from(v))
+                    Self::Some(RuntimeDetails::from(v))
                 }
             }
-            impl From<super::super::super::LadderDetails> for Details {
+            impl From<super::super::super::LadderDetails> for RuntimeDetails {
                 fn from(v: super::super::super::LadderDetails) -> Self {
-                    Self::Ladder(::buffa::alloc::boxed::Box::new(v))
+                    Self::LadderState(::buffa::alloc::boxed::Box::new(v))
                 }
             }
             impl From<super::super::super::LadderDetails>
-            for ::core::option::Option<Details> {
+            for ::core::option::Option<RuntimeDetails> {
                 fn from(v: super::super::super::LadderDetails) -> Self {
-                    Self::Some(Details::from(v))
+                    Self::Some(RuntimeDetails::from(v))
                 }
             }
-            impl serde::Serialize for Details {
+            impl serde::Serialize for RuntimeDetails {
                 fn serialize<S: serde::Serializer>(
                     &self,
                     s: S,
@@ -19934,11 +25997,11 @@ pub mod __buffa {
                         Self::Trailing(v) => {
                             map.serialize_entry("trailing", v)?;
                         }
-                        Self::Twap(v) => {
-                            map.serialize_entry("twap", v)?;
+                        Self::TwapState(v) => {
+                            map.serialize_entry("twapState", v)?;
                         }
-                        Self::Ladder(v) => {
-                            map.serialize_entry("ladder", v)?;
+                        Self::LadderState(v) => {
+                            map.serialize_entry("ladderState", v)?;
                         }
                     }
                     map.end()
@@ -19948,6 +26011,18 @@ pub mod __buffa {
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
+        reg.register_json_any(super::__TRIGGER_MARKET_IOC_JSON_ANY);
+        reg.register_json_any(super::__TRIGGER_LIMIT_GTC_JSON_ANY);
+        reg.register_json_any(super::__TRIGGER_LIMIT_IOC_JSON_ANY);
+        reg.register_json_any(super::__TRIGGER_LIMIT_FOK_JSON_ANY);
+        reg.register_json_any(super::__CONDITIONAL_CHILD_EXECUTION_JSON_ANY);
+        reg.register_json_any(super::__CONDITIONAL_TRIGGER_JSON_ANY);
+        reg.register_json_any(super::__TRAILING_STOP_TRIGGER_JSON_ANY);
+        reg.register_json_any(super::__TWAP_MARKET_IOC_JSON_ANY);
+        reg.register_json_any(super::__TWAP_LIMIT_GTC_JSON_ANY);
+        reg.register_json_any(super::__TWAP_TRIGGER_JSON_ANY);
+        reg.register_json_any(super::__LADDER_TRIGGER_JSON_ANY);
+        reg.register_json_any(super::__TRIGGER_INTENT_JSON_ANY);
         reg.register_json_any(super::__CREATE_TRIGGER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_TRIGGER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_TRIGGER_REQUEST_JSON_ANY);
@@ -19972,6 +26047,54 @@ pub mod __buffa {
         reg.register_json_any(super::__TRIGGER_JSON_ANY);
     }
 }
+#[doc(inline)]
+pub use self::__buffa::view::TriggerMarketIocView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerMarketIocOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerLimitGtcView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerLimitGtcOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerLimitIocView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerLimitIocOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerLimitFokView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerLimitFokOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConditionalChildExecutionView;
+#[doc(inline)]
+pub use self::__buffa::view::ConditionalChildExecutionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConditionalTriggerView;
+#[doc(inline)]
+pub use self::__buffa::view::ConditionalTriggerOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TrailingStopTriggerView;
+#[doc(inline)]
+pub use self::__buffa::view::TrailingStopTriggerOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TwapMarketIocView;
+#[doc(inline)]
+pub use self::__buffa::view::TwapMarketIocOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TwapLimitGtcView;
+#[doc(inline)]
+pub use self::__buffa::view::TwapLimitGtcOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TwapTriggerView;
+#[doc(inline)]
+pub use self::__buffa::view::TwapTriggerOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LadderTriggerView;
+#[doc(inline)]
+pub use self::__buffa::view::LadderTriggerOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerIntentView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerIntentOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateTriggerRequestView;
 #[doc(inline)]
