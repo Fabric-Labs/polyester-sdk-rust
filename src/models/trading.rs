@@ -19,6 +19,9 @@ pub struct Order {
     pub avg_px: Option<Price>,
     pub created_ts_ns: String,
     pub version: u32,
+    pub post_only: bool,
+    /// Attached risk policy when requested via `include_attached_risk`.
+    pub attached_risk: Option<AttachedRisk>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

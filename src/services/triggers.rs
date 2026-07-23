@@ -11,16 +11,17 @@ use crate::connect::triggers::v1::TriggersServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::{
     CreateOrderType, CreateSide, CreateTimeInForce, CreateTriggerParams, CreateTriggerType,
-    ModifyTriggerParams, Trigger, TriggerEvent, TriggerEventsList, TriggerMutationResult,
-    TriggersList,
+    ListTriggersOpts, ModifyTriggerParams, Trigger, TriggerEvent, TriggerEventsList,
+    TriggerMutationResult, TriggersList,
 };
-use crate::proto::orders::v1::{
-    FeeSource, OrderType, SelfTradePreventionMode, Side, TimeInForce, TriggerPriceSource,
-};
+use crate::proto::orders::v1::{FeeSource, SelfTradePreventionMode, Side};
 use crate::proto::triggers::v1::{
-    CancelTriggerRequest, CreateTriggerRequest, GetTriggerRequest, LadderDistribution,
-    ListTriggerEventsRequest, ListTriggersRequest, ModifyTriggerRequest, PauseTriggerRequest,
-    ResumeTriggerRequest, TriggerType, create_trigger_request, modify_trigger_request,
+    CancelTriggerRequest, ConditionalChildExecution, ConditionalTrigger, CreateTriggerRequest,
+    GetTriggerRequest, LadderTrigger, ListTriggerEventsRequest, ListTriggersRequest,
+    ModifyTriggerRequest, PauseTriggerRequest, ResumeTriggerRequest, TrailingStopTrigger,
+    TriggerIntent, TriggerLimitFok, TriggerLimitGtc, TriggerLimitIoc, TriggerMarketIoc,
+    TwapLimitGtc, TwapMarketIoc, TwapTrigger, conditional_child_execution, modify_trigger_request,
+    trailing_stop_trigger, trigger_intent, twap_trigger,
 };
 use crate::types::{resolve_price_ticks, resolve_qty_scaled};
 
@@ -54,6 +55,26 @@ impl TriggersService {
         Ok(triggers_list_from_proto(&resp))
     }
 
+    pub async fn list_with(&self, opts: ListTriggersOpts) -> Result<TriggersList> {
+        use crate::codecs::decode::trigger_status_from_label;
+        let mut req = ListTriggersRequest {
+            limit: if opts.limit == 0 { 50 } else { opts.limit },
+            ..Default::default()
+        };
+        if let Some(symbol) = opts.symbol {
+            req.symbol = symbol;
+        }
+        if let Some(token) = opts.page_token {
+            req.page_token = token;
+        }
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, opts.subaccount_id)?;
+        for label in &opts.status {
+            let status = trigger_status_from_label(label).map_err(Error::validation)?;
+            req.status.push(status.into());
+        }
+        self.list(req).await
+    }
+
     pub async fn get(&self, req: GetTriggerRequest) -> Result<Option<Trigger>> {
         let client = self.client();
         let resp = unary::await_auth(
@@ -78,89 +99,183 @@ impl TriggersService {
             Some(&params.symbol),
             self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
         )?;
-        let mut req = CreateTriggerRequest {
+        let mut intent = TriggerIntent {
             symbol: params.symbol.clone(),
-            trigger_type: match params.trigger_type {
-                CreateTriggerType::StopLoss => TriggerType::StopLoss.into(),
-                CreateTriggerType::TakeProfit => TriggerType::TakeProfit.into(),
-                CreateTriggerType::TrailingStop => TriggerType::TrailingStop.into(),
-                CreateTriggerType::Twap => TriggerType::Twap.into(),
-                CreateTriggerType::Ladder => TriggerType::Ladder.into(),
-            },
-            side: match params.side {
-                CreateSide::Buy => Side::Buy.into(),
-                CreateSide::Sell => Side::Sell.into(),
-            },
-            order_type: match params.order_type {
-                CreateOrderType::Limit => OrderType::Limit.into(),
-                CreateOrderType::Market => OrderType::Market.into(),
-            },
             qty_scaled: qty,
-            post_only: params.post_only,
             ..Default::default()
         };
-        if let Some(price) = params.trigger_price.as_ref() {
-            req.trigger_price_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
-        }
-        if let Some(price) = params.limit_price.as_ref() {
-            req.limit_price_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
-        }
-        if let Some(source) = params.trigger_price_source.as_deref() {
-            req.trigger_price_source = Self::trigger_price_source(source)?.into();
-        }
-        if let Some(tif) = params.time_in_force {
-            req.time_in_force = match tif {
-                CreateTimeInForce::Gtc => TimeInForce::Gtc.into(),
-                CreateTimeInForce::Ioc => TimeInForce::Ioc.into(),
-                CreateTimeInForce::Fok => TimeInForce::Fok.into(),
-            };
-        }
-        req.subaccount_id = scope::optional_subaccount(&self.ctx, params.subaccount_id)?;
-        req.client_trigger_id = params
+        intent.client_trigger_id = params
             .client_trigger_id
             .clone()
             .filter(|s| !s.is_empty())
             .unwrap_or_else(Self::new_client_trigger_id);
-        if let Some(price) = params.activation_price.as_ref() {
-            req.activation_price_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
-        }
-        if let Some(ticks) = params.trailing_distance_ticks {
-            req.trailing_distance =
-                Some(create_trigger_request::TrailingDistance::TrailingDistanceTicks(ticks));
-        } else if let Some(bps) = params.trailing_distance_bps {
-            req.trailing_distance =
-                Some(create_trigger_request::TrailingDistance::TrailingDistanceBps(bps));
-        }
-        if let Some(ticks) = params.max_slippage_ticks {
-            req.max_slippage = Some(create_trigger_request::MaxSlippage::MaxSlippageTicks(ticks));
-        } else if let Some(bps) = params.max_slippage_bps {
-            req.max_slippage = Some(create_trigger_request::MaxSlippage::MaxSlippageBps(bps));
-        }
-        if let Some(ms) = params.twap_duration_ms {
-            req.twap_duration_ms = ms;
-        }
-        if let Some(ms) = params.twap_slice_interval_ms {
-            req.twap_slice_interval_ms = ms;
-        }
-        if let Some(price) = params.ladder_price_min.as_ref() {
-            req.ladder_price_min_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
-        }
-        if let Some(price) = params.ladder_price_max.as_ref() {
-            req.ladder_price_max_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
-        }
-        if let Some(levels) = params.ladder_levels {
-            req.ladder_levels = levels;
-        }
-        if let Some(dist) = params.ladder_distribution.as_deref() {
-            req.ladder_distribution = Self::ladder_distribution(dist)?.into();
-        }
         if let Some(src) = params.fee_source.as_deref() {
-            req.fee_source = Self::fee_source(src)?.into();
+            intent.fee_source = Self::fee_source(src)?.into();
         }
         if let Some(mode) = params.self_trade_prevention_mode.as_deref() {
-            req.self_trade_prevention_mode = Self::stp_mode(mode)?.into();
+            intent.self_trade_prevention_mode = Self::stp_mode(mode)?.into();
         }
+        // trigger_price_source is no longer part of the create wire contract; it is
+        // evaluated server-side. Accept and ignore for API compatibility.
+        let _ = params.trigger_price_source.as_ref();
+
+        let side = match params.side {
+            CreateSide::Buy => Side::Buy,
+            CreateSide::Sell => Side::Sell,
+        };
+
+        intent.strategy = Some(match params.trigger_type {
+            CreateTriggerType::StopLoss | CreateTriggerType::TakeProfit => {
+                let trigger_price_ticks = match params.trigger_price.as_ref() {
+                    Some(price) => resolve_price_ticks(price, Some(&params.symbol))?,
+                    None => 0,
+                };
+                let mut cond = ConditionalTrigger {
+                    trigger_price_ticks,
+                    side: side.into(),
+                    ..Default::default()
+                };
+                *cond.child.get_or_insert_default() = Self::encode_conditional_child(params)?;
+                if matches!(params.trigger_type, CreateTriggerType::StopLoss) {
+                    trigger_intent::Strategy::StopLoss(Box::new(cond))
+                } else {
+                    trigger_intent::Strategy::TakeProfit(Box::new(cond))
+                }
+            }
+            CreateTriggerType::TrailingStop => {
+                // Trailing stop is an implicit SELL market-IOC strategy; side,
+                // order_type, tif, and post_only are ignored.
+                let mut trailing = TrailingStopTrigger::default();
+                if let Some(ticks) = params.trailing_distance_ticks {
+                    trailing.trailing_distance = Some(
+                        trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(ticks),
+                    );
+                } else if let Some(bps) = params.trailing_distance_bps {
+                    trailing.trailing_distance =
+                        Some(trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(bps));
+                } else {
+                    return Err(Error::validation(
+                        "trailing_stop requires trailing_distance_ticks or trailing_distance_bps",
+                    ));
+                }
+                if let Some(price) = params.activation_price.as_ref() {
+                    trailing.activation_price_ticks =
+                        resolve_price_ticks(price, Some(&params.symbol))?;
+                }
+                if let Some(ticks) = params.max_slippage_ticks {
+                    trailing.max_slippage =
+                        Some(trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(ticks));
+                } else if let Some(bps) = params.max_slippage_bps {
+                    trailing.max_slippage =
+                        Some(trailing_stop_trigger::MaxSlippage::MaxSlippageBps(bps));
+                }
+                trigger_intent::Strategy::TrailingStop(Box::new(trailing))
+            }
+            CreateTriggerType::Twap => {
+                let mut twap = TwapTrigger {
+                    side: side.into(),
+                    ..Default::default()
+                };
+                if let Some(ms) = params.twap_duration_ms {
+                    twap.duration_ms = ms;
+                }
+                if let Some(ms) = params.twap_slice_interval_ms {
+                    twap.slice_interval_ms = ms;
+                }
+                twap.execution = Some(match params.order_type {
+                    CreateOrderType::Market => {
+                        twap_trigger::Execution::MarketIoc(Box::new(TwapMarketIoc::default()))
+                    }
+                    CreateOrderType::Limit => {
+                        let price = params.limit_price.as_ref().ok_or_else(|| {
+                            Error::validation("twap limit slices require limit_price")
+                        })?;
+                        twap_trigger::Execution::LimitGtc(Box::new(TwapLimitGtc {
+                            price_ticks: resolve_price_ticks(price, Some(&params.symbol))?,
+                            ..Default::default()
+                        }))
+                    }
+                });
+                trigger_intent::Strategy::Twap(Box::new(twap))
+            }
+            CreateTriggerType::Ladder => {
+                if let Some(dist) = params.ladder_distribution.as_deref() {
+                    let dist = dist.trim().to_ascii_lowercase();
+                    if !dist.is_empty() && dist != "linear" {
+                        return Err(Error::validation(
+                            "ladder only supports linear distribution",
+                        ));
+                    }
+                }
+                let mut ladder = LadderTrigger {
+                    side: side.into(),
+                    post_only: params.post_only,
+                    ..Default::default()
+                };
+                if let Some(price) = params.ladder_price_min.as_ref() {
+                    ladder.price_min_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
+                }
+                if let Some(price) = params.ladder_price_max.as_ref() {
+                    ladder.price_max_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
+                }
+                if let Some(levels) = params.ladder_levels {
+                    ladder.levels = levels;
+                }
+                trigger_intent::Strategy::Ladder(Box::new(ladder))
+            }
+        });
+
+        let mut req = CreateTriggerRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            ..Default::default()
+        };
+        *req.trigger.get_or_insert_default() = intent;
         Ok(req)
+    }
+
+    /// Map flat (`order_type`, `time_in_force`, `limit_price`, `post_only`) params
+    /// onto a stop-loss / take-profit child execution variant.
+    fn encode_conditional_child(
+        params: &CreateTriggerParams,
+    ) -> Result<ConditionalChildExecution> {
+        let execution = match params.order_type {
+            CreateOrderType::Market => conditional_child_execution::Execution::MarketIoc(Box::new(
+                TriggerMarketIoc::default(),
+            )),
+            CreateOrderType::Limit => {
+                let price = params
+                    .limit_price
+                    .as_ref()
+                    .ok_or_else(|| Error::validation("limit trigger requires limit_price"))?;
+                let price_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
+                match params.time_in_force {
+                    Some(CreateTimeInForce::Ioc) => {
+                        conditional_child_execution::Execution::LimitIoc(Box::new(TriggerLimitIoc {
+                            price_ticks,
+                            ..Default::default()
+                        }))
+                    }
+                    Some(CreateTimeInForce::Fok) => {
+                        conditional_child_execution::Execution::LimitFok(Box::new(TriggerLimitFok {
+                            price_ticks,
+                            ..Default::default()
+                        }))
+                    }
+                    // gtc or unspecified
+                    _ => conditional_child_execution::Execution::LimitGtc(Box::new(
+                        TriggerLimitGtc {
+                            price_ticks,
+                            post_only: params.post_only,
+                            ..Default::default()
+                        },
+                    )),
+                }
+            }
+        };
+        Ok(ConditionalChildExecution {
+            execution: Some(execution),
+            ..Default::default()
+        })
     }
 
     fn encode_modify_params(&self, params: &ModifyTriggerParams) -> Result<ModifyTriggerRequest> {
@@ -213,28 +328,6 @@ impl TriggersService {
                 .map(|d| d.as_nanos())
                 .unwrap_or(0)
         )
-    }
-
-    fn trigger_price_source(label: &str) -> Result<TriggerPriceSource> {
-        match label.to_ascii_lowercase().as_str() {
-            "last" | "last_price" => Ok(TriggerPriceSource::LastPrice),
-            "index" | "index_price" => Ok(TriggerPriceSource::IndexPrice),
-            "mark" | "mark_price" => Ok(TriggerPriceSource::MarkPrice),
-            _ => Err(Error::validation(
-                "trigger_price_source must be last, index, or mark",
-            )),
-        }
-    }
-
-    fn ladder_distribution(label: &str) -> Result<LadderDistribution> {
-        match label.to_ascii_lowercase().as_str() {
-            "linear" => Ok(LadderDistribution::Linear),
-            "geometric" => Ok(LadderDistribution::Geometric),
-            "weighted_favorable" => Ok(LadderDistribution::WeightedFavorable),
-            _ => Err(Error::validation(
-                "ladder_distribution must be linear, geometric, or weighted_favorable",
-            )),
-        }
     }
 
     fn fee_source(label: &str) -> Result<FeeSource> {
