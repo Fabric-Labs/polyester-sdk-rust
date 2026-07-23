@@ -16,16 +16,17 @@ use crate::models::{
     CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType, CreateSide,
     CreateTimeInForce, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts, ListOrderHistoryOpts,
     MaxSlippage, ModifyOrderParams, ModifyOrderResult, Order, OrderMutationResult, OrdersList,
-    RiskLeg, TrailingDistance, TrailingStop, TriggerPriceSourceKind, UserTrade, UserTradesList,
+    RiskLeg, TrailingDistance, TrailingStop, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
     BatchCancelItem as ProtoBatchCancelItem, BatchCancelOrdersRequest, BatchCreateOrdersRequest,
     BatchModifyItem as ProtoBatchModifyItem, BatchModifyOrdersRequest, CancelAllAfterRequest,
     CancelAllOrdersRequest, CancelOrderRequest, CreateOrderRequest, GetOpenOrdersRequest,
-    GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, ModifyBehavior,
-    ModifyOrderRequest, OrderType, RiskPolicy, Side, StopLossPolicy, TakeProfitPolicy, TimeInForce,
-    TrailingStopPolicy, TriggerPriceSource, batch_modify_item, cancel_order_request,
-    get_order_request, modify_order_request, risk_policy, trailing_stop_policy,
+    GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, LimitFok, LimitGtc, LimitIoc,
+    MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, RiskExecution, RiskLimitGtc,
+    RiskPolicy, Side, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy, batch_modify_item,
+    cancel_order_request, get_order_request, modify_order_request, order_intent, risk_execution,
+    risk_policy, trailing_stop_policy,
 };
 use crate::types::{Price, Quantity, resolve_price_ticks, resolve_qty_scaled};
 
@@ -176,7 +177,10 @@ impl OrdersService {
         Ok(get_order_from_proto(&resp))
     }
 
-    fn encode_create_params(&self, params: &CreateOrderParams) -> Result<CreateOrderRequest> {
+    /// Build the transport-independent [`OrderIntent`] shared by single and batch
+    /// create. The flat public params (`order_type`/`time_in_force`/`post_only`)
+    /// are mapped onto the appropriate execution variant.
+    fn order_intent_from_params(&self, params: &CreateOrderParams) -> Result<OrderIntent> {
         let scale = self
             .ctx
             .catalogs
@@ -187,120 +191,144 @@ impl OrdersService {
             Some(&params.symbol),
             self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
         )?;
-        let mut req = CreateOrderRequest {
+        let mut intent = OrderIntent {
             symbol: params.symbol.clone(),
             qty_scaled: qty,
             side: match params.side {
                 CreateSide::Buy => Side::Buy.into(),
                 CreateSide::Sell => Side::Sell.into(),
             },
-            order_type: match params.order_type {
-                CreateOrderType::Limit => OrderType::Limit.into(),
-                CreateOrderType::Market => OrderType::Market.into(),
-            },
             ..Default::default()
         };
-        if let Some(price) = params.price.as_ref() {
-            req.price_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
-        } else if matches!(params.order_type, CreateOrderType::Limit) {
-            return Err(Error::validation(
-                "price is required for limit orders (use Price::from_decimal or Price::from_ticks)",
-            ));
-        }
-        if let Some(ref_price) = params.market_client_ref_price.as_ref() {
-            req.market_client_ref_price_ticks =
-                resolve_price_ticks(ref_price, Some(&params.symbol))?;
-        }
-        if let Some(tif) = params.time_in_force {
-            req.time_in_force = match tif {
-                CreateTimeInForce::Gtc => TimeInForce::Gtc.into(),
-                CreateTimeInForce::Ioc => TimeInForce::Ioc.into(),
-                CreateTimeInForce::Fok => TimeInForce::Fok.into(),
-            };
-        }
         if let Some(id) = params.client_order_id.as_ref() {
-            req.client_order_id = id.clone();
+            intent.client_order_id = id.clone();
         }
-        req.subaccount_id = scope::optional_subaccount(&self.ctx, params.subaccount_id)?;
-        if let Some(v) = params.post_only {
-            req.post_only = v;
-        }
+        let post_only = params.post_only.unwrap_or(false);
+        intent.execution = Some(match params.order_type {
+            CreateOrderType::Market => {
+                if post_only {
+                    return Err(Error::validation(
+                        "post_only is not supported for market orders",
+                    ));
+                }
+                let mut market = MarketIoc::default();
+                if let Some(ref_price) = params.market_client_ref_price.as_ref() {
+                    market.client_ref_price_ticks =
+                        resolve_price_ticks(ref_price, Some(&params.symbol))?;
+                }
+                order_intent::Execution::MarketIoc(Box::new(market))
+            }
+            CreateOrderType::Limit => {
+                let price = params.price.as_ref().ok_or_else(|| {
+                    Error::validation(
+                        "price is required for limit orders (use Price::from_decimal or Price::from_ticks)",
+                    )
+                })?;
+                let price_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
+                match params.time_in_force {
+                    Some(CreateTimeInForce::Ioc) => {
+                        if post_only {
+                            return Err(Error::validation(
+                                "post_only is not supported for ioc limit orders",
+                            ));
+                        }
+                        order_intent::Execution::LimitIoc(Box::new(LimitIoc {
+                            price_ticks,
+                            ..Default::default()
+                        }))
+                    }
+                    Some(CreateTimeInForce::Fok) => {
+                        if post_only {
+                            return Err(Error::validation(
+                                "post_only is not supported for fok limit orders",
+                            ));
+                        }
+                        order_intent::Execution::LimitFok(Box::new(LimitFok {
+                            price_ticks,
+                            ..Default::default()
+                        }))
+                    }
+                    // gtc or unspecified
+                    _ => order_intent::Execution::LimitGtc(Box::new(LimitGtc {
+                        price_ticks,
+                        post_only,
+                        ..Default::default()
+                    })),
+                }
+            }
+        });
         if let Some(risk) = params.attached_risk.as_ref() {
-            *req.attached_risk.get_or_insert_default() =
+            *intent.attached_risk.get_or_insert_default() =
                 Self::encode_attached_risk(risk, Some(&params.symbol))?;
         }
+        Ok(intent)
+    }
+
+    fn encode_create_params(&self, params: &CreateOrderParams) -> Result<CreateOrderRequest> {
+        let order = self.order_intent_from_params(params)?;
+        let mut req = CreateOrderRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            ..Default::default()
+        };
+        *req.order.get_or_insert_default() = order;
         Ok(req)
     }
 
-    fn encode_trigger_price_source(
-        source: Option<TriggerPriceSourceKind>,
-    ) -> buffa::EnumValue<TriggerPriceSource> {
-        match source {
-            None => TriggerPriceSource::TRIGGER_PRICE_SOURCE_UNSPECIFIED.into(),
-            Some(TriggerPriceSourceKind::LastPrice) => TriggerPriceSource::LastPrice.into(),
-            Some(TriggerPriceSourceKind::IndexPrice) => TriggerPriceSource::IndexPrice.into(),
-            Some(TriggerPriceSourceKind::MarkPrice) => TriggerPriceSource::MarkPrice.into(),
-        }
-    }
-
-    fn encode_child_order_type(order_type: Option<CreateOrderType>) -> buffa::EnumValue<OrderType> {
-        match order_type {
-            None | Some(CreateOrderType::Market) => OrderType::Market.into(),
-            Some(CreateOrderType::Limit) => OrderType::Limit.into(),
-        }
-    }
-
-    fn encode_risk_leg(leg: &RiskLeg, symbol: Option<&str>) -> Result<(i64, i64, CreateOrderType)> {
-        let trigger = resolve_price_ticks(&leg.trigger_price, symbol)?;
+    /// Map the flat public [`RiskLeg`] (`order_type`/`limit_price`) onto a child
+    /// [`RiskExecution`] variant. `trigger_price_source` is no longer part of the
+    /// policy wire and is ignored.
+    fn encode_risk_child(leg: &RiskLeg, symbol: Option<&str>) -> Result<RiskExecution> {
         let child_ty = leg.order_type.unwrap_or(CreateOrderType::Market);
-        let limit = match (child_ty, leg.limit_price.as_ref()) {
-            (CreateOrderType::Limit, Some(price)) => resolve_price_ticks(price, symbol)?,
-            (CreateOrderType::Limit, None) => {
-                return Err(Error::validation(
-                    "attached_risk LIMIT child requires limit_price",
-                ));
-            }
+        let execution = match (child_ty, leg.limit_price.as_ref()) {
+            (CreateOrderType::Market, None) => risk_execution::Execution::MarketIoc(Box::default()),
             (CreateOrderType::Market, Some(_)) => {
                 return Err(Error::validation(
                     "attached_risk MARKET child must not set limit_price",
                 ));
             }
-            (CreateOrderType::Market, None) => 0,
+            (CreateOrderType::Limit, Some(price)) => {
+                risk_execution::Execution::LimitGtc(Box::new(RiskLimitGtc {
+                    price_ticks: resolve_price_ticks(price, symbol)?,
+                    ..Default::default()
+                }))
+            }
+            (CreateOrderType::Limit, None) => {
+                return Err(Error::validation(
+                    "attached_risk LIMIT child requires limit_price",
+                ));
+            }
         };
-        Ok((trigger, limit, child_ty))
+        Ok(RiskExecution {
+            execution: Some(execution),
+            ..Default::default()
+        })
     }
 
     fn encode_take_profit(leg: &RiskLeg, symbol: Option<&str>) -> Result<TakeProfitPolicy> {
-        let (trigger, limit, child_ty) = Self::encode_risk_leg(leg, symbol)?;
-        Ok(TakeProfitPolicy {
-            trigger_price_ticks: trigger,
-            trigger_price_source: Self::encode_trigger_price_source(leg.trigger_price_source),
-            order_type: Self::encode_child_order_type(Some(child_ty)),
-            limit_price_ticks: limit,
+        let mut policy = TakeProfitPolicy {
+            trigger_price_ticks: resolve_price_ticks(&leg.trigger_price, symbol)?,
             ..Default::default()
-        })
+        };
+        *policy.child.get_or_insert_default() = Self::encode_risk_child(leg, symbol)?;
+        Ok(policy)
     }
 
     fn encode_stop_loss(leg: &RiskLeg, symbol: Option<&str>) -> Result<StopLossPolicy> {
-        let (trigger, limit, child_ty) = Self::encode_risk_leg(leg, symbol)?;
-        Ok(StopLossPolicy {
-            trigger_price_ticks: trigger,
-            trigger_price_source: Self::encode_trigger_price_source(leg.trigger_price_source),
-            order_type: Self::encode_child_order_type(Some(child_ty)),
-            limit_price_ticks: limit,
+        let mut policy = StopLossPolicy {
+            trigger_price_ticks: resolve_price_ticks(&leg.trigger_price, symbol)?,
             ..Default::default()
-        })
+        };
+        *policy.child.get_or_insert_default() = Self::encode_risk_child(leg, symbol)?;
+        Ok(policy)
     }
 
     fn encode_trailing_stop(
         stop: &TrailingStop,
         symbol: Option<&str>,
     ) -> Result<TrailingStopPolicy> {
-        let mut proto = TrailingStopPolicy {
-            trigger_price_source: Self::encode_trigger_price_source(stop.trigger_price_source),
-            order_type: Self::encode_child_order_type(stop.order_type),
-            ..Default::default()
-        };
+        // `trigger_price_source`/`order_type` were dropped from the trailing-stop
+        // policy wire; the child is an implicit market execution.
+        let mut proto = TrailingStopPolicy::default();
         if let Some(activation) = stop.activation_price.as_ref() {
             proto.activation_price_ticks = resolve_price_ticks(activation, symbol)?;
         }
@@ -454,20 +482,18 @@ impl OrdersService {
         items: Vec<CreateOrderParams>,
         subaccount_id: Option<u64>,
         request_id: Option<String>,
-        allow_partial: bool,
     ) -> Result<BatchCreateOrdersResult> {
         if items.is_empty() {
             return Err(Error::validation("batch_create requires at least one item"));
         }
         let mut encoded = Vec::with_capacity(items.len());
         for item in &items {
-            encoded.push(self.encode_create_params(item)?);
+            encoded.push(self.order_intent_from_params(item)?);
         }
         let req = BatchCreateOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
             request_id: request_id.unwrap_or_else(|| Self::request_id("batch-create")),
             items: encoded,
-            allow_partial,
             ..Default::default()
         };
         let client = self.write_client();
@@ -1030,8 +1056,9 @@ mod tests {
         );
         create.attached_risk = Some(risk.clone());
         let create_wire = client.orders.encode_create_params(&create).unwrap();
-        assert!(create_wire.attached_risk.is_set());
-        assert!(create_wire.attached_risk.as_option().unwrap().oco);
+        let order = create_wire.order.as_option().unwrap();
+        assert!(order.attached_risk.is_set());
+        assert!(order.attached_risk.as_option().unwrap().oco);
 
         let mut modify = modify_params(None, None);
         modify.new_attached_risk = Some(risk);
