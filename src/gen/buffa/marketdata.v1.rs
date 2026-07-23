@@ -3397,6 +3397,193 @@ impl ::buffa::Enumeration for Timeframe {
         ]
     }
 }
+/// PairStatus describes which order mutations a spot pair currently accepts.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum PairStatus {
+    /// Pair status was not provided.
+    PAIR_STATUS_UNSPECIFIED = 0i32,
+    /// New orders and cancellations are accepted.
+    PAIR_STATUS_ENABLED = 1i32,
+    /// New orders are temporarily disabled.
+    PAIR_STATUS_DISABLED = 2i32,
+    /// Only cancellations are accepted.
+    PAIR_STATUS_CANCEL_ONLY = 3i32,
+    /// New orders must use a post-only execution variant.
+    PAIR_STATUS_POST_ONLY = 4i32,
+    /// New spot orders are blocked by reduce-only policy.
+    PAIR_STATUS_REDUCE_ONLY = 5i32,
+}
+impl PairStatus {
+    ///Idiomatic alias for [`Self::PAIR_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::PAIR_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::PAIR_STATUS_ENABLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Enabled: Self = Self::PAIR_STATUS_ENABLED;
+    ///Idiomatic alias for [`Self::PAIR_STATUS_DISABLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Disabled: Self = Self::PAIR_STATUS_DISABLED;
+    ///Idiomatic alias for [`Self::PAIR_STATUS_CANCEL_ONLY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CancelOnly: Self = Self::PAIR_STATUS_CANCEL_ONLY;
+    ///Idiomatic alias for [`Self::PAIR_STATUS_POST_ONLY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PostOnly: Self = Self::PAIR_STATUS_POST_ONLY;
+    ///Idiomatic alias for [`Self::PAIR_STATUS_REDUCE_ONLY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReduceOnly: Self = Self::PAIR_STATUS_REDUCE_ONLY;
+}
+impl ::core::default::Default for PairStatus {
+    fn default() -> Self {
+        Self::PAIR_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for PairStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for PairStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = PairStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(PairStatus)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<PairStatus, E> {
+                <PairStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<PairStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <PairStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<PairStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <PairStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<PairStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PairStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for PairStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::PAIR_STATUS_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::PAIR_STATUS_ENABLED),
+            2i32 => ::core::option::Option::Some(Self::PAIR_STATUS_DISABLED),
+            3i32 => ::core::option::Option::Some(Self::PAIR_STATUS_CANCEL_ONLY),
+            4i32 => ::core::option::Option::Some(Self::PAIR_STATUS_POST_ONLY),
+            5i32 => ::core::option::Option::Some(Self::PAIR_STATUS_REDUCE_ONLY),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::PAIR_STATUS_UNSPECIFIED => "PAIR_STATUS_UNSPECIFIED",
+            Self::PAIR_STATUS_ENABLED => "PAIR_STATUS_ENABLED",
+            Self::PAIR_STATUS_DISABLED => "PAIR_STATUS_DISABLED",
+            Self::PAIR_STATUS_CANCEL_ONLY => "PAIR_STATUS_CANCEL_ONLY",
+            Self::PAIR_STATUS_POST_ONLY => "PAIR_STATUS_POST_ONLY",
+            Self::PAIR_STATUS_REDUCE_ONLY => "PAIR_STATUS_REDUCE_ONLY",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "PAIR_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::PAIR_STATUS_UNSPECIFIED)
+            }
+            "PAIR_STATUS_ENABLED" => {
+                ::core::option::Option::Some(Self::PAIR_STATUS_ENABLED)
+            }
+            "PAIR_STATUS_DISABLED" => {
+                ::core::option::Option::Some(Self::PAIR_STATUS_DISABLED)
+            }
+            "PAIR_STATUS_CANCEL_ONLY" => {
+                ::core::option::Option::Some(Self::PAIR_STATUS_CANCEL_ONLY)
+            }
+            "PAIR_STATUS_POST_ONLY" => {
+                ::core::option::Option::Some(Self::PAIR_STATUS_POST_ONLY)
+            }
+            "PAIR_STATUS_REDUCE_ONLY" => {
+                ::core::option::Option::Some(Self::PAIR_STATUS_REDUCE_ONLY)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::PAIR_STATUS_UNSPECIFIED,
+            Self::PAIR_STATUS_ENABLED,
+            Self::PAIR_STATUS_DISABLED,
+            Self::PAIR_STATUS_CANCEL_ONLY,
+            Self::PAIR_STATUS_POST_ONLY,
+            Self::PAIR_STATUS_REDUCE_ONLY,
+        ]
+    }
+}
 /// ---------------------------------------------------------------------------
 /// GetTrades: Binary (protobuf) request/response with scaled integers.
 /// REST surfaces expose decimal strings via DTO conversion.
@@ -7120,16 +7307,15 @@ pub struct PairConfig {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub delisting_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Current trading status: enabled, disabled, cancel_only, post_only, or
-    /// reduce_only.
+    /// Current trading status.
     ///
     /// Field 15: `status`
     #[serde(
         rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub status: ::buffa::alloc::string::String,
+    pub status: ::buffa::EnumValue<PairStatus>,
     /// Default MARKET order slippage cap for BUY orders, in basis points
     /// (1 bp = 0.01%). A request-level slippage setting can override this value.
     ///
@@ -7289,8 +7475,11 @@ impl ::buffa::Message for PairConfig {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         if self.default_market_slippage_bps_buy != 0i32 {
             size
@@ -7367,8 +7556,11 @@ impl ::buffa::Message for PairConfig {
             ::buffa::types::put_len_delimited_header(14u32, __cache.consume_next(), buf);
             self.delisting_at.write_to(__cache, buf);
         }
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(15u32, &self.status, buf);
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(15u32, val, buf);
+            }
         }
         if self.default_market_slippage_bps_buy != 0i32 {
             ::buffa::types::put_int32_field(
@@ -7513,9 +7705,11 @@ impl ::buffa::Message for PairConfig {
             15u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             16u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -7564,7 +7758,7 @@ impl ::buffa::Message for PairConfig {
         self.marketdata = ::buffa::MessageField::none();
         self.listing_at = ::buffa::MessageField::none();
         self.delisting_at = ::buffa::MessageField::none();
-        self.status.clear();
+        self.status = ::buffa::EnumValue::from(0);
         self.default_market_slippage_bps_buy = 0i32;
         self.default_market_slippage_bps_sell = 0i32;
         self.max_client_ref_drift_bps = 0i32;
@@ -18272,11 +18466,10 @@ pub mod __buffa {
             pub delisting_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Current trading status: enabled, disabled, cancel_only, post_only, or
-            /// reduce_only.
+            /// Current trading status.
             ///
             /// Field 15: `status`
-            pub status: &'a str,
+            pub status: ::buffa::EnumValue<super::super::PairStatus>,
             /// Default MARKET order slippage cap for BUY orders, in basis points
             /// (1 bp = 0.01%). A request-level slippage setting can override this value.
             ///
@@ -18487,9 +18680,11 @@ pub mod __buffa {
                     15u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     16u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -18576,7 +18771,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    status: self.status.to_string(),
+                    status: self.status,
                     default_market_slippage_bps_buy: self
                         .default_market_slippage_bps_buy,
                     default_market_slippage_bps_sell: self
@@ -18682,10 +18877,11 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 if self.default_market_slippage_bps_buy != 0i32 {
                     size
@@ -18792,8 +18988,11 @@ pub mod __buffa {
                     );
                     self.delisting_at.write_to(__cache, buf);
                 }
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(15u32, &self.status, buf);
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(15u32, val, buf);
+                    }
                 }
                 if self.default_market_slippage_bps_buy != 0i32 {
                     ::buffa::types::put_int32_field(
@@ -18916,8 +19115,8 @@ pub mod __buffa {
                         __map.serialize_entry("delistingAt", __v)?;
                     }
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_i32(
                     &self.default_market_slippage_bps_buy,
@@ -19158,12 +19357,11 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().delisting_at
             }
-            /// Current trading status: enabled, disabled, cancel_only, post_only, or
-            /// reduce_only.
+            /// Current trading status.
             ///
             /// Field 15: `status`
             #[must_use]
-            pub fn status(&self) -> &'_ str {
+            pub fn status(&self) -> ::buffa::EnumValue<super::super::PairStatus> {
                 self.0.reborrow().status
             }
             /// Default MARKET order slippage cap for BUY orders, in basis points

@@ -891,6 +891,8 @@ pub enum ErrorCode {
     ERROR_CODE_MAX_SLIPPAGE_INVALID = 48i32,
     /// Client reference price is stale compared to server-side BBO/drift policy.
     ERROR_CODE_STALE_QUOTE = 65i32,
+    /// Request failed structural or cross-field validation.
+    ERROR_CODE_VALIDATION_ERROR = 66i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1079,6 +1081,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_STALE_QUOTE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const StaleQuote: Self = Self::ERROR_CODE_STALE_QUOTE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_VALIDATION_ERROR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ValidationError: Self = Self::ERROR_CODE_VALIDATION_ERROR;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -1284,6 +1289,7 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             48i32 => ::core::option::Option::Some(Self::ERROR_CODE_MAX_SLIPPAGE_INVALID),
             65i32 => ::core::option::Option::Some(Self::ERROR_CODE_STALE_QUOTE),
+            66i32 => ::core::option::Option::Some(Self::ERROR_CODE_VALIDATION_ERROR),
             _ => ::core::option::Option::None,
         }
     }
@@ -1390,6 +1396,7 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_MAX_SLIPPAGE_INVALID => "ERROR_CODE_MAX_SLIPPAGE_INVALID",
             Self::ERROR_CODE_STALE_QUOTE => "ERROR_CODE_STALE_QUOTE",
+            Self::ERROR_CODE_VALIDATION_ERROR => "ERROR_CODE_VALIDATION_ERROR",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1592,6 +1599,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_STALE_QUOTE" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_STALE_QUOTE)
             }
+            "ERROR_CODE_VALIDATION_ERROR" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_VALIDATION_ERROR)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1659,6 +1669,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID,
             Self::ERROR_CODE_MAX_SLIPPAGE_INVALID,
             Self::ERROR_CODE_STALE_QUOTE,
+            Self::ERROR_CODE_VALIDATION_ERROR,
         ]
     }
 }
@@ -2294,74 +2305,309 @@ impl ::buffa::Enumeration for ModifyActionTaken {
 /// Connect/Proto-facing Messages (scaled ints, fixed64 IDs)
 /// =============================================================================
 ///
-/// CreateOrderRequest is the binary (protobuf) request for placing orders.
-/// Uses scaled integers for quantity and price, plus fixed64 IDs.
-/// Preferred by latency-sensitive clients.
+/// MarketIoc configures a market order. Market orders always execute as
+/// immediate-or-cancel and therefore cannot rest or be post-only.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
-pub struct CreateOrderRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+pub struct MarketIoc {
+    /// Optional client reference price in quote units scaled by 1e6. When
+    /// omitted, admission uses server-side reference pricing.
     ///
-    /// Field 1: `subaccount_id`
+    /// Field 3: `client_ref_price_ticks`
     #[serde(
-        rename = "subaccountId",
-        alias = "subaccount_id",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub subaccount_id: ::core::option::Option<u64>,
-    /// Trading pair symbol, e.g., "BTC-USDT"; resolved to pair_id by gateway.
-    ///
-    /// Field 2: `symbol`
-    #[serde(
-        rename = "symbol",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub symbol: ::buffa::alloc::string::String,
-    /// Order side: BUY or SELL.
-    ///
-    /// Field 3: `side`
-    #[serde(
-        rename = "side",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub side: ::buffa::EnumValue<Side>,
-    /// Order type: LIMIT or MARKET.
-    ///
-    /// Field 4: `order_type`
-    #[serde(
-        rename = "orderType",
-        alias = "order_type",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub order_type: ::buffa::EnumValue<OrderType>,
-    /// Time-in-force: GTC, IOC, or FOK. Defaults to GTC if unspecified.
-    ///
-    /// Field 5: `time_in_force`
-    #[serde(
-        rename = "timeInForce",
-        alias = "time_in_force",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub time_in_force: ::buffa::EnumValue<TimeInForce>,
-    /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
-    ///
-    /// Field 6: `qty_scaled`
-    #[serde(
-        rename = "qtyScaled",
-        alias = "qty_scaled",
+        rename = "clientRefPriceTicks",
+        alias = "client_ref_price_ticks",
         with = "::buffa::json_helpers::int64",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
-    pub qty_scaled: i64,
-    /// Price in quote units scaled by 1e6. Optional for MARKET orders.
+    pub client_ref_price_ticks: i64,
+    #[serde(flatten)]
+    pub max_slippage: ::core::option::Option<__buffa::oneof::market_ioc::MaxSlippage>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MarketIoc {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MarketIoc")
+            .field("client_ref_price_ticks", &self.client_ref_price_ticks)
+            .field("max_slippage", &self.max_slippage)
+            .finish()
+    }
+}
+impl MarketIoc {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
     ///
-    /// Field 7: `price_ticks`
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.MarketIoc";
+}
+::buffa::impl_default_instance!(MarketIoc);
+impl ::buffa::MessageName for MarketIoc {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "MarketIoc";
+    const FULL_NAME: &'static str = "orders.v1.MarketIoc";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.MarketIoc";
+}
+impl ::buffa::Message for MarketIoc {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if let ::core::option::Option::Some(ref v) = self.max_slippage {
+            match v {
+                __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(v) => {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                }
+                __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageBps(v) => {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                }
+            }
+        }
+        if self.client_ref_price_ticks != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.client_ref_price_ticks)
+                        as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.max_slippage {
+            match v {
+                __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(x) => {
+                    ::buffa::types::put_int32_field(1u32, *x, buf);
+                }
+                __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageBps(x) => {
+                    ::buffa::types::put_int32_field(2u32, *x, buf);
+                }
+            }
+        }
+        if self.client_ref_price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(3u32, self.client_ref_price_ticks, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_slippage = ::core::option::Option::Some(
+                    __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
+                        ::buffa::types::decode_int32(buf)?,
+                    ),
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_slippage = ::core::option::Option::Some(
+                    __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
+                        ::buffa::types::decode_int32(buf)?,
+                    ),
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.client_ref_price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.max_slippage = ::core::option::Option::None;
+        self.client_ref_price_ticks = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MarketIoc {
+    const PROTO_FQN: &'static str = "orders.v1.MarketIoc";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for MarketIoc {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = MarketIoc;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct MarketIoc")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<MarketIoc, A::Error> {
+                let mut __f_client_ref_price_ticks: ::core::option::Option<i64> = None;
+                let mut __oneof_max_slippage: ::core::option::Option<
+                    __buffa::oneof::market_ioc::MaxSlippage,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "clientRefPriceTicks" | "client_ref_price_ticks" => {
+                            __f_client_ref_price_ticks = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = i64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<i64, D::Error> {
+                                        ::buffa::json_helpers::int64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "maxSlippageTicks" | "max_slippage_ticks" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i32;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i32, D::Error> {
+                                    ::buffa::json_helpers::int32::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i32> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_max_slippage.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'max_slippage'",
+                                        ),
+                                    );
+                                }
+                                __oneof_max_slippage = Some(
+                                    __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(v),
+                                );
+                            }
+                        }
+                        "maxSlippageBps" | "max_slippage_bps" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i32;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i32, D::Error> {
+                                    ::buffa::json_helpers::int32::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i32> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_max_slippage.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'max_slippage'",
+                                        ),
+                                    );
+                                }
+                                __oneof_max_slippage = Some(
+                                    __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageBps(v),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <MarketIoc as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_client_ref_price_ticks {
+                    __r.client_ref_price_ticks = v;
+                }
+                __r.max_slippage = __oneof_max_slippage;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MarketIoc {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.MarketIoc",
+    to_json: ::buffa::type_registry::any_to_json::<MarketIoc>,
+    from_json: ::buffa::type_registry::any_from_json::<MarketIoc>,
+    is_wkt: false,
+};
+pub mod market_ioc {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::market_ioc::MaxSlippage;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::market_ioc::MaxSlippage as MaxSlippageView;
+}
+/// LimitGtc configures a good-til-canceled limit order.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct LimitGtc {
+    /// Limit price in quote units scaled by 1e6.
+    ///
+    /// Field 1: `price_ticks`
     #[serde(
         rename = "priceTicks",
         alias = "price_ticks",
@@ -2369,21 +2615,10 @@ pub struct CreateOrderRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub price_ticks: i64,
-    /// Optional client-side reference price in quote units scaled by 1e6 for
-    /// MARKET slippage anchoring.
-    /// When absent, admission uses server-side reference pricing.
+    /// Reject the order instead of taking liquidity. Post-only is available only
+    /// on this resting limit-order variant.
     ///
-    /// Field 14: `market_client_ref_price_ticks`
-    #[serde(
-        rename = "marketClientRefPriceTicks",
-        alias = "market_client_ref_price_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub market_client_ref_price_ticks: i64,
-    /// If true, the order is rejected instead of crossing the book (maker-only).
-    ///
-    /// Field 8: `post_only`
+    /// Field 2: `post_only`
     #[serde(
         rename = "postOnly",
         alias = "post_only",
@@ -2391,9 +2626,423 @@ pub struct CreateOrderRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub post_only: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for LimitGtc {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("LimitGtc")
+            .field("price_ticks", &self.price_ticks)
+            .field("post_only", &self.post_only)
+            .finish()
+    }
+}
+impl LimitGtc {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitGtc";
+}
+::buffa::impl_default_instance!(LimitGtc);
+impl ::buffa::MessageName for LimitGtc {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "LimitGtc";
+    const FULL_NAME: &'static str = "orders.v1.LimitGtc";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitGtc";
+}
+impl ::buffa::Message for LimitGtc {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.price_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+        }
+        if self.post_only {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+        }
+        if self.post_only {
+            ::buffa::types::put_bool_field(2u32, self.post_only, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.post_only = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.price_ticks = 0i64;
+        self.post_only = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for LimitGtc {
+    const PROTO_FQN: &'static str = "orders.v1.LimitGtc";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for LimitGtc {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.LimitGtc",
+    to_json: ::buffa::type_registry::any_to_json::<LimitGtc>,
+    from_json: ::buffa::type_registry::any_from_json::<LimitGtc>,
+    is_wkt: false,
+};
+/// LimitIoc configures an immediate-or-cancel limit order.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct LimitIoc {
+    /// Limit price in quote units scaled by 1e6.
+    ///
+    /// Field 1: `price_ticks`
+    #[serde(
+        rename = "priceTicks",
+        alias = "price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_ticks: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for LimitIoc {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("LimitIoc").field("price_ticks", &self.price_ticks).finish()
+    }
+}
+impl LimitIoc {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitIoc";
+}
+::buffa::impl_default_instance!(LimitIoc);
+impl ::buffa::MessageName for LimitIoc {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "LimitIoc";
+    const FULL_NAME: &'static str = "orders.v1.LimitIoc";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitIoc";
+}
+impl ::buffa::Message for LimitIoc {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.price_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.price_ticks = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for LimitIoc {
+    const PROTO_FQN: &'static str = "orders.v1.LimitIoc";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for LimitIoc {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIMIT_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.LimitIoc",
+    to_json: ::buffa::type_registry::any_to_json::<LimitIoc>,
+    from_json: ::buffa::type_registry::any_from_json::<LimitIoc>,
+    is_wkt: false,
+};
+/// LimitFok configures a fill-or-kill limit order.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct LimitFok {
+    /// Limit price in quote units scaled by 1e6.
+    ///
+    /// Field 1: `price_ticks`
+    #[serde(
+        rename = "priceTicks",
+        alias = "price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_ticks: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for LimitFok {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("LimitFok").field("price_ticks", &self.price_ticks).finish()
+    }
+}
+impl LimitFok {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitFok";
+}
+::buffa::impl_default_instance!(LimitFok);
+impl ::buffa::MessageName for LimitFok {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "LimitFok";
+    const FULL_NAME: &'static str = "orders.v1.LimitFok";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitFok";
+}
+impl ::buffa::Message for LimitFok {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.price_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.price_ticks = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for LimitFok {
+    const PROTO_FQN: &'static str = "orders.v1.LimitFok";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for LimitFok {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIMIT_FOK_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.LimitFok",
+    to_json: ::buffa::type_registry::any_to_json::<LimitFok>,
+    from_json: ::buffa::type_registry::any_from_json::<LimitFok>,
+    is_wkt: false,
+};
+/// OrderIntent contains one order's complete, transport-independent placement
+/// intent. Single and batch create use this same message.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct OrderIntent {
+    /// Trading pair symbol, for example "BTC-USDT".
+    ///
+    /// Field 1: `symbol`
+    #[serde(
+        rename = "symbol",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub symbol: ::buffa::alloc::string::String,
+    /// Order side.
+    ///
+    /// Field 2: `side`
+    #[serde(
+        rename = "side",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub side: ::buffa::EnumValue<Side>,
+    /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
+    ///
+    /// Field 3: `qty_scaled`
+    #[serde(
+        rename = "qtyScaled",
+        alias = "qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub qty_scaled: i64,
     /// Optional client order identifier for idempotency.
     ///
-    /// Field 9: `client_order_id`
+    /// Field 20: `client_order_id`
     #[serde(
         rename = "clientOrderId",
         alias = "client_order_id",
@@ -2401,10 +3050,10 @@ pub struct CreateOrderRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub client_order_id: ::buffa::alloc::string::String,
-    /// Fee source for BUY orders: QUOTE (default) or RECEIVED. SELL orders always
-    /// pay fees in quote asset.
+    /// Fee source for BUY orders: QUOTE (default) or RECEIVED. SELL orders must
+    /// use QUOTE.
     ///
-    /// Field 10: `fee_source`
+    /// Field 21: `fee_source`
     #[serde(
         rename = "feeSource",
         alias = "fee_source",
@@ -2414,7 +3063,7 @@ pub struct CreateOrderRequest {
     pub fee_source: ::buffa::EnumValue<FeeSource>,
     /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
     ///
-    /// Field 11: `self_trade_prevention_mode`
+    /// Field 22: `self_trade_prevention_mode`
     #[serde(
         rename = "selfTradePreventionMode",
         alias = "self_trade_prevention_mode",
@@ -2422,9 +3071,9 @@ pub struct CreateOrderRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub self_trade_prevention_mode: ::buffa::EnumValue<SelfTradePreventionMode>,
-    /// Optional attached risk controls (TP/SL/TrailingStop) for this order.
+    /// Optional attached risk controls that arm after the parent order fills.
     ///
-    /// Field 20: `attached_risk`
+    /// Field 30: `attached_risk`
     #[serde(
         rename = "attachedRisk",
         alias = "attached_risk",
@@ -2432,57 +3081,40 @@ pub struct CreateOrderRequest {
     )]
     pub attached_risk: ::buffa::MessageField<RiskPolicy>,
     #[serde(flatten)]
-    pub market_max_slippage: ::core::option::Option<
-        __buffa::oneof::create_order_request::MarketMaxSlippage,
-    >,
+    pub execution: ::core::option::Option<__buffa::oneof::order_intent::Execution>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CreateOrderRequest {
+impl ::core::fmt::Debug for OrderIntent {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CreateOrderRequest")
-            .field("subaccount_id", &self.subaccount_id)
+        f.debug_struct("OrderIntent")
             .field("symbol", &self.symbol)
             .field("side", &self.side)
-            .field("order_type", &self.order_type)
-            .field("time_in_force", &self.time_in_force)
             .field("qty_scaled", &self.qty_scaled)
-            .field("price_ticks", &self.price_ticks)
-            .field("market_client_ref_price_ticks", &self.market_client_ref_price_ticks)
-            .field("post_only", &self.post_only)
             .field("client_order_id", &self.client_order_id)
             .field("fee_source", &self.fee_source)
             .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
             .field("attached_risk", &self.attached_risk)
-            .field("market_max_slippage", &self.market_max_slippage)
+            .field("execution", &self.execution)
             .finish()
     }
 }
-impl CreateOrderRequest {
+impl OrderIntent {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.CreateOrderRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.OrderIntent";
 }
-impl CreateOrderRequest {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_subaccount_id(mut self, value: u64) -> Self {
-        self.subaccount_id = Some(value);
-        self
-    }
-}
-::buffa::impl_default_instance!(CreateOrderRequest);
-impl ::buffa::MessageName for CreateOrderRequest {
+::buffa::impl_default_instance!(OrderIntent);
+impl ::buffa::MessageName for OrderIntent {
     const PACKAGE: &'static str = "orders.v1";
-    const NAME: &'static str = "CreateOrderRequest";
-    const FULL_NAME: &'static str = "orders.v1.CreateOrderRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.CreateOrderRequest";
+    const NAME: &'static str = "OrderIntent";
+    const FULL_NAME: &'static str = "orders.v1.OrderIntent";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.OrderIntent";
 }
-impl ::buffa::Message for CreateOrderRequest {
+impl ::buffa::Message for OrderIntent {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -2493,9 +3125,6 @@ impl ::buffa::Message for CreateOrderRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if self.subaccount_id.is_some() {
-            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-        }
         if !self.symbol.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
         }
@@ -2505,64 +3134,61 @@ impl ::buffa::Message for CreateOrderRequest {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.time_in_force.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
         if self.qty_scaled != 0i64 {
             size += 1u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
         }
-        if self.price_ticks != 0i64 {
-            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
-        }
-        if self.post_only {
-            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        if let ::core::option::Option::Some(ref v) = self.execution {
+            match v {
+                __buffa::oneof::order_intent::Execution::MarketIoc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::order_intent::Execution::LimitGtc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::order_intent::Execution::LimitIoc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::order_intent::Execution::LimitFok(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+            }
         }
         if !self.client_order_id.is_empty() {
             size
-                += 1u32
+                += 2u32
                     + ::buffa::types::string_encoded_len(&self.client_order_id) as u32;
         }
         {
             let val = self.fee_source.to_i32();
             if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
         {
             let val = self.self_trade_prevention_mode.to_i32();
             if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
-        }
-        if let ::core::option::Option::Some(ref v) = self.market_max_slippage {
-            match v {
-                __buffa::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageTicks(
-                    v,
-                ) => {
-                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
-                }
-                __buffa::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageBps(
-                    v,
-                ) => {
-                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
-                }
-            }
-        }
-        if self.market_client_ref_price_ticks != 0i64 {
-            size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(
-                        self.market_client_ref_price_ticks,
-                    ) as u32;
         }
         if self.attached_risk.is_set() {
             let __slot = __cache.reserve();
@@ -2582,77 +3208,71 @@ impl ::buffa::Message for CreateOrderRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if let Some(v) = self.subaccount_id {
-            ::buffa::types::put_fixed64_field(1u32, v, buf);
-        }
         if !self.symbol.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.symbol, buf);
+            ::buffa::types::put_string_field(1u32, &self.symbol, buf);
         }
         {
             let val = self.side.to_i32();
             if val != 0 {
-                ::buffa::types::put_int32_field(3u32, val, buf);
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(4u32, val, buf);
-            }
-        }
-        {
-            let val = self.time_in_force.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(5u32, val, buf);
+                ::buffa::types::put_int32_field(2u32, val, buf);
             }
         }
         if self.qty_scaled != 0i64 {
-            ::buffa::types::put_int64_field(6u32, self.qty_scaled, buf);
+            ::buffa::types::put_int64_field(3u32, self.qty_scaled, buf);
         }
-        if self.price_ticks != 0i64 {
-            ::buffa::types::put_int64_field(7u32, self.price_ticks, buf);
-        }
-        if self.post_only {
-            ::buffa::types::put_bool_field(8u32, self.post_only, buf);
+        if let ::core::option::Option::Some(ref v) = self.execution {
+            match v {
+                __buffa::oneof::order_intent::Execution::MarketIoc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::order_intent::Execution::LimitGtc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::order_intent::Execution::LimitIoc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::order_intent::Execution::LimitFok(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        13u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
         }
         if !self.client_order_id.is_empty() {
-            ::buffa::types::put_string_field(9u32, &self.client_order_id, buf);
+            ::buffa::types::put_string_field(20u32, &self.client_order_id, buf);
         }
         {
             let val = self.fee_source.to_i32();
             if val != 0 {
-                ::buffa::types::put_int32_field(10u32, val, buf);
+                ::buffa::types::put_int32_field(21u32, val, buf);
             }
         }
         {
             let val = self.self_trade_prevention_mode.to_i32();
             if val != 0 {
-                ::buffa::types::put_int32_field(11u32, val, buf);
+                ::buffa::types::put_int32_field(22u32, val, buf);
             }
-        }
-        if let ::core::option::Option::Some(ref v) = self.market_max_slippage {
-            match v {
-                __buffa::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageTicks(
-                    x,
-                ) => {
-                    ::buffa::types::put_int32_field(12u32, *x, buf);
-                }
-                __buffa::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageBps(
-                    x,
-                ) => {
-                    ::buffa::types::put_int32_field(13u32, *x, buf);
-                }
-            }
-        }
-        if self.market_client_ref_price_ticks != 0i64 {
-            ::buffa::types::put_int64_field(
-                14u32,
-                self.market_client_ref_price_ticks,
-                buf,
-            );
         }
         if self.attached_risk.is_set() {
-            ::buffa::types::put_len_delimited_header(20u32, __cache.consume_next(), buf);
+            ::buffa::types::put_len_delimited_header(30u32, __cache.consume_next(), buf);
             self.attached_risk.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -2671,73 +3291,112 @@ impl ::buffa::Message for CreateOrderRequest {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Fixed64,
-                )?;
-                self.subaccount_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_fixed64(buf)?,
-                );
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.symbol, buf)?;
             }
-            3u32 => {
+            2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.order_type = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.time_in_force = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            6u32 => {
+            3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.qty_scaled = ::buffa::types::decode_int64(buf)?;
             }
-            7u32 => {
+            10u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.price_ticks = ::buffa::types::decode_int64(buf)?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::order_intent::Execution::MarketIoc(ref mut existing),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::order_intent::Execution::MarketIoc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
             }
-            8u32 => {
+            11u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.post_only = ::buffa::types::decode_bool(buf)?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::order_intent::Execution::LimitGtc(ref mut existing),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::order_intent::Execution::LimitGtc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
             }
-            9u32 => {
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::order_intent::Execution::LimitIoc(ref mut existing),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::order_intent::Execution::LimitIoc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::order_intent::Execution::LimitFok(ref mut existing),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::order_intent::Execution::LimitFok(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            20u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.client_order_id, buf)?;
             }
-            10u32 => {
+            21u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
@@ -2746,7 +3405,7 @@ impl ::buffa::Message for CreateOrderRequest {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
-            11u32 => {
+            22u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
@@ -2755,36 +3414,7 @@ impl ::buffa::Message for CreateOrderRequest {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
-            12u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.market_max_slippage = ::core::option::Option::Some(
-                    __buffa::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageTicks(
-                        ::buffa::types::decode_int32(buf)?,
-                    ),
-                );
-            }
-            13u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.market_max_slippage = ::core::option::Option::Some(
-                    __buffa::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageBps(
-                        ::buffa::types::decode_int32(buf)?,
-                    ),
-                );
-            }
-            14u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.market_client_ref_price_ticks = ::buffa::types::decode_int64(buf)?;
-            }
-            20u32 => {
+            30u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
@@ -2803,25 +3433,19 @@ impl ::buffa::Message for CreateOrderRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.subaccount_id = ::core::option::Option::None;
         self.symbol.clear();
         self.side = ::buffa::EnumValue::from(0);
-        self.order_type = ::buffa::EnumValue::from(0);
-        self.time_in_force = ::buffa::EnumValue::from(0);
         self.qty_scaled = 0i64;
-        self.price_ticks = 0i64;
-        self.post_only = false;
+        self.execution = ::core::option::Option::None;
         self.client_order_id.clear();
         self.fee_source = ::buffa::EnumValue::from(0);
         self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
-        self.market_max_slippage = ::core::option::Option::None;
-        self.market_client_ref_price_ticks = 0i64;
         self.attached_risk = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for CreateOrderRequest {
-    const PROTO_FQN: &'static str = "orders.v1.CreateOrderRequest";
+impl ::buffa::ExtensionSet for OrderIntent {
+    const PROTO_FQN: &'static str = "orders.v1.OrderIntent";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -2829,38 +3453,26 @@ impl ::buffa::ExtensionSet for CreateOrderRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl<'de> serde::Deserialize<'de> for CreateOrderRequest {
+impl<'de> serde::Deserialize<'de> for OrderIntent {
     fn deserialize<D: serde::Deserializer<'de>>(
         d: D,
     ) -> ::core::result::Result<Self, D::Error> {
         struct _V;
         impl<'de> serde::de::Visitor<'de> for _V {
-            type Value = CreateOrderRequest;
+            type Value = OrderIntent;
             fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                f.write_str("struct CreateOrderRequest")
+                f.write_str("struct OrderIntent")
             }
             #[allow(clippy::field_reassign_with_default)]
             fn visit_map<A: serde::de::MapAccess<'de>>(
                 self,
                 mut map: A,
-            ) -> ::core::result::Result<CreateOrderRequest, A::Error> {
-                let mut __f_subaccount_id: ::core::option::Option<
-                    ::core::option::Option<u64>,
-                > = None;
+            ) -> ::core::result::Result<OrderIntent, A::Error> {
                 let mut __f_symbol: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_side: ::core::option::Option<::buffa::EnumValue<Side>> = None;
-                let mut __f_order_type: ::core::option::Option<
-                    ::buffa::EnumValue<OrderType>,
-                > = None;
-                let mut __f_time_in_force: ::core::option::Option<
-                    ::buffa::EnumValue<TimeInForce>,
-                > = None;
                 let mut __f_qty_scaled: ::core::option::Option<i64> = None;
-                let mut __f_price_ticks: ::core::option::Option<i64> = None;
-                let mut __f_market_client_ref_price_ticks: ::core::option::Option<i64> = None;
-                let mut __f_post_only: ::core::option::Option<bool> = None;
                 let mut __f_client_order_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
@@ -2873,29 +3485,11 @@ impl<'de> serde::Deserialize<'de> for CreateOrderRequest {
                 let mut __f_attached_risk: ::core::option::Option<
                     ::buffa::MessageField<RiskPolicy>,
                 > = None;
-                let mut __oneof_market_max_slippage: ::core::option::Option<
-                    __buffa::oneof::create_order_request::MarketMaxSlippage,
+                let mut __oneof_execution: ::core::option::Option<
+                    __buffa::oneof::order_intent::Execution,
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
-                        "subaccountId" | "subaccount_id" => {
-                            __f_subaccount_id = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::core::option::Option<u64>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::core::option::Option<u64>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::opt_uint64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
                         "symbol" => {
                             __f_symbol = Some({
                                 struct _S;
@@ -2932,42 +3526,6 @@ impl<'de> serde::Deserialize<'de> for CreateOrderRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "orderType" | "order_type" => {
-                            __f_order_type = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<OrderType>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<OrderType>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "timeInForce" | "time_in_force" => {
-                            __f_time_in_force = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<TimeInForce>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<TimeInForce>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
                         "qtyScaled" | "qty_scaled" => {
                             __f_qty_scaled = Some({
                                 struct _S;
@@ -2978,52 +3536,6 @@ impl<'de> serde::Deserialize<'de> for CreateOrderRequest {
                                         d: D,
                                     ) -> ::core::result::Result<i64, D::Error> {
                                         ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "priceTicks" | "price_ticks" => {
-                            __f_price_ticks = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i64, D::Error> {
-                                        ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "marketClientRefPriceTicks"
-                        | "market_client_ref_price_ticks" => {
-                            __f_market_client_ref_price_ticks = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i64, D::Error> {
-                                        ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "postOnly" | "post_only" => {
-                            __f_post_only = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = bool;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<bool, D::Error> {
-                                        ::buffa::json_helpers::proto_bool::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -3088,62 +3600,98 @@ impl<'de> serde::Deserialize<'de> for CreateOrderRequest {
                                 map.next_value::<::buffa::MessageField<RiskPolicy>>()?,
                             );
                         }
-                        "marketMaxSlippageTicks" | "market_max_slippage_ticks" => {
-                            struct _DeserSeed;
-                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
-                                fn deserialize<D: serde::Deserializer<'de>>(
-                                    self,
-                                    d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
-                                }
-                            }
-                            let v: ::core::option::Option<i32> = map
+                        "marketIoc" | "market_ioc" => {
+                            let v: ::core::option::Option<MarketIoc> = map
                                 .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            MarketIoc,
+                                        >::new(),
+                                    ),
                                 )?;
                             if let Some(v) = v {
-                                if __oneof_market_max_slippage.is_some() {
+                                if __oneof_execution.is_some() {
                                     return Err(
                                         serde::de::Error::custom(
-                                            "multiple oneof fields set for 'market_max_slippage'",
+                                            "multiple oneof fields set for 'execution'",
                                         ),
                                     );
                                 }
-                                __oneof_market_max_slippage = Some(
-                                    __buffa::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageTicks(
-                                        v,
+                                __oneof_execution = Some(
+                                    __buffa::oneof::order_intent::Execution::MarketIoc(
+                                        ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
                             }
                         }
-                        "marketMaxSlippageBps" | "market_max_slippage_bps" => {
-                            struct _DeserSeed;
-                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
-                                fn deserialize<D: serde::Deserializer<'de>>(
-                                    self,
-                                    d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
-                                }
-                            }
-                            let v: ::core::option::Option<i32> = map
+                        "limitGtc" | "limit_gtc" => {
+                            let v: ::core::option::Option<LimitGtc> = map
                                 .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            LimitGtc,
+                                        >::new(),
+                                    ),
                                 )?;
                             if let Some(v) = v {
-                                if __oneof_market_max_slippage.is_some() {
+                                if __oneof_execution.is_some() {
                                     return Err(
                                         serde::de::Error::custom(
-                                            "multiple oneof fields set for 'market_max_slippage'",
+                                            "multiple oneof fields set for 'execution'",
                                         ),
                                     );
                                 }
-                                __oneof_market_max_slippage = Some(
-                                    __buffa::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageBps(
-                                        v,
+                                __oneof_execution = Some(
+                                    __buffa::oneof::order_intent::Execution::LimitGtc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "limitIoc" | "limit_ioc" => {
+                            let v: ::core::option::Option<LimitIoc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            LimitIoc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::order_intent::Execution::LimitIoc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "limitFok" | "limit_fok" => {
+                            let v: ::core::option::Option<LimitFok> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            LimitFok,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::order_intent::Execution::LimitFok(
+                                        ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
                             }
@@ -3153,33 +3701,15 @@ impl<'de> serde::Deserialize<'de> for CreateOrderRequest {
                         }
                     }
                 }
-                let mut __r = <CreateOrderRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_subaccount_id {
-                    __r.subaccount_id = v;
-                }
+                let mut __r = <OrderIntent as ::core::default::Default>::default();
                 if let ::core::option::Option::Some(v) = __f_symbol {
                     __r.symbol = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_side {
                     __r.side = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_order_type {
-                    __r.order_type = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_time_in_force {
-                    __r.time_in_force = v;
-                }
                 if let ::core::option::Option::Some(v) = __f_qty_scaled {
                     __r.qty_scaled = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_price_ticks {
-                    __r.price_ticks = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_market_client_ref_price_ticks {
-                    __r.market_client_ref_price_ticks = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_post_only {
-                    __r.post_only = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_client_order_id {
                     __r.client_order_id = v;
@@ -3193,11 +3723,191 @@ impl<'de> serde::Deserialize<'de> for CreateOrderRequest {
                 if let ::core::option::Option::Some(v) = __f_attached_risk {
                     __r.attached_risk = v;
                 }
-                __r.market_max_slippage = __oneof_market_max_slippage;
+                __r.execution = __oneof_execution;
                 Ok(__r)
             }
         }
         d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OrderIntent {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ORDER_INTENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.OrderIntent",
+    to_json: ::buffa::type_registry::any_to_json::<OrderIntent>,
+    from_json: ::buffa::type_registry::any_from_json::<OrderIntent>,
+    is_wkt: false,
+};
+pub mod order_intent {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::order_intent::Execution;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::order_intent::Execution as ExecutionView;
+}
+/// CreateOrderRequest submits one order intent for admission.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateOrderRequest {
+    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    /// Order to admit.
+    ///
+    /// Field 2: `order`
+    #[serde(
+        rename = "order",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub order: ::buffa::MessageField<OrderIntent>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateOrderRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateOrderRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("order", &self.order)
+            .finish()
+    }
+}
+impl CreateOrderRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.CreateOrderRequest";
+}
+impl CreateOrderRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(CreateOrderRequest);
+impl ::buffa::MessageName for CreateOrderRequest {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "CreateOrderRequest";
+    const FULL_NAME: &'static str = "orders.v1.CreateOrderRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.CreateOrderRequest";
+}
+impl ::buffa::Message for CreateOrderRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.order.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.order.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
+        if self.order.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.order.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.order.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = ::core::option::Option::None;
+        self.order = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateOrderRequest {
+    const PROTO_FQN: &'static str = "orders.v1.CreateOrderRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for CreateOrderRequest {
@@ -3220,31 +3930,16 @@ pub const __CREATE_ORDER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
     from_json: ::buffa::type_registry::any_from_json::<CreateOrderRequest>,
     is_wkt: false,
 };
-pub mod create_order_request {
-    #[allow(unused_imports)]
-    use super::*;
-    #[doc(inline)]
-    pub use super::__buffa::oneof::create_order_request::MarketMaxSlippage;
-    #[doc(inline)]
-    pub use super::__buffa::view::oneof::create_order_request::MarketMaxSlippage as MarketMaxSlippageView;
-}
-/// CreateOrderResponse is the binary (protobuf) response after placing an order.
+/// CreateOrderResponse acknowledges admission only. It does not report whether
+/// the order is working, filled, canceled, or rejected after admission; use
+/// order reads or realtime streams for execution state.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateOrderResponse {
-    /// Status indicator, e.g., "accepted".
+    /// Assigned order ID.
     ///
-    /// Field 1: `status`
-    #[serde(
-        rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub status: ::buffa::alloc::string::String,
-    /// Order ID as fixed64.
-    ///
-    /// Field 2: `order_id`
+    /// Field 1: `order_id`
     #[serde(
         rename = "orderId",
         alias = "order_id",
@@ -3252,9 +3947,9 @@ pub struct CreateOrderResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub order_id: u64,
-    /// Echoed client order ID (when provided in request).
+    /// Echoed client order ID when one was supplied.
     ///
-    /// Field 3: `client_order_id`
+    /// Field 2: `client_order_id`
     #[serde(
         rename = "clientOrderId",
         alias = "client_order_id",
@@ -3262,24 +3957,25 @@ pub struct CreateOrderResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub client_order_id: ::buffa::alloc::string::String,
-    /// Server timestamp.
+    /// Time admission completed.
     ///
-    /// Field 4: `ts`
+    /// Field 3: `accepted_at`
     #[serde(
-        rename = "ts",
+        rename = "acceptedAt",
+        alias = "accepted_at",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub ts: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Server timestamp as epoch nanoseconds (for bots).
+    pub accepted_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Admission completion time as epoch nanoseconds (UTC).
     ///
-    /// Field 5: `ts_ns`
+    /// Field 4: `accepted_at_ts_ns`
     #[serde(
-        rename = "tsNs",
-        alias = "ts_ns",
+        rename = "acceptedAtTsNs",
+        alias = "accepted_at_ts_ns",
         with = "::buffa::json_helpers::uint64",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
-    pub ts_ns: u64,
+    pub accepted_at_ts_ns: u64,
     /// Trigger ID for attached take-profit.
     ///
     /// Field 20: `take_profit_trigger_id`
@@ -3317,11 +4013,10 @@ pub struct CreateOrderResponse {
 impl ::core::fmt::Debug for CreateOrderResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateOrderResponse")
-            .field("status", &self.status)
             .field("order_id", &self.order_id)
             .field("client_order_id", &self.client_order_id)
-            .field("ts", &self.ts)
-            .field("ts_ns", &self.ts_ns)
+            .field("accepted_at", &self.accepted_at)
+            .field("accepted_at_ts_ns", &self.accepted_at_ts_ns)
             .field("take_profit_trigger_id", &self.take_profit_trigger_id)
             .field("stop_loss_trigger_id", &self.stop_loss_trigger_id)
             .field("trailing_stop_trigger_id", &self.trailing_stop_trigger_id)
@@ -3376,9 +4071,6 @@ impl ::buffa::Message for CreateOrderResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
-        }
         if self.order_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
@@ -3387,16 +4079,18 @@ impl ::buffa::Message for CreateOrderResponse {
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.client_order_id) as u32;
         }
-        if self.ts.is_set() {
+        if self.accepted_at.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.ts.compute_size(__cache);
+            let inner_size = self.accepted_at.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if self.ts_ns != 0u64 {
-            size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+        if self.accepted_at_ts_ns != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns) as u32;
         }
         if let Some(v) = self.take_profit_trigger_id {
             size += 2u32 + ::buffa::types::uint64_encoded_len(v) as u32;
@@ -3417,21 +4111,18 @@ impl ::buffa::Message for CreateOrderResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.status, buf);
-        }
         if self.order_id != 0u64 {
-            ::buffa::types::put_fixed64_field(2u32, self.order_id, buf);
+            ::buffa::types::put_fixed64_field(1u32, self.order_id, buf);
         }
         if !self.client_order_id.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.client_order_id, buf);
+            ::buffa::types::put_string_field(2u32, &self.client_order_id, buf);
         }
-        if self.ts.is_set() {
-            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
-            self.ts.write_to(__cache, buf);
+        if self.accepted_at.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.accepted_at.write_to(__cache, buf);
         }
-        if self.ts_ns != 0u64 {
-            ::buffa::types::put_uint64_field(5u32, self.ts_ns, buf);
+        if self.accepted_at_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.accepted_at_ts_ns, buf);
         }
         if let Some(v) = self.take_profit_trigger_id {
             ::buffa::types::put_uint64_field(20u32, v, buf);
@@ -3458,41 +4149,34 @@ impl ::buffa::Message for CreateOrderResponse {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
                     ::buffa::encoding::WireType::Fixed64,
                 )?;
                 self.order_id = ::buffa::types::decode_fixed64(buf)?;
             }
-            3u32 => {
+            2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.client_order_id, buf)?;
             }
-            4u32 => {
+            3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.ts.get_or_insert_default(),
+                    self.accepted_at.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
             }
-            5u32 => {
+            4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.ts_ns = ::buffa::types::decode_uint64(buf)?;
+                self.accepted_at_ts_ns = ::buffa::types::decode_uint64(buf)?;
             }
             20u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -3529,11 +4213,10 @@ impl ::buffa::Message for CreateOrderResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.status.clear();
         self.order_id = 0u64;
         self.client_order_id.clear();
-        self.ts = ::buffa::MessageField::none();
-        self.ts_ns = 0u64;
+        self.accepted_at = ::buffa::MessageField::none();
+        self.accepted_at_ts_ns = 0u64;
         self.take_profit_trigger_id = ::core::option::Option::None;
         self.stop_loss_trigger_id = ::core::option::Option::None;
         self.trailing_stop_trigger_id = ::core::option::Option::None;
@@ -4125,6 +4808,183 @@ pub const __CANCEL_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     from_json: ::buffa::type_registry::any_from_json::<CancelOrderResponse>,
     is_wkt: false,
 };
+/// FieldViolation describes one actionable request validation failure.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct FieldViolation {
+    /// Protobuf field path relative to the request, using canonical field names.
+    ///
+    /// Field 1: `field_path`
+    #[serde(
+        rename = "fieldPath",
+        alias = "field_path",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub field_path: ::buffa::alloc::string::String,
+    /// Stable validation rule identifier suitable for programmatic matching.
+    ///
+    /// Field 2: `rule_id`
+    #[serde(
+        rename = "ruleId",
+        alias = "rule_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub rule_id: ::buffa::alloc::string::String,
+    /// Human-readable explanation of the violation.
+    ///
+    /// Field 3: `message`
+    #[serde(
+        rename = "message",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub message: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for FieldViolation {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("FieldViolation")
+            .field("field_path", &self.field_path)
+            .field("rule_id", &self.rule_id)
+            .field("message", &self.message)
+            .finish()
+    }
+}
+impl FieldViolation {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.FieldViolation";
+}
+::buffa::impl_default_instance!(FieldViolation);
+impl ::buffa::MessageName for FieldViolation {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "FieldViolation";
+    const FULL_NAME: &'static str = "orders.v1.FieldViolation";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.FieldViolation";
+}
+impl ::buffa::Message for FieldViolation {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.field_path.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.field_path) as u32;
+        }
+        if !self.rule_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.rule_id) as u32;
+        }
+        if !self.message.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.message) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.field_path.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.field_path, buf);
+        }
+        if !self.rule_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.rule_id, buf);
+        }
+        if !self.message.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.message, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.field_path, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.rule_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.message, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.field_path.clear();
+        self.rule_id.clear();
+        self.message.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for FieldViolation {
+    const PROTO_FQN: &'static str = "orders.v1.FieldViolation";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for FieldViolation {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __FIELD_VIOLATION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.FieldViolation",
+    to_json: ::buffa::type_registry::any_to_json::<FieldViolation>,
+    from_json: ::buffa::type_registry::any_from_json::<FieldViolation>,
+    is_wkt: false,
+};
 /// ErrorDetail is attached to ConnectRPC errors for structured error handling.
 /// Clients can inspect this to get a stable machine-readable error code.
 #[derive(Clone, PartialEq, Default)]
@@ -4140,13 +5000,25 @@ pub struct ErrorDetail {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub code: ::buffa::EnumValue<ErrorCode>,
+    /// Field-level validation failures. Empty for non-validation domain errors.
+    ///
+    /// Field 2: `violations`
+    #[serde(
+        rename = "violations",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub violations: ::buffa::alloc::vec::Vec<FieldViolation>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ErrorDetail {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ErrorDetail").field("code", &self.code).finish()
+        f.debug_struct("ErrorDetail")
+            .field("code", &self.code)
+            .field("violations", &self.violations)
+            .finish()
     }
 }
 impl ErrorDetail {
@@ -4170,7 +5042,7 @@ impl ::buffa::Message for ErrorDetail {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -4180,12 +5052,20 @@ impl ::buffa::Message for ErrorDetail {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        for v in &self.violations {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -4195,6 +5075,10 @@ impl ::buffa::Message for ErrorDetail {
             if val != 0 {
                 ::buffa::types::put_int32_field(1u32, val, buf);
             }
+        }
+        for v in &self.violations {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4216,6 +5100,15 @@ impl ::buffa::Message for ErrorDetail {
                 )?;
                 self.code = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.violations.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4225,6 +5118,7 @@ impl ::buffa::Message for ErrorDetail {
     }
     fn clear(&mut self) {
         self.code = ::buffa::EnumValue::from(0);
+        self.violations.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4257,13 +5151,520 @@ pub const __ERROR_DETAIL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
     from_json: ::buffa::type_registry::any_from_json::<ErrorDetail>,
     is_wkt: false,
 };
-/// TakeProfitPolicy defines a take-profit attached to an order.
-/// Arms after the parent order fills; fires when price crosses the threshold.
+/// RiskMarketIoc configures an attached risk leg that submits a market child
+/// with implicit immediate-or-cancel behavior.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RiskMarketIoc {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RiskMarketIoc {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RiskMarketIoc").finish()
+    }
+}
+impl RiskMarketIoc {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.RiskMarketIoc";
+}
+::buffa::impl_default_instance!(RiskMarketIoc);
+impl ::buffa::MessageName for RiskMarketIoc {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "RiskMarketIoc";
+    const FULL_NAME: &'static str = "orders.v1.RiskMarketIoc";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.RiskMarketIoc";
+}
+impl ::buffa::Message for RiskMarketIoc {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RiskMarketIoc {
+    const PROTO_FQN: &'static str = "orders.v1.RiskMarketIoc";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RiskMarketIoc {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RISK_MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.RiskMarketIoc",
+    to_json: ::buffa::type_registry::any_to_json::<RiskMarketIoc>,
+    from_json: ::buffa::type_registry::any_from_json::<RiskMarketIoc>,
+    is_wkt: false,
+};
+/// RiskLimitGtc configures an attached risk leg that submits a resting limit
+/// child. Attached risk legs do not support post-only.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RiskLimitGtc {
+    /// Limit price in quote units scaled by 1e6.
+    ///
+    /// Field 1: `price_ticks`
+    #[serde(
+        rename = "priceTicks",
+        alias = "price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_ticks: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RiskLimitGtc {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RiskLimitGtc").field("price_ticks", &self.price_ticks).finish()
+    }
+}
+impl RiskLimitGtc {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.RiskLimitGtc";
+}
+::buffa::impl_default_instance!(RiskLimitGtc);
+impl ::buffa::MessageName for RiskLimitGtc {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "RiskLimitGtc";
+    const FULL_NAME: &'static str = "orders.v1.RiskLimitGtc";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.RiskLimitGtc";
+}
+impl ::buffa::Message for RiskLimitGtc {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.price_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.price_ticks = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RiskLimitGtc {
+    const PROTO_FQN: &'static str = "orders.v1.RiskLimitGtc";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RiskLimitGtc {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RISK_LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.RiskLimitGtc",
+    to_json: ::buffa::type_registry::any_to_json::<RiskLimitGtc>,
+    from_json: ::buffa::type_registry::any_from_json::<RiskLimitGtc>,
+    is_wkt: false,
+};
+/// RiskExecution selects the child execution supported by attached take-profit
+/// and stop-loss policies.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct RiskExecution {
+    #[serde(flatten)]
+    pub execution: ::core::option::Option<__buffa::oneof::risk_execution::Execution>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RiskExecution {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RiskExecution").field("execution", &self.execution).finish()
+    }
+}
+impl RiskExecution {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.RiskExecution";
+}
+::buffa::impl_default_instance!(RiskExecution);
+impl ::buffa::MessageName for RiskExecution {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "RiskExecution";
+    const FULL_NAME: &'static str = "orders.v1.RiskExecution";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.RiskExecution";
+}
+impl ::buffa::Message for RiskExecution {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if let ::core::option::Option::Some(ref v) = self.execution {
+            match v {
+                __buffa::oneof::risk_execution::Execution::MarketIoc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::risk_execution::Execution::LimitGtc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.execution {
+            match v {
+                __buffa::oneof::risk_execution::Execution::MarketIoc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::risk_execution::Execution::LimitGtc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::risk_execution::Execution::MarketIoc(
+                        ref mut existing,
+                    ),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::risk_execution::Execution::MarketIoc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::risk_execution::Execution::LimitGtc(ref mut existing),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::risk_execution::Execution::LimitGtc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.execution = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RiskExecution {
+    const PROTO_FQN: &'static str = "orders.v1.RiskExecution";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for RiskExecution {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = RiskExecution;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct RiskExecution")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<RiskExecution, A::Error> {
+                let mut __oneof_execution: ::core::option::Option<
+                    __buffa::oneof::risk_execution::Execution,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "marketIoc" | "market_ioc" => {
+                            let v: ::core::option::Option<RiskMarketIoc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            RiskMarketIoc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::risk_execution::Execution::MarketIoc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "limitGtc" | "limit_gtc" => {
+                            let v: ::core::option::Option<RiskLimitGtc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            RiskLimitGtc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::risk_execution::Execution::LimitGtc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <RiskExecution as ::core::default::Default>::default();
+                __r.execution = __oneof_execution;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RiskExecution {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RISK_EXECUTION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.RiskExecution",
+    to_json: ::buffa::type_registry::any_to_json::<RiskExecution>,
+    from_json: ::buffa::type_registry::any_from_json::<RiskExecution>,
+    is_wkt: false,
+};
+pub mod risk_execution {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::risk_execution::Execution;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::risk_execution::Execution as ExecutionView;
+}
+/// TakeProfitPolicy defines a take-profit attached to an order. It evaluates
+/// last trade price, arms after the parent fills, and submits the selected child.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TakeProfitPolicy {
-    /// Trigger price in quote units scaled by 1e6. Required.
+    /// Trigger price in quote units scaled by 1e6.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -4273,37 +5674,14 @@ pub struct TakeProfitPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub trigger_price_ticks: i64,
-    /// Price source for trigger evaluation. Defaults to LAST_PRICE if unspecified.
+    /// Child execution when the threshold is crossed.
     ///
-    /// Field 2: `trigger_price_source`
+    /// Field 2: `child`
     #[serde(
-        rename = "triggerPriceSource",
-        alias = "trigger_price_source",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+        rename = "child",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub trigger_price_source: ::buffa::EnumValue<TriggerPriceSource>,
-    /// Order type for the child order when triggered. Defaults to MARKET.
-    ///
-    /// Field 3: `order_type`
-    #[serde(
-        rename = "orderType",
-        alias = "order_type",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub order_type: ::buffa::EnumValue<OrderType>,
-    /// Limit price in quote units scaled by 1e6 for LIMIT child orders. Required
-    /// if order_type is LIMIT.
-    ///
-    /// Field 4: `limit_price_ticks`
-    #[serde(
-        rename = "limitPriceTicks",
-        alias = "limit_price_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub limit_price_ticks: i64,
+    pub child: ::buffa::MessageField<RiskExecution>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -4312,9 +5690,7 @@ impl ::core::fmt::Debug for TakeProfitPolicy {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("TakeProfitPolicy")
             .field("trigger_price_ticks", &self.trigger_price_ticks)
-            .field("trigger_price_source", &self.trigger_price_source)
-            .field("order_type", &self.order_type)
-            .field("limit_price_ticks", &self.limit_price_ticks)
+            .field("child", &self.child)
             .finish()
     }
 }
@@ -4339,7 +5715,7 @@ impl ::buffa::Message for TakeProfitPolicy {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -4348,29 +5724,20 @@ impl ::buffa::Message for TakeProfitPolicy {
                 += 1u32
                     + ::buffa::types::int64_encoded_len(self.trigger_price_ticks) as u32;
         }
-        {
-            let val = self.trigger_price_source.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        if self.limit_price_ticks != 0i64 {
+        if self.child.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.child.compute_size(__cache);
+            __cache.set(__slot, inner_size);
             size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(self.limit_price_ticks) as u32;
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -4378,20 +5745,9 @@ impl ::buffa::Message for TakeProfitPolicy {
         if self.trigger_price_ticks != 0i64 {
             ::buffa::types::put_int64_field(1u32, self.trigger_price_ticks, buf);
         }
-        {
-            let val = self.trigger_price_source.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(2u32, val, buf);
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(3u32, val, buf);
-            }
-        }
-        if self.limit_price_ticks != 0i64 {
-            ::buffa::types::put_int64_field(4u32, self.limit_price_ticks, buf);
+        if self.child.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.child.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4416,27 +5772,13 @@ impl ::buffa::Message for TakeProfitPolicy {
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.trigger_price_source = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
+                ::buffa::Message::merge_length_delimited(
+                    self.child.get_or_insert_default(),
+                    buf,
+                    ctx,
                 )?;
-                self.order_type = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.limit_price_ticks = ::buffa::types::decode_int64(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -4447,9 +5789,7 @@ impl ::buffa::Message for TakeProfitPolicy {
     }
     fn clear(&mut self) {
         self.trigger_price_ticks = 0i64;
-        self.trigger_price_source = ::buffa::EnumValue::from(0);
-        self.order_type = ::buffa::EnumValue::from(0);
-        self.limit_price_ticks = 0i64;
+        self.child = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4482,13 +5822,13 @@ pub const __TAKE_PROFIT_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     from_json: ::buffa::type_registry::any_from_json::<TakeProfitPolicy>,
     is_wkt: false,
 };
-/// StopLossPolicy defines a stop-loss attached to an order.
-/// Arms after the parent order fills; fires when price crosses the threshold.
+/// StopLossPolicy defines a stop-loss attached to an order. It evaluates last
+/// trade price, arms after the parent fills, and submits the selected child.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct StopLossPolicy {
-    /// Trigger price in quote units scaled by 1e6. Required.
+    /// Trigger price in quote units scaled by 1e6.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -4498,37 +5838,14 @@ pub struct StopLossPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub trigger_price_ticks: i64,
-    /// Price source for trigger evaluation. Defaults to LAST_PRICE if unspecified.
+    /// Child execution when the threshold is crossed.
     ///
-    /// Field 2: `trigger_price_source`
+    /// Field 2: `child`
     #[serde(
-        rename = "triggerPriceSource",
-        alias = "trigger_price_source",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+        rename = "child",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub trigger_price_source: ::buffa::EnumValue<TriggerPriceSource>,
-    /// Order type for the child order when triggered. Defaults to MARKET.
-    ///
-    /// Field 3: `order_type`
-    #[serde(
-        rename = "orderType",
-        alias = "order_type",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub order_type: ::buffa::EnumValue<OrderType>,
-    /// Limit price in quote units scaled by 1e6 for LIMIT child orders. Required
-    /// if order_type is LIMIT.
-    ///
-    /// Field 4: `limit_price_ticks`
-    #[serde(
-        rename = "limitPriceTicks",
-        alias = "limit_price_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub limit_price_ticks: i64,
+    pub child: ::buffa::MessageField<RiskExecution>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -4537,9 +5854,7 @@ impl ::core::fmt::Debug for StopLossPolicy {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("StopLossPolicy")
             .field("trigger_price_ticks", &self.trigger_price_ticks)
-            .field("trigger_price_source", &self.trigger_price_source)
-            .field("order_type", &self.order_type)
-            .field("limit_price_ticks", &self.limit_price_ticks)
+            .field("child", &self.child)
             .finish()
     }
 }
@@ -4564,7 +5879,7 @@ impl ::buffa::Message for StopLossPolicy {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -4573,29 +5888,20 @@ impl ::buffa::Message for StopLossPolicy {
                 += 1u32
                     + ::buffa::types::int64_encoded_len(self.trigger_price_ticks) as u32;
         }
-        {
-            let val = self.trigger_price_source.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        if self.limit_price_ticks != 0i64 {
+        if self.child.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.child.compute_size(__cache);
+            __cache.set(__slot, inner_size);
             size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(self.limit_price_ticks) as u32;
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -4603,20 +5909,9 @@ impl ::buffa::Message for StopLossPolicy {
         if self.trigger_price_ticks != 0i64 {
             ::buffa::types::put_int64_field(1u32, self.trigger_price_ticks, buf);
         }
-        {
-            let val = self.trigger_price_source.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(2u32, val, buf);
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(3u32, val, buf);
-            }
-        }
-        if self.limit_price_ticks != 0i64 {
-            ::buffa::types::put_int64_field(4u32, self.limit_price_ticks, buf);
+        if self.child.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.child.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4641,27 +5936,13 @@ impl ::buffa::Message for StopLossPolicy {
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.trigger_price_source = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
+                ::buffa::Message::merge_length_delimited(
+                    self.child.get_or_insert_default(),
+                    buf,
+                    ctx,
                 )?;
-                self.order_type = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.limit_price_ticks = ::buffa::types::decode_int64(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -4672,9 +5953,7 @@ impl ::buffa::Message for StopLossPolicy {
     }
     fn clear(&mut self) {
         self.trigger_price_ticks = 0i64;
-        self.trigger_price_source = ::buffa::EnumValue::from(0);
-        self.order_type = ::buffa::EnumValue::from(0);
-        self.limit_price_ticks = 0i64;
+        self.child = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4726,26 +6005,6 @@ pub struct TrailingStopPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub activation_price_ticks: i64,
-    /// Price source for trigger evaluation. Defaults to LAST_PRICE if unspecified.
-    ///
-    /// Field 4: `trigger_price_source`
-    #[serde(
-        rename = "triggerPriceSource",
-        alias = "trigger_price_source",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub trigger_price_source: ::buffa::EnumValue<TriggerPriceSource>,
-    /// Order type for the child order when triggered. Defaults to MARKET.
-    ///
-    /// Field 5: `order_type`
-    #[serde(
-        rename = "orderType",
-        alias = "order_type",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub order_type: ::buffa::EnumValue<OrderType>,
     #[serde(flatten)]
     pub trailing_distance: ::core::option::Option<
         __buffa::oneof::trailing_stop_policy::TrailingDistance,
@@ -4762,8 +6021,6 @@ impl ::core::fmt::Debug for TrailingStopPolicy {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("TrailingStopPolicy")
             .field("activation_price_ticks", &self.activation_price_ticks)
-            .field("trigger_price_source", &self.trigger_price_source)
-            .field("order_type", &self.order_type)
             .field("trailing_distance", &self.trailing_distance)
             .field("max_slippage", &self.max_slippage)
             .finish()
@@ -4814,18 +6071,6 @@ impl ::buffa::Message for TrailingStopPolicy {
                     + ::buffa::types::int64_encoded_len(self.activation_price_ticks)
                         as u32;
         }
-        {
-            let val = self.trigger_price_source.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
         if let ::core::option::Option::Some(ref v) = self.max_slippage {
             match v {
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
@@ -4864,18 +6109,6 @@ impl ::buffa::Message for TrailingStopPolicy {
         }
         if self.activation_price_ticks != 0i64 {
             ::buffa::types::put_int64_field(3u32, self.activation_price_ticks, buf);
-        }
-        {
-            let val = self.trigger_price_source.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(4u32, val, buf);
-            }
-        }
-        {
-            let val = self.order_type.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(5u32, val, buf);
-            }
         }
         if let ::core::option::Option::Some(ref v) = self.max_slippage {
             match v {
@@ -4931,24 +6164,6 @@ impl ::buffa::Message for TrailingStopPolicy {
                 )?;
                 self.activation_price_ticks = ::buffa::types::decode_int64(buf)?;
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.trigger_price_source = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.order_type = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
             6u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -4981,8 +6196,6 @@ impl ::buffa::Message for TrailingStopPolicy {
     fn clear(&mut self) {
         self.trailing_distance = ::core::option::Option::None;
         self.activation_price_ticks = 0i64;
-        self.trigger_price_source = ::buffa::EnumValue::from(0);
-        self.order_type = ::buffa::EnumValue::from(0);
         self.max_slippage = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -5012,12 +6225,6 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                 mut map: A,
             ) -> ::core::result::Result<TrailingStopPolicy, A::Error> {
                 let mut __f_activation_price_ticks: ::core::option::Option<i64> = None;
-                let mut __f_trigger_price_source: ::core::option::Option<
-                    ::buffa::EnumValue<TriggerPriceSource>,
-                > = None;
-                let mut __f_order_type: ::core::option::Option<
-                    ::buffa::EnumValue<OrderType>,
-                > = None;
                 let mut __oneof_trailing_distance: ::core::option::Option<
                     __buffa::oneof::trailing_stop_policy::TrailingDistance,
                 > = None;
@@ -5036,42 +6243,6 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                                         d: D,
                                     ) -> ::core::result::Result<i64, D::Error> {
                                         ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "triggerPriceSource" | "trigger_price_source" => {
-                            __f_trigger_price_source = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<TriggerPriceSource>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<TriggerPriceSource>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "orderType" | "order_type" => {
-                            __f_order_type = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<OrderType>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<OrderType>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -5205,12 +6376,6 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                 let mut __r = <TrailingStopPolicy as ::core::default::Default>::default();
                 if let ::core::option::Option::Some(v) = __f_activation_price_ticks {
                     __r.activation_price_ticks = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_trigger_price_source {
-                    __r.trigger_price_source = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_order_type {
-                    __r.order_type = v;
                 }
                 __r.trailing_distance = __oneof_trailing_distance;
                 __r.max_slippage = __oneof_max_slippage;
@@ -6627,23 +7792,14 @@ pub const __CANCEL_ALL_AFTER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyE
 /// BatchCreateOrders: best-effort batch order placement
 /// =============================================================================
 ///
-/// BatchCreateResultItem contains the per-item result of a batch create.
+/// BatchCreateAccepted contains the assigned identifiers for an admitted item.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct BatchCreateResultItem {
-    /// "accepted" or "rejected".
+pub struct BatchCreateAccepted {
+    /// Assigned order ID.
     ///
-    /// Field 1: `status`
-    #[serde(
-        rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub status: ::buffa::alloc::string::String,
-    /// Resolved order ID (populated on accept).
-    ///
-    /// Field 2: `order_id`
+    /// Field 1: `order_id`
     #[serde(
         rename = "orderId",
         alias = "order_id",
@@ -6651,28 +7807,9 @@ pub struct BatchCreateResultItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub order_id: u64,
-    /// Echoed client order ID.
-    ///
-    /// Field 3: `client_order_id`
-    #[serde(
-        rename = "clientOrderId",
-        alias = "client_order_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub client_order_id: ::buffa::alloc::string::String,
-    /// Error code if rejected.
-    ///
-    /// Field 4: `code`
-    #[serde(
-        rename = "code",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub code: ::buffa::alloc::string::String,
     /// Trigger ID for attached take-profit (when accepted and configured).
     ///
-    /// Field 5: `take_profit_trigger_id`
+    /// Field 2: `take_profit_trigger_id`
     #[serde(
         rename = "takeProfitTriggerId",
         alias = "take_profit_trigger_id",
@@ -6682,7 +7819,7 @@ pub struct BatchCreateResultItem {
     pub take_profit_trigger_id: ::core::option::Option<u64>,
     /// Trigger ID for attached stop-loss (when accepted and configured).
     ///
-    /// Field 6: `stop_loss_trigger_id`
+    /// Field 3: `stop_loss_trigger_id`
     #[serde(
         rename = "stopLossTriggerId",
         alias = "stop_loss_trigger_id",
@@ -6692,7 +7829,7 @@ pub struct BatchCreateResultItem {
     pub stop_loss_trigger_id: ::core::option::Option<u64>,
     /// Trigger ID for attached trailing stop (when accepted and configured).
     ///
-    /// Field 7: `trailing_stop_trigger_id`
+    /// Field 4: `trailing_stop_trigger_id`
     #[serde(
         rename = "trailingStopTriggerId",
         alias = "trailing_stop_trigger_id",
@@ -6704,27 +7841,24 @@ pub struct BatchCreateResultItem {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for BatchCreateResultItem {
+impl ::core::fmt::Debug for BatchCreateAccepted {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("BatchCreateResultItem")
-            .field("status", &self.status)
+        f.debug_struct("BatchCreateAccepted")
             .field("order_id", &self.order_id)
-            .field("client_order_id", &self.client_order_id)
-            .field("code", &self.code)
             .field("take_profit_trigger_id", &self.take_profit_trigger_id)
             .field("stop_loss_trigger_id", &self.stop_loss_trigger_id)
             .field("trailing_stop_trigger_id", &self.trailing_stop_trigger_id)
             .finish()
     }
 }
-impl BatchCreateResultItem {
+impl BatchCreateAccepted {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchCreateResultItem";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchCreateAccepted";
 }
-impl BatchCreateResultItem {
+impl BatchCreateAccepted {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::take_profit_trigger_id`] to `Some(value)`, consuming and returning `self`.
@@ -6747,14 +7881,14 @@ impl BatchCreateResultItem {
         self
     }
 }
-::buffa::impl_default_instance!(BatchCreateResultItem);
-impl ::buffa::MessageName for BatchCreateResultItem {
+::buffa::impl_default_instance!(BatchCreateAccepted);
+impl ::buffa::MessageName for BatchCreateAccepted {
     const PACKAGE: &'static str = "orders.v1";
-    const NAME: &'static str = "BatchCreateResultItem";
-    const FULL_NAME: &'static str = "orders.v1.BatchCreateResultItem";
-    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchCreateResultItem";
+    const NAME: &'static str = "BatchCreateAccepted";
+    const FULL_NAME: &'static str = "orders.v1.BatchCreateAccepted";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchCreateAccepted";
 }
-impl ::buffa::Message for BatchCreateResultItem {
+impl ::buffa::Message for BatchCreateAccepted {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -6765,19 +7899,8 @@ impl ::buffa::Message for BatchCreateResultItem {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
-        }
         if self.order_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-        }
-        if !self.client_order_id.is_empty() {
-            size
-                += 1u32
-                    + ::buffa::types::string_encoded_len(&self.client_order_id) as u32;
-        }
-        if !self.code.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
         }
         if let Some(v) = self.take_profit_trigger_id {
             size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
@@ -6798,26 +7921,177 @@ impl ::buffa::Message for BatchCreateResultItem {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.status, buf);
-        }
         if self.order_id != 0u64 {
-            ::buffa::types::put_fixed64_field(2u32, self.order_id, buf);
-        }
-        if !self.client_order_id.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.client_order_id, buf);
-        }
-        if !self.code.is_empty() {
-            ::buffa::types::put_string_field(4u32, &self.code, buf);
+            ::buffa::types::put_fixed64_field(1u32, self.order_id, buf);
         }
         if let Some(v) = self.take_profit_trigger_id {
-            ::buffa::types::put_uint64_field(5u32, v, buf);
+            ::buffa::types::put_uint64_field(2u32, v, buf);
         }
         if let Some(v) = self.stop_loss_trigger_id {
-            ::buffa::types::put_uint64_field(6u32, v, buf);
+            ::buffa::types::put_uint64_field(3u32, v, buf);
         }
         if let Some(v) = self.trailing_stop_trigger_id {
-            ::buffa::types::put_uint64_field(7u32, v, buf);
+            ::buffa::types::put_uint64_field(4u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.order_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.take_profit_trigger_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint64(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.stop_loss_trigger_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint64(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trailing_stop_trigger_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint64(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.order_id = 0u64;
+        self.take_profit_trigger_id = ::core::option::Option::None;
+        self.stop_loss_trigger_id = ::core::option::Option::None;
+        self.trailing_stop_trigger_id = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BatchCreateAccepted {
+    const PROTO_FQN: &'static str = "orders.v1.BatchCreateAccepted";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchCreateAccepted {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BATCH_CREATE_ACCEPTED_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.BatchCreateAccepted",
+    to_json: ::buffa::type_registry::any_to_json::<BatchCreateAccepted>,
+    from_json: ::buffa::type_registry::any_from_json::<BatchCreateAccepted>,
+    is_wkt: false,
+};
+/// BatchCreateRejected contains the typed reason an item was not admitted.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BatchCreateRejected {
+    /// Structured rejection detail.
+    ///
+    /// Field 1: `error`
+    #[serde(
+        rename = "error",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub error: ::buffa::MessageField<ErrorDetail>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BatchCreateRejected {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BatchCreateRejected").field("error", &self.error).finish()
+    }
+}
+impl BatchCreateRejected {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchCreateRejected";
+}
+::buffa::impl_default_instance!(BatchCreateRejected);
+impl ::buffa::MessageName for BatchCreateRejected {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "BatchCreateRejected";
+    const FULL_NAME: &'static str = "orders.v1.BatchCreateRejected";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchCreateRejected";
+}
+impl ::buffa::Message for BatchCreateRejected {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.error.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.error.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.error.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.error.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6837,55 +8111,11 @@ impl ::buffa::Message for BatchCreateResultItem {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Fixed64,
+                ::buffa::Message::merge_length_delimited(
+                    self.error.get_or_insert_default(),
+                    buf,
+                    ctx,
                 )?;
-                self.order_id = ::buffa::types::decode_fixed64(buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.client_order_id, buf)?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.code, buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.take_profit_trigger_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.stop_loss_trigger_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.trailing_stop_trigger_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -6895,13 +8125,227 @@ impl ::buffa::Message for BatchCreateResultItem {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.status.clear();
-        self.order_id = 0u64;
+        self.error = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BatchCreateRejected {
+    const PROTO_FQN: &'static str = "orders.v1.BatchCreateRejected";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchCreateRejected {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BATCH_CREATE_REJECTED_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.BatchCreateRejected",
+    to_json: ::buffa::type_registry::any_to_json::<BatchCreateRejected>,
+    from_json: ::buffa::type_registry::any_from_json::<BatchCreateRejected>,
+    is_wkt: false,
+};
+/// BatchCreateResultItem contains exactly one per-item batch outcome.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct BatchCreateResultItem {
+    /// Echoed client order ID.
+    ///
+    /// Field 1: `client_order_id`
+    #[serde(
+        rename = "clientOrderId",
+        alias = "client_order_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub client_order_id: ::buffa::alloc::string::String,
+    #[serde(flatten)]
+    pub outcome: ::core::option::Option<
+        __buffa::oneof::batch_create_result_item::Outcome,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BatchCreateResultItem {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BatchCreateResultItem")
+            .field("client_order_id", &self.client_order_id)
+            .field("outcome", &self.outcome)
+            .finish()
+    }
+}
+impl BatchCreateResultItem {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchCreateResultItem";
+}
+::buffa::impl_default_instance!(BatchCreateResultItem);
+impl ::buffa::MessageName for BatchCreateResultItem {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "BatchCreateResultItem";
+    const FULL_NAME: &'static str = "orders.v1.BatchCreateResultItem";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchCreateResultItem";
+}
+impl ::buffa::Message for BatchCreateResultItem {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.client_order_id.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.client_order_id) as u32;
+        }
+        if let ::core::option::Option::Some(ref v) = self.outcome {
+            match v {
+                __buffa::oneof::batch_create_result_item::Outcome::Accepted(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::batch_create_result_item::Outcome::Rejected(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.client_order_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.client_order_id, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.outcome {
+            match v {
+                __buffa::oneof::batch_create_result_item::Outcome::Accepted(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::batch_create_result_item::Outcome::Rejected(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.client_order_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::batch_create_result_item::Outcome::Accepted(
+                        ref mut existing,
+                    ),
+                ) = self.outcome
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.outcome = ::core::option::Option::Some(
+                        __buffa::oneof::batch_create_result_item::Outcome::Accepted(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::batch_create_result_item::Outcome::Rejected(
+                        ref mut existing,
+                    ),
+                ) = self.outcome
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.outcome = ::core::option::Option::Some(
+                        __buffa::oneof::batch_create_result_item::Outcome::Rejected(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
         self.client_order_id.clear();
-        self.code.clear();
-        self.take_profit_trigger_id = ::core::option::Option::None;
-        self.stop_loss_trigger_id = ::core::option::Option::None;
-        self.trailing_stop_trigger_id = ::core::option::Option::None;
+        self.outcome = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6912,6 +8356,111 @@ impl ::buffa::ExtensionSet for BatchCreateResultItem {
     }
     fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
         &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for BatchCreateResultItem {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = BatchCreateResultItem;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct BatchCreateResultItem")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<BatchCreateResultItem, A::Error> {
+                let mut __f_client_order_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __oneof_outcome: ::core::option::Option<
+                    __buffa::oneof::batch_create_result_item::Outcome,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "clientOrderId" | "client_order_id" => {
+                            __f_client_order_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "accepted" => {
+                            let v: ::core::option::Option<BatchCreateAccepted> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            BatchCreateAccepted,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_outcome.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'outcome'",
+                                        ),
+                                    );
+                                }
+                                __oneof_outcome = Some(
+                                    __buffa::oneof::batch_create_result_item::Outcome::Accepted(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "rejected" => {
+                            let v: ::core::option::Option<BatchCreateRejected> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            BatchCreateRejected,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_outcome.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'outcome'",
+                                        ),
+                                    );
+                                }
+                                __oneof_outcome = Some(
+                                    __buffa::oneof::batch_create_result_item::Outcome::Rejected(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <BatchCreateResultItem as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_client_order_id {
+                    __r.client_order_id = v;
+                }
+                __r.outcome = __oneof_outcome;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for BatchCreateResultItem {
@@ -6934,6 +8483,14 @@ pub const __BATCH_CREATE_RESULT_ITEM_JSON_ANY: ::buffa::type_registry::JsonAnyEn
     from_json: ::buffa::type_registry::any_from_json::<BatchCreateResultItem>,
     is_wkt: false,
 };
+pub mod batch_create_result_item {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::batch_create_result_item::Outcome;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::batch_create_result_item::Outcome as OutcomeView;
+}
 /// BatchCreateOrdersRequest places multiple orders in one request.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -6959,7 +8516,8 @@ pub struct BatchCreateOrdersRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
-    /// Orders to create (max 20). Reuses CreateOrderRequest payload, including attached risk.
+    /// Orders to create (max 20). Every item uses the same OrderIntent contract as
+    /// single create.
     ///
     /// Field 3: `items`
     #[serde(
@@ -6967,17 +8525,7 @@ pub struct BatchCreateOrdersRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub items: ::buffa::alloc::vec::Vec<CreateOrderRequest>,
-    /// Optional partial-success flag. Current implementation is always best-effort.
-    ///
-    /// Field 4: `allow_partial`
-    #[serde(
-        rename = "allowPartial",
-        alias = "allow_partial",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub allow_partial: bool,
+    pub items: ::buffa::alloc::vec::Vec<OrderIntent>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -6988,7 +8536,6 @@ impl ::core::fmt::Debug for BatchCreateOrdersRequest {
             .field("subaccount_id", &self.subaccount_id)
             .field("request_id", &self.request_id)
             .field("items", &self.items)
-            .field("allow_partial", &self.allow_partial)
             .finish()
     }
 }
@@ -7040,9 +8587,6 @@ impl ::buffa::Message for BatchCreateOrdersRequest {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if self.allow_partial {
-            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7062,9 +8606,6 @@ impl ::buffa::Message for BatchCreateOrdersRequest {
         for v in &self.items {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
-        }
-        if self.allow_partial {
-            ::buffa::types::put_bool_field(4u32, self.allow_partial, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7104,13 +8645,6 @@ impl ::buffa::Message for BatchCreateOrdersRequest {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.items.push(elem);
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.allow_partial = ::buffa::types::decode_bool(buf)?;
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7122,7 +8656,6 @@ impl ::buffa::Message for BatchCreateOrdersRequest {
         self.subaccount_id = ::core::option::Option::None;
         self.request_id.clear();
         self.items.clear();
-        self.allow_partial = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -16421,72 +17954,2031 @@ pub mod __buffa {
         /// Connect/Proto-facing Messages (scaled ints, fixed64 IDs)
         /// =============================================================================
         ///
-        /// CreateOrderRequest is the binary (protobuf) request for placing orders.
-        /// Uses scaled integers for quantity and price, plus fixed64 IDs.
-        /// Preferred by latency-sensitive clients.
+        /// MarketIoc configures a market order. Market orders always execute as
+        /// immediate-or-cancel and therefore cannot rest or be post-only.
+        #[derive(Clone, Debug, Default)]
+        pub struct MarketIocView<'a> {
+            /// Optional client reference price in quote units scaled by 1e6. When
+            /// omitted, admission uses server-side reference pricing.
+            ///
+            /// Field 3: `client_ref_price_ticks`
+            pub client_ref_price_ticks: i64,
+            pub max_slippage: ::core::option::Option<
+                super::super::__buffa::view::oneof::market_ioc::MaxSlippage,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MarketIocView<'a> {
+            type Owned = super::super::MarketIoc;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.client_ref_price_ticks = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_slippage = Some(
+                            super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_slippage = Some(
+                            super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::MarketIoc, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::MarketIoc, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MarketIoc {
+                    client_ref_price_ticks: self.client_ref_price_ticks,
+                    max_slippage: self
+                        .max_slippage
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
+                                    *v,
+                                )
+                            }
+                        }),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MarketIocView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if let ::core::option::Option::Some(ref v) = self.max_slippage {
+                    match v {
+                        super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                        }
+                        super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                        }
+                    }
+                }
+                if self.client_ref_price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(
+                                self.client_ref_price_ticks,
+                            ) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let ::core::option::Option::Some(ref v) = self.max_slippage {
+                    match v {
+                        super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(1u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(2u32, *x, buf);
+                        }
+                    }
+                }
+                if self.client_ref_price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(
+                        3u32,
+                        self.client_ref_price_ticks,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MarketIocView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.client_ref_price_ticks,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "clientRefPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.client_ref_price_ticks,
+                            ),
+                        )?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.max_slippage {
+                    match __ov {
+                        super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "maxSlippageTicks",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "maxSlippageBps",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MarketIocView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "MarketIoc";
+            const FULL_NAME: &'static str = "orders.v1.MarketIoc";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.MarketIoc";
+        }
+        ::buffa::impl_default_view_instance!(MarketIocView);
+        ::buffa::impl_view_reborrow!(MarketIocView);
+        /** Self-contained, `'static` owned view of a `MarketIoc` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MarketIocView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MarketIocView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MarketIocOwnedView(::buffa::OwnedView<MarketIocView<'static>>);
+        impl MarketIocOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarketIocOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarketIocOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MarketIoc,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarketIocOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MarketIocView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MarketIocView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::MarketIoc, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional client reference price in quote units scaled by 1e6. When
+            /// omitted, admission uses server-side reference pricing.
+            ///
+            /// Field 3: `client_ref_price_ticks`
+            #[must_use]
+            pub fn client_ref_price_ticks(&self) -> i64 {
+                self.0.reborrow().client_ref_price_ticks
+            }
+            /// Oneof `max_slippage`.
+            #[must_use]
+            pub fn max_slippage(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::market_ioc::MaxSlippage,
+            > {
+                self.0.reborrow().max_slippage.as_ref()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<MarketIocView<'static>>>
+        for MarketIocOwnedView {
+            fn from(inner: ::buffa::OwnedView<MarketIocView<'static>>) -> Self {
+                MarketIocOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MarketIocOwnedView>
+        for ::buffa::OwnedView<MarketIocView<'static>> {
+            fn from(wrapper: MarketIocOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<MarketIocView<'static>>>
+        for MarketIocOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<MarketIocView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MarketIoc {
+            type View<'a> = MarketIocView<'a>;
+            type ViewHandle = MarketIocOwnedView;
+        }
+        impl ::serde::Serialize for MarketIocOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// LimitGtc configures a good-til-canceled limit order.
+        #[derive(Clone, Debug, Default)]
+        pub struct LimitGtcView<'a> {
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            pub price_ticks: i64,
+            /// Reject the order instead of taking liquidity. Post-only is available only
+            /// on this resting limit-order variant.
+            ///
+            /// Field 2: `post_only`
+            pub post_only: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for LimitGtcView<'a> {
+            type Owned = super::super::LimitGtc;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.post_only = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::LimitGtc, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::LimitGtc, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::LimitGtc {
+                    price_ticks: self.price_ticks,
+                    post_only: self.post_only,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for LimitGtcView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+                }
+                if self.post_only {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+                }
+                if self.post_only {
+                    ::buffa::types::put_bool_field(2u32, self.post_only, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for LimitGtcView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
+                        )?;
+                }
+                if self.post_only {
+                    __map.serialize_entry("postOnly", &self.post_only)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for LimitGtcView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "LimitGtc";
+            const FULL_NAME: &'static str = "orders.v1.LimitGtc";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitGtc";
+        }
+        ::buffa::impl_default_view_instance!(LimitGtcView);
+        ::buffa::impl_view_reborrow!(LimitGtcView);
+        /** Self-contained, `'static` owned view of a `LimitGtc` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`LimitGtcView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LimitGtcView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct LimitGtcOwnedView(::buffa::OwnedView<LimitGtcView<'static>>);
+        impl LimitGtcOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitGtcOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitGtcOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::LimitGtc,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitGtcOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`LimitGtcView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &LimitGtcView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::LimitGtc, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            #[must_use]
+            pub fn price_ticks(&self) -> i64 {
+                self.0.reborrow().price_ticks
+            }
+            /// Reject the order instead of taking liquidity. Post-only is available only
+            /// on this resting limit-order variant.
+            ///
+            /// Field 2: `post_only`
+            #[must_use]
+            pub fn post_only(&self) -> bool {
+                self.0.reborrow().post_only
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<LimitGtcView<'static>>>
+        for LimitGtcOwnedView {
+            fn from(inner: ::buffa::OwnedView<LimitGtcView<'static>>) -> Self {
+                LimitGtcOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<LimitGtcOwnedView>
+        for ::buffa::OwnedView<LimitGtcView<'static>> {
+            fn from(wrapper: LimitGtcOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<LimitGtcView<'static>>>
+        for LimitGtcOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<LimitGtcView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::LimitGtc {
+            type View<'a> = LimitGtcView<'a>;
+            type ViewHandle = LimitGtcOwnedView;
+        }
+        impl ::serde::Serialize for LimitGtcOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// LimitIoc configures an immediate-or-cancel limit order.
+        #[derive(Clone, Debug, Default)]
+        pub struct LimitIocView<'a> {
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            pub price_ticks: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for LimitIocView<'a> {
+            type Owned = super::super::LimitIoc;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::LimitIoc, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::LimitIoc, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::LimitIoc {
+                    price_ticks: self.price_ticks,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for LimitIocView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for LimitIocView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for LimitIocView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "LimitIoc";
+            const FULL_NAME: &'static str = "orders.v1.LimitIoc";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitIoc";
+        }
+        ::buffa::impl_default_view_instance!(LimitIocView);
+        ::buffa::impl_view_reborrow!(LimitIocView);
+        /** Self-contained, `'static` owned view of a `LimitIoc` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`LimitIocView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LimitIocView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct LimitIocOwnedView(::buffa::OwnedView<LimitIocView<'static>>);
+        impl LimitIocOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitIocOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitIocOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::LimitIoc,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitIocOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`LimitIocView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &LimitIocView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::LimitIoc, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            #[must_use]
+            pub fn price_ticks(&self) -> i64 {
+                self.0.reborrow().price_ticks
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<LimitIocView<'static>>>
+        for LimitIocOwnedView {
+            fn from(inner: ::buffa::OwnedView<LimitIocView<'static>>) -> Self {
+                LimitIocOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<LimitIocOwnedView>
+        for ::buffa::OwnedView<LimitIocView<'static>> {
+            fn from(wrapper: LimitIocOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<LimitIocView<'static>>>
+        for LimitIocOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<LimitIocView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::LimitIoc {
+            type View<'a> = LimitIocView<'a>;
+            type ViewHandle = LimitIocOwnedView;
+        }
+        impl ::serde::Serialize for LimitIocOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// LimitFok configures a fill-or-kill limit order.
+        #[derive(Clone, Debug, Default)]
+        pub struct LimitFokView<'a> {
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            pub price_ticks: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for LimitFokView<'a> {
+            type Owned = super::super::LimitFok;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::LimitFok, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::LimitFok, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::LimitFok {
+                    price_ticks: self.price_ticks,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for LimitFokView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for LimitFokView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for LimitFokView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "LimitFok";
+            const FULL_NAME: &'static str = "orders.v1.LimitFok";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitFok";
+        }
+        ::buffa::impl_default_view_instance!(LimitFokView);
+        ::buffa::impl_view_reborrow!(LimitFokView);
+        /** Self-contained, `'static` owned view of a `LimitFok` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`LimitFokView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LimitFokView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct LimitFokOwnedView(::buffa::OwnedView<LimitFokView<'static>>);
+        impl LimitFokOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitFokOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitFokOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::LimitFok,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitFokOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`LimitFokView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &LimitFokView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::LimitFok, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            #[must_use]
+            pub fn price_ticks(&self) -> i64 {
+                self.0.reborrow().price_ticks
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<LimitFokView<'static>>>
+        for LimitFokOwnedView {
+            fn from(inner: ::buffa::OwnedView<LimitFokView<'static>>) -> Self {
+                LimitFokOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<LimitFokOwnedView>
+        for ::buffa::OwnedView<LimitFokView<'static>> {
+            fn from(wrapper: LimitFokOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<LimitFokView<'static>>>
+        for LimitFokOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<LimitFokView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::LimitFok {
+            type View<'a> = LimitFokView<'a>;
+            type ViewHandle = LimitFokOwnedView;
+        }
+        impl ::serde::Serialize for LimitFokOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// OrderIntent contains one order's complete, transport-independent placement
+        /// intent. Single and batch create use this same message.
+        #[derive(Clone, Debug, Default)]
+        pub struct OrderIntentView<'a> {
+            /// Trading pair symbol, for example "BTC-USDT".
+            ///
+            /// Field 1: `symbol`
+            pub symbol: &'a str,
+            /// Order side.
+            ///
+            /// Field 2: `side`
+            pub side: ::buffa::EnumValue<super::super::Side>,
+            /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
+            ///
+            /// Field 3: `qty_scaled`
+            pub qty_scaled: i64,
+            /// Optional client order identifier for idempotency.
+            ///
+            /// Field 20: `client_order_id`
+            pub client_order_id: &'a str,
+            /// Fee source for BUY orders: QUOTE (default) or RECEIVED. SELL orders must
+            /// use QUOTE.
+            ///
+            /// Field 21: `fee_source`
+            pub fee_source: ::buffa::EnumValue<super::super::FeeSource>,
+            /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
+            ///
+            /// Field 22: `self_trade_prevention_mode`
+            pub self_trade_prevention_mode: ::buffa::EnumValue<
+                super::super::SelfTradePreventionMode,
+            >,
+            /// Optional attached risk controls that arm after the parent order fills.
+            ///
+            /// Field 30: `attached_risk`
+            pub attached_risk: ::buffa::MessageFieldView<
+                super::super::__buffa::view::RiskPolicyView<'a>,
+            >,
+            pub execution: ::core::option::Option<
+                super::super::__buffa::view::oneof::order_intent::Execution<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for OrderIntentView<'a> {
+            type Owned = super::super::OrderIntent;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.side = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    20u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_order_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    21u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fee_source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    22u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.self_trade_prevention_mode = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    30u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.attached_risk.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.attached_risk = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::RiskPolicyView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::order_intent::Execution::MarketIoc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::order_intent::Execution::MarketIoc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::MarketIocView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::order_intent::Execution::LimitGtc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::order_intent::Execution::LimitGtc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::LimitGtcView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::order_intent::Execution::LimitIoc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::order_intent::Execution::LimitIoc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::LimitIocView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::order_intent::Execution::LimitFok(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::order_intent::Execution::LimitFok(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::LimitFokView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::OrderIntent,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::OrderIntent,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::OrderIntent {
+                    symbol: self.symbol.to_string(),
+                    side: self.side,
+                    qty_scaled: self.qty_scaled,
+                    client_order_id: self.client_order_id.to_string(),
+                    fee_source: self.fee_source,
+                    self_trade_prevention_mode: self.self_trade_prevention_mode,
+                    attached_risk: match self.attached_risk.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::RiskPolicy,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    execution: match self.execution.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::order_intent::Execution::MarketIoc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::order_intent::Execution::MarketIoc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::order_intent::Execution::LimitGtc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::order_intent::Execution::LimitGtc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::order_intent::Execution::LimitIoc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::order_intent::Execution::LimitIoc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::order_intent::Execution::LimitFok(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::order_intent::Execution::LimitFok(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for OrderIntentView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.symbol.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+                }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+                }
+                if let ::core::option::Option::Some(ref v) = self.execution {
+                    match v {
+                        super::super::__buffa::view::oneof::order_intent::Execution::MarketIoc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitGtc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitIoc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitFok(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                    }
+                }
+                if !self.client_order_id.is_empty() {
+                    size
+                        += 2u32
+                            + ::buffa::types::string_encoded_len(&self.client_order_id)
+                                as u32;
+                }
+                {
+                    let val = self.fee_source.to_i32();
+                    if val != 0 {
+                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.self_trade_prevention_mode.to_i32();
+                    if val != 0 {
+                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.attached_risk.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.attached_risk.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.symbol.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.symbol, buf);
+                }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if self.qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(3u32, self.qty_scaled, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.execution {
+                    match v {
+                        super::super::__buffa::view::oneof::order_intent::Execution::MarketIoc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                10u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitGtc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                11u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitIoc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                12u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitFok(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                13u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                if !self.client_order_id.is_empty() {
+                    ::buffa::types::put_string_field(20u32, &self.client_order_id, buf);
+                }
+                {
+                    let val = self.fee_source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(21u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.self_trade_prevention_mode.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(22u32, val, buf);
+                    }
+                }
+                if self.attached_risk.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        30u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.attached_risk.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for OrderIntentView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
+                    __map.serialize_entry("symbol", self.symbol)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
+                    __map.serialize_entry("side", &self.side)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
+                    __map
+                        .serialize_entry(
+                            "qtyScaled",
+                            &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_order_id) {
+                    __map.serialize_entry("clientOrderId", self.client_order_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.fee_source,
+                ) {
+                    __map.serialize_entry("feeSource", &self.fee_source)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.self_trade_prevention_mode,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "selfTradePreventionMode",
+                            &self.self_trade_prevention_mode,
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .attached_risk
+                        .as_option()
+                    {
+                        __map.serialize_entry("attachedRisk", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.execution {
+                    match __ov {
+                        super::super::__buffa::view::oneof::order_intent::Execution::MarketIoc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("marketIoc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitGtc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitGtc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitIoc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitIoc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitFok(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitFok", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for OrderIntentView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "OrderIntent";
+            const FULL_NAME: &'static str = "orders.v1.OrderIntent";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.OrderIntent";
+        }
+        ::buffa::impl_default_view_instance!(OrderIntentView);
+        ::buffa::impl_view_reborrow!(OrderIntentView);
+        /** Self-contained, `'static` owned view of a `OrderIntent` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OrderIntentView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OrderIntentView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct OrderIntentOwnedView(::buffa::OwnedView<OrderIntentView<'static>>);
+        impl OrderIntentOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrderIntentOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrderIntentOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::OrderIntent,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrderIntentOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`OrderIntentView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &OrderIntentView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::OrderIntent,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Trading pair symbol, for example "BTC-USDT".
+            ///
+            /// Field 1: `symbol`
+            #[must_use]
+            pub fn symbol(&self) -> &'_ str {
+                self.0.reborrow().symbol
+            }
+            /// Order side.
+            ///
+            /// Field 2: `side`
+            #[must_use]
+            pub fn side(&self) -> ::buffa::EnumValue<super::super::Side> {
+                self.0.reborrow().side
+            }
+            /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
+            ///
+            /// Field 3: `qty_scaled`
+            #[must_use]
+            pub fn qty_scaled(&self) -> i64 {
+                self.0.reborrow().qty_scaled
+            }
+            /// Optional client order identifier for idempotency.
+            ///
+            /// Field 20: `client_order_id`
+            #[must_use]
+            pub fn client_order_id(&self) -> &'_ str {
+                self.0.reborrow().client_order_id
+            }
+            /// Fee source for BUY orders: QUOTE (default) or RECEIVED. SELL orders must
+            /// use QUOTE.
+            ///
+            /// Field 21: `fee_source`
+            #[must_use]
+            pub fn fee_source(&self) -> ::buffa::EnumValue<super::super::FeeSource> {
+                self.0.reborrow().fee_source
+            }
+            /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
+            ///
+            /// Field 22: `self_trade_prevention_mode`
+            #[must_use]
+            pub fn self_trade_prevention_mode(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::SelfTradePreventionMode> {
+                self.0.reborrow().self_trade_prevention_mode
+            }
+            /// Optional attached risk controls that arm after the parent order fills.
+            ///
+            /// Field 30: `attached_risk`
+            #[must_use]
+            pub fn attached_risk(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::RiskPolicyView<'_>,
+            > {
+                &self.0.reborrow().attached_risk
+            }
+            /// Oneof `execution`.
+            #[must_use]
+            pub fn execution(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::order_intent::Execution<'_>,
+            > {
+                self.0.reborrow().execution.as_ref()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<OrderIntentView<'static>>>
+        for OrderIntentOwnedView {
+            fn from(inner: ::buffa::OwnedView<OrderIntentView<'static>>) -> Self {
+                OrderIntentOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<OrderIntentOwnedView>
+        for ::buffa::OwnedView<OrderIntentView<'static>> {
+            fn from(wrapper: OrderIntentOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<OrderIntentView<'static>>>
+        for OrderIntentOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<OrderIntentView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::OrderIntent {
+            type View<'a> = OrderIntentView<'a>;
+            type ViewHandle = OrderIntentOwnedView;
+        }
+        impl ::serde::Serialize for OrderIntentOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CreateOrderRequest submits one order intent for admission.
         #[derive(Clone, Debug, Default)]
         pub struct CreateOrderRequestView<'a> {
             /// Target sub-account numeric ID. When omitted, uses caller's root account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Trading pair symbol, e.g., "BTC-USDT"; resolved to pair_id by gateway.
+            /// Order to admit.
             ///
-            /// Field 2: `symbol`
-            pub symbol: &'a str,
-            /// Order side: BUY or SELL.
-            ///
-            /// Field 3: `side`
-            pub side: ::buffa::EnumValue<super::super::Side>,
-            /// Order type: LIMIT or MARKET.
-            ///
-            /// Field 4: `order_type`
-            pub order_type: ::buffa::EnumValue<super::super::OrderType>,
-            /// Time-in-force: GTC, IOC, or FOK. Defaults to GTC if unspecified.
-            ///
-            /// Field 5: `time_in_force`
-            pub time_in_force: ::buffa::EnumValue<super::super::TimeInForce>,
-            /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
-            ///
-            /// Field 6: `qty_scaled`
-            pub qty_scaled: i64,
-            /// Price in quote units scaled by 1e6. Optional for MARKET orders.
-            ///
-            /// Field 7: `price_ticks`
-            pub price_ticks: i64,
-            /// Optional client-side reference price in quote units scaled by 1e6 for
-            /// MARKET slippage anchoring.
-            /// When absent, admission uses server-side reference pricing.
-            ///
-            /// Field 14: `market_client_ref_price_ticks`
-            pub market_client_ref_price_ticks: i64,
-            /// If true, the order is rejected instead of crossing the book (maker-only).
-            ///
-            /// Field 8: `post_only`
-            pub post_only: bool,
-            /// Optional client order identifier for idempotency.
-            ///
-            /// Field 9: `client_order_id`
-            pub client_order_id: &'a str,
-            /// Fee source for BUY orders: QUOTE (default) or RECEIVED. SELL orders always
-            /// pay fees in quote asset.
-            ///
-            /// Field 10: `fee_source`
-            pub fee_source: ::buffa::EnumValue<super::super::FeeSource>,
-            /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
-            ///
-            /// Field 11: `self_trade_prevention_mode`
-            pub self_trade_prevention_mode: ::buffa::EnumValue<
-                super::super::SelfTradePreventionMode,
-            >,
-            /// Optional attached risk controls (TP/SL/TrailingStop) for this order.
-            ///
-            /// Field 20: `attached_risk`
-            pub attached_risk: ::buffa::MessageFieldView<
-                super::super::__buffa::view::RiskPolicyView<'a>,
-            >,
-            pub market_max_slippage: ::core::option::Option<
-                super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage,
+            /// Field 2: `order`
+            pub order: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OrderIntentView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -16535,98 +20027,9 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.side = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.order_type = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.time_in_force = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
-                    }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
-                    }
-                    14u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.market_client_ref_price_ticks = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
-                    }
-                    8u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.post_only = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    9u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.client_order_id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    10u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.fee_source = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    11u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.self_trade_prevention_mode = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    20u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.attached_risk.as_mut() {
+                        match view.order.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -16635,36 +20038,14 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.attached_risk = ::buffa::MessageFieldView::set(
-                                    <super::super::__buffa::view::RiskPolicyView as ::buffa::MessageView>::decode_view_ctx(
+                                view.order = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OrderIntentView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
                                 );
                             }
                         }
-                    }
-                    12u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.market_max_slippage = Some(
-                            super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageTicks(
-                                ::buffa::types::decode_int32(&mut cur)?,
-                            ),
-                        );
-                    }
-                    13u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.market_max_slippage = Some(
-                            super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageBps(
-                                ::buffa::types::decode_int32(&mut cur)?,
-                            ),
-                        );
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -16696,44 +20077,14 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateOrderRequest {
                     subaccount_id: self.subaccount_id,
-                    symbol: self.symbol.to_string(),
-                    side: self.side,
-                    order_type: self.order_type,
-                    time_in_force: self.time_in_force,
-                    qty_scaled: self.qty_scaled,
-                    price_ticks: self.price_ticks,
-                    market_client_ref_price_ticks: self.market_client_ref_price_ticks,
-                    post_only: self.post_only,
-                    client_order_id: self.client_order_id.to_string(),
-                    fee_source: self.fee_source,
-                    self_trade_prevention_mode: self.self_trade_prevention_mode,
-                    attached_risk: match self.attached_risk.as_option() {
+                    order: match self.order.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
-                                super::super::RiskPolicy,
+                                super::super::OrderIntent,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    market_max_slippage: self
-                        .market_max_slippage
-                        .as_ref()
-                        .map(|v| match v {
-                            super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageTicks(
-                                v,
-                            ) => {
-                                super::super::__buffa::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageTicks(
-                                    *v,
-                                )
-                            }
-                            super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageBps(
-                                v,
-                            ) => {
-                                super::super::__buffa::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageBps(
-                                    *v,
-                                )
-                            }
-                        }),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -16751,87 +20102,12 @@ pub mod __buffa {
                 if self.subaccount_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if !self.symbol.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
-                }
-                {
-                    let val = self.side.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.time_in_force.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if self.qty_scaled != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
-                }
-                if self.price_ticks != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
-                }
-                if self.post_only {
-                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if !self.client_order_id.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.client_order_id)
-                                as u32;
-                }
-                {
-                    let val = self.fee_source.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.self_trade_prevention_mode.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if let ::core::option::Option::Some(ref v) = self.market_max_slippage {
-                    match v {
-                        super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageTicks(
-                            v,
-                        ) => {
-                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
-                        }
-                        super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageBps(
-                            v,
-                        ) => {
-                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
-                        }
-                    }
-                }
-                if self.market_client_ref_price_ticks != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.market_client_ref_price_ticks,
-                            ) as u32;
-                }
-                if self.attached_risk.is_set() {
+                if self.order.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.attached_risk.compute_size(__cache);
+                    let inner_size = self.order.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
-                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -16848,79 +20124,13 @@ pub mod __buffa {
                 if let Some(v) = self.subaccount_id {
                     ::buffa::types::put_fixed64_field(1u32, v, buf);
                 }
-                if !self.symbol.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.symbol, buf);
-                }
-                {
-                    let val = self.side.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(3u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(4u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.time_in_force.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(5u32, val, buf);
-                    }
-                }
-                if self.qty_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(6u32, self.qty_scaled, buf);
-                }
-                if self.price_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(7u32, self.price_ticks, buf);
-                }
-                if self.post_only {
-                    ::buffa::types::put_bool_field(8u32, self.post_only, buf);
-                }
-                if !self.client_order_id.is_empty() {
-                    ::buffa::types::put_string_field(9u32, &self.client_order_id, buf);
-                }
-                {
-                    let val = self.fee_source.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(10u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.self_trade_prevention_mode.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(11u32, val, buf);
-                    }
-                }
-                if let ::core::option::Option::Some(ref v) = self.market_max_slippage {
-                    match v {
-                        super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageTicks(
-                            x,
-                        ) => {
-                            ::buffa::types::put_int32_field(12u32, *x, buf);
-                        }
-                        super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageBps(
-                            x,
-                        ) => {
-                            ::buffa::types::put_int32_field(13u32, *x, buf);
-                        }
-                    }
-                }
-                if self.market_client_ref_price_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        14u32,
-                        self.market_client_ref_price_ticks,
-                        buf,
-                    );
-                }
-                if self.attached_risk.is_set() {
+                if self.order.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        20u32,
+                        2u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    self.attached_risk.write_to(__cache, buf);
+                    self.order.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -16950,96 +20160,9 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
-                    __map.serialize_entry("symbol", self.symbol)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
-                    __map.serialize_entry("side", &self.side)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.order_type,
-                ) {
-                    __map.serialize_entry("orderType", &self.order_type)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.time_in_force,
-                ) {
-                    __map.serialize_entry("timeInForce", &self.time_in_force)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
-                    __map
-                        .serialize_entry(
-                            "qtyScaled",
-                            &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
-                    __map
-                        .serialize_entry(
-                            "priceTicks",
-                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.market_client_ref_price_ticks,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "marketClientRefPriceTicks",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.market_client_ref_price_ticks,
-                            ),
-                        )?;
-                }
-                if self.post_only {
-                    __map.serialize_entry("postOnly", &self.post_only)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_order_id) {
-                    __map.serialize_entry("clientOrderId", self.client_order_id)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.fee_source,
-                ) {
-                    __map.serialize_entry("feeSource", &self.fee_source)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.self_trade_prevention_mode,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "selfTradePreventionMode",
-                            &self.self_trade_prevention_mode,
-                        )?;
-                }
                 {
-                    if let ::core::option::Option::Some(__v) = self
-                        .attached_risk
-                        .as_option()
-                    {
-                        __map.serialize_entry("attachedRisk", __v)?;
-                    }
-                }
-                if let ::core::option::Option::Some(ref __ov) = self.market_max_slippage
-                {
-                    match __ov {
-                        super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageTicks(
-                            v,
-                        ) => {
-                            __map
-                                .serialize_entry(
-                                    "marketMaxSlippageTicks",
-                                    &::buffa::json_helpers::ProtoJson(v),
-                                )?;
-                        }
-                        super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage::MarketMaxSlippageBps(
-                            v,
-                        ) => {
-                            __map
-                                .serialize_entry(
-                                    "marketMaxSlippageBps",
-                                    &::buffa::json_helpers::ProtoJson(v),
-                                )?;
-                        }
+                    if let ::core::option::Option::Some(__v) = self.order.as_option() {
+                        __map.serialize_entry("order", __v)?;
                     }
                 }
                 __map.end()
@@ -17145,109 +20268,16 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Trading pair symbol, e.g., "BTC-USDT"; resolved to pair_id by gateway.
+            /// Order to admit.
             ///
-            /// Field 2: `symbol`
+            /// Field 2: `order`
             #[must_use]
-            pub fn symbol(&self) -> &'_ str {
-                self.0.reborrow().symbol
-            }
-            /// Order side: BUY or SELL.
-            ///
-            /// Field 3: `side`
-            #[must_use]
-            pub fn side(&self) -> ::buffa::EnumValue<super::super::Side> {
-                self.0.reborrow().side
-            }
-            /// Order type: LIMIT or MARKET.
-            ///
-            /// Field 4: `order_type`
-            #[must_use]
-            pub fn order_type(&self) -> ::buffa::EnumValue<super::super::OrderType> {
-                self.0.reborrow().order_type
-            }
-            /// Time-in-force: GTC, IOC, or FOK. Defaults to GTC if unspecified.
-            ///
-            /// Field 5: `time_in_force`
-            #[must_use]
-            pub fn time_in_force(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::TimeInForce> {
-                self.0.reborrow().time_in_force
-            }
-            /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
-            ///
-            /// Field 6: `qty_scaled`
-            #[must_use]
-            pub fn qty_scaled(&self) -> i64 {
-                self.0.reborrow().qty_scaled
-            }
-            /// Price in quote units scaled by 1e6. Optional for MARKET orders.
-            ///
-            /// Field 7: `price_ticks`
-            #[must_use]
-            pub fn price_ticks(&self) -> i64 {
-                self.0.reborrow().price_ticks
-            }
-            /// Optional client-side reference price in quote units scaled by 1e6 for
-            /// MARKET slippage anchoring.
-            /// When absent, admission uses server-side reference pricing.
-            ///
-            /// Field 14: `market_client_ref_price_ticks`
-            #[must_use]
-            pub fn market_client_ref_price_ticks(&self) -> i64 {
-                self.0.reborrow().market_client_ref_price_ticks
-            }
-            /// If true, the order is rejected instead of crossing the book (maker-only).
-            ///
-            /// Field 8: `post_only`
-            #[must_use]
-            pub fn post_only(&self) -> bool {
-                self.0.reborrow().post_only
-            }
-            /// Optional client order identifier for idempotency.
-            ///
-            /// Field 9: `client_order_id`
-            #[must_use]
-            pub fn client_order_id(&self) -> &'_ str {
-                self.0.reborrow().client_order_id
-            }
-            /// Fee source for BUY orders: QUOTE (default) or RECEIVED. SELL orders always
-            /// pay fees in quote asset.
-            ///
-            /// Field 10: `fee_source`
-            #[must_use]
-            pub fn fee_source(&self) -> ::buffa::EnumValue<super::super::FeeSource> {
-                self.0.reborrow().fee_source
-            }
-            /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
-            ///
-            /// Field 11: `self_trade_prevention_mode`
-            #[must_use]
-            pub fn self_trade_prevention_mode(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::SelfTradePreventionMode> {
-                self.0.reborrow().self_trade_prevention_mode
-            }
-            /// Optional attached risk controls (TP/SL/TrailingStop) for this order.
-            ///
-            /// Field 20: `attached_risk`
-            #[must_use]
-            pub fn attached_risk(
+            pub fn order(
                 &self,
             ) -> &::buffa::MessageFieldView<
-                super::super::__buffa::view::RiskPolicyView<'_>,
+                super::super::__buffa::view::OrderIntentView<'_>,
             > {
-                &self.0.reborrow().attached_risk
-            }
-            /// Oneof `market_max_slippage`.
-            #[must_use]
-            pub fn market_max_slippage(
-                &self,
-            ) -> ::core::option::Option<
-                &super::super::__buffa::view::oneof::create_order_request::MarketMaxSlippage,
-            > {
-                self.0.reborrow().market_max_slippage.as_ref()
+                &self.0.reborrow().order
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<CreateOrderRequestView<'static>>>
@@ -17280,31 +20310,29 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// CreateOrderResponse is the binary (protobuf) response after placing an order.
+        /// CreateOrderResponse acknowledges admission only. It does not report whether
+        /// the order is working, filled, canceled, or rejected after admission; use
+        /// order reads or realtime streams for execution state.
         #[derive(Clone, Debug, Default)]
         pub struct CreateOrderResponseView<'a> {
-            /// Status indicator, e.g., "accepted".
+            /// Assigned order ID.
             ///
-            /// Field 1: `status`
-            pub status: &'a str,
-            /// Order ID as fixed64.
-            ///
-            /// Field 2: `order_id`
+            /// Field 1: `order_id`
             pub order_id: u64,
-            /// Echoed client order ID (when provided in request).
+            /// Echoed client order ID when one was supplied.
             ///
-            /// Field 3: `client_order_id`
+            /// Field 2: `client_order_id`
             pub client_order_id: &'a str,
-            /// Server timestamp.
+            /// Time admission completed.
             ///
-            /// Field 4: `ts`
-            pub ts: ::buffa::MessageFieldView<
+            /// Field 3: `accepted_at`
+            pub accepted_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Server timestamp as epoch nanoseconds (for bots).
+            /// Admission completion time as epoch nanoseconds (UTC).
             ///
-            /// Field 5: `ts_ns`
-            pub ts_ns: u64,
+            /// Field 4: `accepted_at_ts_ns`
+            pub accepted_at_ts_ns: u64,
             /// Trigger ID for attached take-profit.
             ///
             /// Field 20: `take_profit_trigger_id`
@@ -17353,32 +20381,25 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
                             ::buffa::encoding::WireType::Fixed64,
                         )?;
                         view.order_id = ::buffa::types::decode_fixed64(&mut cur)?;
                     }
-                    3u32 => {
+                    2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.client_order_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
-                    4u32 => {
+                    3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.ts.as_mut() {
+                        match view.accepted_at.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -17387,7 +20408,7 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.ts = ::buffa::MessageFieldView::set(
+                                view.accepted_at = ::buffa::MessageFieldView::set(
                                     <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
@@ -17396,12 +20417,14 @@ pub mod __buffa {
                             }
                         }
                     }
-                    5u32 => {
+                    4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                        view.accepted_at_ts_ns = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
                     }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -17459,10 +20482,9 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CreateOrderResponse {
-                    status: self.status.to_string(),
                     order_id: self.order_id,
                     client_order_id: self.client_order_id.to_string(),
-                    ts: match self.ts.as_option() {
+                    accepted_at: match self.accepted_at.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
                                 ::buffa_types::google::protobuf::Timestamp,
@@ -17470,7 +20492,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    ts_ns: self.ts_ns,
+                    accepted_at_ts_ns: self.accepted_at_ts_ns,
                     take_profit_trigger_id: self.take_profit_trigger_id,
                     stop_loss_trigger_id: self.stop_loss_trigger_id,
                     trailing_stop_trigger_id: self.trailing_stop_trigger_id,
@@ -17488,11 +20510,6 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
-                }
                 if self.order_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
@@ -17502,16 +20519,19 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.client_order_id)
                                 as u32;
                 }
-                if self.ts.is_set() {
+                if self.accepted_at.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.ts.compute_size(__cache);
+                    let inner_size = self.accepted_at.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if self.ts_ns != 0u64 {
-                    size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+                if self.accepted_at_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns)
+                                as u32;
                 }
                 if let Some(v) = self.take_profit_trigger_id {
                     size += 2u32 + ::buffa::types::uint64_encoded_len(v) as u32;
@@ -17533,25 +20553,22 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.status, buf);
-                }
                 if self.order_id != 0u64 {
-                    ::buffa::types::put_fixed64_field(2u32, self.order_id, buf);
+                    ::buffa::types::put_fixed64_field(1u32, self.order_id, buf);
                 }
                 if !self.client_order_id.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.client_order_id, buf);
+                    ::buffa::types::put_string_field(2u32, &self.client_order_id, buf);
                 }
-                if self.ts.is_set() {
+                if self.accepted_at.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        4u32,
+                        3u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    self.ts.write_to(__cache, buf);
+                    self.accepted_at.write_to(__cache, buf);
                 }
-                if self.ts_ns != 0u64 {
-                    ::buffa::types::put_uint64_field(5u32, self.ts_ns, buf);
+                if self.accepted_at_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.accepted_at_ts_ns, buf);
                 }
                 if let Some(v) = self.take_profit_trigger_id {
                     ::buffa::types::put_uint64_field(20u32, v, buf);
@@ -17583,9 +20600,6 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
-                }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.order_id) {
                     __map
                         .serialize_entry(
@@ -17597,15 +20611,20 @@ pub mod __buffa {
                     __map.serialize_entry("clientOrderId", self.client_order_id)?;
                 }
                 {
-                    if let ::core::option::Option::Some(__v) = self.ts.as_option() {
-                        __map.serialize_entry("ts", __v)?;
+                    if let ::core::option::Option::Some(__v) = self
+                        .accepted_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("acceptedAt", __v)?;
                     }
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.ts_ns) {
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.accepted_at_ts_ns,
+                ) {
                     __map
                         .serialize_entry(
-                            "tsNs",
-                            &::buffa::json_helpers::ProtoJson(&self.ts_ns),
+                            "acceptedAtTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.accepted_at_ts_ns),
                         )?;
                 }
                 if let ::core::option::Option::Some(__v) = self.take_profit_trigger_id {
@@ -17726,44 +20745,37 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Status indicator, e.g., "accepted".
+            /// Assigned order ID.
             ///
-            /// Field 1: `status`
-            #[must_use]
-            pub fn status(&self) -> &'_ str {
-                self.0.reborrow().status
-            }
-            /// Order ID as fixed64.
-            ///
-            /// Field 2: `order_id`
+            /// Field 1: `order_id`
             #[must_use]
             pub fn order_id(&self) -> u64 {
                 self.0.reborrow().order_id
             }
-            /// Echoed client order ID (when provided in request).
+            /// Echoed client order ID when one was supplied.
             ///
-            /// Field 3: `client_order_id`
+            /// Field 2: `client_order_id`
             #[must_use]
             pub fn client_order_id(&self) -> &'_ str {
                 self.0.reborrow().client_order_id
             }
-            /// Server timestamp.
+            /// Time admission completed.
             ///
-            /// Field 4: `ts`
+            /// Field 3: `accepted_at`
             #[must_use]
-            pub fn ts(
+            pub fn accepted_at(
                 &self,
             ) -> &::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
-                &self.0.reborrow().ts
+                &self.0.reborrow().accepted_at
             }
-            /// Server timestamp as epoch nanoseconds (for bots).
+            /// Admission completion time as epoch nanoseconds (UTC).
             ///
-            /// Field 5: `ts_ns`
+            /// Field 4: `accepted_at_ts_ns`
             #[must_use]
-            pub fn ts_ns(&self) -> u64 {
-                self.0.reborrow().ts_ns
+            pub fn accepted_at_ts_ns(&self) -> u64 {
+                self.0.reborrow().accepted_at_ts_ns
             }
             /// Trigger ID for attached take-profit.
             ///
@@ -18629,6 +21641,335 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// FieldViolation describes one actionable request validation failure.
+        #[derive(Clone, Debug, Default)]
+        pub struct FieldViolationView<'a> {
+            /// Protobuf field path relative to the request, using canonical field names.
+            ///
+            /// Field 1: `field_path`
+            pub field_path: &'a str,
+            /// Stable validation rule identifier suitable for programmatic matching.
+            ///
+            /// Field 2: `rule_id`
+            pub rule_id: &'a str,
+            /// Human-readable explanation of the violation.
+            ///
+            /// Field 3: `message`
+            pub message: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for FieldViolationView<'a> {
+            type Owned = super::super::FieldViolation;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.field_path = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.rule_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.message = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::FieldViolation,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::FieldViolation,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::FieldViolation {
+                    field_path: self.field_path.to_string(),
+                    rule_id: self.rule_id.to_string(),
+                    message: self.message.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for FieldViolationView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.field_path.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.field_path)
+                                as u32;
+                }
+                if !self.rule_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.rule_id) as u32;
+                }
+                if !self.message.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.message) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.field_path.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.field_path, buf);
+                }
+                if !self.rule_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.rule_id, buf);
+                }
+                if !self.message.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.message, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for FieldViolationView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.field_path) {
+                    __map.serialize_entry("fieldPath", self.field_path)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.rule_id) {
+                    __map.serialize_entry("ruleId", self.rule_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.message) {
+                    __map.serialize_entry("message", self.message)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for FieldViolationView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "FieldViolation";
+            const FULL_NAME: &'static str = "orders.v1.FieldViolation";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.FieldViolation";
+        }
+        ::buffa::impl_default_view_instance!(FieldViolationView);
+        ::buffa::impl_view_reborrow!(FieldViolationView);
+        /** Self-contained, `'static` owned view of a `FieldViolation` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`FieldViolationView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`FieldViolationView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct FieldViolationOwnedView(
+            ::buffa::OwnedView<FieldViolationView<'static>>,
+        );
+        impl FieldViolationOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FieldViolationOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FieldViolationOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::FieldViolation,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FieldViolationOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`FieldViolationView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &FieldViolationView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::FieldViolation,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Protobuf field path relative to the request, using canonical field names.
+            ///
+            /// Field 1: `field_path`
+            #[must_use]
+            pub fn field_path(&self) -> &'_ str {
+                self.0.reborrow().field_path
+            }
+            /// Stable validation rule identifier suitable for programmatic matching.
+            ///
+            /// Field 2: `rule_id`
+            #[must_use]
+            pub fn rule_id(&self) -> &'_ str {
+                self.0.reborrow().rule_id
+            }
+            /// Human-readable explanation of the violation.
+            ///
+            /// Field 3: `message`
+            #[must_use]
+            pub fn message(&self) -> &'_ str {
+                self.0.reborrow().message
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<FieldViolationView<'static>>>
+        for FieldViolationOwnedView {
+            fn from(inner: ::buffa::OwnedView<FieldViolationView<'static>>) -> Self {
+                FieldViolationOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<FieldViolationOwnedView>
+        for ::buffa::OwnedView<FieldViolationView<'static>> {
+            fn from(wrapper: FieldViolationOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<FieldViolationView<'static>>>
+        for FieldViolationOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<FieldViolationView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::FieldViolation {
+            type View<'a> = FieldViolationView<'a>;
+            type ViewHandle = FieldViolationOwnedView;
+        }
+        impl ::serde::Serialize for FieldViolationOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// ErrorDetail is attached to ConnectRPC errors for structured error handling.
         /// Clients can inspect this to get a stable machine-readable error code.
         #[derive(Clone, Debug, Default)]
@@ -18637,6 +21978,13 @@ pub mod __buffa {
             ///
             /// Field 1: `code`
             pub code: ::buffa::EnumValue<super::super::ErrorCode>,
+            /// Field-level validation failures. Empty for non-validation domain errors.
+            ///
+            /// Field 2: `violations`
+            pub violations: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::FieldViolationView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ErrorDetailView<'a> {
@@ -18679,6 +22027,21 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.violations
+                            .push(
+                                <super::super::__buffa::view::FieldViolationView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -18709,6 +22072,11 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ErrorDetail {
                     code: self.code,
+                    violations: self
+                        .violations
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -18719,7 +22087,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for ErrorDetailView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -18729,13 +22097,21 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                for v in &self.violations {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -18745,6 +22121,14 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(1u32, val, buf);
                     }
+                }
+                for v in &self.violations {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -18769,6 +22153,9 @@ pub mod __buffa {
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.code) {
                     __map.serialize_entry("code", &self.code)?;
+                }
+                if !self.violations.is_empty() {
+                    __map.serialize_entry("violations", &*self.violations)?;
                 }
                 __map.end()
             }
@@ -18871,6 +22258,18 @@ pub mod __buffa {
             pub fn code(&self) -> ::buffa::EnumValue<super::super::ErrorCode> {
                 self.0.reborrow().code
             }
+            /// Field-level validation failures. Empty for non-validation domain errors.
+            ///
+            /// Field 2: `violations`
+            #[must_use]
+            pub fn violations(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::FieldViolationView<'_>,
+            > {
+                &self.0.reborrow().violations
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<ErrorDetailView<'static>>>
         for ErrorDetailOwnedView {
@@ -18902,29 +22301,932 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// TakeProfitPolicy defines a take-profit attached to an order.
-        /// Arms after the parent order fills; fires when price crosses the threshold.
+        /// RiskMarketIoc configures an attached risk leg that submits a market child
+        /// with implicit immediate-or-cancel behavior.
+        #[derive(Clone, Debug, Default)]
+        pub struct RiskMarketIocView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RiskMarketIocView<'a> {
+            type Owned = super::super::RiskMarketIoc;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RiskMarketIoc,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RiskMarketIoc,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RiskMarketIoc {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RiskMarketIocView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RiskMarketIocView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RiskMarketIocView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "RiskMarketIoc";
+            const FULL_NAME: &'static str = "orders.v1.RiskMarketIoc";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.RiskMarketIoc";
+        }
+        ::buffa::impl_default_view_instance!(RiskMarketIocView);
+        ::buffa::impl_view_reborrow!(RiskMarketIocView);
+        /** Self-contained, `'static` owned view of a `RiskMarketIoc` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RiskMarketIocView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RiskMarketIocView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RiskMarketIocOwnedView(
+            ::buffa::OwnedView<RiskMarketIocView<'static>>,
+        );
+        impl RiskMarketIocOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RiskMarketIocOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RiskMarketIocOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RiskMarketIoc,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RiskMarketIocOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`RiskMarketIocView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RiskMarketIocView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RiskMarketIoc,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<RiskMarketIocView<'static>>>
+        for RiskMarketIocOwnedView {
+            fn from(inner: ::buffa::OwnedView<RiskMarketIocView<'static>>) -> Self {
+                RiskMarketIocOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RiskMarketIocOwnedView>
+        for ::buffa::OwnedView<RiskMarketIocView<'static>> {
+            fn from(wrapper: RiskMarketIocOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<RiskMarketIocView<'static>>>
+        for RiskMarketIocOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<RiskMarketIocView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RiskMarketIoc {
+            type View<'a> = RiskMarketIocView<'a>;
+            type ViewHandle = RiskMarketIocOwnedView;
+        }
+        impl ::serde::Serialize for RiskMarketIocOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// RiskLimitGtc configures an attached risk leg that submits a resting limit
+        /// child. Attached risk legs do not support post-only.
+        #[derive(Clone, Debug, Default)]
+        pub struct RiskLimitGtcView<'a> {
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            pub price_ticks: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RiskLimitGtcView<'a> {
+            type Owned = super::super::RiskLimitGtc;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RiskLimitGtc,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RiskLimitGtc,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RiskLimitGtc {
+                    price_ticks: self.price_ticks,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RiskLimitGtcView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RiskLimitGtcView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RiskLimitGtcView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "RiskLimitGtc";
+            const FULL_NAME: &'static str = "orders.v1.RiskLimitGtc";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.RiskLimitGtc";
+        }
+        ::buffa::impl_default_view_instance!(RiskLimitGtcView);
+        ::buffa::impl_view_reborrow!(RiskLimitGtcView);
+        /** Self-contained, `'static` owned view of a `RiskLimitGtc` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RiskLimitGtcView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RiskLimitGtcView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RiskLimitGtcOwnedView(::buffa::OwnedView<RiskLimitGtcView<'static>>);
+        impl RiskLimitGtcOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RiskLimitGtcOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RiskLimitGtcOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RiskLimitGtc,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RiskLimitGtcOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`RiskLimitGtcView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RiskLimitGtcView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RiskLimitGtc,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            #[must_use]
+            pub fn price_ticks(&self) -> i64 {
+                self.0.reborrow().price_ticks
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<RiskLimitGtcView<'static>>>
+        for RiskLimitGtcOwnedView {
+            fn from(inner: ::buffa::OwnedView<RiskLimitGtcView<'static>>) -> Self {
+                RiskLimitGtcOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RiskLimitGtcOwnedView>
+        for ::buffa::OwnedView<RiskLimitGtcView<'static>> {
+            fn from(wrapper: RiskLimitGtcOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<RiskLimitGtcView<'static>>>
+        for RiskLimitGtcOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<RiskLimitGtcView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RiskLimitGtc {
+            type View<'a> = RiskLimitGtcView<'a>;
+            type ViewHandle = RiskLimitGtcOwnedView;
+        }
+        impl ::serde::Serialize for RiskLimitGtcOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// RiskExecution selects the child execution supported by attached take-profit
+        /// and stop-loss policies.
+        #[derive(Clone, Debug, Default)]
+        pub struct RiskExecutionView<'a> {
+            pub execution: ::core::option::Option<
+                super::super::__buffa::view::oneof::risk_execution::Execution<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RiskExecutionView<'a> {
+            type Owned = super::super::RiskExecution;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::risk_execution::Execution::MarketIoc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::risk_execution::Execution::MarketIoc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::RiskMarketIocView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::risk_execution::Execution::LimitGtc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::risk_execution::Execution::LimitGtc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::RiskLimitGtcView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RiskExecution,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RiskExecution,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RiskExecution {
+                    execution: match self.execution.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::risk_execution::Execution::MarketIoc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::risk_execution::Execution::MarketIoc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::risk_execution::Execution::LimitGtc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::risk_execution::Execution::LimitGtc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RiskExecutionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if let ::core::option::Option::Some(ref v) = self.execution {
+                    match v {
+                        super::super::__buffa::view::oneof::risk_execution::Execution::MarketIoc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::risk_execution::Execution::LimitGtc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let ::core::option::Option::Some(ref v) = self.execution {
+                    match v {
+                        super::super::__buffa::view::oneof::risk_execution::Execution::MarketIoc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                1u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::risk_execution::Execution::LimitGtc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                2u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RiskExecutionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(ref __ov) = self.execution {
+                    match __ov {
+                        super::super::__buffa::view::oneof::risk_execution::Execution::MarketIoc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("marketIoc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::risk_execution::Execution::LimitGtc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitGtc", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RiskExecutionView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "RiskExecution";
+            const FULL_NAME: &'static str = "orders.v1.RiskExecution";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.RiskExecution";
+        }
+        ::buffa::impl_default_view_instance!(RiskExecutionView);
+        ::buffa::impl_view_reborrow!(RiskExecutionView);
+        /** Self-contained, `'static` owned view of a `RiskExecution` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RiskExecutionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RiskExecutionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RiskExecutionOwnedView(
+            ::buffa::OwnedView<RiskExecutionView<'static>>,
+        );
+        impl RiskExecutionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RiskExecutionOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RiskExecutionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RiskExecution,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RiskExecutionOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`RiskExecutionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RiskExecutionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RiskExecution,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Oneof `execution`.
+            #[must_use]
+            pub fn execution(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::risk_execution::Execution<'_>,
+            > {
+                self.0.reborrow().execution.as_ref()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<RiskExecutionView<'static>>>
+        for RiskExecutionOwnedView {
+            fn from(inner: ::buffa::OwnedView<RiskExecutionView<'static>>) -> Self {
+                RiskExecutionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RiskExecutionOwnedView>
+        for ::buffa::OwnedView<RiskExecutionView<'static>> {
+            fn from(wrapper: RiskExecutionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<RiskExecutionView<'static>>>
+        for RiskExecutionOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<RiskExecutionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RiskExecution {
+            type View<'a> = RiskExecutionView<'a>;
+            type ViewHandle = RiskExecutionOwnedView;
+        }
+        impl ::serde::Serialize for RiskExecutionOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TakeProfitPolicy defines a take-profit attached to an order. It evaluates
+        /// last trade price, arms after the parent fills, and submits the selected child.
         #[derive(Clone, Debug, Default)]
         pub struct TakeProfitPolicyView<'a> {
-            /// Trigger price in quote units scaled by 1e6. Required.
+            /// Trigger price in quote units scaled by 1e6.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
-            /// Price source for trigger evaluation. Defaults to LAST_PRICE if unspecified.
+            /// Child execution when the threshold is crossed.
             ///
-            /// Field 2: `trigger_price_source`
-            pub trigger_price_source: ::buffa::EnumValue<
-                super::super::TriggerPriceSource,
+            /// Field 2: `child`
+            pub child: ::buffa::MessageFieldView<
+                super::super::__buffa::view::RiskExecutionView<'a>,
             >,
-            /// Order type for the child order when triggered. Defaults to MARKET.
-            ///
-            /// Field 3: `order_type`
-            pub order_type: ::buffa::EnumValue<super::super::OrderType>,
-            /// Limit price in quote units scaled by 1e6 for LIMIT child orders. Required
-            /// if order_type is LIMIT.
-            ///
-            /// Field 4: `limit_price_ticks`
-            pub limit_price_ticks: i64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for TakeProfitPolicyView<'a> {
@@ -18970,27 +23272,27 @@ pub mod __buffa {
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.trigger_price_source = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.order_type = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.limit_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.child.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.child = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::RiskExecutionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -19022,9 +23324,14 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::TakeProfitPolicy {
                     trigger_price_ticks: self.trigger_price_ticks,
-                    trigger_price_source: self.trigger_price_source,
-                    order_type: self.order_type,
-                    limit_price_ticks: self.limit_price_ticks,
+                    child: match self.child.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::RiskExecution,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -19035,7 +23342,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for TakeProfitPolicyView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -19045,23 +23352,13 @@ pub mod __buffa {
                             + ::buffa::types::int64_encoded_len(self.trigger_price_ticks)
                                 as u32;
                 }
-                {
-                    let val = self.trigger_price_source.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if self.limit_price_ticks != 0i64 {
+                if self.child.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.child.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
                     size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.limit_price_ticks)
-                                as u32;
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -19069,7 +23366,7 @@ pub mod __buffa {
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -19077,20 +23374,13 @@ pub mod __buffa {
                 if self.trigger_price_ticks != 0i64 {
                     ::buffa::types::put_int64_field(1u32, self.trigger_price_ticks, buf);
                 }
-                {
-                    let val = self.trigger_price_source.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(2u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(3u32, val, buf);
-                    }
-                }
-                if self.limit_price_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(4u32, self.limit_price_ticks, buf);
+                if self.child.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.child.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -19122,28 +23412,10 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.trigger_price_ticks),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.trigger_price_source,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "triggerPriceSource",
-                            &self.trigger_price_source,
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.order_type,
-                ) {
-                    __map.serialize_entry("orderType", &self.order_type)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.limit_price_ticks,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "limitPriceTicks",
-                            &::buffa::json_helpers::ProtoJson(&self.limit_price_ticks),
-                        )?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.child.as_option() {
+                        __map.serialize_entry("child", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -19241,36 +23513,23 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger price in quote units scaled by 1e6. Required.
+            /// Trigger price in quote units scaled by 1e6.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
             pub fn trigger_price_ticks(&self) -> i64 {
                 self.0.reborrow().trigger_price_ticks
             }
-            /// Price source for trigger evaluation. Defaults to LAST_PRICE if unspecified.
+            /// Child execution when the threshold is crossed.
             ///
-            /// Field 2: `trigger_price_source`
+            /// Field 2: `child`
             #[must_use]
-            pub fn trigger_price_source(
+            pub fn child(
                 &self,
-            ) -> ::buffa::EnumValue<super::super::TriggerPriceSource> {
-                self.0.reborrow().trigger_price_source
-            }
-            /// Order type for the child order when triggered. Defaults to MARKET.
-            ///
-            /// Field 3: `order_type`
-            #[must_use]
-            pub fn order_type(&self) -> ::buffa::EnumValue<super::super::OrderType> {
-                self.0.reborrow().order_type
-            }
-            /// Limit price in quote units scaled by 1e6 for LIMIT child orders. Required
-            /// if order_type is LIMIT.
-            ///
-            /// Field 4: `limit_price_ticks`
-            #[must_use]
-            pub fn limit_price_ticks(&self) -> i64 {
-                self.0.reborrow().limit_price_ticks
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::RiskExecutionView<'_>,
+            > {
+                &self.0.reborrow().child
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<TakeProfitPolicyView<'static>>>
@@ -19303,29 +23562,20 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// StopLossPolicy defines a stop-loss attached to an order.
-        /// Arms after the parent order fills; fires when price crosses the threshold.
+        /// StopLossPolicy defines a stop-loss attached to an order. It evaluates last
+        /// trade price, arms after the parent fills, and submits the selected child.
         #[derive(Clone, Debug, Default)]
         pub struct StopLossPolicyView<'a> {
-            /// Trigger price in quote units scaled by 1e6. Required.
+            /// Trigger price in quote units scaled by 1e6.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
-            /// Price source for trigger evaluation. Defaults to LAST_PRICE if unspecified.
+            /// Child execution when the threshold is crossed.
             ///
-            /// Field 2: `trigger_price_source`
-            pub trigger_price_source: ::buffa::EnumValue<
-                super::super::TriggerPriceSource,
+            /// Field 2: `child`
+            pub child: ::buffa::MessageFieldView<
+                super::super::__buffa::view::RiskExecutionView<'a>,
             >,
-            /// Order type for the child order when triggered. Defaults to MARKET.
-            ///
-            /// Field 3: `order_type`
-            pub order_type: ::buffa::EnumValue<super::super::OrderType>,
-            /// Limit price in quote units scaled by 1e6 for LIMIT child orders. Required
-            /// if order_type is LIMIT.
-            ///
-            /// Field 4: `limit_price_ticks`
-            pub limit_price_ticks: i64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for StopLossPolicyView<'a> {
@@ -19371,27 +23621,27 @@ pub mod __buffa {
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.trigger_price_source = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.order_type = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.limit_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.child.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.child = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::RiskExecutionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -19423,9 +23673,14 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::StopLossPolicy {
                     trigger_price_ticks: self.trigger_price_ticks,
-                    trigger_price_source: self.trigger_price_source,
-                    order_type: self.order_type,
-                    limit_price_ticks: self.limit_price_ticks,
+                    child: match self.child.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::RiskExecution,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -19436,7 +23691,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for StopLossPolicyView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -19446,23 +23701,13 @@ pub mod __buffa {
                             + ::buffa::types::int64_encoded_len(self.trigger_price_ticks)
                                 as u32;
                 }
-                {
-                    let val = self.trigger_price_source.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if self.limit_price_ticks != 0i64 {
+                if self.child.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.child.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
                     size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.limit_price_ticks)
-                                as u32;
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -19470,7 +23715,7 @@ pub mod __buffa {
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -19478,20 +23723,13 @@ pub mod __buffa {
                 if self.trigger_price_ticks != 0i64 {
                     ::buffa::types::put_int64_field(1u32, self.trigger_price_ticks, buf);
                 }
-                {
-                    let val = self.trigger_price_source.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(2u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(3u32, val, buf);
-                    }
-                }
-                if self.limit_price_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(4u32, self.limit_price_ticks, buf);
+                if self.child.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.child.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -19523,28 +23761,10 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.trigger_price_ticks),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.trigger_price_source,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "triggerPriceSource",
-                            &self.trigger_price_source,
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.order_type,
-                ) {
-                    __map.serialize_entry("orderType", &self.order_type)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.limit_price_ticks,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "limitPriceTicks",
-                            &::buffa::json_helpers::ProtoJson(&self.limit_price_ticks),
-                        )?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.child.as_option() {
+                        __map.serialize_entry("child", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -19642,36 +23862,23 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger price in quote units scaled by 1e6. Required.
+            /// Trigger price in quote units scaled by 1e6.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
             pub fn trigger_price_ticks(&self) -> i64 {
                 self.0.reborrow().trigger_price_ticks
             }
-            /// Price source for trigger evaluation. Defaults to LAST_PRICE if unspecified.
+            /// Child execution when the threshold is crossed.
             ///
-            /// Field 2: `trigger_price_source`
+            /// Field 2: `child`
             #[must_use]
-            pub fn trigger_price_source(
+            pub fn child(
                 &self,
-            ) -> ::buffa::EnumValue<super::super::TriggerPriceSource> {
-                self.0.reborrow().trigger_price_source
-            }
-            /// Order type for the child order when triggered. Defaults to MARKET.
-            ///
-            /// Field 3: `order_type`
-            #[must_use]
-            pub fn order_type(&self) -> ::buffa::EnumValue<super::super::OrderType> {
-                self.0.reborrow().order_type
-            }
-            /// Limit price in quote units scaled by 1e6 for LIMIT child orders. Required
-            /// if order_type is LIMIT.
-            ///
-            /// Field 4: `limit_price_ticks`
-            #[must_use]
-            pub fn limit_price_ticks(&self) -> i64 {
-                self.0.reborrow().limit_price_ticks
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::RiskExecutionView<'_>,
+            > {
+                &self.0.reborrow().child
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<StopLossPolicyView<'static>>>
@@ -19715,16 +23922,6 @@ pub mod __buffa {
             ///
             /// Field 3: `activation_price_ticks`
             pub activation_price_ticks: i64,
-            /// Price source for trigger evaluation. Defaults to LAST_PRICE if unspecified.
-            ///
-            /// Field 4: `trigger_price_source`
-            pub trigger_price_source: ::buffa::EnumValue<
-                super::super::TriggerPriceSource,
-            >,
-            /// Order type for the child order when triggered. Defaults to MARKET.
-            ///
-            /// Field 5: `order_type`
-            pub order_type: ::buffa::EnumValue<super::super::OrderType>,
             pub trailing_distance: ::core::option::Option<
                 super::super::__buffa::view::oneof::trailing_stop_policy::TrailingDistance,
             >,
@@ -19772,24 +23969,6 @@ pub mod __buffa {
                         view.activation_price_ticks = ::buffa::types::decode_int64(
                             &mut cur,
                         )?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.trigger_price_source = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.order_type = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -19865,8 +24044,6 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::TrailingStopPolicy {
                     activation_price_ticks: self.activation_price_ticks,
-                    trigger_price_source: self.trigger_price_source,
-                    order_type: self.order_type,
                     trailing_distance: self
                         .trailing_distance
                         .as_ref()
@@ -19940,18 +24117,6 @@ pub mod __buffa {
                                 self.activation_price_ticks,
                             ) as u32;
                 }
-                {
-                    let val = self.trigger_price_source.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
                 if let ::core::option::Option::Some(ref v) = self.max_slippage {
                     match v {
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
@@ -19998,18 +24163,6 @@ pub mod __buffa {
                         buf,
                     );
                 }
-                {
-                    let val = self.trigger_price_source.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(4u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.order_type.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(5u32, val, buf);
-                    }
-                }
                 if let ::core::option::Option::Some(ref v) = self.max_slippage {
                     match v {
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
@@ -20055,20 +24208,6 @@ pub mod __buffa {
                                 &self.activation_price_ticks,
                             ),
                         )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.trigger_price_source,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "triggerPriceSource",
-                            &self.trigger_price_source,
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.order_type,
-                ) {
-                    __map.serialize_entry("orderType", &self.order_type)?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.trailing_distance {
                     match __ov {
@@ -20218,22 +24357,6 @@ pub mod __buffa {
             #[must_use]
             pub fn activation_price_ticks(&self) -> i64 {
                 self.0.reborrow().activation_price_ticks
-            }
-            /// Price source for trigger evaluation. Defaults to LAST_PRICE if unspecified.
-            ///
-            /// Field 4: `trigger_price_source`
-            #[must_use]
-            pub fn trigger_price_source(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::TriggerPriceSource> {
-                self.0.reborrow().trigger_price_source
-            }
-            /// Order type for the child order when triggered. Defaults to MARKET.
-            ///
-            /// Field 5: `order_type`
-            #[must_use]
-            pub fn order_type(&self) -> ::buffa::EnumValue<super::super::OrderType> {
-                self.0.reborrow().order_type
             }
             /// Oneof `trailing_distance`.
             #[must_use]
@@ -22560,37 +26683,702 @@ pub mod __buffa {
         /// BatchCreateOrders: best-effort batch order placement
         /// =============================================================================
         ///
-        /// BatchCreateResultItem contains the per-item result of a batch create.
+        /// BatchCreateAccepted contains the assigned identifiers for an admitted item.
         #[derive(Clone, Debug, Default)]
-        pub struct BatchCreateResultItemView<'a> {
-            /// "accepted" or "rejected".
+        pub struct BatchCreateAcceptedView<'a> {
+            /// Assigned order ID.
             ///
-            /// Field 1: `status`
-            pub status: &'a str,
-            /// Resolved order ID (populated on accept).
-            ///
-            /// Field 2: `order_id`
+            /// Field 1: `order_id`
             pub order_id: u64,
-            /// Echoed client order ID.
-            ///
-            /// Field 3: `client_order_id`
-            pub client_order_id: &'a str,
-            /// Error code if rejected.
-            ///
-            /// Field 4: `code`
-            pub code: &'a str,
             /// Trigger ID for attached take-profit (when accepted and configured).
             ///
-            /// Field 5: `take_profit_trigger_id`
+            /// Field 2: `take_profit_trigger_id`
             pub take_profit_trigger_id: ::core::option::Option<u64>,
             /// Trigger ID for attached stop-loss (when accepted and configured).
             ///
-            /// Field 6: `stop_loss_trigger_id`
+            /// Field 3: `stop_loss_trigger_id`
             pub stop_loss_trigger_id: ::core::option::Option<u64>,
             /// Trigger ID for attached trailing stop (when accepted and configured).
             ///
-            /// Field 7: `trailing_stop_trigger_id`
+            /// Field 4: `trailing_stop_trigger_id`
             pub trailing_stop_trigger_id: ::core::option::Option<u64>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for BatchCreateAcceptedView<'a> {
+            type Owned = super::super::BatchCreateAccepted;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.order_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.take_profit_trigger_id = Some(
+                            ::buffa::types::decode_uint64(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.stop_loss_trigger_id = Some(
+                            ::buffa::types::decode_uint64(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trailing_stop_trigger_id = Some(
+                            ::buffa::types::decode_uint64(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateAccepted,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateAccepted,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BatchCreateAccepted {
+                    order_id: self.order_id,
+                    take_profit_trigger_id: self.take_profit_trigger_id,
+                    stop_loss_trigger_id: self.stop_loss_trigger_id,
+                    trailing_stop_trigger_id: self.trailing_stop_trigger_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for BatchCreateAcceptedView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.order_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if let Some(v) = self.take_profit_trigger_id {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
+                }
+                if let Some(v) = self.stop_loss_trigger_id {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
+                }
+                if let Some(v) = self.trailing_stop_trigger_id {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.order_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.order_id, buf);
+                }
+                if let Some(v) = self.take_profit_trigger_id {
+                    ::buffa::types::put_uint64_field(2u32, v, buf);
+                }
+                if let Some(v) = self.stop_loss_trigger_id {
+                    ::buffa::types::put_uint64_field(3u32, v, buf);
+                }
+                if let Some(v) = self.trailing_stop_trigger_id {
+                    ::buffa::types::put_uint64_field(4u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for BatchCreateAcceptedView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.order_id) {
+                    __map
+                        .serialize_entry(
+                            "orderId",
+                            &::buffa::json_helpers::ProtoJson(&self.order_id),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.take_profit_trigger_id {
+                    __map
+                        .serialize_entry(
+                            "takeProfitTriggerId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.stop_loss_trigger_id {
+                    __map
+                        .serialize_entry(
+                            "stopLossTriggerId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.trailing_stop_trigger_id
+                {
+                    __map
+                        .serialize_entry(
+                            "trailingStopTriggerId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BatchCreateAcceptedView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "BatchCreateAccepted";
+            const FULL_NAME: &'static str = "orders.v1.BatchCreateAccepted";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchCreateAccepted";
+        }
+        ::buffa::impl_default_view_instance!(BatchCreateAcceptedView);
+        ::buffa::impl_view_reborrow!(BatchCreateAcceptedView);
+        /** Self-contained, `'static` owned view of a `BatchCreateAccepted` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BatchCreateAcceptedView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchCreateAcceptedView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BatchCreateAcceptedOwnedView(
+            ::buffa::OwnedView<BatchCreateAcceptedView<'static>>,
+        );
+        impl BatchCreateAcceptedOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateAcceptedOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateAcceptedOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BatchCreateAccepted,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateAcceptedOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`BatchCreateAcceptedView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BatchCreateAcceptedView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateAccepted,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Assigned order ID.
+            ///
+            /// Field 1: `order_id`
+            #[must_use]
+            pub fn order_id(&self) -> u64 {
+                self.0.reborrow().order_id
+            }
+            /// Trigger ID for attached take-profit (when accepted and configured).
+            ///
+            /// Field 2: `take_profit_trigger_id`
+            #[must_use]
+            pub fn take_profit_trigger_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().take_profit_trigger_id
+            }
+            /// Trigger ID for attached stop-loss (when accepted and configured).
+            ///
+            /// Field 3: `stop_loss_trigger_id`
+            #[must_use]
+            pub fn stop_loss_trigger_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().stop_loss_trigger_id
+            }
+            /// Trigger ID for attached trailing stop (when accepted and configured).
+            ///
+            /// Field 4: `trailing_stop_trigger_id`
+            #[must_use]
+            pub fn trailing_stop_trigger_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().trailing_stop_trigger_id
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<BatchCreateAcceptedView<'static>>>
+        for BatchCreateAcceptedOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<BatchCreateAcceptedView<'static>>,
+            ) -> Self {
+                BatchCreateAcceptedOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BatchCreateAcceptedOwnedView>
+        for ::buffa::OwnedView<BatchCreateAcceptedView<'static>> {
+            fn from(wrapper: BatchCreateAcceptedOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<BatchCreateAcceptedView<'static>>>
+        for BatchCreateAcceptedOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<BatchCreateAcceptedView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::BatchCreateAccepted {
+            type View<'a> = BatchCreateAcceptedView<'a>;
+            type ViewHandle = BatchCreateAcceptedOwnedView;
+        }
+        impl ::serde::Serialize for BatchCreateAcceptedOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// BatchCreateRejected contains the typed reason an item was not admitted.
+        #[derive(Clone, Debug, Default)]
+        pub struct BatchCreateRejectedView<'a> {
+            /// Structured rejection detail.
+            ///
+            /// Field 1: `error`
+            pub error: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ErrorDetailView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for BatchCreateRejectedView<'a> {
+            type Owned = super::super::BatchCreateRejected;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.error.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.error = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ErrorDetailView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateRejected,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateRejected,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BatchCreateRejected {
+                    error: match self.error.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ErrorDetail,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for BatchCreateRejectedView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.error.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.error.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.error.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.error.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for BatchCreateRejectedView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.error.as_option() {
+                        __map.serialize_entry("error", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BatchCreateRejectedView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "BatchCreateRejected";
+            const FULL_NAME: &'static str = "orders.v1.BatchCreateRejected";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchCreateRejected";
+        }
+        ::buffa::impl_default_view_instance!(BatchCreateRejectedView);
+        ::buffa::impl_view_reborrow!(BatchCreateRejectedView);
+        /** Self-contained, `'static` owned view of a `BatchCreateRejected` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BatchCreateRejectedView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchCreateRejectedView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BatchCreateRejectedOwnedView(
+            ::buffa::OwnedView<BatchCreateRejectedView<'static>>,
+        );
+        impl BatchCreateRejectedOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateRejectedOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateRejectedOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BatchCreateRejected,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateRejectedOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`BatchCreateRejectedView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BatchCreateRejectedView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateRejected,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Structured rejection detail.
+            ///
+            /// Field 1: `error`
+            #[must_use]
+            pub fn error(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ErrorDetailView<'_>,
+            > {
+                &self.0.reborrow().error
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<BatchCreateRejectedView<'static>>>
+        for BatchCreateRejectedOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<BatchCreateRejectedView<'static>>,
+            ) -> Self {
+                BatchCreateRejectedOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BatchCreateRejectedOwnedView>
+        for ::buffa::OwnedView<BatchCreateRejectedView<'static>> {
+            fn from(wrapper: BatchCreateRejectedOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<BatchCreateRejectedView<'static>>>
+        for BatchCreateRejectedOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<BatchCreateRejectedView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::BatchCreateRejected {
+            type View<'a> = BatchCreateRejectedView<'a>;
+            type ViewHandle = BatchCreateRejectedOwnedView;
+        }
+        impl ::serde::Serialize for BatchCreateRejectedOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// BatchCreateResultItem contains exactly one per-item batch outcome.
+        #[derive(Clone, Debug, Default)]
+        pub struct BatchCreateResultItemView<'a> {
+            /// Echoed client order ID.
+            ///
+            /// Field 1: `client_order_id`
+            pub client_order_id: &'a str,
+            pub outcome: ::core::option::Option<
+                super::super::__buffa::view::oneof::batch_create_result_item::Outcome<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BatchCreateResultItemView<'a> {
@@ -22629,55 +27417,69 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.client_order_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Fixed64,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.order_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Accepted(
+                                ref mut existing,
+                            ),
+                        ) = view.outcome
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.outcome = Some(
+                                super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Accepted(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::BatchCreateAcceptedView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.client_order_id = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.code = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.take_profit_trigger_id = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.stop_loss_trigger_id = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.trailing_stop_trigger_id = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Rejected(
+                                ref mut existing,
+                            ),
+                        ) = view.outcome
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.outcome = Some(
+                                super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Rejected(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::BatchCreateRejectedView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -22708,13 +27510,34 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::BatchCreateResultItem {
-                    status: self.status.to_string(),
-                    order_id: self.order_id,
                     client_order_id: self.client_order_id.to_string(),
-                    code: self.code.to_string(),
-                    take_profit_trigger_id: self.take_profit_trigger_id,
-                    stop_loss_trigger_id: self.stop_loss_trigger_id,
-                    trailing_stop_trigger_id: self.trailing_stop_trigger_id,
+                    outcome: match self.outcome.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Accepted(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::batch_create_result_item::Outcome::Accepted(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Rejected(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::batch_create_result_item::Outcome::Rejected(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -22725,35 +27548,39 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for BatchCreateResultItemView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
-                }
-                if self.order_id != 0u64 {
-                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-                }
                 if !self.client_order_id.is_empty() {
                     size
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.client_order_id)
                                 as u32;
                 }
-                if !self.code.is_empty() {
-                    size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
-                }
-                if let Some(v) = self.take_profit_trigger_id {
-                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
-                }
-                if let Some(v) = self.stop_loss_trigger_id {
-                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
-                }
-                if let Some(v) = self.trailing_stop_trigger_id {
-                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
+                if let ::core::option::Option::Some(ref v) = self.outcome {
+                    match v {
+                        super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Accepted(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Rejected(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -22761,31 +27588,37 @@ pub mod __buffa {
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.status, buf);
-                }
-                if self.order_id != 0u64 {
-                    ::buffa::types::put_fixed64_field(2u32, self.order_id, buf);
-                }
                 if !self.client_order_id.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.client_order_id, buf);
+                    ::buffa::types::put_string_field(1u32, &self.client_order_id, buf);
                 }
-                if !self.code.is_empty() {
-                    ::buffa::types::put_string_field(4u32, &self.code, buf);
-                }
-                if let Some(v) = self.take_profit_trigger_id {
-                    ::buffa::types::put_uint64_field(5u32, v, buf);
-                }
-                if let Some(v) = self.stop_loss_trigger_id {
-                    ::buffa::types::put_uint64_field(6u32, v, buf);
-                }
-                if let Some(v) = self.trailing_stop_trigger_id {
-                    ::buffa::types::put_uint64_field(7u32, v, buf);
+                if let ::core::option::Option::Some(ref v) = self.outcome {
+                    match v {
+                        super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Accepted(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                2u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Rejected(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                3u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -22808,43 +27641,22 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.order_id) {
-                    __map
-                        .serialize_entry(
-                            "orderId",
-                            &::buffa::json_helpers::ProtoJson(&self.order_id),
-                        )?;
-                }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.client_order_id) {
                     __map.serialize_entry("clientOrderId", self.client_order_id)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.code) {
-                    __map.serialize_entry("code", self.code)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.take_profit_trigger_id {
-                    __map
-                        .serialize_entry(
-                            "takeProfitTriggerId",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                if let ::core::option::Option::Some(__v) = self.stop_loss_trigger_id {
-                    __map
-                        .serialize_entry(
-                            "stopLossTriggerId",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                if let ::core::option::Option::Some(__v) = self.trailing_stop_trigger_id
-                {
-                    __map
-                        .serialize_entry(
-                            "trailingStopTriggerId",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
+                if let ::core::option::Option::Some(ref __ov) = self.outcome {
+                    match __ov {
+                        super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Accepted(
+                            v,
+                        ) => {
+                            __map.serialize_entry("accepted", v)?;
+                        }
+                        super::super::__buffa::view::oneof::batch_create_result_item::Outcome::Rejected(
+                            v,
+                        ) => {
+                            __map.serialize_entry("rejected", v)?;
+                        }
+                    }
                 }
                 __map.end()
             }
@@ -22942,54 +27754,23 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// "accepted" or "rejected".
-            ///
-            /// Field 1: `status`
-            #[must_use]
-            pub fn status(&self) -> &'_ str {
-                self.0.reborrow().status
-            }
-            /// Resolved order ID (populated on accept).
-            ///
-            /// Field 2: `order_id`
-            #[must_use]
-            pub fn order_id(&self) -> u64 {
-                self.0.reborrow().order_id
-            }
             /// Echoed client order ID.
             ///
-            /// Field 3: `client_order_id`
+            /// Field 1: `client_order_id`
             #[must_use]
             pub fn client_order_id(&self) -> &'_ str {
                 self.0.reborrow().client_order_id
             }
-            /// Error code if rejected.
-            ///
-            /// Field 4: `code`
+            /// Oneof `outcome`.
             #[must_use]
-            pub fn code(&self) -> &'_ str {
-                self.0.reborrow().code
-            }
-            /// Trigger ID for attached take-profit (when accepted and configured).
-            ///
-            /// Field 5: `take_profit_trigger_id`
-            #[must_use]
-            pub fn take_profit_trigger_id(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().take_profit_trigger_id
-            }
-            /// Trigger ID for attached stop-loss (when accepted and configured).
-            ///
-            /// Field 6: `stop_loss_trigger_id`
-            #[must_use]
-            pub fn stop_loss_trigger_id(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().stop_loss_trigger_id
-            }
-            /// Trigger ID for attached trailing stop (when accepted and configured).
-            ///
-            /// Field 7: `trailing_stop_trigger_id`
-            #[must_use]
-            pub fn trailing_stop_trigger_id(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().trailing_stop_trigger_id
+            pub fn outcome(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::batch_create_result_item::Outcome<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().outcome.as_ref()
             }
         }
         impl ::core::convert::From<
@@ -23037,17 +27818,14 @@ pub mod __buffa {
             ///
             /// Field 2: `request_id`
             pub request_id: &'a str,
-            /// Orders to create (max 20). Reuses CreateOrderRequest payload, including attached risk.
+            /// Orders to create (max 20). Every item uses the same OrderIntent contract as
+            /// single create.
             ///
             /// Field 3: `items`
             pub items: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::CreateOrderRequestView<'a>,
+                super::super::__buffa::view::OrderIntentView<'a>,
             >,
-            /// Optional partial-success flag. Current implementation is always best-effort.
-            ///
-            /// Field 4: `allow_partial`
-            pub allow_partial: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BatchCreateOrdersRequestView<'a> {
@@ -23097,13 +27875,6 @@ pub mod __buffa {
                         )?;
                         view.request_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.allow_partial = ::buffa::types::decode_bool(&mut cur)?;
-                    }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -23113,7 +27884,7 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         view.items
                             .push(
-                                <super::super::__buffa::view::CreateOrderRequestView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::OrderIntentView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -23155,7 +27926,6 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    allow_partial: self.allow_partial,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -23187,9 +27957,6 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if self.allow_partial {
-                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -23214,9 +27981,6 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
-                }
-                if self.allow_partial {
-                    ::buffa::types::put_bool_field(4u32, self.allow_partial, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -23251,9 +28015,6 @@ pub mod __buffa {
                 }
                 if !self.items.is_empty() {
                     __map.serialize_entry("items", &*self.items)?;
-                }
-                if self.allow_partial {
-                    __map.serialize_entry("allowPartial", &self.allow_partial)?;
                 }
                 __map.end()
             }
@@ -23367,7 +28128,8 @@ pub mod __buffa {
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
             }
-            /// Orders to create (max 20). Reuses CreateOrderRequest payload, including attached risk.
+            /// Orders to create (max 20). Every item uses the same OrderIntent contract as
+            /// single create.
             ///
             /// Field 3: `items`
             #[must_use]
@@ -23375,16 +28137,9 @@ pub mod __buffa {
                 &self,
             ) -> &::buffa::RepeatedView<
                 '_,
-                super::super::__buffa::view::CreateOrderRequestView<'_>,
+                super::super::__buffa::view::OrderIntentView<'_>,
             > {
                 &self.0.reborrow().items
-            }
-            /// Optional partial-success flag. Current implementation is always best-effort.
-            ///
-            /// Field 4: `allow_partial`
-            #[must_use]
-            pub fn allow_partial(&self) -> bool {
-                self.0.reborrow().allow_partial
             }
         }
         impl ::core::convert::From<
@@ -37036,13 +41791,40 @@ pub mod __buffa {
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
-            pub mod create_order_request {
+            pub mod market_ioc {
                 #[allow(unused_imports)]
                 use super::*;
                 #[derive(Clone, Debug)]
-                pub enum MarketMaxSlippage {
-                    MarketMaxSlippageTicks(i32),
-                    MarketMaxSlippageBps(i32),
+                pub enum MaxSlippage {
+                    MaxSlippageTicks(i32),
+                    MaxSlippageBps(i32),
+                }
+            }
+            pub mod order_intent {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Execution<'a> {
+                    MarketIoc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::MarketIocView<'a>,
+                        >,
+                    ),
+                    LimitGtc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::LimitGtcView<'a>,
+                        >,
+                    ),
+                    LimitIoc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::LimitIocView<'a>,
+                        >,
+                    ),
+                    LimitFok(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::LimitFokView<'a>,
+                        >,
+                    ),
                 }
             }
             pub mod cancel_order_request {
@@ -37052,6 +41834,27 @@ pub mod __buffa {
                 pub enum Key<'a> {
                     OrderId(u64),
                     ClientOrderId(&'a str),
+                }
+            }
+            pub mod risk_execution {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Execution<'a> {
+                    MarketIoc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::RiskMarketIocView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    LimitGtc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::RiskLimitGtcView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
             pub mod trailing_stop_policy {
@@ -37083,6 +41886,27 @@ pub mod __buffa {
                     TrailingStop(
                         ::buffa::alloc::boxed::Box<
                             super::super::super::super::__buffa::view::TrailingStopPolicyView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                }
+            }
+            pub mod batch_create_result_item {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Outcome<'a> {
+                    Accepted(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::BatchCreateAcceptedView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    Rejected(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::BatchCreateRejectedView<
                                 'a,
                             >,
                         >,
@@ -37121,18 +41945,17 @@ pub mod __buffa {
     pub mod oneof {
         #[allow(unused_imports)]
         use super::*;
-        pub mod create_order_request {
+        pub mod market_ioc {
             #[allow(unused_imports)]
             use super::*;
-            /// Optional max slippage override for MARKET orders.
-            /// If omitted, server-side per-pair default slippage is used.
+            /// Optional max slippage override. If omitted, the pair default is used.
             #[derive(Clone, PartialEq, Debug)]
-            pub enum MarketMaxSlippage {
-                MarketMaxSlippageTicks(i32),
-                MarketMaxSlippageBps(i32),
+            pub enum MaxSlippage {
+                MaxSlippageTicks(i32),
+                MaxSlippageBps(i32),
             }
-            impl ::buffa::Oneof for MarketMaxSlippage {}
-            impl serde::Serialize for MarketMaxSlippage {
+            impl ::buffa::Oneof for MaxSlippage {}
+            impl serde::Serialize for MaxSlippage {
                 fn serialize<S: serde::Serializer>(
                     &self,
                     s: S,
@@ -37140,17 +41963,99 @@ pub mod __buffa {
                     use serde::ser::SerializeMap;
                     let mut map = s.serialize_map(Some(1))?;
                     match self {
-                        Self::MarketMaxSlippageTicks(v) => {
+                        Self::MaxSlippageTicks(v) => {
                             map.serialize_entry(
-                                "marketMaxSlippageTicks",
+                                "maxSlippageTicks",
                                 &::buffa::json_helpers::ProtoJson(v),
                             )?;
                         }
-                        Self::MarketMaxSlippageBps(v) => {
+                        Self::MaxSlippageBps(v) => {
                             map.serialize_entry(
-                                "marketMaxSlippageBps",
+                                "maxSlippageBps",
                                 &::buffa::json_helpers::ProtoJson(v),
                             )?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
+        pub mod order_intent {
+            #[allow(unused_imports)]
+            use super::*;
+            /// Required execution behavior. The selected variant exposes only fields that
+            /// can be honored together.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Execution {
+                MarketIoc(::buffa::alloc::boxed::Box<super::super::super::MarketIoc>),
+                LimitGtc(::buffa::alloc::boxed::Box<super::super::super::LimitGtc>),
+                LimitIoc(::buffa::alloc::boxed::Box<super::super::super::LimitIoc>),
+                LimitFok(::buffa::alloc::boxed::Box<super::super::super::LimitFok>),
+            }
+            impl ::buffa::Oneof for Execution {}
+            impl From<super::super::super::MarketIoc> for Execution {
+                fn from(v: super::super::super::MarketIoc) -> Self {
+                    Self::MarketIoc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::MarketIoc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::MarketIoc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::LimitGtc> for Execution {
+                fn from(v: super::super::super::LimitGtc) -> Self {
+                    Self::LimitGtc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::LimitGtc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::LimitGtc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::LimitIoc> for Execution {
+                fn from(v: super::super::super::LimitIoc) -> Self {
+                    Self::LimitIoc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::LimitIoc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::LimitIoc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::LimitFok> for Execution {
+                fn from(v: super::super::super::LimitFok) -> Self {
+                    Self::LimitFok(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::LimitFok>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::LimitFok) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl serde::Serialize for Execution {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::MarketIoc(v) => {
+                            map.serialize_entry("marketIoc", v)?;
+                        }
+                        Self::LimitGtc(v) => {
+                            map.serialize_entry("limitGtc", v)?;
+                        }
+                        Self::LimitIoc(v) => {
+                            map.serialize_entry("limitIoc", v)?;
+                        }
+                        Self::LimitFok(v) => {
+                            map.serialize_entry("limitFok", v)?;
                         }
                     }
                     map.end()
@@ -37182,6 +42087,58 @@ pub mod __buffa {
                         }
                         Self::ClientOrderId(v) => {
                             map.serialize_entry("clientOrderId", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
+        pub mod risk_execution {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Execution {
+                MarketIoc(
+                    ::buffa::alloc::boxed::Box<super::super::super::RiskMarketIoc>,
+                ),
+                LimitGtc(::buffa::alloc::boxed::Box<super::super::super::RiskLimitGtc>),
+            }
+            impl ::buffa::Oneof for Execution {}
+            impl From<super::super::super::RiskMarketIoc> for Execution {
+                fn from(v: super::super::super::RiskMarketIoc) -> Self {
+                    Self::MarketIoc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::RiskMarketIoc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::RiskMarketIoc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::RiskLimitGtc> for Execution {
+                fn from(v: super::super::super::RiskLimitGtc) -> Self {
+                    Self::LimitGtc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::RiskLimitGtc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::RiskLimitGtc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl serde::Serialize for Execution {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::MarketIoc(v) => {
+                            map.serialize_entry("marketIoc", v)?;
+                        }
+                        Self::LimitGtc(v) => {
+                            map.serialize_entry("limitGtc", v)?;
                         }
                     }
                     map.end()
@@ -37313,6 +42270,61 @@ pub mod __buffa {
                 }
             }
         }
+        pub mod batch_create_result_item {
+            #[allow(unused_imports)]
+            use super::*;
+            /// Accepted or rejected outcome.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Outcome {
+                Accepted(
+                    ::buffa::alloc::boxed::Box<super::super::super::BatchCreateAccepted>,
+                ),
+                Rejected(
+                    ::buffa::alloc::boxed::Box<super::super::super::BatchCreateRejected>,
+                ),
+            }
+            impl ::buffa::Oneof for Outcome {}
+            impl From<super::super::super::BatchCreateAccepted> for Outcome {
+                fn from(v: super::super::super::BatchCreateAccepted) -> Self {
+                    Self::Accepted(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::BatchCreateAccepted>
+            for ::core::option::Option<Outcome> {
+                fn from(v: super::super::super::BatchCreateAccepted) -> Self {
+                    Self::Some(Outcome::from(v))
+                }
+            }
+            impl From<super::super::super::BatchCreateRejected> for Outcome {
+                fn from(v: super::super::super::BatchCreateRejected) -> Self {
+                    Self::Rejected(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::BatchCreateRejected>
+            for ::core::option::Option<Outcome> {
+                fn from(v: super::super::super::BatchCreateRejected) -> Self {
+                    Self::Some(Outcome::from(v))
+                }
+            }
+            impl serde::Serialize for Outcome {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::Accepted(v) => {
+                            map.serialize_entry("accepted", v)?;
+                        }
+                        Self::Rejected(v) => {
+                            map.serialize_entry("rejected", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
         pub mod modify_order_request {
             #[allow(unused_imports)]
             use super::*;
@@ -37411,11 +42423,20 @@ pub mod __buffa {
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
+        reg.register_json_any(super::__MARKET_IOC_JSON_ANY);
+        reg.register_json_any(super::__LIMIT_GTC_JSON_ANY);
+        reg.register_json_any(super::__LIMIT_IOC_JSON_ANY);
+        reg.register_json_any(super::__LIMIT_FOK_JSON_ANY);
+        reg.register_json_any(super::__ORDER_INTENT_JSON_ANY);
         reg.register_json_any(super::__CREATE_ORDER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_ORDER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ORDER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ORDER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__FIELD_VIOLATION_JSON_ANY);
         reg.register_json_any(super::__ERROR_DETAIL_JSON_ANY);
+        reg.register_json_any(super::__RISK_MARKET_IOC_JSON_ANY);
+        reg.register_json_any(super::__RISK_LIMIT_GTC_JSON_ANY);
+        reg.register_json_any(super::__RISK_EXECUTION_JSON_ANY);
         reg.register_json_any(super::__TAKE_PROFIT_POLICY_JSON_ANY);
         reg.register_json_any(super::__STOP_LOSS_POLICY_JSON_ANY);
         reg.register_json_any(super::__TRAILING_STOP_POLICY_JSON_ANY);
@@ -37424,6 +42445,8 @@ pub mod __buffa {
         reg.register_json_any(super::__CANCEL_ALL_ORDERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ALL_AFTER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ALL_AFTER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__BATCH_CREATE_ACCEPTED_JSON_ANY);
+        reg.register_json_any(super::__BATCH_CREATE_REJECTED_JSON_ANY);
         reg.register_json_any(super::__BATCH_CREATE_RESULT_ITEM_JSON_ANY);
         reg.register_json_any(super::__BATCH_CREATE_ORDERS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__BATCH_CREATE_ORDERS_RESPONSE_JSON_ANY);
@@ -37457,6 +42480,26 @@ pub mod __buffa {
     }
 }
 #[doc(inline)]
+pub use self::__buffa::view::MarketIocView;
+#[doc(inline)]
+pub use self::__buffa::view::MarketIocOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LimitGtcView;
+#[doc(inline)]
+pub use self::__buffa::view::LimitGtcOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LimitIocView;
+#[doc(inline)]
+pub use self::__buffa::view::LimitIocOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LimitFokView;
+#[doc(inline)]
+pub use self::__buffa::view::LimitFokOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::OrderIntentView;
+#[doc(inline)]
+pub use self::__buffa::view::OrderIntentOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::CreateOrderRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateOrderRequestOwnedView;
@@ -37473,9 +42516,25 @@ pub use self::__buffa::view::CancelOrderResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CancelOrderResponseOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::FieldViolationView;
+#[doc(inline)]
+pub use self::__buffa::view::FieldViolationOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::ErrorDetailView;
 #[doc(inline)]
 pub use self::__buffa::view::ErrorDetailOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RiskMarketIocView;
+#[doc(inline)]
+pub use self::__buffa::view::RiskMarketIocOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RiskLimitGtcView;
+#[doc(inline)]
+pub use self::__buffa::view::RiskLimitGtcOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RiskExecutionView;
+#[doc(inline)]
+pub use self::__buffa::view::RiskExecutionOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::TakeProfitPolicyView;
 #[doc(inline)]
@@ -37508,6 +42567,14 @@ pub use self::__buffa::view::CancelAllAfterRequestOwnedView;
 pub use self::__buffa::view::CancelAllAfterResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CancelAllAfterResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCreateAcceptedView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCreateAcceptedOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCreateRejectedView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCreateRejectedOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::BatchCreateResultItemView;
 #[doc(inline)]

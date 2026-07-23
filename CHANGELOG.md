@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Breaking
+- Order and trigger create now map onto the POLY-3701 execution variants. `CreateOrderRequest`/`BatchCreateOrdersRequest` carry `OrderIntent`s; `CreateTriggerRequest` carries a `TriggerIntent` with a strategy oneof. The flat public `CreateOrderParams` / `CreateTriggerParams` APIs are unchanged.
+- `OrdersService::batch_create` drops the `allow_partial` argument (removed from the wire).
+- Invalid `post_only` combinations are rejected: `post_only` is only honored on GTC limit orders/triggers (market, IOC, and FOK reject it).
+- Ladder triggers only support the `linear` distribution; any other value is rejected.
+- Trailing-stop triggers require `trailing_distance_ticks` or `trailing_distance_bps` and are always an implicit SELL market-IOC strategy (`side`/`order_type`/`time_in_force`/`post_only` are ignored).
+- Attached-risk TP/SL legs no longer carry `trigger_price_source` on the wire; the child execution (`market`/`limit` + `limit_price`) is derived from a `RiskExecution`. `TrailingStopPolicy` drops `trigger_price_source`/`order_type`.
+- `Trigger` read model now exposes full proto fields (order params, timestamps, detail blocks, `post_only`, `parent_order_id`, child order ids), projected from the `configuration` + `runtime_details` oneofs
+- `Order` read model adds `post_only` and `attached_risk`
+- `TriggersService::list_with` accepts validated `ListTriggersOpts.status` labels (`created`/`armed`/`running`/`completed`/`cancelled`/`failed`/`paused`)
+
+### Fixed
+- `orders.get_with` / list with `include_attached_risk` now returns policy data on `Order.attached_risk`
+- `CreateOrderResponse` / `CreateTriggerResponse` / batch-create items no longer carry a status field; admission acks synthesize `"accepted"` and batch items decode the `accepted`/`rejected` outcome oneof
+
 ## 0.1.0a6
 
 Package version: `0.1.0-alpha.6`. Git tag: `v0.1.0a6`.
