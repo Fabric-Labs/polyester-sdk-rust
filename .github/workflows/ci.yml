@@ -17,7 +17,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          # Branch tip on main so the optional capability commit can push; PRs stay detached.
+          ref: ${{ github.event_name == 'push' && github.ref_name || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Rust toolchain
@@ -35,11 +36,13 @@ jobs:
             exit 1
           fi
 
+      # Capability artifacts: refresh + optional bot commit only on main (never on PRs).
       - name: Refresh SDK capability artifacts
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: python3 scripts/check_sdk_coverage.py --write-capabilities
 
       - name: Commit capability artifacts if changed
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
