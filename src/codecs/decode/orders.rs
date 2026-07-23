@@ -393,8 +393,8 @@ mod tests {
         use crate::models::{CreateOrderType, TrailingDistance};
         use crate::proto::orders::v1::{
             AttachedRisk as ProtoAttachedRisk, AttachedRiskTakeProfit, AttachedRiskTrailingStop,
-            RiskExecution, RiskLimitGtc, RiskMarketIoc, TakeProfitPolicy, TrailingStopPolicy,
-            risk_execution, trailing_stop_policy,
+            RiskExecution, RiskLimitGtc, TakeProfitPolicy, TrailingStopPolicy, risk_execution,
+            trailing_stop_policy,
         };
 
         let msg = ProtoOrder {
@@ -406,9 +406,7 @@ mod tests {
                     policy: TakeProfitPolicy {
                         trigger_price_ticks: 6000,
                         child: RiskExecution {
-                            execution: Some(risk_execution::Execution::MarketIoc(Box::new(
-                                RiskMarketIoc::default(),
-                            ))),
+                            execution: Some(risk_execution::Execution::MarketIoc(Box::default())),
                             ..Default::default()
                         }
                         .into(),
