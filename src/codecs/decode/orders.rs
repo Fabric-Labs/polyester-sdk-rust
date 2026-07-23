@@ -14,11 +14,11 @@ use crate::models::{
 };
 use crate::proto::orders::v1::{
     AttachedRisk as ProtoAttachedRisk, BatchCancelOrdersResponse, BatchCreateOrdersResponse,
-    BatchModifyOrdersResponse, CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse,
-    CreateOrderResponse, GetOpenOrdersResponse, GetOrderHistoryResponse, GetOrderResponse,
-    GetUserTradesResponse, ModifyOrderResponse, Order as ProtoOrder, RiskExecution, StopLossPolicy,
-    TakeProfitPolicy, TrailingStopPolicy, UserTrade as ProtoUserTrade, batch_create_result_item,
-    risk_execution, trailing_stop_policy,
+    BatchModifyOrdersResponse, CancelAllAfterResponse, CancelAllOrdersResponse,
+    CancelOrderResponse, CreateOrderResponse, GetOpenOrdersResponse, GetOrderHistoryResponse,
+    GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse, Order as ProtoOrder,
+    RiskExecution, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy,
+    UserTrade as ProtoUserTrade, batch_create_result_item, risk_execution, trailing_stop_policy,
 };
 use buffa::Enumeration;
 
@@ -104,7 +104,9 @@ fn trailing_stop_from_policy(policy: &TrailingStopPolicy) -> TrailingStop {
         None => TrailingDistance::Ticks(0),
     };
     let max_slippage = match policy.max_slippage.as_ref() {
-        Some(trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)) => Some(MaxSlippage::Ticks(*v)),
+        Some(trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)) => {
+            Some(MaxSlippage::Ticks(*v))
+        }
         Some(trailing_stop_policy::MaxSlippage::MaxSlippageBps(v)) => Some(MaxSlippage::Bps(*v)),
         None => None,
     };
@@ -447,11 +449,11 @@ mod tests {
         assert!(risk.stop_loss.is_none());
         let trailing = risk.trailing_stop.expect("trailing_stop");
         assert_eq!(trailing.distance, TrailingDistance::Bps(25));
-        assert_eq!(trailing.max_slippage, Some(crate::models::MaxSlippage::Ticks(10)));
         assert_eq!(
-            trailing.activation_price.as_ref().unwrap().as_ticks(),
-            5500
+            trailing.max_slippage,
+            Some(crate::models::MaxSlippage::Ticks(10))
         );
+        assert_eq!(trailing.activation_price.as_ref().unwrap().as_ticks(), 5500);
         assert!(trailing.trigger_price_source.is_none());
         assert!(trailing.order_type.is_none());
 
