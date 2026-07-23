@@ -8,7 +8,6 @@ use crate::models::{
     TriggerMutationResult, TriggerStopDetails, TriggerTrailingDetails, TriggerTwapDetails,
     TriggersList,
 };
-use crate::types::Price;
 use crate::proto::orders::v1::{
     FeeSource, SelfTradePreventionMode, TriggerDirection, TriggerPriceSource,
 };
@@ -19,6 +18,7 @@ use crate::proto::triggers::v1::{
     TriggerEvent as ProtoTriggerEvent, TriggerStatus, conditional_child_execution, trigger,
     twap_trigger,
 };
+use crate::types::Price;
 use buffa::Enumeration;
 use buffa_types::google::protobuf::Timestamp;
 
@@ -116,11 +116,13 @@ fn trigger_details_from_proto(
     symbol_id_opt: Option<u32>,
 ) -> Option<TriggerDetails> {
     match msg.runtime_details.as_ref() {
-        Some(trigger::RuntimeDetails::Stop(stop)) => Some(TriggerDetails::Stop(TriggerStopDetails {
-            trigger_price: decode_price_ticks(stop.trigger_price_ticks, symbol.clone()),
-            trigger_price_source: trigger_price_source_label(stop.trigger_price_source),
-            trigger_direction: trigger_direction_label(stop.trigger_direction),
-        })),
+        Some(trigger::RuntimeDetails::Stop(stop)) => {
+            Some(TriggerDetails::Stop(TriggerStopDetails {
+                trigger_price: decode_price_ticks(stop.trigger_price_ticks, symbol.clone()),
+                trigger_price_source: trigger_price_source_label(stop.trigger_price_source),
+                trigger_direction: trigger_direction_label(stop.trigger_direction),
+            }))
+        }
         Some(trigger::RuntimeDetails::Trailing(trailing)) => {
             Some(TriggerDetails::Trailing(TriggerTrailingDetails {
                 trailing_distance: if trailing.trailing_distance_ticks > 0 {
@@ -455,22 +457,24 @@ mod tests {
             status: TriggerStatus::StatusArmed.into(),
             qty_scaled: 100,
             client_trigger_id: "cid".into(),
-            configuration: Some(trigger::Configuration::StopLoss(Box::new(ConditionalTrigger {
-                trigger_price_ticks: 5000,
-                side: Side::Buy.into(),
-                child: ConditionalChildExecution {
-                    execution: Some(conditional_child_execution::Execution::LimitGtc(Box::new(
-                        TriggerLimitGtc {
-                            price_ticks: 4990,
-                            post_only: true,
-                            ..Default::default()
-                        },
-                    ))),
+            configuration: Some(trigger::Configuration::StopLoss(Box::new(
+                ConditionalTrigger {
+                    trigger_price_ticks: 5000,
+                    side: Side::Buy.into(),
+                    child: ConditionalChildExecution {
+                        execution: Some(conditional_child_execution::Execution::LimitGtc(
+                            Box::new(TriggerLimitGtc {
+                                price_ticks: 4990,
+                                post_only: true,
+                                ..Default::default()
+                            }),
+                        )),
+                        ..Default::default()
+                    }
+                    .into(),
                     ..Default::default()
-                }
-                .into(),
-                ..Default::default()
-            }))),
+                },
+            ))),
             runtime_details: Some(trigger::RuntimeDetails::Stop(Box::new(StopDetails {
                 trigger_price_ticks: 5000,
                 ..Default::default()

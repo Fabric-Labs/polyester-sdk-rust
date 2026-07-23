@@ -147,9 +147,8 @@ impl TriggersService {
                 // order_type, tif, and post_only are ignored.
                 let mut trailing = TrailingStopTrigger::default();
                 if let Some(ticks) = params.trailing_distance_ticks {
-                    trailing.trailing_distance = Some(
-                        trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(ticks),
-                    );
+                    trailing.trailing_distance =
+                        Some(trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(ticks));
                 } else if let Some(bps) = params.trailing_distance_bps {
                     trailing.trailing_distance =
                         Some(trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(bps));
@@ -235,9 +234,7 @@ impl TriggersService {
 
     /// Map flat (`order_type`, `time_in_force`, `limit_price`, `post_only`) params
     /// onto a stop-loss / take-profit child execution variant.
-    fn encode_conditional_child(
-        params: &CreateTriggerParams,
-    ) -> Result<ConditionalChildExecution> {
+    fn encode_conditional_child(params: &CreateTriggerParams) -> Result<ConditionalChildExecution> {
         let execution = match params.order_type {
             CreateOrderType::Market => conditional_child_execution::Execution::MarketIoc(Box::new(
                 TriggerMarketIoc::default(),
@@ -250,16 +247,20 @@ impl TriggersService {
                 let price_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
                 match params.time_in_force {
                     Some(CreateTimeInForce::Ioc) => {
-                        conditional_child_execution::Execution::LimitIoc(Box::new(TriggerLimitIoc {
-                            price_ticks,
-                            ..Default::default()
-                        }))
+                        conditional_child_execution::Execution::LimitIoc(Box::new(
+                            TriggerLimitIoc {
+                                price_ticks,
+                                ..Default::default()
+                            },
+                        ))
                     }
                     Some(CreateTimeInForce::Fok) => {
-                        conditional_child_execution::Execution::LimitFok(Box::new(TriggerLimitFok {
-                            price_ticks,
-                            ..Default::default()
-                        }))
+                        conditional_child_execution::Execution::LimitFok(Box::new(
+                            TriggerLimitFok {
+                                price_ticks,
+                                ..Default::default()
+                            },
+                        ))
                     }
                     // gtc or unspecified
                     _ => conditional_child_execution::Execution::LimitGtc(Box::new(
