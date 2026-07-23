@@ -6,17 +6,21 @@ use super::enums::{
 use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
-    BatchCancelOrdersResult, BatchCancelResultItem, BatchCreateOrdersResult, BatchCreateResultItem,
-    BatchModifyOrdersResult, BatchModifyResultItem, CancelAllAfterResult, CancelAllOrdersResult,
-    GetOrderResult, ModifyOrderResult, Order, OrderMutationResult, OrdersList, UserTrade,
+    AttachedRisk, BatchCancelOrdersResult, BatchCancelResultItem, BatchCreateOrdersResult,
+    BatchCreateResultItem, BatchModifyOrdersResult, BatchModifyResultItem, CancelAllAfterResult,
+    CancelAllOrdersResult, CreateOrderType, GetOrderResult, MaxSlippage, ModifyOrderResult, Order,
+    OrderMutationResult, OrdersList, RiskLeg, TrailingDistance, TrailingStop, UserTrade,
     UserTradesList,
 };
 use crate::proto::orders::v1::{
-    BatchCancelOrdersResponse, BatchCreateOrdersResponse, BatchModifyOrdersResponse,
-    CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse, CreateOrderResponse,
-    GetOpenOrdersResponse, GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse,
-    ModifyOrderResponse, Order as ProtoOrder, UserTrade as ProtoUserTrade,
+    AttachedRisk as ProtoAttachedRisk, BatchCancelOrdersResponse, BatchCreateOrdersResponse,
+    BatchModifyOrdersResponse, CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse,
+    CreateOrderResponse, GetOpenOrdersResponse, GetOrderHistoryResponse, GetOrderResponse,
+    GetUserTradesResponse, ModifyOrderResponse, Order as ProtoOrder, RiskExecution, StopLossPolicy,
+    TakeProfitPolicy, TrailingStopPolicy, UserTrade as ProtoUserTrade, batch_create_result_item,
+    risk_execution, trailing_stop_policy,
 };
+use buffa::Enumeration;
 
 pub fn order_from_proto(msg: &ProtoOrder) -> Order {
     let symbol_id = msg.symbol_id;
@@ -44,7 +48,107 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Order {
             msg.created_ts_ns.to_string()
         },
         version: msg.version,
+        post_only: msg.post_only,
+        attached_risk: msg
+            .attached_risk
+            .as_option()
+            .and_then(attached_risk_from_proto),
     }
+}
+
+/// Project an attached take-profit/stop-loss policy onto the flat public
+/// [`RiskLeg`]. The child execution determines `order_type`/`limit_price`.
+/// `trigger_price_source` is no longer part of the policy wire and is left empty.
+fn decode_risk_leg(trigger_price_ticks: i64, child: Option<&RiskExecution>) -> Option<RiskLeg> {
+    if trigger_price_ticks == 0 {
+        return None;
+    }
+    let mut order_type = None;
+    let mut limit_price = None;
+    if let Some(child) = child {
+        match child.execution.as_ref() {
+            Some(risk_execution::Execution::MarketIoc(_)) => {
+                order_type = Some(CreateOrderType::Market);
+            }
+            Some(risk_execution::Execution::LimitGtc(limit)) => {
+                order_type = Some(CreateOrderType::Limit);
+                limit_price = decode_price_ticks(limit.price_ticks, None);
+            }
+            None => {}
+        }
+    }
+    Some(RiskLeg {
+        trigger_price: decode_price_ticks(trigger_price_ticks, None)?,
+        trigger_price_source: None,
+        order_type,
+        limit_price,
+    })
+}
+
+fn risk_leg_from_take_profit(policy: &TakeProfitPolicy) -> Option<RiskLeg> {
+    decode_risk_leg(policy.trigger_price_ticks, policy.child.as_option())
+}
+
+fn risk_leg_from_stop_loss(policy: &StopLossPolicy) -> Option<RiskLeg> {
+    decode_risk_leg(policy.trigger_price_ticks, policy.child.as_option())
+}
+
+fn trailing_stop_from_policy(policy: &TrailingStopPolicy) -> TrailingStop {
+    let distance = match policy.trailing_distance.as_ref() {
+        Some(trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(v)) => {
+            TrailingDistance::Ticks(*v)
+        }
+        Some(trailing_stop_policy::TrailingDistance::TrailingDistanceBps(v)) => {
+            TrailingDistance::Bps(*v)
+        }
+        None => TrailingDistance::Ticks(0),
+    };
+    let max_slippage = match policy.max_slippage.as_ref() {
+        Some(trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)) => Some(MaxSlippage::Ticks(*v)),
+        Some(trailing_stop_policy::MaxSlippage::MaxSlippageBps(v)) => Some(MaxSlippage::Bps(*v)),
+        None => None,
+    };
+    TrailingStop {
+        distance,
+        activation_price: if policy.activation_price_ticks > 0 {
+            decode_price_ticks(policy.activation_price_ticks, None)
+        } else {
+            None
+        },
+        // `trigger_price_source`/`order_type` were dropped from the trailing-stop
+        // policy wire; the child is an implicit market execution.
+        trigger_price_source: None,
+        order_type: None,
+        max_slippage,
+    }
+}
+
+fn attached_risk_from_proto(msg: &ProtoAttachedRisk) -> Option<AttachedRisk> {
+    let take_profit = msg
+        .take_profit
+        .as_option()
+        .and_then(|leg| leg.policy.as_option().and_then(risk_leg_from_take_profit));
+    let trailing_stop = msg
+        .trailing_stop
+        .as_option()
+        .and_then(|leg| leg.policy.as_option().map(trailing_stop_from_policy));
+    // Match TS: when trailing is present, stop-loss is suppressed.
+    let stop_loss = if trailing_stop.is_some() {
+        None
+    } else {
+        msg.stop_loss
+            .as_option()
+            .and_then(|leg| leg.policy.as_option().and_then(risk_leg_from_stop_loss))
+    };
+    if take_profit.is_none() && stop_loss.is_none() && trailing_stop.is_none() {
+        return None;
+    }
+    Some(AttachedRisk {
+        take_profit,
+        stop_loss,
+        trailing_stop,
+        oco: msg.oco,
+    })
 }
 
 pub fn orders_list_from_open(msg: &GetOpenOrdersResponse) -> OrdersList {
@@ -107,8 +211,10 @@ pub fn get_order_from_proto(msg: &GetOrderResponse) -> GetOrderResult {
     GetOrderResult { order, trades }
 }
 
+/// `CreateOrderResponse` acknowledges admission only and no longer carries a
+/// status field; synthesize `"accepted"`.
 pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> OrderMutationResult {
-    order_mutation(&msg.status, msg.order_id, &msg.client_order_id)
+    order_mutation("accepted", msg.order_id, &msg.client_order_id)
 }
 
 pub fn order_mutation_from_cancel(msg: &CancelOrderResponse) -> OrderMutationResult {
@@ -152,16 +258,38 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> CancelAllOrdersRe
     }
 }
 
+/// Per-item results now carry an `Accepted`/`Rejected` outcome oneof instead of
+/// flat status/order_id/code fields.
 pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> BatchCreateOrdersResult {
     BatchCreateOrdersResult {
         results: msg
             .results
             .iter()
-            .map(|item| BatchCreateResultItem {
-                status: item.status.clone(),
-                order_id: format_uint64_id(item.order_id),
-                client_order_id: item.client_order_id.clone(),
-                code: item.code.clone(),
+            .map(|item| {
+                let mut out = BatchCreateResultItem {
+                    status: String::new(),
+                    order_id: String::new(),
+                    client_order_id: item.client_order_id.clone(),
+                    code: String::new(),
+                };
+                match item.outcome.as_ref() {
+                    Some(batch_create_result_item::Outcome::Accepted(accepted)) => {
+                        out.status = "accepted".to_owned();
+                        out.order_id = format_uint64_id(accepted.order_id);
+                    }
+                    Some(batch_create_result_item::Outcome::Rejected(rejected)) => {
+                        out.status = "rejected".to_owned();
+                        if let Some(err) = rejected.error.as_option() {
+                            out.code = err
+                                .code
+                                .as_known()
+                                .map(|c| c.proto_name().to_owned())
+                                .unwrap_or_default();
+                        }
+                    }
+                    None => {}
+                }
+                out
             })
             .collect(),
         accepted_count: msg.accepted_count as i32,
@@ -240,6 +368,7 @@ mod tests {
             price_ticks: 5000,
             avg_price_ticks: 4990,
             created_ts_ns: 1_700_000_000_000,
+            post_only: true,
             ..Default::default()
         };
         let order = order_from_proto(&msg);
@@ -248,11 +377,121 @@ mod tests {
         assert_eq!(order.status, "working");
         assert_eq!(order.order_type, "limit");
         assert_eq!(order.tif, "gtc");
+        assert!(order.post_only);
+        assert!(order.attached_risk.is_none());
         assert_eq!(order.orig_qty.as_ref().unwrap().as_scaled(), 100);
         let mut msg2 = msg;
         msg2.version = 7;
         let order2 = order_from_proto(&msg2);
         assert_eq!(order2.version, 7);
+    }
+
+    #[test]
+    fn order_from_proto_maps_attached_risk_policy() {
+        use crate::models::{CreateOrderType, TrailingDistance};
+        use crate::proto::orders::v1::{
+            AttachedRisk as ProtoAttachedRisk, AttachedRiskTakeProfit, AttachedRiskTrailingStop,
+            RiskExecution, RiskLimitGtc, RiskMarketIoc, TakeProfitPolicy, TrailingStopPolicy,
+            risk_execution, trailing_stop_policy,
+        };
+
+        let msg = ProtoOrder {
+            order_id: 1,
+            symbol_id: 1,
+            post_only: false,
+            attached_risk: ProtoAttachedRisk {
+                take_profit: AttachedRiskTakeProfit {
+                    policy: TakeProfitPolicy {
+                        trigger_price_ticks: 6000,
+                        child: RiskExecution {
+                            execution: Some(risk_execution::Execution::MarketIoc(Box::new(
+                                RiskMarketIoc::default(),
+                            ))),
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                trailing_stop: AttachedRiskTrailingStop {
+                    policy: TrailingStopPolicy {
+                        activation_price_ticks: 5500,
+                        trailing_distance: Some(
+                            trailing_stop_policy::TrailingDistance::TrailingDistanceBps(25),
+                        ),
+                        max_slippage: Some(trailing_stop_policy::MaxSlippage::MaxSlippageTicks(10)),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                oco: true,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let order = order_from_proto(&msg);
+        let risk = order.attached_risk.expect("attached_risk");
+        assert!(risk.oco);
+        let tp = risk.take_profit.expect("take_profit");
+        assert_eq!(tp.trigger_price.as_ticks(), 6000);
+        // trigger_price_source is no longer carried on the policy wire.
+        assert!(tp.trigger_price_source.is_none());
+        assert_eq!(tp.order_type, Some(CreateOrderType::Market));
+        assert!(tp.limit_price.is_none());
+        assert!(risk.stop_loss.is_none());
+        let trailing = risk.trailing_stop.expect("trailing_stop");
+        assert_eq!(trailing.distance, TrailingDistance::Bps(25));
+        assert_eq!(trailing.max_slippage, Some(crate::models::MaxSlippage::Ticks(10)));
+        assert_eq!(
+            trailing.activation_price.as_ref().unwrap().as_ticks(),
+            5500
+        );
+        assert!(trailing.trigger_price_source.is_none());
+        assert!(trailing.order_type.is_none());
+
+        // A LIMIT stop-loss child projects order_type=limit with its limit price.
+        let sl_msg = ProtoOrder {
+            order_id: 2,
+            symbol_id: 1,
+            attached_risk: ProtoAttachedRisk {
+                stop_loss: crate::proto::orders::v1::AttachedRiskStopLoss {
+                    policy: crate::proto::orders::v1::StopLossPolicy {
+                        trigger_price_ticks: 4900,
+                        child: RiskExecution {
+                            execution: Some(risk_execution::Execution::LimitGtc(Box::new(
+                                RiskLimitGtc {
+                                    price_ticks: 4890,
+                                    ..Default::default()
+                                },
+                            ))),
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let sl = order_from_proto(&sl_msg)
+            .attached_risk
+            .expect("attached_risk")
+            .stop_loss
+            .expect("stop_loss");
+        assert_eq!(sl.trigger_price.as_ticks(), 4900);
+        assert_eq!(sl.order_type, Some(CreateOrderType::Limit));
+        assert_eq!(sl.limit_price.as_ref().unwrap().as_ticks(), 4890);
     }
 
     #[test]
@@ -314,7 +553,6 @@ mod tests {
         assert_eq!(modified.final_order_id, format_uint64_id(11));
 
         let created = order_mutation_from_create(&CreateOrderResponse {
-            status: "accepted".into(),
             order_id: 42,
             client_order_id: "coid-1".into(),
             ..Default::default()
@@ -335,12 +573,18 @@ mod tests {
 
     #[test]
     fn batch_create_from_proto_maps_counts() {
-        use crate::proto::orders::v1::BatchCreateResultItem as ProtoItem;
+        use crate::proto::orders::v1::{
+            BatchCreateAccepted, BatchCreateResultItem as ProtoItem, batch_create_result_item,
+        };
         let msg = BatchCreateOrdersResponse {
             results: vec![ProtoItem {
-                status: "accepted".into(),
-                order_id: 9,
                 client_order_id: "c1".into(),
+                outcome: Some(batch_create_result_item::Outcome::Accepted(Box::new(
+                    BatchCreateAccepted {
+                        order_id: 9,
+                        ..Default::default()
+                    },
+                ))),
                 ..Default::default()
             }],
             accepted_count: 1,
@@ -349,6 +593,8 @@ mod tests {
         };
         let result = batch_create_from_proto(&msg);
         assert_eq!(result.accepted_count, 1);
+        assert_eq!(result.results[0].status, "accepted");
         assert_eq!(result.results[0].order_id, format_uint64_id(9));
+        assert_eq!(result.results[0].client_order_id, "c1");
     }
 }

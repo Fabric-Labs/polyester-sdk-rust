@@ -256,6 +256,19 @@ instrument/domain matches. Transfers and trading withdraws use `AssetAmount`
 Your API key needs a policy that allows trading. Spot orders spend **trading**
 balance (see below).
 
+## Triggers
+
+`triggers.list_with(ListTriggersOpts { status: ... })` filters by lifecycle
+status. Valid values:
+
+`created`, `armed`, `running`, `completed`, `cancelled`, `failed`, `paused`
+
+Unknown values return a validation error (they do not silently return an empty
+list). Response `status` uses the same labels (British spelling `cancelled`).
+
+`orders.get_with(GetOrderOpts { include_attached_risk: true, .. })` returns
+policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
+
 ## Qty / price rules
 
 Public order/trigger write paths take **`Price` / `Quantity` wrappers only**:
