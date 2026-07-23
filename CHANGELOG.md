@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a7
+
+Package version: `0.1.0-alpha.7`. Git tag: `v0.1.0a7`.
+
 ### Breaking
 - Order and trigger create now map onto the POLY-3701 execution variants. `CreateOrderRequest`/`BatchCreateOrdersRequest` carry `OrderIntent`s; `CreateTriggerRequest` carries a `TriggerIntent` with a strategy oneof. The flat public `CreateOrderParams` / `CreateTriggerParams` APIs are unchanged.
 - `OrdersService::batch_create` drops the `allow_partial` argument (removed from the wire).
