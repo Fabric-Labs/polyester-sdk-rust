@@ -24,9 +24,9 @@ use crate::proto::orders::v1::{
     CancelAllOrdersRequest, CancelOrderRequest, CreateOrderRequest, GetOpenOrdersRequest,
     GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, LimitFok, LimitGtc, LimitIoc,
     MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, RiskExecution, RiskLimitGtc,
-    RiskMarketIoc, RiskPolicy, Side, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy,
-    batch_modify_item, cancel_order_request, get_order_request, modify_order_request, order_intent,
-    risk_execution, risk_policy, trailing_stop_policy,
+    RiskPolicy, Side, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy, batch_modify_item,
+    cancel_order_request, get_order_request, modify_order_request, order_intent, risk_execution,
+    risk_policy, trailing_stop_policy,
 };
 use crate::types::{Price, Quantity, resolve_price_ticks, resolve_qty_scaled};
 
@@ -280,9 +280,7 @@ impl OrdersService {
     fn encode_risk_child(leg: &RiskLeg, symbol: Option<&str>) -> Result<RiskExecution> {
         let child_ty = leg.order_type.unwrap_or(CreateOrderType::Market);
         let execution = match (child_ty, leg.limit_price.as_ref()) {
-            (CreateOrderType::Market, None) => {
-                risk_execution::Execution::MarketIoc(Box::new(RiskMarketIoc::default()))
-            }
+            (CreateOrderType::Market, None) => risk_execution::Execution::MarketIoc(Box::default()),
             (CreateOrderType::Market, Some(_)) => {
                 return Err(Error::validation(
                     "attached_risk MARKET child must not set limit_price",

@@ -19,9 +19,9 @@ use crate::proto::triggers::v1::{
     CancelTriggerRequest, ConditionalChildExecution, ConditionalTrigger, CreateTriggerRequest,
     GetTriggerRequest, LadderTrigger, ListTriggerEventsRequest, ListTriggersRequest,
     ModifyTriggerRequest, PauseTriggerRequest, ResumeTriggerRequest, TrailingStopTrigger,
-    TriggerIntent, TriggerLimitFok, TriggerLimitGtc, TriggerLimitIoc, TriggerMarketIoc,
-    TwapLimitGtc, TwapMarketIoc, TwapTrigger, conditional_child_execution, modify_trigger_request,
-    trailing_stop_trigger, trigger_intent, twap_trigger,
+    TriggerIntent, TriggerLimitFok, TriggerLimitGtc, TriggerLimitIoc, TwapLimitGtc, TwapTrigger,
+    conditional_child_execution, modify_trigger_request, trailing_stop_trigger, trigger_intent,
+    twap_trigger,
 };
 use crate::types::{resolve_price_ticks, resolve_qty_scaled};
 
@@ -182,9 +182,7 @@ impl TriggersService {
                     twap.slice_interval_ms = ms;
                 }
                 twap.execution = Some(match params.order_type {
-                    CreateOrderType::Market => {
-                        twap_trigger::Execution::MarketIoc(Box::new(TwapMarketIoc::default()))
-                    }
+                    CreateOrderType::Market => twap_trigger::Execution::MarketIoc(Box::default()),
                     CreateOrderType::Limit => {
                         let price = params.limit_price.as_ref().ok_or_else(|| {
                             Error::validation("twap limit slices require limit_price")
@@ -236,9 +234,9 @@ impl TriggersService {
     /// onto a stop-loss / take-profit child execution variant.
     fn encode_conditional_child(params: &CreateTriggerParams) -> Result<ConditionalChildExecution> {
         let execution = match params.order_type {
-            CreateOrderType::Market => conditional_child_execution::Execution::MarketIoc(Box::new(
-                TriggerMarketIoc::default(),
-            )),
+            CreateOrderType::Market => {
+                conditional_child_execution::Execution::MarketIoc(Box::default())
+            }
             CreateOrderType::Limit => {
                 let price = params
                     .limit_price
