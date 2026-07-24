@@ -3,11 +3,11 @@
 use crate::auth::{self, Credentials};
 use crate::errors::{Error, Result, map_connect_error};
 use buffa::Message;
-use bytes::BytesMut;
 use connectrpc::ConnectError;
 use connectrpc::client::{CallOptions, ClientConfig, HttpClient};
 use connectrpc::rustls;
 use http::Uri;
+use serde::Serialize;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -113,12 +113,18 @@ impl Factory {
         map_connect_error(err)
     }
 
-    /// Build CallOptions with API-key signatures for the exact protobuf body bytes.
-    pub fn sign_options<M: Message>(&self, procedure: &str, request: &M) -> Result<CallOptions> {
+    /// Build `CallOptions` with API-key signatures over the exact bytes that
+    /// Connect will send for the configured wire format.
+    pub fn sign_options<M: Message + Serialize>(
+        &self,
+        procedure: &str,
+        request: &M,
+    ) -> Result<CallOptions> {
         let creds = self.require_credentials()?;
-        let mut buf = BytesMut::new();
-        request.encode(&mut buf);
-        let body = buf.freeze();
+        let body = match self.config.wire_format {
+            WireFormat::Binary => request.encode_to_bytes(),
+            WireFormat::Json => connectrpc::JsonCodec::encode(request).map_err(Self::map_error)?,
+        };
         let sign_url = auth::request_url(&self.config.api_url, procedure);
         let headers = creds.sign_request("POST", &sign_url, &body, None);
         let mut opts = CallOptions::default();

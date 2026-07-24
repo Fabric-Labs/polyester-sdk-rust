@@ -50,7 +50,12 @@ pub fn jwt_session_only(err: &Error) -> bool {
 
 pub fn devnet_proto_mismatch(err: &Error) -> bool {
     let msg = err.to_string().to_ascii_lowercase();
-    msg.contains("internal error") || msg.contains("decode") || msg.contains("proto")
+    msg.contains("internal error")
+        || msg.contains("decode")
+        || msg.contains("protobuf")
+        || msg.contains("proto mismatch")
+        || msg.contains("invalid wire type")
+        || msg.contains("failed to deserialize")
 }
 
 pub fn devnet_unavailable(err: &Error) -> bool {
@@ -144,5 +149,19 @@ where
         Err(err) => {
             panic!("{label} failed: {err}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn private_proto_channel_auth_error_is_not_a_proto_mismatch() {
+        let err = Error::auth(
+            "realtime subscription token for private:auth:api-keys:account:proto: \
+             authentication failed",
+        );
+        assert!(!devnet_proto_mismatch(&err));
     }
 }

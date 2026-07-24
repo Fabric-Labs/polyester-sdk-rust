@@ -641,28 +641,24 @@ impl OrderbookService {
             client: self.ctx.realtime.clone(),
             channel,
             decode: Arc::new(crate::codecs::decode::orderbook_delta_from_bytes),
-            fetch_snapshot: {
-                let state = state.clone();
-                Arc::new(move || {
-                    let svc = svc.clone();
-                    let symbol = fetch_symbol.clone();
-                    let state = state.clone();
-                    Box::pin(async move {
-                        let snap = svc.get(&symbol, Some(ws_depth)).await?;
-                        let mut s = state.lock().expect("book lock");
-                        s.bids = levels_from_orderbook_side(&snap.bids);
-                        s.asks = levels_from_orderbook_side(&snap.asks);
-                        s.book_seq = snap.book_seq.parse().unwrap_or(0);
-                        Ok(snap)
-                    })
-                })
-            },
+            fetch_snapshot: Arc::new(move || {
+                let svc = svc.clone();
+                let symbol = fetch_symbol.clone();
+                Box::pin(async move { svc.get(&symbol, Some(ws_depth)).await })
+            }),
             read_publication: Arc::new(|delta: OrderBookDeltaUpdate| vec![delta]),
             apply_snapshot: {
+                let state = state.clone();
                 let handle_delta = handle_delta.clone();
                 let emit = emit.clone();
                 Arc::new(
-                    move |_snapshot: OrderbookData, buffered: Vec<OrderBookDeltaUpdate>| {
+                    move |snapshot: OrderbookData, buffered: Vec<OrderBookDeltaUpdate>| {
+                        {
+                            let mut s = state.lock().expect("book lock");
+                            s.bids = levels_from_orderbook_side(&snapshot.bids);
+                            s.asks = levels_from_orderbook_side(&snapshot.asks);
+                            s.book_seq = snapshot.book_seq.parse().unwrap_or(0);
+                        }
                         for delta in buffered {
                             handle_delta(delta);
                         }

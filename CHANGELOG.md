@@ -23,9 +23,21 @@
 - Unit coverage for MFA auth-code mapping and predicates
 - Unit coverage for API/subaccount policy realtime protobuf decode
 - Private realtime mutation publish tests dropped (mutations are session-only); subscribe-connect coverage retained
+- Live integration coverage now rejects private-channel authentication failures instead of treating an idle or failed background task as a successful subscription
+- Remove duplicate funded transfer coverage that could submit the same configured transfer twice in a full test run
 
 ### Changed
 - CI no longer auto-commits `sdk-capabilities.json` / README on pull requests. Capability refresh + optional bot commit runs only on merge to `main`.
+- Realtime subscribe methods wait for the initial websocket handshake and retain background reconnect errors for inspection through `err()` / `take_err()`
+
+### Fixed
+- Sign API-key requests over the actual JSON body when `WireFormat::Json` is configured, instead of always signing protobuf bytes
+- Canonical query / realtime subscription URL encoding now preserves RFC 3986 unreserved characters (`-` `_` `.` `~`). Previously `NON_ALPHANUMERIC` escaped hyphens as `%2D`, which produced `SIGNATURE_INVALID` on private channels such as `api-keys` and `api-policies`
+- Direct realtime queues fail closed with `Error::QueueOverflow`; a zero queue setting is clamped to one
+- Snapshot-then-stream subscribes before fetching its snapshot, can retry a transient snapshot failure, applies only current-generation orderbook snapshots, and fails closed if its recovery buffer overflows
+- Conditional triggers reject `post_only` for market, IOC, and FOK child executions
+- `Credentials::new` rejects an empty API key ID
+- Correct the capability label: API-key auth uses Ed25519 signatures, not HMAC
 
 ## 0.1.0a7
 

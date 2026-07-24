@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "sdk": "rust",
-  "generatedAt": "2026-07-24T16:30:00Z",
+  "generatedAt": "2026-07-24T16:36:26Z",
   "publicDescriptorSha256": "2e9db62c9ef16ade53a4e9e65aa200cf3799d881d24ec41280c3440101dee653",
   "capabilities": [
     {
@@ -26,7 +26,7 @@
     },
     {
       "id": "api_key_auth",
-      "label": "API-key (Ed25519 HMAC) auth",
+      "label": "API-key (Ed25519 signature) auth",
       "supported": true
     },
     {
