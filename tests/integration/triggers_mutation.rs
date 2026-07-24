@@ -112,8 +112,13 @@ async fn trigger_pause_resume_cancel() {
         eprintln!("skip: no trigger_id from create");
         return;
     }
-    if !created.status.is_empty() && !created.status.to_ascii_lowercase().contains("created") {
-        eprintln!("skip: unexpected create status {}", created.status);
+    if !created.status.is_empty() {
+        let status = created.status.to_ascii_lowercase();
+        assert!(
+            status.contains("accepted") || status.contains("created"),
+            "unexpected create status {}",
+            created.status
+        );
     }
 
     let trigger_id = created.trigger_id.clone();

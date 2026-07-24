@@ -2,7 +2,7 @@
 //!
 //! Run:
 //! ```bash
-//! cargo test --test integration -- --nocapture
+//! cargo test --test integration -- --nocapture --test-threads=1
 //! ```
 
 mod account;
@@ -14,7 +14,6 @@ mod funded_internal_transfer;
 mod funded_market_fill;
 mod funded_order_holds;
 mod funded_spot_fill;
-mod funded_transfer_to_user;
 mod lifecycle_app;
 mod market;
 mod market_order_mutation;

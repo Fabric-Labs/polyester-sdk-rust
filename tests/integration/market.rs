@@ -1,6 +1,8 @@
 use crate::support::{
     call_optional, call_required, hydrate_spot_and_zipper, require_live_client, smoke_symbol,
 };
+use polyester::services::{CreateSubscriptionOptions, MarketOverviewCreateSubscriptionOptions};
+use std::time::Duration;
 
 #[tokio::test]
 async fn spot_config_has_pairs() {
@@ -135,4 +137,61 @@ async fn market_data_get_candles() {
     for candle in &candles.candles {
         let _ = candle;
     }
+}
+
+#[tokio::test]
+async fn managed_market_overview_starts_with_snapshot() {
+    let Some(client) = require_live_client() else {
+        return;
+    };
+    let mut sub = client
+        .market_overview
+        .create_subscription(MarketOverviewCreateSubscriptionOptions {
+            limit: Some(10),
+            ..Default::default()
+        })
+        .await
+        .expect("market overview managed subscribe");
+    let rows = tokio::time::timeout(Duration::from_secs(10), sub.updates().recv())
+        .await
+        .expect("market overview initial snapshot timed out")
+        .expect("market overview subscription closed");
+    assert!(!rows.is_empty(), "expected initial market overview rows");
+    assert!(
+        sub.err().is_none(),
+        "market overview error: {:?}",
+        sub.err()
+    );
+    sub.close();
+}
+
+#[tokio::test]
+async fn managed_orderbook_starts_with_snapshot() {
+    let Some(client) = require_live_client() else {
+        return;
+    };
+    let spot = hydrate_spot_and_zipper(&client)
+        .await
+        .expect("hydrate spot for managed orderbook");
+    let symbol = smoke_symbol(&spot);
+    let mut sub = client
+        .orderbook
+        .create_subscription(CreateSubscriptionOptions {
+            symbol: symbol.clone(),
+            depth: Some(50),
+            ..Default::default()
+        })
+        .await
+        .expect("orderbook managed subscribe");
+    let book = tokio::time::timeout(Duration::from_secs(10), sub.updates().recv())
+        .await
+        .expect("orderbook initial snapshot timed out")
+        .expect("orderbook subscription closed");
+    assert_eq!(book.symbol, symbol);
+    assert!(
+        !book.book_seq.is_empty() || !book.bids.is_empty() || !book.asks.is_empty(),
+        "expected initial orderbook state"
+    );
+    assert!(sub.err().is_none(), "orderbook error: {:?}", sub.err());
+    sub.close();
 }

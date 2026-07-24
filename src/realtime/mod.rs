@@ -10,10 +10,10 @@ use crate::errors::{Error, Result};
 use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
-use tokio::sync::{mpsc, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::time::{Duration, timeout};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
@@ -48,6 +48,14 @@ pub fn try_enqueue<T>(
     }
 }
 
+fn try_send_direct<T>(tx: &mpsc::Sender<T>, item: T, message: &str) -> Result<bool> {
+    match tx.try_send(item) {
+        Ok(()) => Ok(true),
+        Err(mpsc::error::TrySendError::Full(_)) => Err(Error::queue_overflow(message)),
+        Err(mpsc::error::TrySendError::Closed(_)) => Ok(false),
+    }
+}
+
 /// Realtime websocket client.
 #[derive(Clone)]
 pub struct Client {
@@ -68,7 +76,7 @@ impl Client {
             ws_url: ws_url.into(),
             api_url: api_url.into(),
             credentials,
-            max_queue: max_queue.unwrap_or(DEFAULT_QUEUE),
+            max_queue: max_queue.unwrap_or(DEFAULT_QUEUE).max(1),
         }
     }
 
@@ -98,26 +106,42 @@ impl Client {
     }
 
     /// Subscribe to a channel and receive raw Centrifugo JSON frames.
+    ///
+    /// Returns only after the initial websocket handshake and channel
+    /// subscription succeed.
     pub async fn subscribe_raw(&self, channel: &str) -> Result<Subscription> {
         self.validate_channel(channel)?;
 
         let (stop_tx, stop_rx) = watch::channel(false);
         let alive = Arc::new(AtomicBool::new(true));
+        let last_error = Arc::new(Mutex::new(None));
+        let (ready_tx, ready_rx) = oneshot::channel();
         let (tx, rx) = mpsc::channel::<String>(self.max_queue);
 
         let this = self.clone();
         let channel = channel.to_owned();
         let alive_task = alive.clone();
+        let error_task = last_error.clone();
         let task = tokio::spawn(async move {
             let _guard = AliveGuard(alive_task.clone());
+            let mut ready = Some(ready_tx);
             while !*stop_rx.borrow() {
                 match this
-                    .run_raw_subscription_once(&channel, &tx, &stop_rx)
+                    .run_raw_subscription_once(&channel, &tx, &stop_rx, &mut ready)
                     .await
                 {
                     Ok(()) => break,
                     Err(_) if *stop_rx.borrow() => break,
-                    Err(_) => {
+                    Err(err) if matches!(err, Error::QueueOverflow(_)) => {
+                        *error_task.lock().expect("error lock") = Some(err);
+                        break;
+                    }
+                    Err(err) => {
+                        *error_task.lock().expect("error lock") = Some(err.clone());
+                        if let Some(ready) = ready.take() {
+                            let _ = ready.send(Err(err));
+                            break;
+                        }
                         if *stop_rx.borrow() {
                             break;
                         }
@@ -128,16 +152,23 @@ impl Client {
             alive_task.store(false, Ordering::SeqCst);
             drop(tx);
         });
+        ready_rx
+            .await
+            .map_err(|_| Error::realtime("realtime task ended before handshake".to_owned()))??;
 
         Ok(Subscription {
             rx,
             stop: stop_tx,
             alive,
             task,
+            last_error,
         })
     }
 
     /// Subscribe to a protobuf Centrifugo channel and decode publications.
+    ///
+    /// Returns only after the initial websocket handshake and channel
+    /// subscription succeed.
     pub async fn subscribe_proto<T, F>(
         &self,
         channel: &str,
@@ -169,22 +200,41 @@ impl Client {
 
         let (stop_tx, stop_rx) = watch::channel(false);
         let alive = Arc::new(AtomicBool::new(true));
+        let last_error = Arc::new(Mutex::new(None));
+        let (ready_tx, ready_rx) = oneshot::channel();
         let (tx, rx) = mpsc::channel::<T>(self.max_queue);
         let decode = Arc::new(decode);
 
         let this = self.clone();
         let channel = channel.to_owned();
         let alive_task = alive.clone();
+        let error_task = last_error.clone();
         let task = tokio::spawn(async move {
             let _guard = AliveGuard(alive_task.clone());
+            let mut ready = Some(ready_tx);
             while !*stop_rx.borrow() {
                 match this
-                    .run_proto_subscription_once(&channel, decode.as_ref(), &tx, &stop_rx)
+                    .run_proto_subscription_once(
+                        &channel,
+                        decode.as_ref(),
+                        &tx,
+                        &stop_rx,
+                        &mut ready,
+                    )
                     .await
                 {
                     Ok(()) => break,
                     Err(_) if *stop_rx.borrow() => break,
-                    Err(_) => {
+                    Err(err) if matches!(err, Error::QueueOverflow(_)) => {
+                        *error_task.lock().expect("error lock") = Some(err);
+                        break;
+                    }
+                    Err(err) => {
+                        *error_task.lock().expect("error lock") = Some(err.clone());
+                        if let Some(ready) = ready.take() {
+                            let _ = ready.send(Err(err));
+                            break;
+                        }
                         if *stop_rx.borrow() || !auto_reconnect {
                             break;
                         }
@@ -195,12 +245,16 @@ impl Client {
             alive_task.store(false, Ordering::SeqCst);
             drop(tx);
         });
+        ready_rx
+            .await
+            .map_err(|_| Error::realtime("realtime task ended before handshake".to_owned()))??;
 
         Ok(TypedSubscription {
             rx,
             stop: stop_tx,
             alive,
             task,
+            last_error,
         })
     }
 
@@ -238,14 +292,19 @@ impl Client {
         channel: &str,
         tx: &mpsc::Sender<String>,
         stop: &watch::Receiver<bool>,
+        ready: &mut Option<oneshot::Sender<Result<()>>>,
     ) -> Result<()> {
         let url = self.ws_endpoint();
-        let (ws, _) = connect_async(&url)
+        let (ws, _) = timeout(CENTRIFUGO_READ_TIMEOUT, connect_async(&url))
             .await
+            .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
             .map_err(|e| Error::realtime(format!("ws connect: {e}")))?;
         let (mut write, mut read) = ws.split();
         self.handshake_channel(&mut write, &mut read, channel)
             .await?;
+        if let Some(ready) = ready.take() {
+            let _ = ready.send(Ok(()));
+        }
 
         loop {
             if *stop.borrow() {
@@ -268,7 +327,13 @@ impl Client {
                                 .send(Message::Text(reply.into()))
                                 .await
                                 .map_err(|e| Error::realtime(format!("ws send: {e}")))?;
-                        } else if !frame.trim().is_empty() && tx.send(frame).await.is_err() {
+                        } else if !frame.trim().is_empty()
+                            && !try_send_direct(
+                                tx,
+                                frame,
+                                "raw realtime subscription queue full; consumer too slow",
+                            )?
+                        {
                             return Ok(());
                         }
                     }
@@ -293,17 +358,22 @@ impl Client {
         decode: &F,
         tx: &mpsc::Sender<T>,
         stop: &watch::Receiver<bool>,
+        ready: &mut Option<oneshot::Sender<Result<()>>>,
     ) -> Result<()>
     where
         F: Fn(&[u8]) -> Result<T>,
     {
         let url = self.ws_endpoint();
-        let (ws, _) = connect_async(&url)
+        let (ws, _) = timeout(CENTRIFUGO_READ_TIMEOUT, connect_async(&url))
             .await
+            .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
             .map_err(|e| Error::realtime(format!("ws connect: {e}")))?;
         let (mut write, mut read) = ws.split();
         self.handshake_channel(&mut write, &mut read, channel)
             .await?;
+        if let Some(ready) = ready.take() {
+            let _ = ready.send(Ok(()));
+        }
 
         loop {
             if *stop.borrow() {
@@ -331,7 +401,11 @@ impl Client {
                         if let Some(payload) = publication_payload(&frame) {
                             let bytes = payload?;
                             let item = decode(&bytes)?;
-                            if tx.send(item).await.is_err() {
+                            if !try_send_direct(
+                                tx,
+                                item,
+                                "typed realtime subscription queue full; consumer too slow",
+                            )? {
                                 return Ok(());
                             }
                         }
@@ -358,6 +432,7 @@ pub struct Subscription {
     stop: watch::Sender<bool>,
     alive: Arc<AtomicBool>,
     task: tokio::task::JoinHandle<()>,
+    last_error: Arc<Mutex<Option<Error>>>,
 }
 
 impl Subscription {
@@ -368,6 +443,16 @@ impl Subscription {
     /// True while the background websocket task is still running.
     pub fn is_alive(&self) -> bool {
         self.alive.load(Ordering::SeqCst) && !self.task.is_finished()
+    }
+
+    /// Most recent connection or terminal delivery error.
+    pub fn err(&self) -> Option<Error> {
+        self.last_error.lock().expect("error lock").clone()
+    }
+
+    /// Take and clear the most recent background error.
+    pub fn take_err(&self) -> Option<Error> {
+        self.last_error.lock().expect("error lock").take()
     }
 
     pub fn close(&self) {
@@ -387,6 +472,7 @@ pub struct TypedSubscription<T> {
     stop: watch::Sender<bool>,
     alive: Arc<AtomicBool>,
     task: tokio::task::JoinHandle<()>,
+    last_error: Arc<Mutex<Option<Error>>>,
 }
 
 impl<T> TypedSubscription<T> {
@@ -397,6 +483,16 @@ impl<T> TypedSubscription<T> {
     /// True while the background websocket task is still running.
     pub fn is_alive(&self) -> bool {
         self.alive.load(Ordering::SeqCst) && !self.task.is_finished()
+    }
+
+    /// Most recent connection or terminal delivery error.
+    pub fn err(&self) -> Option<Error> {
+        self.last_error.lock().expect("error lock").clone()
+    }
+
+    /// Take and clear the most recent background error.
+    pub fn take_err(&self) -> Option<Error> {
+        self.last_error.lock().expect("error lock").take()
     }
 
     pub fn close(&self) {
@@ -639,6 +735,40 @@ mod tests {
         assert!(rx.try_recv().is_err());
     }
 
+    #[test]
+    fn direct_subscription_queue_fails_closed_on_overflow() {
+        let (tx, mut rx) = mpsc::channel::<u8>(1);
+        assert!(try_send_direct(&tx, 1, "full").unwrap());
+        assert!(matches!(
+            try_send_direct(&tx, 2, "full"),
+            Err(Error::QueueOverflow(_))
+        ));
+        assert_eq!(rx.try_recv().unwrap(), 1);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn realtime_queue_capacity_is_never_zero() {
+        let client = Client::new(
+            "wss://example.invalid",
+            "https://example.invalid",
+            None,
+            Some(0),
+        );
+        assert_eq!(client.max_queue, 1);
+    }
+
+    #[tokio::test]
+    async fn subscribe_surfaces_initial_handshake_failure() {
+        let client = Client::new("not a websocket URL", "", None, None);
+
+        let result =
+            tokio::time::timeout(Duration::from_secs(2), client.subscribe_raw("public:test"))
+                .await
+                .expect("subscribe should not hang");
+        assert!(result.is_err(), "initial handshake error must be returned");
+    }
+
     #[tokio::test]
     async fn dropping_raw_subscription_signals_stop() {
         let (stop, mut stop_rx) = watch::channel(false);
@@ -654,6 +784,7 @@ mod tests {
             stop,
             alive,
             task,
+            last_error: Arc::new(Mutex::new(None)),
         };
 
         drop(subscription);
@@ -681,6 +812,7 @@ mod tests {
             stop,
             alive,
             task,
+            last_error: Arc::new(Mutex::new(None)),
         };
 
         drop(subscription);

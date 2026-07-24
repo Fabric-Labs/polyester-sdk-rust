@@ -16,6 +16,11 @@ async fn wait_private_subscribe_optional<T>(
             // Subscribe + private-channel auth succeeded; idle channel is OK.
         }
     }
+    if !sub.is_alive()
+        && let Some(err) = sub.err()
+    {
+        panic!("{label} realtime connection terminated: {err}");
+    }
     sub.close();
 }
 
