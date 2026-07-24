@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "sdk": "rust",
-  "generatedAt": "2026-07-24T12:40:14Z",
-  "publicDescriptorSha256": "2e9db62c9ef16ade53a4e9e65aa200cf3799d881d24ec41280c3440101dee653",
+  "generatedAt": "2026-07-24T14:24:12Z",
+  "publicDescriptorSha256": "50fc69ce61c3ed15b4787e5a320a4eedf011682cc20964be5ffef9d8089adb54",
   "capabilities": [
     {
       "id": "market_data",
@@ -43,27 +43,27 @@
     },
     {
       "id": "profile",
-      "label": "Profile",
+      "label": "Profile (identity subscribe)",
       "supported": true
     },
     {
       "id": "api_keys",
-      "label": "API keys",
+      "label": "API keys (list/get/subscribe/generate_keypair)",
       "supported": true
     },
     {
       "id": "subaccounts",
-      "label": "Subaccounts (members, invites, activity)",
+      "label": "Subaccounts (reads/subscribe)",
       "supported": true
     },
     {
       "id": "address_book",
-      "label": "Address book",
+      "label": "Address book (reads/subscribe)",
       "supported": true
     },
     {
       "id": "policies",
-      "label": "Policies",
+      "label": "Policies (realtime subscribe)",
       "supported": true
     },
     {
@@ -154,7 +154,7 @@
     {
       "id": "resolve",
       "label": "Account resolve / lookup",
-      "supported": true
+      "supported": false
     }
   ],
   "unmappedWrappedServices": []

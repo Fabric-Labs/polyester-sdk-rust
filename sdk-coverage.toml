@@ -13,3 +13,83 @@ reason = "Wallet login; this SDK authenticates with API-key HMAC credentials."
 [[allowlist]]
 procedure = "/auth.v1.AuthService/LoginWithWallet"
 reason = "Wallet login; this SDK authenticates with API-key HMAC credentials."
+
+[[allowlist]]
+service = "auth.v1.PolicyService"
+reason = "Policy unary RPCs are JWT/session-only; API-key SDK exposes subscribe helpers only."
+
+[[allowlist]]
+service = "auth.v1.ResolveService"
+reason = "Account resolve is JWT/session-only; outside the API-key SDK surface."
+
+[[allowlist]]
+service = "auth.v1.ProfileService"
+reason = "Profile unary RPCs are JWT/session-only; API-key SDK keeps identity subscribe only."
+
+[[allowlist]]
+procedure = "/auth.v1.ApiKeyService/CreateApiKey"
+reason = "API key create/update/delete are JWT/session-only; list/get/subscribe remain."
+
+[[allowlist]]
+procedure = "/auth.v1.ApiKeyService/UpdateApiKey"
+reason = "API key create/update/delete are JWT/session-only; list/get/subscribe remain."
+
+[[allowlist]]
+procedure = "/auth.v1.ApiKeyService/DeleteApiKey"
+reason = "API key create/update/delete are JWT/session-only; list/get/subscribe remain."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/CreateSubaccount"
+reason = "Subaccount mutations and invite/member writes are JWT/session-only."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/UpdateSubaccount"
+reason = "Subaccount mutations and invite/member writes are JWT/session-only."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/SetSubaccountMemberMFARequirement"
+reason = "Subaccount mutations and invite/member writes are JWT/session-only."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/RemoveSubaccountMember"
+reason = "Subaccount mutations and invite/member writes are JWT/session-only."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/UpdateSubaccountMemberRole"
+reason = "Subaccount mutations and invite/member writes are JWT/session-only."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/InviteSubaccountMember"
+reason = "Subaccount mutations and invite/member writes are JWT/session-only."
+
+[[allowlist]]
+procedure = "/auth.v1.SubaccountService/RespondSubaccountInvite"
+reason = "Subaccount mutations and invite/member writes are JWT/session-only."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/CreateAddressBookEntry"
+reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/UpdateAddressBookEntry"
+reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/DeleteAddressBookEntry"
+reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/CopyAddressBookEntry"
+reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/CreateAddressBookTag"
+reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/UpdateAddressBookTag"
+reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
+
+[[allowlist]]
+procedure = "/auth.v1.AddressBookService/DeleteAddressBookTag"
+reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."

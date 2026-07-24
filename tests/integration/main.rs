@@ -21,6 +21,7 @@ mod market_order_mutation;
 mod money;
 mod orders;
 mod orders_mutation;
+mod private_realtime;
 mod realtime;
 mod support;
 mod transfers;
