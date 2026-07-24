@@ -51,6 +51,14 @@ on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Conne
 Rows marked **No** are intentional for API-key SDKs (use the TypeScript
 browser client for wallet login and session MFA).
 
+Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
+still applies. In particular, whiteboard/social-verification and some
+layout/polychart routes may require a JWT session or may not be mounted.
+Subscription-token requests for API-key, policy, subaccount, and address-book
+administration channels may return `401` where those channels are not enabled
+for API-key principals. Normal order, balance, trade, trigger, and transfer
+market-making flows are separate.
+
 Full cross-language comparison:
 [SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
 <!-- sdk-capabilities:end -->
