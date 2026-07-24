@@ -92,8 +92,10 @@ async fn private_subscribe_connects_subaccounts() {
     let Some(()) = require_account_id(&client) else {
         return;
     };
-    let Some(sub) =
-        call_optional("sub_accounts.subscribe", || client.sub_accounts.subscribe(None)).await
+    let Some(sub) = call_optional("sub_accounts.subscribe", || {
+        client.sub_accounts.subscribe(None)
+    })
+    .await
     else {
         return;
     };
@@ -108,8 +110,10 @@ async fn private_subscribe_connects_address_books() {
     let Some(()) = require_account_id(&client) else {
         return;
     };
-    let Some(sub) = call_optional("address_book.subscribe", || client.address_book.subscribe(None))
-        .await
+    let Some(sub) = call_optional("address_book.subscribe", || {
+        client.address_book.subscribe(None)
+    })
+    .await
     else {
         return;
     };
@@ -154,7 +158,8 @@ async fn private_subscribe_connects_trades() {
     let Some(()) = require_account_id(&client) else {
         return;
     };
-    let Some(sub) = call_optional("trades.subscribe", || client.trades.subscribe(None)).await else {
+    let Some(sub) = call_optional("trades.subscribe", || client.trades.subscribe(None)).await
+    else {
         return;
     };
     wait_private_subscribe_optional("trades.subscribe", sub).await;
@@ -183,8 +188,10 @@ async fn private_subscribe_connects_trigger_events() {
     let Some(()) = require_account_id(&client) else {
         return;
     };
-    let Some(sub) =
-        call_optional("triggers.subscribe_events", || client.triggers.subscribe_events(None)).await
+    let Some(sub) = call_optional("triggers.subscribe_events", || {
+        client.triggers.subscribe_events(None)
+    })
+    .await
     else {
         return;
     };
@@ -199,7 +206,8 @@ async fn private_subscribe_connects_orders() {
     let Some(()) = require_account_id(&client) else {
         return;
     };
-    let Some(sub) = call_optional("orders.subscribe", || client.orders.subscribe(None)).await else {
+    let Some(sub) = call_optional("orders.subscribe", || client.orders.subscribe(None)).await
+    else {
         return;
     };
     wait_private_subscribe_optional("orders.subscribe", sub).await;
