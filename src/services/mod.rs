@@ -12,7 +12,7 @@ mod thin;
 mod triggers;
 mod unary;
 
-pub use api_keys::{ApiKeysService, UpdateApiKeyParams};
+pub use api_keys::ApiKeysService;
 pub use auth::AuthService;
 pub use balances::BalancesService;
 pub use deposit_withdraw::{DepositService, WithdrawService, ZipperService};
