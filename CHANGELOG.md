@@ -4,13 +4,25 @@
 
 ### Breaking
 - Stable MFA auth error codes (POLY-2919): `AUTH_API_KEY_MFA_REQUIRED` is removed; use `AUTH_MFA_NOT_ENROLLED`, `AUTH_STEP_UP_REQUIRED`, `AUTH_MFA_ELEVATION_REQUIRED`, and `AUTH_MFA_LAST_FACTOR_REQUIRED` from `AuthErrorDetail`
+- Remove JWT/session-only handwritten wrappers that cannot work with API-key auth:
+  - `PoliciesService`: all unary list/get/create/update/delete/set methods and policy update builders/params (`UpdateApiPolicyParams`, `UpdateSubaccountPolicyParams`, `build_update_*_policy_request`)
+  - `ApiKeysService`: `create` / `update` / `delete` (and `UpdateApiKeyParams` / `build_update_api_key_request`)
+  - `SubAccountsService`: create/update/delete and member/invite mutation helpers (and `UpdateSubaccountParams` / `build_update_subaccount_request`)
+  - `AddressBookService`: entry/tag mutation helpers (and address-book update builders/params)
+  - `ProfileService`: `get` / `update` / `get_username_history` (keep `subscribe_identity`)
+  - `ResolveService` / `Client::resolve` removed entirely
+- Capability matrix: Profile/Policies marked subscribe-only; Account resolve unsupported for this API-key SDK
 
 ### Features
 - `Error::is_mfa_enrollment_required` / `is_step_up_required` / `is_mfa_elevation_required` / `is_mfa_last_factor_required` classify MFA control flow from structured auth codes only (no message heuristics)
 - `errors::auth_codes` constants and public method-option `MFARequirement` documentation metadata
+- POLY-3739: `PoliciesService::subscribe_api_policies` typed subscribe for `private:auth:api-policies:{account}:proto`
+- `PoliciesService::subscribe_subaccount_policies` alias for the existing subaccount-policies subscribe path
 
 ### Testing
 - Unit coverage for MFA auth-code mapping and predicates
+- Unit coverage for API/subaccount policy realtime protobuf decode
+- Private realtime mutation publish tests dropped (mutations are session-only); subscribe-connect coverage retained
 
 ### Changed
 - CI no longer auto-commits `sdk-capabilities.json` / README on pull requests. Capability refresh + optional bot commit runs only on merge to `main`.

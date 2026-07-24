@@ -1,10 +1,7 @@
 //! Signed account-admin integration tests.
 
 use crate::support::{call_optional, require_live_client};
-use polyester::proto::auth::v1::{
-    ListAddressBooksRequest, ListApiPoliciesRequest, ListSubaccountPoliciesRequest,
-    ListSubaccountsRequest, ResolveAccountRequest,
-};
+use polyester::proto::auth::v1::{ListAddressBooksRequest, ListSubaccountsRequest};
 
 #[tokio::test]
 async fn api_keys_list() {
@@ -15,20 +12,26 @@ async fn api_keys_list() {
 }
 
 #[tokio::test]
-async fn policies_list() {
+async fn policies_subscribe_only() {
+    // Policy unary RPCs are JWT/session-only; API-key SDK keeps subscribe helpers.
     let Some(client) = require_live_client() else {
         return;
     };
-    let _ = call_optional("policies.list_subaccount_policies", || {
-        client
-            .policies
-            .list_subaccount_policies(ListSubaccountPoliciesRequest::default())
+    if client
+        .default_account_id
+        .as_deref()
+        .unwrap_or("")
+        .is_empty()
+    {
+        eprintln!("skip: POLYESTER_ACCOUNT_ID required for policies.subscribe");
+        return;
+    }
+    let _ = call_optional("policies.subscribe_api_policies", || {
+        client.policies.subscribe_api_policies(None)
     })
     .await;
-    let _ = call_optional("policies.list_api_policies", || {
-        client
-            .policies
-            .list_api_policies(ListApiPoliciesRequest::default())
+    let _ = call_optional("policies.subscribe_subaccount_policies", || {
+        client.policies.subscribe_subaccount_policies(None)
     })
     .await;
 }
@@ -40,28 +43,6 @@ async fn sub_accounts_list() {
     };
     let _ = call_optional("sub_accounts.list", || {
         client.sub_accounts.list(ListSubaccountsRequest::default())
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn resolve_account() {
-    let Some(client) = require_live_client() else {
-        return;
-    };
-    let account_id = match std::env::var("POLYESTER_ACCOUNT_ID") {
-        Ok(v) if !v.trim().is_empty() => v.trim().to_owned(),
-        _ => {
-            eprintln!("skip: POLYESTER_ACCOUNT_ID not set");
-            return;
-        }
-    };
-    let req = ResolveAccountRequest {
-        query: account_id,
-        ..Default::default()
-    };
-    let _ = call_optional("resolve.resolve_account", || {
-        client.resolve.resolve_account(req)
     })
     .await;
 }

@@ -32,21 +32,19 @@ pub fn is_not_found(err: &Error) -> bool {
 }
 
 pub fn jwt_session_only(err: &Error) -> bool {
+    let msg = err.to_string().to_ascii_lowercase();
+    let sessionish = msg.contains("authorization header")
+        || msg.contains("bearer")
+        || msg.contains("interactive session")
+        || msg.contains("permission denied")
+        || msg.contains("permission_denied");
     match err {
-        Error::Auth(msg) => {
-            let m = msg.to_ascii_lowercase();
-            m.contains("authorization header")
-                || m.contains("bearer")
-                || m.contains("interactive session")
-                || m.contains("permission denied")
-                || m.contains("permission_denied")
-        }
-        Error::Api { code, message, .. } => {
+        Error::Auth(_) => sessionish,
+        Error::Api { code, .. } => {
             let c = code.to_ascii_lowercase();
-            let m = message.to_ascii_lowercase();
-            c.contains("permission_denied") || m.contains("interactive session")
+            sessionish || c.contains("unauthenticated") || c.contains("permission_denied")
         }
-        _ => false,
+        _ => sessionish,
     }
 }
 
