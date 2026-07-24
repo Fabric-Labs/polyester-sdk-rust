@@ -46,6 +46,15 @@ pub enum Error {
     QueueOverflow(String),
 }
 
+/// Stable auth.v1.AuthErrorDetail codes used for MFA control flow.
+/// Prefer these over ConnectError message text.
+pub mod auth_codes {
+    pub const MFA_NOT_ENROLLED: &str = "AUTH_MFA_NOT_ENROLLED";
+    pub const STEP_UP_REQUIRED: &str = "AUTH_STEP_UP_REQUIRED";
+    pub const MFA_ELEVATION_REQUIRED: &str = "AUTH_MFA_ELEVATION_REQUIRED";
+    pub const MFA_LAST_FACTOR_REQUIRED: &str = "AUTH_MFA_LAST_FACTOR_REQUIRED";
+}
+
 impl Error {
     pub fn auth(msg: impl Into<String>) -> Self {
         Self::Auth(msg.into())
@@ -65,6 +74,34 @@ impl Error {
 
     pub fn queue_overflow(msg: impl Into<String>) -> Self {
         Self::QueueOverflow(msg.into())
+    }
+
+    /// Structured auth.v1.AuthErrorDetail code when this is an [`Error::Api`].
+    pub fn auth_error_code(&self) -> Option<&str> {
+        match self {
+            Self::Api { code, .. } => Some(code.as_str()),
+            _ => None,
+        }
+    }
+
+    /// True when the caller must enroll an MFA factor before continuing.
+    pub fn is_mfa_enrollment_required(&self) -> bool {
+        self.auth_error_code() == Some(auth_codes::MFA_NOT_ENROLLED)
+    }
+
+    /// True when the caller must retry with a fresh `X-Auth-Step-Up` proof.
+    pub fn is_step_up_required(&self) -> bool {
+        self.auth_error_code() == Some(auth_codes::STEP_UP_REQUIRED)
+    }
+
+    /// True when the caller needs a recent MFA-elevated interactive session.
+    pub fn is_mfa_elevation_required(&self) -> bool {
+        self.auth_error_code() == Some(auth_codes::MFA_ELEVATION_REQUIRED)
+    }
+
+    /// True when the final active MFA factor cannot be removed.
+    pub fn is_mfa_last_factor_required(&self) -> bool {
+        self.auth_error_code() == Some(auth_codes::MFA_LAST_FACTOR_REQUIRED)
     }
 }
 
@@ -138,23 +175,83 @@ mod tests {
     use crate::proto::auth::v1::AuthErrorCode;
     use buffa::EnumValue;
 
-    #[test]
-    fn map_connect_error_surfaces_auth_revision_conflict() {
+    fn map_auth(code: AuthErrorCode, message: &str) -> Error {
         let detail_msg = AuthErrorDetail {
-            code: EnumValue::Known(AuthErrorCode::AUTH_REVISION_CONFLICT),
-            message: "resource changed".into(),
+            code: EnumValue::Known(code),
+            message: message.into(),
             ..Default::default()
         };
-        let err = ConnectError::aborted("aborted").with_detail(ErrorDetail::from_message(
-            "auth.v1.AuthErrorDetail",
-            &detail_msg,
-        ));
-        match map_connect_error(err) {
+        map_connect_error(ConnectError::permission_denied("denied").with_detail(
+            ErrorDetail::from_message("auth.v1.AuthErrorDetail", &detail_msg),
+        ))
+    }
+
+    #[test]
+    fn map_connect_error_surfaces_auth_revision_conflict() {
+        match map_auth(AuthErrorCode::AUTH_REVISION_CONFLICT, "resource changed") {
             Error::Api { message, code, .. } => {
                 assert_eq!(code, "AUTH_REVISION_CONFLICT");
                 assert_eq!(message, "resource changed");
             }
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn map_connect_error_surfaces_stable_mfa_codes() {
+        let cases = [
+            (
+                AuthErrorCode::AUTH_MFA_NOT_ENROLLED,
+                auth_codes::MFA_NOT_ENROLLED,
+                Error::is_mfa_enrollment_required as fn(&Error) -> bool,
+            ),
+            (
+                AuthErrorCode::AUTH_STEP_UP_REQUIRED,
+                auth_codes::STEP_UP_REQUIRED,
+                Error::is_step_up_required,
+            ),
+            (
+                AuthErrorCode::AUTH_MFA_ELEVATION_REQUIRED,
+                auth_codes::MFA_ELEVATION_REQUIRED,
+                Error::is_mfa_elevation_required,
+            ),
+            (
+                AuthErrorCode::AUTH_MFA_LAST_FACTOR_REQUIRED,
+                auth_codes::MFA_LAST_FACTOR_REQUIRED,
+                Error::is_mfa_last_factor_required,
+            ),
+        ];
+        for (proto_code, want, predicate) in cases {
+            let mapped = map_auth(proto_code, "mfa control flow");
+            assert_eq!(mapped.auth_error_code(), Some(want));
+            assert!(predicate(&mapped));
+            for (_, other_code, other_predicate) in cases {
+                if other_code == want {
+                    continue;
+                }
+                assert!(!other_predicate(&mapped));
+            }
+        }
+    }
+
+    #[test]
+    fn mfa_predicates_ignore_message_text() {
+        assert!(!Error::Auth("must enroll mfa".into()).is_mfa_enrollment_required());
+        assert!(
+            !Error::Api {
+                message: "step-up required".into(),
+                code: "permission_denied".into(),
+                metadata: Vec::new(),
+            }
+            .is_step_up_required()
+        );
+        assert!(
+            !Error::Api {
+                message: "api key mfa".into(),
+                code: "AUTH_API_KEY_MFA_REQUIRED".into(),
+                metadata: Vec::new(),
+            }
+            .is_mfa_enrollment_required()
+        );
     }
 }
