@@ -156,6 +156,7 @@ pub struct Trigger {
 pub struct TriggersList {
     pub triggers: Vec<Trigger>,
     pub total: usize,
+    pub next_page_token: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -174,4 +175,5 @@ pub struct TriggerEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TriggerEventsList {
     pub events: Vec<TriggerEvent>,
+    pub next_page_token: String,
 }

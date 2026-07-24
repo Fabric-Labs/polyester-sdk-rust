@@ -371,7 +371,11 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
 pub fn triggers_list_from_proto(msg: &ListTriggersResponse) -> TriggersList {
     let triggers: Vec<_> = msg.triggers.iter().map(trigger_from_proto).collect();
     let total = triggers.len();
-    TriggersList { triggers, total }
+    TriggersList {
+        triggers,
+        total,
+        next_page_token: msg.next_page_token.clone(),
+    }
 }
 
 pub fn get_trigger_from_proto(msg: &GetTriggerResponse) -> Option<Trigger> {
@@ -435,6 +439,7 @@ pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> TriggerEvent {
 pub fn trigger_events_list_from_proto(msg: &ListTriggerEventsResponse) -> TriggerEventsList {
     TriggerEventsList {
         events: msg.events.iter().map(trigger_event_from_proto).collect(),
+        next_page_token: msg.next_page_token.clone(),
     }
 }
 
@@ -443,8 +448,9 @@ mod tests {
     use super::*;
     use crate::proto::orders::v1::Side;
     use crate::proto::triggers::v1::{
-        ConditionalChildExecution, ConditionalTrigger, GetTriggerResponse, ListTriggersResponse,
-        StopDetails, TriggerLimitGtc,
+        ConditionalChildExecution, ConditionalTrigger, GetTriggerResponse,
+        ListTriggerEventsResponse, ListTriggersResponse, StopDetails, TriggerEventType,
+        TriggerLimitGtc,
     };
 
     #[test]
@@ -518,10 +524,12 @@ mod tests {
                 symbol_id: 1,
                 ..Default::default()
             }],
+            next_page_token: "trig-page-2".into(),
             ..Default::default()
         });
         assert_eq!(listed.triggers.len(), 1);
         assert_eq!(listed.total, 1);
+        assert_eq!(listed.next_page_token, "trig-page-2");
 
         let got = get_trigger_from_proto(&GetTriggerResponse {
             trigger: ProtoTrigger {
@@ -533,5 +541,21 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(got.unwrap().trigger_id, format_uint64_id(3));
+    }
+
+    #[test]
+    fn trigger_events_list_keeps_next_page_token() {
+        let listed = trigger_events_list_from_proto(&ListTriggerEventsResponse {
+            events: vec![ProtoTriggerEvent {
+                trigger_id: 1,
+                event_type: TriggerEventType::EventFired.into(),
+                ts_ns: 123,
+                ..Default::default()
+            }],
+            next_page_token: "evt-page-2".into(),
+            ..Default::default()
+        });
+        assert_eq!(listed.events.len(), 1);
+        assert_eq!(listed.next_page_token, "evt-page-2");
     }
 }
