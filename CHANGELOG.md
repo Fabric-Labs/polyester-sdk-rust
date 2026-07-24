@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a8
+
+Package version: `0.1.0-alpha.8`. Git tag: `v0.1.0a8`.
+
 ### Breaking
 - Stable MFA auth error codes (POLY-2919): `AUTH_API_KEY_MFA_REQUIRED` is removed; use `AUTH_MFA_NOT_ENROLLED`, `AUTH_STEP_UP_REQUIRED`, `AUTH_MFA_ELEVATION_REQUIRED`, and `AUTH_MFA_LAST_FACTOR_REQUIRED` from `AuthErrorDetail`
 - Remove JWT/session-only handwritten wrappers that cannot work with API-key auth:
