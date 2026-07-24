@@ -3766,6 +3766,8 @@ pub const __LIST_TRANSFERS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TransferSide {
+    /// Display classification for this transfer side.
+    ///
     /// Field 1: `kind`
     #[serde(
         rename = "kind",
@@ -3773,7 +3775,7 @@ pub struct TransferSide {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub kind: ::buffa::EnumValue<TransferSideKind>,
-    /// Public root or subaccount id when this side is safe to identify. Never
+    /// Public root account or subaccount ID when this side is safe to identify. Never
     /// populated for private counterparties or non-user ledger accounts.
     ///
     /// Field 2: `account_id`
@@ -3786,8 +3788,8 @@ pub struct TransferSide {
     pub account_id: ::core::option::Option<u64>,
     /// Address for this side when known. For EXTERNAL_ADDRESS this is an
     /// external-chain wallet address from lifecycle correlation; for identifiable
-    /// Polyester user ledger accounts this is a Polyester smart-account address.
-    /// May be empty during the transfer-to-lifecycle consistency window.
+    /// Polyester accounts this is a Polyester smart-account address.
+    /// May be empty until the corresponding lifecycle details are available.
     ///
     /// Field 3: `address`
     #[serde(
@@ -3956,13 +3958,13 @@ pub const __TRANSFER_SIDE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
     from_json: ::buffa::type_registry::any_from_json::<TransferSide>,
     is_wkt: false,
 };
-/// Transfer row with compact integers and client-side resolution.
+/// TransferRow describes one debit or credit leg of a ledger transfer.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TransferRow {
-    /// Public unified asset id. Resolve symbol from SpotConfig; U128 amounts in
-    /// this row always use fixed 18-decimal ledger scale.
+    /// Public unified asset ID. Resolve its symbol through the spot configuration
+    /// API. U128 amounts in this row always use a fixed 18-decimal ledger scale.
     ///
     /// Field 1: `asset_id`
     #[serde(
@@ -3983,7 +3985,7 @@ pub struct TransferRow {
     pub amount_e18: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
-    /// product reason for this transfer
+    /// Product reason for this transfer.
     ///
     /// Field 3: `transfer_code`
     #[serde(
@@ -3993,7 +3995,7 @@ pub struct TransferRow {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub transfer_code: ::buffa::EnumValue<super::super::v1::TransferCode>,
-    /// account bucket affected by this transfer
+    /// Account bucket affected by this transfer.
     ///
     /// Field 4: `account_code`
     #[serde(
@@ -4003,7 +4005,7 @@ pub struct TransferRow {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub account_code: ::buffa::EnumValue<super::super::v1::AccountCode>,
-    /// transfer timestamp in microseconds since epoch (UTC)
+    /// Transfer timestamp in microseconds since epoch (UTC).
     ///
     /// Field 5: `ts_us`
     #[serde(
@@ -4024,7 +4026,7 @@ pub struct TransferRow {
     pub balance_after_e18: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
-    /// true for debit legs, false for credit legs
+    /// True when this row is the debit leg; false when it is the credit leg.
     ///
     /// Field 10: `is_debit`
     #[serde(
@@ -4034,7 +4036,7 @@ pub struct TransferRow {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_debit: bool,
-    /// Correlation id derived from ME matchId for grouping related legs (0 when N/A).
+    /// Correlation ID used to group related transfer legs. Zero when unavailable.
     ///
     /// Field 11: `link_id`
     #[serde(
@@ -4044,7 +4046,7 @@ pub struct TransferRow {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub link_id: u64,
-    /// Public lifecycle flow id when this transfer belongs to a chain lifecycle flow.
+    /// Public lifecycle flow ID when this transfer belongs to a chain lifecycle flow.
     ///
     /// Field 12: `flow_id`
     #[serde(
@@ -4054,8 +4056,8 @@ pub struct TransferRow {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub flow_id: ::buffa::alloc::string::String,
-    /// Ledger debit side for From-column display. This is debit-to-credit, not
-    /// row-relative; use is_debit to know whether this row is the debit leg.
+    /// Debit side of the transfer. This relationship is debit-to-credit rather
+    /// than row-relative; use is_debit to determine whether this row is the debit leg.
     ///
     /// Field 13: `source`
     #[serde(
@@ -4063,8 +4065,8 @@ pub struct TransferRow {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub source: ::buffa::MessageField<TransferSide>,
-    /// Ledger credit side for To-column display. This is debit-to-credit, not
-    /// row-relative; use is_debit to know whether this row is the credit leg.
+    /// Credit side of the transfer. This relationship is debit-to-credit rather
+    /// than row-relative; use is_debit to determine whether this row is the credit leg.
     ///
     /// Field 14: `destination`
     #[serde(
@@ -4391,6 +4393,7 @@ pub const __TRANSFER_ROW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
     from_json: ::buffa::type_registry::any_from_json::<TransferRow>,
     is_wkt: false,
 };
+/// ListTransfersResponse contains transfer rows and an optional continuation cursor.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -10429,17 +10432,19 @@ pub mod __buffa {
         /// TransferSide describes one side of a ledger transfer for display.
         #[derive(Clone, Debug, Default)]
         pub struct TransferSideView<'a> {
+            /// Display classification for this transfer side.
+            ///
             /// Field 1: `kind`
             pub kind: ::buffa::EnumValue<super::super::TransferSideKind>,
-            /// Public root or subaccount id when this side is safe to identify. Never
+            /// Public root account or subaccount ID when this side is safe to identify. Never
             /// populated for private counterparties or non-user ledger accounts.
             ///
             /// Field 2: `account_id`
             pub account_id: ::core::option::Option<u64>,
             /// Address for this side when known. For EXTERNAL_ADDRESS this is an
             /// external-chain wallet address from lifecycle correlation; for identifiable
-            /// Polyester user ledger accounts this is a Polyester smart-account address.
-            /// May be empty during the transfer-to-lifecycle consistency window.
+            /// Polyester accounts this is a Polyester smart-account address.
+            /// May be empty until the corresponding lifecycle details are available.
             ///
             /// Field 3: `address`
             pub address: &'a str,
@@ -10712,12 +10717,14 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
+            /// Display classification for this transfer side.
+            ///
             /// Field 1: `kind`
             #[must_use]
             pub fn kind(&self) -> ::buffa::EnumValue<super::super::TransferSideKind> {
                 self.0.reborrow().kind
             }
-            /// Public root or subaccount id when this side is safe to identify. Never
+            /// Public root account or subaccount ID when this side is safe to identify. Never
             /// populated for private counterparties or non-user ledger accounts.
             ///
             /// Field 2: `account_id`
@@ -10727,8 +10734,8 @@ pub mod __buffa {
             }
             /// Address for this side when known. For EXTERNAL_ADDRESS this is an
             /// external-chain wallet address from lifecycle correlation; for identifiable
-            /// Polyester user ledger accounts this is a Polyester smart-account address.
-            /// May be empty during the transfer-to-lifecycle consistency window.
+            /// Polyester accounts this is a Polyester smart-account address.
+            /// May be empty until the corresponding lifecycle details are available.
             ///
             /// Field 3: `address`
             #[must_use]
@@ -10766,11 +10773,11 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// Transfer row with compact integers and client-side resolution.
+        /// TransferRow describes one debit or credit leg of a ledger transfer.
         #[derive(Clone, Debug, Default)]
         pub struct TransferRowView<'a> {
-            /// Public unified asset id. Resolve symbol from SpotConfig; U128 amounts in
-            /// this row always use fixed 18-decimal ledger scale.
+            /// Public unified asset ID. Resolve its symbol through the spot configuration
+            /// API. U128 amounts in this row always use a fixed 18-decimal ledger scale.
             ///
             /// Field 1: `asset_id`
             pub asset_id: u32,
@@ -10782,19 +10789,19 @@ pub mod __buffa {
                     'a,
                 >,
             >,
-            /// product reason for this transfer
+            /// Product reason for this transfer.
             ///
             /// Field 3: `transfer_code`
             pub transfer_code: ::buffa::EnumValue<
                 super::super::super::super::v1::TransferCode,
             >,
-            /// account bucket affected by this transfer
+            /// Account bucket affected by this transfer.
             ///
             /// Field 4: `account_code`
             pub account_code: ::buffa::EnumValue<
                 super::super::super::super::v1::AccountCode,
             >,
-            /// transfer timestamp in microseconds since epoch (UTC)
+            /// Transfer timestamp in microseconds since epoch (UTC).
             ///
             /// Field 5: `ts_us`
             pub ts_us: u64,
@@ -10806,27 +10813,27 @@ pub mod __buffa {
                     'a,
                 >,
             >,
-            /// true for debit legs, false for credit legs
+            /// True when this row is the debit leg; false when it is the credit leg.
             ///
             /// Field 10: `is_debit`
             pub is_debit: bool,
-            /// Correlation id derived from ME matchId for grouping related legs (0 when N/A).
+            /// Correlation ID used to group related transfer legs. Zero when unavailable.
             ///
             /// Field 11: `link_id`
             pub link_id: u64,
-            /// Public lifecycle flow id when this transfer belongs to a chain lifecycle flow.
+            /// Public lifecycle flow ID when this transfer belongs to a chain lifecycle flow.
             ///
             /// Field 12: `flow_id`
             pub flow_id: &'a str,
-            /// Ledger debit side for From-column display. This is debit-to-credit, not
-            /// row-relative; use is_debit to know whether this row is the debit leg.
+            /// Debit side of the transfer. This relationship is debit-to-credit rather
+            /// than row-relative; use is_debit to determine whether this row is the debit leg.
             ///
             /// Field 13: `source`
             pub source: ::buffa::MessageFieldView<
                 super::super::__buffa::view::TransferSideView<'a>,
             >,
-            /// Ledger credit side for To-column display. This is debit-to-credit, not
-            /// row-relative; use is_debit to know whether this row is the credit leg.
+            /// Credit side of the transfer. This relationship is debit-to-credit rather
+            /// than row-relative; use is_debit to determine whether this row is the credit leg.
             ///
             /// Field 14: `destination`
             pub destination: ::buffa::MessageFieldView<
@@ -11416,8 +11423,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Public unified asset id. Resolve symbol from SpotConfig; U128 amounts in
-            /// this row always use fixed 18-decimal ledger scale.
+            /// Public unified asset ID. Resolve its symbol through the spot configuration
+            /// API. U128 amounts in this row always use a fixed 18-decimal ledger scale.
             ///
             /// Field 1: `asset_id`
             #[must_use]
@@ -11437,7 +11444,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().amount_e18
             }
-            /// product reason for this transfer
+            /// Product reason for this transfer.
             ///
             /// Field 3: `transfer_code`
             #[must_use]
@@ -11446,7 +11453,7 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::super::super::v1::TransferCode> {
                 self.0.reborrow().transfer_code
             }
-            /// account bucket affected by this transfer
+            /// Account bucket affected by this transfer.
             ///
             /// Field 4: `account_code`
             #[must_use]
@@ -11455,7 +11462,7 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::super::super::v1::AccountCode> {
                 self.0.reborrow().account_code
             }
-            /// transfer timestamp in microseconds since epoch (UTC)
+            /// Transfer timestamp in microseconds since epoch (UTC).
             ///
             /// Field 5: `ts_us`
             #[must_use]
@@ -11475,29 +11482,29 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().balance_after_e18
             }
-            /// true for debit legs, false for credit legs
+            /// True when this row is the debit leg; false when it is the credit leg.
             ///
             /// Field 10: `is_debit`
             #[must_use]
             pub fn is_debit(&self) -> bool {
                 self.0.reborrow().is_debit
             }
-            /// Correlation id derived from ME matchId for grouping related legs (0 when N/A).
+            /// Correlation ID used to group related transfer legs. Zero when unavailable.
             ///
             /// Field 11: `link_id`
             #[must_use]
             pub fn link_id(&self) -> u64 {
                 self.0.reborrow().link_id
             }
-            /// Public lifecycle flow id when this transfer belongs to a chain lifecycle flow.
+            /// Public lifecycle flow ID when this transfer belongs to a chain lifecycle flow.
             ///
             /// Field 12: `flow_id`
             #[must_use]
             pub fn flow_id(&self) -> &'_ str {
                 self.0.reborrow().flow_id
             }
-            /// Ledger debit side for From-column display. This is debit-to-credit, not
-            /// row-relative; use is_debit to know whether this row is the debit leg.
+            /// Debit side of the transfer. This relationship is debit-to-credit rather
+            /// than row-relative; use is_debit to determine whether this row is the debit leg.
             ///
             /// Field 13: `source`
             #[must_use]
@@ -11508,8 +11515,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().source
             }
-            /// Ledger credit side for To-column display. This is debit-to-credit, not
-            /// row-relative; use is_debit to know whether this row is the credit leg.
+            /// Credit side of the transfer. This relationship is debit-to-credit rather
+            /// than row-relative; use is_debit to determine whether this row is the credit leg.
             ///
             /// Field 14: `destination`
             #[must_use]
@@ -11551,6 +11558,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// ListTransfersResponse contains transfer rows and an optional continuation cursor.
         #[derive(Clone, Debug, Default)]
         pub struct ListTransfersResponseView<'a> {
             /// Transfer rows in requested order.

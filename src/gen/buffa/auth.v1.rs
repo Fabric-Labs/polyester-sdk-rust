@@ -35068,8 +35068,6 @@ pub enum AuthErrorCode {
     AUTH_SUBACCOUNT_ACCESS_DENIED = 11i32,
     /// Caller does not have access to the requested API key.
     AUTH_API_KEY_ACCESS_DENIED = 12i32,
-    /// API key operation requires MFA.
-    AUTH_API_KEY_MFA_REQUIRED = 13i32,
     /// Requested API key status transition is not allowed.
     AUTH_API_KEY_INVALID_STATUS_TRANSITION = 14i32,
     /// Policy definition or binding is invalid.
@@ -35118,6 +35116,10 @@ pub enum AuthErrorCode {
     AUTH_POLICY_SCOPE_MISMATCH = 36i32,
     /// The resource changed after the caller read it.
     AUTH_REVISION_CONFLICT = 37i32,
+    /// A recently MFA-elevated interactive session is required.
+    AUTH_MFA_ELEVATION_REQUIRED = 38i32,
+    /// At least one active MFA factor must remain enrolled.
+    AUTH_MFA_LAST_FACTOR_REQUIRED = 39i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -35159,9 +35161,6 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_API_KEY_ACCESS_DENIED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthApiKeyAccessDenied: Self = Self::AUTH_API_KEY_ACCESS_DENIED;
-    ///Idiomatic alias for [`Self::AUTH_API_KEY_MFA_REQUIRED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const AuthApiKeyMfaRequired: Self = Self::AUTH_API_KEY_MFA_REQUIRED;
     ///Idiomatic alias for [`Self::AUTH_API_KEY_INVALID_STATUS_TRANSITION`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthApiKeyInvalidStatusTransition: Self = Self::AUTH_API_KEY_INVALID_STATUS_TRANSITION;
@@ -35234,6 +35233,12 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_REVISION_CONFLICT`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthRevisionConflict: Self = Self::AUTH_REVISION_CONFLICT;
+    ///Idiomatic alias for [`Self::AUTH_MFA_ELEVATION_REQUIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthMfaElevationRequired: Self = Self::AUTH_MFA_ELEVATION_REQUIRED;
+    ///Idiomatic alias for [`Self::AUTH_MFA_LAST_FACTOR_REQUIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthMfaLastFactorRequired: Self = Self::AUTH_MFA_LAST_FACTOR_REQUIRED;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -35342,7 +35347,6 @@ impl ::buffa::Enumeration for AuthErrorCode {
             10i32 => ::core::option::Option::Some(Self::AUTH_RESOURCE_NOT_FOUND),
             11i32 => ::core::option::Option::Some(Self::AUTH_SUBACCOUNT_ACCESS_DENIED),
             12i32 => ::core::option::Option::Some(Self::AUTH_API_KEY_ACCESS_DENIED),
-            13i32 => ::core::option::Option::Some(Self::AUTH_API_KEY_MFA_REQUIRED),
             14i32 => {
                 ::core::option::Option::Some(
                     Self::AUTH_API_KEY_INVALID_STATUS_TRANSITION,
@@ -35377,6 +35381,8 @@ impl ::buffa::Enumeration for AuthErrorCode {
             35i32 => ::core::option::Option::Some(Self::AUTH_POLICY_LOCKED),
             36i32 => ::core::option::Option::Some(Self::AUTH_POLICY_SCOPE_MISMATCH),
             37i32 => ::core::option::Option::Some(Self::AUTH_REVISION_CONFLICT),
+            38i32 => ::core::option::Option::Some(Self::AUTH_MFA_ELEVATION_REQUIRED),
+            39i32 => ::core::option::Option::Some(Self::AUTH_MFA_LAST_FACTOR_REQUIRED),
             _ => ::core::option::Option::None,
         }
     }
@@ -35398,7 +35404,6 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_RESOURCE_NOT_FOUND => "AUTH_RESOURCE_NOT_FOUND",
             Self::AUTH_SUBACCOUNT_ACCESS_DENIED => "AUTH_SUBACCOUNT_ACCESS_DENIED",
             Self::AUTH_API_KEY_ACCESS_DENIED => "AUTH_API_KEY_ACCESS_DENIED",
-            Self::AUTH_API_KEY_MFA_REQUIRED => "AUTH_API_KEY_MFA_REQUIRED",
             Self::AUTH_API_KEY_INVALID_STATUS_TRANSITION => {
                 "AUTH_API_KEY_INVALID_STATUS_TRANSITION"
             }
@@ -35431,6 +35436,8 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_POLICY_LOCKED => "AUTH_POLICY_LOCKED",
             Self::AUTH_POLICY_SCOPE_MISMATCH => "AUTH_POLICY_SCOPE_MISMATCH",
             Self::AUTH_REVISION_CONFLICT => "AUTH_REVISION_CONFLICT",
+            Self::AUTH_MFA_ELEVATION_REQUIRED => "AUTH_MFA_ELEVATION_REQUIRED",
+            Self::AUTH_MFA_LAST_FACTOR_REQUIRED => "AUTH_MFA_LAST_FACTOR_REQUIRED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -35471,9 +35478,6 @@ impl ::buffa::Enumeration for AuthErrorCode {
             }
             "AUTH_API_KEY_ACCESS_DENIED" => {
                 ::core::option::Option::Some(Self::AUTH_API_KEY_ACCESS_DENIED)
-            }
-            "AUTH_API_KEY_MFA_REQUIRED" => {
-                ::core::option::Option::Some(Self::AUTH_API_KEY_MFA_REQUIRED)
             }
             "AUTH_API_KEY_INVALID_STATUS_TRANSITION" => {
                 ::core::option::Option::Some(
@@ -35547,6 +35551,12 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_REVISION_CONFLICT" => {
                 ::core::option::Option::Some(Self::AUTH_REVISION_CONFLICT)
             }
+            "AUTH_MFA_ELEVATION_REQUIRED" => {
+                ::core::option::Option::Some(Self::AUTH_MFA_ELEVATION_REQUIRED)
+            }
+            "AUTH_MFA_LAST_FACTOR_REQUIRED" => {
+                ::core::option::Option::Some(Self::AUTH_MFA_LAST_FACTOR_REQUIRED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -35565,7 +35575,6 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_RESOURCE_NOT_FOUND,
             Self::AUTH_SUBACCOUNT_ACCESS_DENIED,
             Self::AUTH_API_KEY_ACCESS_DENIED,
-            Self::AUTH_API_KEY_MFA_REQUIRED,
             Self::AUTH_API_KEY_INVALID_STATUS_TRANSITION,
             Self::AUTH_POLICY_INVALID,
             Self::AUTH_SMART_ACCOUNT_ALREADY_LINKED,
@@ -35590,6 +35599,8 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_POLICY_LOCKED,
             Self::AUTH_POLICY_SCOPE_MISMATCH,
             Self::AUTH_REVISION_CONFLICT,
+            Self::AUTH_MFA_ELEVATION_REQUIRED,
+            Self::AUTH_MFA_LAST_FACTOR_REQUIRED,
         ]
     }
 }

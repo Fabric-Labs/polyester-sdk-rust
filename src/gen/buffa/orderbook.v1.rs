@@ -812,6 +812,9 @@ pub struct OrderBookDelta {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub book_seq_start: u64,
+    /// Monotonic book sequence at the end of this update's range. Consumers can
+    /// retain it as the last applied sequence and ignore updates that do not advance it.
+    ///
     /// Field 3: `book_seq_end`
     #[serde(
         rename = "bookSeqEnd",
@@ -2225,6 +2228,9 @@ pub mod __buffa {
             ///
             /// Field 2: `book_seq_start`
             pub book_seq_start: u64,
+            /// Monotonic book sequence at the end of this update's range. Consumers can
+            /// retain it as the last applied sequence and ignore updates that do not advance it.
+            ///
             /// Field 3: `book_seq_end`
             pub book_seq_end: u64,
             /// Bid-side updates (SET semantics at price_ticks).
@@ -2691,6 +2697,9 @@ pub mod __buffa {
             pub fn book_seq_start(&self) -> u64 {
                 self.0.reborrow().book_seq_start
             }
+            /// Monotonic book sequence at the end of this update's range. Consumers can
+            /// retain it as the last applied sequence and ignore updates that do not advance it.
+            ///
             /// Field 3: `book_seq_end`
             #[must_use]
             pub fn book_seq_end(&self) -> u64 {
