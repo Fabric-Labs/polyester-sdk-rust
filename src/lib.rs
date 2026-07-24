@@ -60,7 +60,7 @@ pub mod realtime;
 pub mod chain;
 
 pub use client::{Client, Config};
-pub use errors::{Error, Result};
+pub use errors::{Error, Result, auth_codes};
 pub use types::{
     AssetAmount, Price, PriceTicks, QtyScaled, Quantity, QuantityDomain,
     resolve_asset_amount_scaled, resolve_price_ticks, resolve_qty_scaled,
