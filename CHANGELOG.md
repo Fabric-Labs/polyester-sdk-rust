@@ -8,9 +8,12 @@
 ### Features
 - `Error::is_mfa_enrollment_required` / `is_step_up_required` / `is_mfa_elevation_required` / `is_mfa_last_factor_required` classify MFA control flow from structured auth codes only (no message heuristics)
 - `errors::auth_codes` constants and public method-option `MFARequirement` documentation metadata
+- POLY-3739: `PoliciesService::subscribe_api_policies` typed subscribe for `private:auth:api-policies:{account}:proto`
+- `PoliciesService::subscribe_subaccount_policies` alias for the existing subaccount-policies subscribe path
 
 ### Testing
 - Unit coverage for MFA auth-code mapping and predicates
+- Unit coverage for API/subaccount policy realtime protobuf decode
 
 ### Changed
 - CI no longer auto-commits `sdk-capabilities.json` / README on pull requests. Capability refresh + optional bot commit runs only on merge to `main`.

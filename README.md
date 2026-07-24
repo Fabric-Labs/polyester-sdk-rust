@@ -403,6 +403,12 @@ if let Some(order) = orders.recv().await {
     println!("{} {}", order.order_id, order.status);
 }
 
+let mut api_policies = client.policies.subscribe_api_policies(None).await?;
+if let Some(policy) = api_policies.recv().await {
+    println!("{} {}", policy.policy_id, policy.revision);
+}
+
+
 let mut book = client
     .orderbook
     .create_subscription(CreateSubscriptionOptions {

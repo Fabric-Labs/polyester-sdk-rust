@@ -277,6 +277,15 @@ impl PoliciesService {
         account_id: Option<&str>,
     ) -> crate::errors::Result<crate::realtime::TypedSubscription<crate::models::SubaccountPolicy>>
     {
+        self.subscribe_subaccount_policies(account_id).await
+    }
+
+    /// Subscribe to private subaccount policy updates (requires `realtime` feature).
+    pub async fn subscribe_subaccount_policies(
+        &self,
+        account_id: Option<&str>,
+    ) -> crate::errors::Result<crate::realtime::TypedSubscription<crate::models::SubaccountPolicy>>
+    {
         let account = super::scope::resolve_account_id(&self.ctx, account_id)?;
         let channel = format!("private:auth:subaccount-policies:{account}:proto");
         self.ctx
@@ -285,6 +294,19 @@ impl PoliciesService {
                 &channel,
                 crate::codecs::decode::subaccount_policy_from_bytes,
             )
+            .await
+    }
+
+    /// Subscribe to private API-key policy updates (requires `realtime` feature).
+    pub async fn subscribe_api_policies(
+        &self,
+        account_id: Option<&str>,
+    ) -> crate::errors::Result<crate::realtime::TypedSubscription<crate::models::ApiPolicy>> {
+        let account = super::scope::resolve_account_id(&self.ctx, account_id)?;
+        let channel = format!("private:auth:api-policies:{account}:proto");
+        self.ctx
+            .realtime
+            .subscribe_proto(&channel, crate::codecs::decode::api_policy_from_bytes)
             .await
     }
 

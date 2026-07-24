@@ -4,22 +4,22 @@ use buffa::Message;
 
 use super::{
     account_identity_from_proto, address_book_invalidation_from_proto, api_key_from_proto,
-    asset_balance_from_proto, candle_point_from_proto, flow_summary_message_from_proto,
-    market_overview_batch_from_proto, market_trade_from_proto, order_from_proto,
-    subaccount_from_proto, subaccount_policy_from_proto, transfer_row_from_proto,
+    api_policy_from_proto, asset_balance_from_proto, candle_point_from_proto,
+    flow_summary_message_from_proto, market_overview_batch_from_proto, market_trade_from_proto,
+    order_from_proto, subaccount_from_proto, subaccount_policy_from_proto, transfer_row_from_proto,
     trigger_event_from_proto, trigger_from_proto, user_trade_from_proto,
     zipped_asset_supply_batch_from_proto,
 };
 use crate::errors::{Error, Result};
 use crate::models::{
-    AccountIdentity, AddressBookViewInvalidation, ApiData, ApiKeySummary, AssetBalance, Candle,
-    LedgerTransfer, LifecycleFlowSummary, MarketOverviewList, MarketTrade, Order,
+    AccountIdentity, AddressBookViewInvalidation, ApiData, ApiKeySummary, ApiPolicy, AssetBalance,
+    Candle, LedgerTransfer, LifecycleFlowSummary, MarketOverviewList, MarketTrade, Order,
     OrderBookDeltaUpdate, PriceQtyPair, SubAccount, SubaccountPolicy, Trigger, TriggerEvent,
     UserTrade, ZippedAssetSupplyBatch,
 };
 use crate::proto::auth::v1::{
     AccountIdentity as ProtoAccountIdentity, AddressBookViewInvalidated, ApiKey as ProtoApiKey,
-    Subaccount, SubaccountPolicyView,
+    ApiPolicyView, Subaccount, SubaccountPolicyView,
 };
 use crate::proto::chain::lifecycle::v1::{FlowDetailView, FlowSummaryView};
 use crate::proto::chain::zipper::v1::ZippedAssetSupplyBatch as ProtoZippedAssetSupplyBatch;
@@ -165,6 +165,11 @@ pub fn subaccount_policy_from_bytes(payload: &[u8]) -> Result<SubaccountPolicy> 
     Ok(subaccount_policy_from_proto(&msg))
 }
 
+pub fn api_policy_from_bytes(payload: &[u8]) -> Result<ApiPolicy> {
+    let msg = decode_proto::<ApiPolicyView>(payload)?;
+    Ok(api_policy_from_proto(&msg))
+}
+
 pub fn address_book_invalidation_from_bytes(payload: &[u8]) -> Result<AddressBookViewInvalidation> {
     let msg = decode_proto::<AddressBookViewInvalidated>(payload)?;
     Ok(address_book_invalidation_from_proto(&msg))
@@ -193,6 +198,41 @@ mod tests {
         assert_eq!(order.order_id, format_uint64_id(42));
         assert_eq!(order.side, "buy");
         assert_eq!(order.status, "working");
+    }
+
+    #[test]
+    fn api_policy_from_bytes_round_trip() {
+        use crate::proto::auth::v1::ApiPolicyView;
+
+        let msg = ApiPolicyView {
+            id: 9,
+            name: "bots".into(),
+            description: "api key policy".into(),
+            revision: 4,
+            ..Default::default()
+        };
+        let bytes = msg.encode_to_vec();
+        let policy = api_policy_from_bytes(&bytes).expect("decode");
+        assert_eq!(policy.policy_id, format_uint64_id(9));
+        assert_eq!(policy.name, "bots");
+        assert_eq!(policy.revision, 4);
+    }
+
+    #[test]
+    fn subaccount_policy_from_bytes_round_trip() {
+        use crate::proto::auth::v1::SubaccountPolicyView;
+
+        let msg = SubaccountPolicyView {
+            id: 7,
+            name: "trader".into(),
+            revision: 3,
+            ..Default::default()
+        };
+        let bytes = msg.encode_to_vec();
+        let policy = subaccount_policy_from_bytes(&bytes).expect("decode");
+        assert_eq!(policy.policy_id, format_uint64_id(7));
+        assert_eq!(policy.name, "trader");
+        assert_eq!(policy.revision, 3);
     }
 
     #[test]
