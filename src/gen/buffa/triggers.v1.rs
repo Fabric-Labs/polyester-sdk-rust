@@ -8137,7 +8137,8 @@ pub struct TrailingDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub max_slippage_bps: i32,
-    /// Direction/source are fixed per trigger; exposed for completeness.
+    /// Price source used for trigger evaluation. Fixed for the lifetime of the
+    /// trigger and exposed for completeness.
     ///
     /// Field 8: `trigger_price_source`
     #[serde(
@@ -8149,6 +8150,9 @@ pub struct TrailingDetails {
     pub trigger_price_source: ::buffa::EnumValue<
         super::super::orders::v1::TriggerPriceSource,
     >,
+    /// Direction the price must cross to fire the trigger. Fixed for the lifetime
+    /// of the trigger and exposed for completeness.
+    ///
     /// Field 9: `trigger_direction`
     #[serde(
         rename = "triggerDirection",
@@ -22278,12 +22282,16 @@ pub mod __buffa {
             ///
             /// Field 7: `max_slippage_bps`
             pub max_slippage_bps: i32,
-            /// Direction/source are fixed per trigger; exposed for completeness.
+            /// Price source used for trigger evaluation. Fixed for the lifetime of the
+            /// trigger and exposed for completeness.
             ///
             /// Field 8: `trigger_price_source`
             pub trigger_price_source: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::TriggerPriceSource,
             >,
+            /// Direction the price must cross to fire the trigger. Fixed for the lifetime
+            /// of the trigger and exposed for completeness.
+            ///
             /// Field 9: `trigger_direction`
             pub trigger_direction: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::TriggerDirection,
@@ -22809,7 +22817,8 @@ pub mod __buffa {
             pub fn max_slippage_bps(&self) -> i32 {
                 self.0.reborrow().max_slippage_bps
             }
-            /// Direction/source are fixed per trigger; exposed for completeness.
+            /// Price source used for trigger evaluation. Fixed for the lifetime of the
+            /// trigger and exposed for completeness.
             ///
             /// Field 8: `trigger_price_source`
             #[must_use]
@@ -22820,6 +22829,9 @@ pub mod __buffa {
             > {
                 self.0.reborrow().trigger_price_source
             }
+            /// Direction the price must cross to fire the trigger. Fixed for the lifetime
+            /// of the trigger and exposed for completeness.
+            ///
             /// Field 9: `trigger_direction`
             #[must_use]
             pub fn trigger_direction(
