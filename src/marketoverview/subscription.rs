@@ -40,7 +40,11 @@ impl Subscription {
 
     /// Terminal subscription error, if the stream failed (e.g. queue overflow).
     pub fn err(&self) -> Option<Error> {
-        self.last_error.lock().expect("error lock").clone()
+        self.last_error
+            .lock()
+            .expect("error lock")
+            .clone()
+            .or_else(|| self.stream.err())
     }
 
     /// Refetch the REST snapshot.

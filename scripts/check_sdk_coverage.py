@@ -615,7 +615,7 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
     },
     {
         "id": "api_key_auth",
-        "label": "API-key (Ed25519 HMAC) auth",
+        "label": "API-key (Ed25519 signature) auth",
         "kind": "always_yes",
     },
     {

@@ -1,8 +1,9 @@
 //! Spot / zipper catalog cache for scale lookups.
 //!
-//! Zipper live supply is stored in [`Manager::zipped_asset_supply`] (keyed by
-//! `zipped_asset_id`). Full enriched zipper config rows are not mutated; use
-//! [`Manager::patch_zipper_supply`] from `subscribe_zipped_asset_supply(true)`.
+//! Zipper live supply is read through [`Manager::supply_for_zipped_asset_id`]
+//! (keyed by `zipped_asset_id`). Full enriched zipper config rows are not
+//! mutated; use [`Manager::patch_zipper_supply`] from
+//! `subscribe_zipped_asset_supply(true)`.
 
 use crate::models::ZippedAssetSupplyUpdate;
 use serde_json::Value;

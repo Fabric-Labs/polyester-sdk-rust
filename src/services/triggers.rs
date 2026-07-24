@@ -235,6 +235,11 @@ impl TriggersService {
     fn encode_conditional_child(params: &CreateTriggerParams) -> Result<ConditionalChildExecution> {
         let execution = match params.order_type {
             CreateOrderType::Market => {
+                if params.post_only {
+                    return Err(Error::validation(
+                        "post_only is only valid for limit GTC executions",
+                    ));
+                }
                 conditional_child_execution::Execution::MarketIoc(Box::default())
             }
             CreateOrderType::Limit => {
@@ -245,6 +250,11 @@ impl TriggersService {
                 let price_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
                 match params.time_in_force {
                     Some(CreateTimeInForce::Ioc) => {
+                        if params.post_only {
+                            return Err(Error::validation(
+                                "post_only is only valid for limit GTC executions",
+                            ));
+                        }
                         conditional_child_execution::Execution::LimitIoc(Box::new(
                             TriggerLimitIoc {
                                 price_ticks,
@@ -253,6 +263,11 @@ impl TriggersService {
                         ))
                     }
                     Some(CreateTimeInForce::Fok) => {
+                        if params.post_only {
+                            return Err(Error::validation(
+                                "post_only is only valid for limit GTC executions",
+                            ));
+                        }
                         conditional_child_execution::Execution::LimitFok(Box::new(
                             TriggerLimitFok {
                                 price_ticks,
@@ -537,6 +552,41 @@ mod tests {
         let decimal_wire = client.triggers.encode_create_params(&decimal).unwrap();
         let scaled_wire = client.triggers.encode_create_params(&scaled).unwrap();
         assert_eq!(decimal_wire.encode_to_vec(), scaled_wire.encode_to_vec());
+    }
+
+    #[test]
+    fn conditional_trigger_rejects_post_only_outside_limit_gtc() {
+        let client = client();
+        let qty =
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap();
+        let trigger_price =
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap();
+        let limit_price = crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap();
+        let base = create_params(qty, trigger_price, limit_price.clone());
+
+        for (order_type, time_in_force, child_limit_price) in [
+            (CreateOrderType::Market, None, None),
+            (
+                CreateOrderType::Limit,
+                Some(CreateTimeInForce::Ioc),
+                Some(limit_price.clone()),
+            ),
+            (
+                CreateOrderType::Limit,
+                Some(CreateTimeInForce::Fok),
+                Some(limit_price.clone()),
+            ),
+        ] {
+            let params = CreateTriggerParams {
+                post_only: true,
+                order_type,
+                time_in_force,
+                limit_price: child_limit_price,
+                ..base.clone()
+            };
+            let err = client.triggers.encode_create_params(&params).unwrap_err();
+            assert!(err.to_string().contains("limit GTC"), "{err}");
+        }
     }
 
     #[test]

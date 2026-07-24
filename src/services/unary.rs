@@ -5,6 +5,7 @@ use crate::transport::Factory;
 use buffa::Message;
 use connectrpc::ConnectError;
 use connectrpc::client::{CallOptions, UnaryResponse};
+use serde::Serialize;
 use std::future::Future;
 
 #[inline]
@@ -22,7 +23,7 @@ pub async fn await_auth<M, R, Fut>(
     call: impl FnOnce(M, CallOptions) -> Fut,
 ) -> Result<UnaryResponse<R>>
 where
-    M: Message,
+    M: Message + Serialize,
     Fut: Future<Output = std::result::Result<UnaryResponse<R>, ConnectError>>,
 {
     let opts = factory.sign_options(procedure, &request)?;
