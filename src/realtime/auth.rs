@@ -1,13 +1,12 @@
 //! Signed HTTP token exchange for private Centrifugo channels.
 
-use crate::auth::Credentials;
+use crate::auth::{Credentials, encode_query_component};
 use crate::errors::{Error, Result};
 use http_body_util::Empty;
 use hyper::header::{HeaderName, HeaderValue};
 use hyper::{Method, Request};
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
-use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use serde::Deserialize;
 use std::time::Duration;
 
@@ -21,11 +20,12 @@ pub fn connection_token_url(api_url: &str) -> String {
 }
 
 pub fn subscription_token_url(api_url: &str, channel: &str) -> String {
-    let encoded = utf8_percent_encode(channel, NON_ALPHANUMERIC).to_string();
+    // Must use the same encoder as API-key canonical_query so the signed query
+    // string matches the request URL (preserve RFC 3986 unreserved chars).
     format!(
         "{}/v1/rt/subscribe?channel={}",
         api_url.trim_end_matches('/'),
-        encoded
+        encode_query_component(channel)
     )
 }
 
@@ -117,4 +117,30 @@ fn build_http_client() -> Result<HyperClient> {
     Ok(Client::builder(TokioExecutor::new())
         .pool_idle_timeout(Duration::from_secs(30))
         .build(https))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::canonical_query;
+
+    #[test]
+    fn subscription_token_url_preserves_hyphens_for_signing() {
+        let url = subscription_token_url(
+            "https://api.example.test",
+            "private:auth:api-keys:account:proto",
+        );
+        assert_eq!(
+            url,
+            "https://api.example.test/v1/rt/subscribe?channel=private%3Aauth%3Aapi-keys%3Aaccount%3Aproto"
+        );
+        assert_eq!(
+            canonical_query(&url),
+            "channel=private%3Aauth%3Aapi-keys%3Aaccount%3Aproto"
+        );
+        assert!(
+            !canonical_query(&url).contains("%2D"),
+            "hyphens must not be percent-encoded in the signed query"
+        );
+    }
 }

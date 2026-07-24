@@ -21,7 +21,7 @@ on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Conne
 | Order book snapshot + realtime | Yes |
 | Market overview (list + subscribe) | Yes |
 | Order book heatmap | Yes |
-| API-key (Ed25519 HMAC) auth | Yes |
+| API-key (Ed25519 signature) auth | Yes |
 | Wallet / browser login | No |
 | Session MFA enrollment and challenges | No |
 | Profile (identity subscribe) | Yes |
@@ -57,19 +57,14 @@ Full cross-language comparison:
 
 ## Install
 
-```toml
-[dependencies]
-polyester-sdk = "0.1.0-alpha.7"
-```
-
-Realtime (Centrifugo) and on-chain Funding helpers are always included.
-
-Git install (if you prefer pinning a tag before crates.io mirrors):
+The crate is not on crates.io yet. Pin the published git tag:
 
 ```toml
 [dependencies]
 polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a7" }
 ```
+
+Realtime (Centrifugo) and on-chain Funding helpers are always included.
 
 For development from a git checkout:
 
@@ -326,7 +321,10 @@ let result = account.send_calls(&[call], true, Duration::from_secs(60)).await?;
 
 Realtime queues fail with `Error::QueueOverflow` instead of silently dropping;
 managed streams rebuild snapshots after reconnect and expose
-`on_reconnect` / `on_snapshot_refresh` hooks.
+`on_reconnect` / `on_snapshot_refresh` hooks. Subscribe methods return only
+after the initial websocket handshake succeeds. After connection, use
+`is_alive()`, `err()`, and `take_err()` to monitor terminal delivery errors and
+reconnects. Snapshot-recovery buffers also fail closed on overflow.
 
 Pass `default_account_id` (your Profile **Account ID**) on the client for bucket
 transfers and other account-scoped ledger operations.
@@ -428,7 +426,7 @@ if let Some(snapshot) = book.updates().recv().await {
 source "$HOME/.cargo/env"   # if cargo is not on PATH yet
 cargo check
 cargo test --lib
-cargo test --test integration
+cargo test --test integration -- --test-threads=1
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -440,8 +438,8 @@ python3 scripts/check_sdk_coverage.py
 python3 scripts/check_sdk_coverage.py --write-capabilities  # refresh JSON + README table
 ```
 
-CI also refreshes `sdk-capabilities.json` and the README capability table on the
-same branch when they drift (same-repo PRs / pushes to `main`).
+CI refreshes `sdk-capabilities.json` and the README capability table on pushes to
+`main` when they drift (not on pull-request CI).
 
 Live integration tests under `tests/integration/` need
 `POLYESTER_API_KEY_ID` / `POLYESTER_API_PRIVATE_KEY` (and usually
@@ -457,6 +455,8 @@ Optional tiers (same gates as Go/Python):
 | `POLYESTER_TEST_INTERNAL_TRANSFER_DEST` | Internal / unified→user transfers |
 
 With a local `.env`, `dotenvy` loads it automatically (`.env` is gitignored).
+Run live mutation/funded tests serially so order lifecycle and balance checks do
+not race each other.
 
 CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python).
 
@@ -469,7 +469,7 @@ CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python)
 | `src/auth`, `src/transport` | Ed25519 API-key signing + Connect `HttpClient` |
 | `src/types`, `src/codecs` | `Price` / `Quantity` / scalars |
 | `src/services`, `src/client` | Ergonomic async `Client` surface |
-| `src/realtime` | WebSocket subscriptions (`realtime` feature, default on) |
+| `src/realtime` | WebSocket subscriptions (always included; `realtime`/`chain` are empty compat flags) |
 | `src/catalogs`, `src/orderbook` | Catalog cache + local book helpers |
 
 Proto stubs are updated when a new `src/gen/` bundle is landed. Day-to-day SDK
@@ -481,7 +481,8 @@ python3 scripts/gen_module_tree.py
 
 ## Auth signing
 
-Authenticated Connect calls sign the **exact protobuf body bytes** with:
+Authenticated Connect calls sign the **exact configured wire body bytes**
+(protobuf or JSON) with:
 
 ```text
 timestamp_ms

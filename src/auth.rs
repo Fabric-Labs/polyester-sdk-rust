@@ -33,6 +33,9 @@ impl std::fmt::Debug for Credentials {
 impl Credentials {
     pub fn new(key_id: impl Into<String>, private_key_hex: &str) -> Result<Self> {
         let key_id = key_id.into().trim().to_owned();
+        if key_id.is_empty() {
+            return Err(Error::auth("API key ID must not be empty"));
+        }
         let seed = normalize_private_key(private_key_hex)?;
         let signing_key = SigningKey::from_bytes(&seed);
         Ok(Self {
@@ -120,6 +123,23 @@ pub fn account_id_from_env() -> Option<String> {
     if v.is_empty() { None } else { Some(v) }
 }
 
+/// RFC 3986 unreserved characters that must remain literal in query components.
+///
+/// Matches Python `urllib.parse.quote(..., safe="")` and Go `url.QueryEscape`
+/// (with `+` normalized to `%20`): `ALPHA / DIGIT / "-" / "." / "_" / "~"`.
+/// Using `percent_encoding::NON_ALPHANUMERIC` alone is wrong — it encodes `-` as
+/// `%2D`, which breaks API-key signatures for channels like `api-keys`.
+const QUERY_COMPONENT_ASCII_SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'_')
+    .remove(b'.')
+    .remove(b'~');
+
+/// Percent-encode a query component for Polyester API-key canonicalization.
+pub fn encode_query_component(s: &str) -> String {
+    percent_encoding::utf8_percent_encode(s, QUERY_COMPONENT_ASCII_SET).to_string()
+}
+
 /// Sort and percent-encode query parameters (Python `quote(safe="")` parity).
 pub fn canonical_query(raw_url: &str) -> String {
     let Ok(parsed) = url::Url::parse(raw_url) else {
@@ -132,13 +152,15 @@ pub fn canonical_query(raw_url: &str) -> String {
     pairs.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
     pairs
         .into_iter()
-        .map(|(k, v)| format!("{}={}", query_escape(&k), query_escape(&v)))
+        .map(|(k, v)| {
+            format!(
+                "{}={}",
+                encode_query_component(&k),
+                encode_query_component(&v)
+            )
+        })
         .collect::<Vec<_>>()
         .join("&")
-}
-
-fn query_escape(s: &str) -> String {
-    percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
 }
 
 pub fn canonical_signing_string(
@@ -200,6 +222,57 @@ mod tests {
     }
 
     #[test]
+    fn encode_query_component_preserves_rfc3986_unreserved() {
+        assert_eq!(encode_query_component("api-keys"), "api-keys");
+        assert_eq!(encode_query_component("a_b.c~d-e"), "a_b.c~d-e");
+        assert_eq!(encode_query_component("hello world"), "hello%20world");
+        assert_eq!(encode_query_component("a+b"), "a%2Bb");
+        assert_eq!(
+            encode_query_component("private:auth:api-keys:account:proto"),
+            "private%3Aauth%3Aapi-keys%3Aaccount%3Aproto"
+        );
+    }
+
+    #[test]
+    fn canonical_query_preserves_hyphens_in_channel_param() {
+        let url =
+            "https://api.example.test/v1/rt/subscribe?channel=private:auth:api-keys:account:proto";
+        assert_eq!(
+            canonical_query(url),
+            "channel=private%3Aauth%3Aapi-keys%3Aaccount%3Aproto"
+        );
+    }
+
+    #[test]
+    fn canonical_query_shared_vectors() {
+        // Cross-language parity vectors (Python quote(safe="") / Go QueryEscape+%20).
+        // Note: bare `+` in a query string is form-decoded as space before re-encoding.
+        let cases = [
+            (
+                "https://api.example.test/x?z=1&a=hello world&m=a+b",
+                "a=hello%20world&m=a%20b&z=1",
+            ),
+            (
+                "https://api.example.test/x?z=1&a=hello%20world&m=a%2Bb",
+                "a=hello%20world&m=a%2Bb&z=1",
+            ),
+            ("https://api.example.test/x?b=&a=1", "a=1&b="),
+            ("https://api.example.test/x?a=1&a=2&b=0", "a=1&a=2&b=0"),
+            (
+                "https://api.example.test/x?path=foo/bar&name=a_b.c~d-e",
+                "name=a_b.c~d-e&path=foo%2Fbar",
+            ),
+            (
+                "https://api.example.test/x?msg=%E2%9C%93&plain=ok",
+                "msg=%E2%9C%93&plain=ok",
+            ),
+        ];
+        for (url, want) in cases {
+            assert_eq!(canonical_query(url), want, "url={url}");
+        }
+    }
+
+    #[test]
     fn canonical_signing_string_matches_contract() {
         let got = canonical_signing_string(
             "123",
@@ -248,6 +321,13 @@ mod tests {
         assert_eq!(headers.get(HEADER_KEY_ID).unwrap(), "ak_test");
         assert_eq!(headers.get(HEADER_TIMESTAMP).unwrap(), "1");
         assert_eq!(headers.get(HEADER_SIGNATURE).unwrap().len(), 128);
+    }
+
+    #[test]
+    fn credentials_reject_empty_key_id() {
+        let (seed, _) = generate_ed25519_keypair();
+        let err = Credentials::new("  ", &seed).unwrap_err();
+        assert!(matches!(err, Error::Auth(_)));
     }
 
     #[test]

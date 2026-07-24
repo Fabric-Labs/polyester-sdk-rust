@@ -1,6 +1,6 @@
 //! Snapshot-then-stream coordinator (Go `realtime.SnapshotThenStream` parity).
 
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 use crate::realtime::{Client, TypedSubscription};
 use futures_util::future::BoxFuture;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -50,7 +50,9 @@ struct Inner<TSnapshot, TPublication> {
     disposed: AtomicBool,
     generation: AtomicU64,
     pending: Mutex<Vec<TPublication>>,
+    last_error: Mutex<Option<Error>>,
     stop_tx: watch::Sender<bool>,
+    connection_tx: watch::Sender<Option<Result<()>>>,
     started: AtomicBool,
 }
 
@@ -66,6 +68,7 @@ where
             cfg.max_buffered
         };
         let (stop_tx, _) = watch::channel(false);
+        let (connection_tx, _) = watch::channel(None);
         Self {
             inner: Arc::new(Inner {
                 client: cfg.client,
@@ -82,7 +85,9 @@ where
                 disposed: AtomicBool::new(false),
                 generation: AtomicU64::new(0),
                 pending: Mutex::new(Vec::new()),
+                last_error: Mutex::new(None),
                 stop_tx,
+                connection_tx,
                 started: AtomicBool::new(false),
             }),
         }
@@ -90,20 +95,39 @@ where
 
     /// Begin websocket streaming and perform the initial snapshot refresh.
     pub async fn start(&self) -> Result<()> {
-        if self.inner.started.swap(true, Ordering::SeqCst) {
-            return Ok(());
+        if !self.inner.started.swap(true, Ordering::SeqCst) {
+            let inner = self.inner.clone();
+            tokio::spawn(async move {
+                inner.run().await;
+            });
         }
-        let inner = self.inner.clone();
-        tokio::spawn(async move {
-            inner.run().await;
-        });
+        let mut connection_rx = self.inner.connection_tx.subscribe();
+        loop {
+            if self.inner.disposed.load(Ordering::SeqCst) {
+                return match self.err() {
+                    Some(err) => Err(err),
+                    None => Ok(()),
+                };
+            }
+            let status = connection_rx.borrow().clone();
+            if let Some(result) = status {
+                result?;
+                break;
+            }
+            if connection_rx.changed().await.is_err() {
+                return Ok(());
+            }
+        }
         self.refresh_snapshot().await
     }
 
     /// Fetch a REST snapshot and merge buffered publications.
     pub async fn refresh_snapshot(&self) -> Result<()> {
         if self.inner.disposed.load(Ordering::SeqCst) {
-            return Ok(());
+            return match self.err() {
+                Some(err) => Err(err),
+                None => Ok(()),
+            };
         }
         let generation = self.inner.generation.fetch_add(1, Ordering::SeqCst) + 1;
         self.inner.ready.store(false, Ordering::SeqCst);
@@ -150,6 +174,11 @@ where
 
     pub fn is_disposed(&self) -> bool {
         self.inner.disposed.load(Ordering::SeqCst)
+    }
+
+    /// Terminal stream error, if recovery failed closed.
+    pub fn err(&self) -> Option<Error> {
+        self.inner.last_error.lock().expect("error lock").clone()
     }
 
     /// Stop the stream.
@@ -201,12 +230,17 @@ where
                     false,
                 ) => {
                     match sub {
-                        Ok(sub) => sub,
-                        Err(_) => {
+                        Ok(sub) => {
+                            self.connection_tx.send_replace(Some(Ok(())));
+                            sub
+                        }
+                        Err(err) => {
+                            self.connection_tx.send_replace(Some(Err(err)));
                             if self.disposed.load(Ordering::SeqCst) {
                                 break;
                             }
                             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                            self.connection_tx.send_replace(None);
                             continue;
                         }
                     }
@@ -227,6 +261,7 @@ where
             }
             first = false;
             self.pump_subscription(sub, &mut stop_rx).await;
+            self.connection_tx.send_replace(None);
             if self.disposed.load(Ordering::SeqCst) || *stop_rx.borrow() {
                 break;
             }
@@ -268,9 +303,16 @@ where
         if !self.ready.load(Ordering::SeqCst) {
             let mut pending = self.pending.lock().expect("pending lock");
             pending.extend(items);
-            let overflow = pending.len().saturating_sub(self.max_buffered);
-            if overflow > 0 {
-                pending.drain(0..overflow);
+            if pending.len() > self.max_buffered {
+                pending.clear();
+                drop(pending);
+                *self.last_error.lock().expect("error lock") = Some(Error::queue_overflow(
+                    "snapshot recovery buffer full; recreate the subscription",
+                ));
+                self.ready.store(false, Ordering::SeqCst);
+                self.disposed.store(true, Ordering::SeqCst);
+                self.generation.fetch_add(1, Ordering::SeqCst);
+                let _ = self.stop_tx.send(true);
             }
             return;
         }
@@ -311,5 +353,73 @@ mod tests {
         sts.refresh_snapshot().await.expect("refresh");
         assert_eq!(fired.load(Ordering::SeqCst), 1);
         assert!(sts.is_ready());
+    }
+
+    #[tokio::test]
+    async fn refresh_snapshot_retries_after_initial_failure() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let fetch_attempts = attempts.clone();
+        let client = Client::new(
+            "wss://example.invalid",
+            "https://example.invalid",
+            None,
+            None,
+        );
+        let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+            client,
+            channel: "public:test".into(),
+            decode: Arc::new(|_b| Ok(1u8)),
+            fetch_snapshot: Arc::new(move || {
+                let attempt = fetch_attempts.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    if attempt == 0 {
+                        Err(crate::Error::transport("transient snapshot failure"))
+                    } else {
+                        Ok("snap".to_string())
+                    }
+                }
+                .boxed()
+            }),
+            read_publication: Arc::new(|p| vec![p]),
+            apply_snapshot: Arc::new(|_s, _p| {}),
+            apply_live_publications: Arc::new(|_p| {}),
+            max_buffered: 8,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
+        });
+
+        assert!(sts.refresh_snapshot().await.is_err());
+        sts.refresh_snapshot().await.expect("snapshot retry");
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+        assert!(sts.is_ready());
+        sts.close();
+    }
+
+    #[test]
+    fn snapshot_buffer_overflow_fails_closed() {
+        let client = Client::new(
+            "wss://example.invalid",
+            "https://example.invalid",
+            None,
+            None,
+        );
+        let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+            client,
+            channel: "public:test".into(),
+            decode: Arc::new(|_b| Ok(1u8)),
+            fetch_snapshot: Arc::new(|| async { Ok("snap".to_string()) }.boxed()),
+            read_publication: Arc::new(|p| vec![p]),
+            apply_snapshot: Arc::new(|_s, _p| {}),
+            apply_live_publications: Arc::new(|_p| {}),
+            max_buffered: 1,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
+        });
+
+        sts.inner.handle_publication(1);
+        assert!(!sts.is_disposed());
+        sts.inner.handle_publication(2);
+        assert!(sts.is_disposed());
+        assert!(matches!(sts.err(), Some(Error::QueueOverflow(_))));
     }
 }
