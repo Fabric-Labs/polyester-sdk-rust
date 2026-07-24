@@ -815,12 +815,12 @@ pub const __ASSET_CHAIN_VARIANT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     is_wkt: false,
 };
 /// ZippedAssetSupplyUpdate carries the latest route liquidity for one zipped
-/// asset. It is published on the protobuf websocket channel.
+/// asset. It is published on the Protobuf WebSocket channel.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ZippedAssetSupplyUpdate {
-    /// Canonical zipped asset route id.
+    /// Canonical zipped asset route ID.
     ///
     /// Field 1: `zipped_asset_id`
     #[serde(
@@ -976,6 +976,8 @@ pub const __ZIPPED_ASSET_SUPPLY_UPDATE_JSON_ANY: ::buffa::type_registry::JsonAny
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ZippedAssetSupplyBatch {
+    /// Supply updates included in this batch.
+    ///
     /// Field 1: `updates`
     #[serde(
         rename = "updates",
@@ -3294,10 +3296,10 @@ pub mod __buffa {
             }
         }
         /// ZippedAssetSupplyUpdate carries the latest route liquidity for one zipped
-        /// asset. It is published on the protobuf websocket channel.
+        /// asset. It is published on the Protobuf WebSocket channel.
         #[derive(Clone, Debug, Default)]
         pub struct ZippedAssetSupplyUpdateView<'a> {
-            /// Canonical zipped asset route id.
+            /// Canonical zipped asset route ID.
             ///
             /// Field 1: `zipped_asset_id`
             pub zipped_asset_id: u32,
@@ -3559,7 +3561,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Canonical zipped asset route id.
+            /// Canonical zipped asset route ID.
             ///
             /// Field 1: `zipped_asset_id`
             #[must_use]
@@ -3614,6 +3616,8 @@ pub mod __buffa {
         /// ZippedAssetSupplyBatch batches public zipped-asset supply updates.
         #[derive(Clone, Debug, Default)]
         pub struct ZippedAssetSupplyBatchView<'a> {
+            /// Supply updates included in this batch.
+            ///
             /// Field 1: `updates`
             pub updates: ::buffa::RepeatedView<
                 'a,
@@ -3862,6 +3866,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
+            /// Supply updates included in this batch.
+            ///
             /// Field 1: `updates`
             #[must_use]
             pub fn updates(

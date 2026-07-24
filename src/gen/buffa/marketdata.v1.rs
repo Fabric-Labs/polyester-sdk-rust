@@ -2015,7 +2015,7 @@ pub const __HEATMAP_DELTA_BUCKET_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
     from_json: ::buffa::type_registry::any_from_json::<HeatmapDeltaBucket>,
     is_wkt: false,
 };
-/// HeatmapLiveBucket is the canonical live payload for realtime heatmap updates.
+/// HeatmapLiveBucket is the canonical live payload for real-time heatmap updates.
 /// It represents the latest state of one bucket (open or finalized).
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -2050,7 +2050,8 @@ pub struct HeatmapLiveBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// false for provisional open-bucket updates, true when bucket is finalized.
+    /// True when this bucket is finalized; false for provisional updates to an
+    /// open bucket.
     ///
     /// Field 4: `is_final`
     #[serde(
@@ -2060,12 +2061,16 @@ pub struct HeatmapLiveBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_final: bool,
+    /// Sparse bid-side level changes represented by this bucket.
+    ///
     /// Field 5: `bids`
     #[serde(
         rename = "bids",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub bids: ::buffa::MessageField<HeatmapDeltaLevels>,
+    /// Sparse ask-side level changes represented by this bucket.
+    ///
     /// Field 6: `asks`
     #[serde(
         rename = "asks",
@@ -2082,6 +2087,8 @@ pub struct HeatmapLiveBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub updates_in_bucket: u32,
+    /// Earliest monotonic order book sequence represented by this bucket.
+    ///
     /// Field 8: `book_seq_start`
     #[serde(
         rename = "bookSeqStart",
@@ -2090,6 +2097,8 @@ pub struct HeatmapLiveBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub book_seq_start: u64,
+    /// Latest monotonic order book sequence represented by this bucket.
+    ///
     /// Field 9: `book_seq_end`
     #[serde(
         rename = "bookSeqEnd",
@@ -2098,7 +2107,7 @@ pub struct HeatmapLiveBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub book_seq_end: u64,
-    /// Quantity semantics for qty_scaled in bids/asks.
+    /// Quantity semantics for qty_scaled in bids and asks.
     ///
     /// Field 10: `quantity_mode`
     #[serde(
@@ -10819,7 +10828,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// HeatmapLiveBucket is the canonical live payload for realtime heatmap updates.
+        /// HeatmapLiveBucket is the canonical live payload for real-time heatmap updates.
         /// It represents the latest state of one bucket (open or finalized).
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapLiveBucketView<'a> {
@@ -10835,14 +10844,19 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: u64,
-            /// false for provisional open-bucket updates, true when bucket is finalized.
+            /// True when this bucket is finalized; false for provisional updates to an
+            /// open bucket.
             ///
             /// Field 4: `is_final`
             pub is_final: bool,
+            /// Sparse bid-side level changes represented by this bucket.
+            ///
             /// Field 5: `bids`
             pub bids: ::buffa::MessageFieldView<
                 super::super::__buffa::view::HeatmapDeltaLevelsView<'a>,
             >,
+            /// Sparse ask-side level changes represented by this bucket.
+            ///
             /// Field 6: `asks`
             pub asks: ::buffa::MessageFieldView<
                 super::super::__buffa::view::HeatmapDeltaLevelsView<'a>,
@@ -10851,11 +10865,15 @@ pub mod __buffa {
             ///
             /// Field 7: `updates_in_bucket`
             pub updates_in_bucket: u32,
+            /// Earliest monotonic order book sequence represented by this bucket.
+            ///
             /// Field 8: `book_seq_start`
             pub book_seq_start: u64,
+            /// Latest monotonic order book sequence represented by this bucket.
+            ///
             /// Field 9: `book_seq_end`
             pub book_seq_end: u64,
-            /// Quantity semantics for qty_scaled in bids/asks.
+            /// Quantity semantics for qty_scaled in bids and asks.
             ///
             /// Field 10: `quantity_mode`
             pub quantity_mode: ::buffa::EnumValue<super::super::HeatmapQuantityMode>,
@@ -11422,13 +11440,16 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// false for provisional open-bucket updates, true when bucket is finalized.
+            /// True when this bucket is finalized; false for provisional updates to an
+            /// open bucket.
             ///
             /// Field 4: `is_final`
             #[must_use]
             pub fn is_final(&self) -> bool {
                 self.0.reborrow().is_final
             }
+            /// Sparse bid-side level changes represented by this bucket.
+            ///
             /// Field 5: `bids`
             #[must_use]
             pub fn bids(
@@ -11438,6 +11459,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().bids
             }
+            /// Sparse ask-side level changes represented by this bucket.
+            ///
             /// Field 6: `asks`
             #[must_use]
             pub fn asks(
@@ -11454,17 +11477,21 @@ pub mod __buffa {
             pub fn updates_in_bucket(&self) -> u32 {
                 self.0.reborrow().updates_in_bucket
             }
+            /// Earliest monotonic order book sequence represented by this bucket.
+            ///
             /// Field 8: `book_seq_start`
             #[must_use]
             pub fn book_seq_start(&self) -> u64 {
                 self.0.reborrow().book_seq_start
             }
+            /// Latest monotonic order book sequence represented by this bucket.
+            ///
             /// Field 9: `book_seq_end`
             #[must_use]
             pub fn book_seq_end(&self) -> u64 {
                 self.0.reborrow().book_seq_end
             }
-            /// Quantity semantics for qty_scaled in bids/asks.
+            /// Quantity semantics for qty_scaled in bids and asks.
             ///
             /// Field 10: `quantity_mode`
             #[must_use]
