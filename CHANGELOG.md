@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.0a9
+
+Package version: `0.1.0-alpha.9`. Git tag: `v0.1.0a9`.
+
+### Fixed
+- `TriggersList` and `TriggerEventsList` now surface `next_page_token` from list responses so trigger pagination can continue through the high-level wrappers
+
 ## 0.1.0a8
 
 Package version: `0.1.0-alpha.8`. Git tag: `v0.1.0a8`.
