@@ -119,7 +119,14 @@ fn decode_auth_error_detail(detail: &ErrorDetail) -> Option<AuthErrorDetail> {
 
 /// Map a ConnectRPC error into an SDK error.
 pub fn map_connect_error(err: ConnectError) -> Error {
-    let fallback_message = err.to_string();
+    let fallback_message = {
+        let message = err.to_string();
+        if message.trim().is_empty() {
+            "request failed without server error details".to_owned()
+        } else {
+            message
+        }
+    };
     for detail in &err.details {
         if let Some(auth_detail) = decode_auth_error_detail(detail) {
             let code = auth_detail
@@ -193,6 +200,15 @@ mod tests {
                 assert_eq!(code, "AUTH_REVISION_CONFLICT");
                 assert_eq!(message, "resource changed");
             }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn map_connect_error_never_returns_an_empty_auth_message() {
+        let mapped = map_connect_error(ConnectError::unauthenticated(""));
+        match mapped {
+            Error::Auth(message) => assert!(!message.trim().is_empty()),
             other => panic!("unexpected error: {other:?}"),
         }
     }

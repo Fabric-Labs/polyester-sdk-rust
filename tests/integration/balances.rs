@@ -30,3 +30,26 @@ async fn balances_get_balance_history_optional() {
     })
     .await;
 }
+
+#[tokio::test]
+async fn concurrent_identical_authenticated_reads_do_not_replay_collide() {
+    let Some(client) = require_live_client() else {
+        return;
+    };
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(16));
+    let mut tasks = tokio::task::JoinSet::new();
+    for _ in 0..16 {
+        let balances = client.balances.clone();
+        let barrier = std::sync::Arc::clone(&barrier);
+        tasks.spawn(async move {
+            barrier.wait().await;
+            balances.list(GetBalancesRequest::default()).await
+        });
+    }
+    while let Some(result) = tasks.join_next().await {
+        match result.expect("concurrent balance task panicked") {
+            Ok(_) => {}
+            Err(err) => panic!("concurrent authenticated read failed: {err:?}"),
+        }
+    }
+}

@@ -164,10 +164,47 @@ pub fn format_qty_scaled(qty_scaled: i64, scale: u32) -> String {
     format_scaled(qty_scaled as i128, scale)
 }
 
-/// Format a ledger quantity integer by `10^scale` (Go `FormatLedgerU128` for u64 inputs).
+/// Format a smaller ledger quantity integer by `10^scale`.
 pub fn format_ledger_u64(value: u64, scale: u32) -> String {
     let scale = if scale == 0 { LEDGER_SCALE } else { scale };
     format_scaled(value as i128, scale)
+}
+
+/// Format a full-width unsigned ledger integer string by `10^scale`.
+///
+/// Balance models expose protobuf `u128` values as decimal strings so no
+/// precision is lost. This helper formats those strings without narrowing to
+/// `u64` or a floating-point type.
+pub fn format_ledger_u128(value: &str, scale: u32) -> Result<String> {
+    let digits = value.trim();
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(Error::validation(
+            "ledger value must be an unsigned decimal integer string",
+        ));
+    }
+    let digits = digits.trim_start_matches('0');
+    let digits = if digits.is_empty() { "0" } else { digits };
+    const U128_MAX_DECIMAL: &str = "340282366920938463463374607431768211455";
+    if digits.len() > U128_MAX_DECIMAL.len()
+        || (digits.len() == U128_MAX_DECIMAL.len() && digits > U128_MAX_DECIMAL)
+    {
+        return Err(Error::validation("ledger value exceeds u128 range"));
+    }
+    let scale = if scale == 0 { LEDGER_SCALE } else { scale };
+    if scale == 0 {
+        return Ok(digits.to_owned());
+    }
+    let width = scale as usize + 1;
+    let padded = format!("{digits:0>width$}");
+    let (head, tail) = padded.split_at(padded.len() - scale as usize);
+    let head = head.trim_start_matches('0');
+    let head = if head.is_empty() { "0" } else { head };
+    let tail = tail.trim_end_matches('0');
+    Ok(if tail.is_empty() {
+        head.to_owned()
+    } else {
+        format!("{head}.{tail}")
+    })
 }
 
 fn format_scaled(value: i128, scale: u32) -> String {
@@ -300,5 +337,17 @@ mod tests {
     #[test]
     fn format_qty_scaled_round_trip() {
         assert_eq!(format_qty_scaled(1_000_000, 8), "0.01");
+    }
+
+    #[test]
+    fn format_full_width_ledger_integer_string() {
+        assert_eq!(
+            format_ledger_u128("1000000000000000001", 18).unwrap(),
+            "1.000000000000000001"
+        );
+        assert_eq!(format_ledger_u128("000000", 18).unwrap(), "0");
+        assert!(format_ledger_u128("-1", 18).is_err());
+        assert!(format_ledger_u128("1.5", 18).is_err());
+        assert!(format_ledger_u128("340282366920938463463374607431768211456", 18).is_err());
     }
 }

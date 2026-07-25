@@ -1,13 +1,13 @@
 //! Centrifugo websocket realtime client.
 
 mod auth;
+mod protocol;
 mod snapshot_then_stream;
 
 pub use snapshot_then_stream::{SnapshotThenStream, SnapshotThenStreamConfig};
 
 use crate::auth::Credentials;
 use crate::errors::{Error, Result};
-use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::{
     Arc, Mutex,
@@ -15,12 +15,20 @@ use std::sync::{
 };
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::time::{Duration, timeout};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{
+        Message,
+        client::IntoClientRequest,
+        http::{HeaderValue, header::SEC_WEBSOCKET_PROTOCOL},
+    },
+};
 
 const WS_PATH: &str = "/connection/websocket";
 const DEFAULT_QUEUE: usize = 1000;
 const CENTRIFUGO_READ_TIMEOUT: Duration = Duration::from_secs(30);
 const CENTRIFUGO_RECONNECT_DELAY: Duration = Duration::from_secs(1);
+const CENTRIFUGO_PROTOBUF_SUBPROTOCOL: &str = "centrifuge-protobuf";
 
 /// Enqueue a publication without blocking. On a full queue, mark the
 /// subscription closed and return [`Error::QueueOverflow`] — never silently drop.
@@ -105,64 +113,13 @@ impl Client {
         Ok(())
     }
 
-    /// Subscribe to a channel and receive raw Centrifugo JSON frames.
+    /// Subscribe to a protobuf channel and receive raw publication payloads.
     ///
     /// Returns only after the initial websocket handshake and channel
     /// subscription succeed.
-    pub async fn subscribe_raw(&self, channel: &str) -> Result<Subscription> {
-        self.validate_channel(channel)?;
-
-        let (stop_tx, stop_rx) = watch::channel(false);
-        let alive = Arc::new(AtomicBool::new(true));
-        let last_error = Arc::new(Mutex::new(None));
-        let (ready_tx, ready_rx) = oneshot::channel();
-        let (tx, rx) = mpsc::channel::<String>(self.max_queue);
-
-        let this = self.clone();
-        let channel = channel.to_owned();
-        let alive_task = alive.clone();
-        let error_task = last_error.clone();
-        let task = tokio::spawn(async move {
-            let _guard = AliveGuard(alive_task.clone());
-            let mut ready = Some(ready_tx);
-            while !*stop_rx.borrow() {
-                match this
-                    .run_raw_subscription_once(&channel, &tx, &stop_rx, &mut ready)
-                    .await
-                {
-                    Ok(()) => break,
-                    Err(_) if *stop_rx.borrow() => break,
-                    Err(err) if matches!(err, Error::QueueOverflow(_)) => {
-                        *error_task.lock().expect("error lock") = Some(err);
-                        break;
-                    }
-                    Err(err) => {
-                        *error_task.lock().expect("error lock") = Some(err.clone());
-                        if let Some(ready) = ready.take() {
-                            let _ = ready.send(Err(err));
-                            break;
-                        }
-                        if *stop_rx.borrow() {
-                            break;
-                        }
-                        tokio::time::sleep(CENTRIFUGO_RECONNECT_DELAY).await;
-                    }
-                }
-            }
-            alive_task.store(false, Ordering::SeqCst);
-            drop(tx);
-        });
-        ready_rx
+    pub async fn subscribe_raw(&self, channel: &str) -> Result<TypedSubscription<Vec<u8>>> {
+        self.subscribe_proto(channel, |bytes| Ok(bytes.to_vec()))
             .await
-            .map_err(|_| Error::realtime("realtime task ended before handshake".to_owned()))??;
-
-        Ok(Subscription {
-            rx,
-            stop: stop_tx,
-            alive,
-            task,
-            last_error,
-        })
     }
 
     /// Subscribe to a protobuf Centrifugo channel and decode publications.
@@ -287,71 +244,6 @@ impl Client {
         Ok(())
     }
 
-    async fn run_raw_subscription_once(
-        &self,
-        channel: &str,
-        tx: &mpsc::Sender<String>,
-        stop: &watch::Receiver<bool>,
-        ready: &mut Option<oneshot::Sender<Result<()>>>,
-    ) -> Result<()> {
-        let url = self.ws_endpoint();
-        let (ws, _) = timeout(CENTRIFUGO_READ_TIMEOUT, connect_async(&url))
-            .await
-            .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
-            .map_err(|e| Error::realtime(format!("ws connect: {e}")))?;
-        let (mut write, mut read) = ws.split();
-        self.handshake_channel(&mut write, &mut read, channel)
-            .await?;
-        if let Some(ready) = ready.take() {
-            let _ = ready.send(Ok(()));
-        }
-
-        loop {
-            if *stop.borrow() {
-                return Ok(());
-            }
-            let msg = match timeout(CENTRIFUGO_READ_TIMEOUT, read.next()).await {
-                Ok(Some(Ok(msg))) => msg,
-                Ok(Some(Err(e))) => return Err(Error::realtime(e.to_string())),
-                Ok(None) => return Err(Error::realtime("websocket closed".to_owned())),
-                Err(_) => continue,
-            };
-            if *stop.borrow() {
-                return Ok(());
-            }
-            match msg {
-                Message::Text(text) => {
-                    for frame in split_centrifugo_frames(&text) {
-                        if let Some(reply) = handle_centrifugo_control(&frame) {
-                            write
-                                .send(Message::Text(reply.into()))
-                                .await
-                                .map_err(|e| Error::realtime(format!("ws send: {e}")))?;
-                        } else if !frame.trim().is_empty()
-                            && !try_send_direct(
-                                tx,
-                                frame,
-                                "raw realtime subscription queue full; consumer too slow",
-                            )?
-                        {
-                            return Ok(());
-                        }
-                    }
-                }
-                Message::Ping(payload) => {
-                    write
-                        .send(Message::Pong(payload))
-                        .await
-                        .map_err(|e| Error::realtime(format!("ws pong: {e}")))?;
-                }
-                Message::Close(_) => {
-                    return Err(Error::realtime("websocket closed".to_owned()));
-                }
-                _ => {}
-            }
-        }
-    }
-
     async fn run_proto_subscription_once<T, F>(
         &self,
         channel: &str,
@@ -364,10 +256,27 @@ impl Client {
         F: Fn(&[u8]) -> Result<T>,
     {
         let url = self.ws_endpoint();
-        let (ws, _) = timeout(CENTRIFUGO_READ_TIMEOUT, connect_async(&url))
+        let mut request = url
+            .into_client_request()
+            .map_err(|e| Error::realtime(format!("ws request: {e}")))?;
+        request.headers_mut().insert(
+            SEC_WEBSOCKET_PROTOCOL,
+            HeaderValue::from_static(CENTRIFUGO_PROTOBUF_SUBPROTOCOL),
+        );
+        let (ws, response) = timeout(CENTRIFUGO_READ_TIMEOUT, connect_async(request))
             .await
             .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
             .map_err(|e| Error::realtime(format!("ws connect: {e}")))?;
+        if response
+            .headers()
+            .get(SEC_WEBSOCKET_PROTOCOL)
+            .and_then(|value| value.to_str().ok())
+            != Some(CENTRIFUGO_PROTOBUF_SUBPROTOCOL)
+        {
+            return Err(Error::realtime(
+                "server did not negotiate centrifuge-protobuf websocket subprotocol".to_owned(),
+            ));
+        }
         let (mut write, mut read) = ws.split();
         self.handshake_channel(&mut write, &mut read, channel)
             .await?;
@@ -389,27 +298,40 @@ impl Client {
                 return Ok(());
             }
             match msg {
-                Message::Text(text) => {
-                    for frame in split_centrifugo_frames(&text) {
-                        if let Some(reply) = handle_centrifugo_control(&frame) {
-                            write
-                                .send(Message::Text(reply.into()))
-                                .await
-                                .map_err(|e| Error::realtime(format!("ws send: {e}")))?;
-                            continue;
-                        }
-                        if let Some(payload) = publication_payload(&frame) {
-                            let bytes = payload?;
-                            let item = decode(&bytes)?;
-                            if !try_send_direct(
-                                tx,
-                                item,
-                                "typed realtime subscription queue full; consumer too slow",
-                            )? {
-                                return Ok(());
+                Message::Binary(frame) => {
+                    for incoming in protocol::decode_replies(&frame)? {
+                        match incoming {
+                            protocol::Incoming::Ping => {
+                                write
+                                    .send(Message::Binary(protocol::pong_command().into()))
+                                    .await
+                                    .map_err(|e| {
+                                        Error::realtime(format!("protobuf pong send: {e}"))
+                                    })?;
                             }
+                            protocol::Incoming::Publication(bytes) => {
+                                let item = decode(&bytes)?;
+                                if !try_send_direct(
+                                    tx,
+                                    item,
+                                    "typed realtime subscription queue full; consumer too slow",
+                                )? {
+                                    return Ok(());
+                                }
+                            }
+                            protocol::Incoming::Reply {
+                                error: Some(err), ..
+                            } => {
+                                return Err(centrifugo_protocol_error(err));
+                            }
+                            protocol::Incoming::Reply { .. } => {}
                         }
                     }
+                }
+                Message::Text(_) => {
+                    return Err(Error::realtime(
+                        "received JSON text frame on protobuf websocket".to_owned(),
+                    ));
                 }
                 Message::Ping(payload) => {
                     write
@@ -423,46 +345,6 @@ impl Client {
                 _ => {}
             }
         }
-    }
-}
-
-/// Handle for a raw realtime subscription (Centrifugo JSON frames).
-pub struct Subscription {
-    rx: mpsc::Receiver<String>,
-    stop: watch::Sender<bool>,
-    alive: Arc<AtomicBool>,
-    task: tokio::task::JoinHandle<()>,
-    last_error: Arc<Mutex<Option<Error>>>,
-}
-
-impl Subscription {
-    pub async fn recv(&mut self) -> Option<String> {
-        self.rx.recv().await
-    }
-
-    /// True while the background websocket task is still running.
-    pub fn is_alive(&self) -> bool {
-        self.alive.load(Ordering::SeqCst) && !self.task.is_finished()
-    }
-
-    /// Most recent connection or terminal delivery error.
-    pub fn err(&self) -> Option<Error> {
-        self.last_error.lock().expect("error lock").clone()
-    }
-
-    /// Take and clear the most recent background error.
-    pub fn take_err(&self) -> Option<Error> {
-        self.last_error.lock().expect("error lock").take()
-    }
-
-    pub fn close(&self) {
-        let _ = self.stop.send(true);
-    }
-}
-
-impl Drop for Subscription {
-    fn drop(&mut self) {
-        self.close();
     }
 }
 
@@ -525,19 +407,11 @@ where
     R: StreamExt<Item = std::result::Result<Message, tokio_tungstenite::tungstenite::Error>>
         + Unpin,
 {
-    let mut payload = serde_json::Map::new();
-    if let Some(token) = token {
-        payload.insert(
-            "token".to_owned(),
-            serde_json::Value::String(token.to_owned()),
-        );
-    }
-    let msg = serde_json::json!({ "id": 1, "connect": payload });
     write
-        .send(Message::Text(msg.to_string().into()))
+        .send(Message::Binary(protocol::connect_command(1, token).into()))
         .await
         .map_err(|e| Error::realtime(format!("connect send: {e}")))?;
-    read_centrifugo_reply(read).await
+    read_centrifugo_reply(write, read, 1).await
 }
 
 async fn centrifugo_subscribe<W, R>(
@@ -552,112 +426,75 @@ where
     R: StreamExt<Item = std::result::Result<Message, tokio_tungstenite::tungstenite::Error>>
         + Unpin,
 {
-    let mut payload = serde_json::Map::new();
-    payload.insert(
-        "channel".to_owned(),
-        serde_json::Value::String(channel.to_owned()),
-    );
-    if let Some(token) = token {
-        payload.insert(
-            "token".to_owned(),
-            serde_json::Value::String(token.to_owned()),
-        );
-    }
-    let msg = serde_json::json!({ "id": 2, "subscribe": payload });
     write
-        .send(Message::Text(msg.to_string().into()))
+        .send(Message::Binary(
+            protocol::subscribe_command(2, channel, token).into(),
+        ))
         .await
         .map_err(|e| Error::realtime(format!("subscribe send: {e}")))?;
-    read_centrifugo_reply(read).await
+    read_centrifugo_reply(write, read, 2).await
 }
 
-async fn read_centrifugo_reply<R>(read: &mut R) -> Result<()>
+async fn read_centrifugo_reply<W, R>(write: &mut W, read: &mut R, expected_id: u32) -> Result<()>
 where
+    W: SinkExt<Message> + Unpin,
+    W::Error: std::fmt::Display,
     R: StreamExt<Item = std::result::Result<Message, tokio_tungstenite::tungstenite::Error>>
         + Unpin,
 {
-    let msg = timeout(Duration::from_secs(10), read.next())
-        .await
-        .map_err(|_| Error::realtime("centrifugo reply timeout".to_owned()))?
-        .ok_or_else(|| Error::realtime("centrifugo closed before reply".to_owned()))?
-        .map_err(|e| Error::realtime(format!("centrifugo read: {e}")))?;
-    let text = match msg {
-        Message::Text(t) => t.to_string(),
-        Message::Binary(b) => String::from_utf8_lossy(&b).into_owned(),
-        _ => {
-            return Err(Error::realtime(
-                "unexpected centrifugo reply type".to_owned(),
-            ));
-        }
-    };
-    let payload: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|e| Error::realtime(format!("centrifugo reply json: {e}")))?;
-    if payload.get("error").is_some() {
-        return Err(Error::realtime(format!("centrifugo error: {payload}")));
-    }
-    Ok(())
-}
-
-fn split_centrifugo_frames(raw: &str) -> Vec<String> {
-    raw.split('\n')
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(str::to_owned)
-        .collect()
-}
-
-/// Returns pong reply when Centrifugo expects `{}`, otherwise None.
-fn handle_centrifugo_control(frame: &str) -> Option<&'static str> {
-    let message: serde_json::Value = match serde_json::from_str(frame) {
-        Ok(v) => v,
-        Err(_) => return None,
-    };
-    if message.as_object().is_some_and(|m| m.is_empty()) {
-        return Some("{}");
-    }
-    if let Some(push) = message.get("push").and_then(|v| v.as_object())
-        && push.contains_key("ping")
-    {
-        return Some("{}");
-    }
-    if message.get("ping").is_some() && message.get("id").is_none() {
-        return Some("{}");
-    }
-    None
-}
-
-/// Extract protobuf payload bytes from a Centrifugo push publication frame.
-fn publication_payload(frame: &str) -> Option<Result<Vec<u8>>> {
-    let message: serde_json::Value = match serde_json::from_str(frame) {
-        Ok(v) => v,
-        Err(_) => return None,
-    };
-    let data = message.get("push")?.get("pub")?.get("data").cloned()?;
-    Some(decode_publication_data(&data))
-}
-
-fn decode_publication_data(data: &serde_json::Value) -> Result<Vec<u8>> {
-    match data {
-        serde_json::Value::String(s) => B64
-            .decode(s)
-            .map_err(|e| Error::realtime(format!("publication base64: {e}"))),
-        serde_json::Value::Array(items) => {
-            let mut out = Vec::with_capacity(items.len());
-            for item in items {
-                let n = item
-                    .as_u64()
-                    .ok_or_else(|| Error::realtime("invalid publication bytes".to_owned()))?;
-                if n > u8::MAX as u64 {
-                    return Err(Error::realtime("invalid publication bytes".to_owned()));
+    loop {
+        let msg = timeout(Duration::from_secs(10), read.next())
+            .await
+            .map_err(|_| Error::realtime("centrifugo reply timeout".to_owned()))?
+            .ok_or_else(|| Error::realtime("centrifugo closed before reply".to_owned()))?
+            .map_err(|e| Error::realtime(format!("centrifugo read: {e}")))?;
+        match msg {
+            Message::Binary(frame) => {
+                for incoming in protocol::decode_replies(&frame)? {
+                    match incoming {
+                        protocol::Incoming::Reply {
+                            id,
+                            error: Some(err),
+                        } if id == expected_id => return Err(centrifugo_protocol_error(err)),
+                        protocol::Incoming::Reply { id, error: None } if id == expected_id => {
+                            return Ok(());
+                        }
+                        protocol::Incoming::Ping => {
+                            write
+                                .send(Message::Binary(protocol::pong_command().into()))
+                                .await
+                                .map_err(|e| Error::realtime(format!("protobuf pong send: {e}")))?;
+                        }
+                        _ => {}
+                    }
                 }
-                out.push(n as u8);
             }
-            Ok(out)
+            Message::Text(_) => {
+                return Err(Error::realtime(
+                    "received JSON text reply on protobuf websocket".to_owned(),
+                ));
+            }
+            Message::Ping(payload) => {
+                write
+                    .send(Message::Pong(payload))
+                    .await
+                    .map_err(|e| Error::realtime(format!("ws pong: {e}")))?;
+            }
+            Message::Close(_) => {
+                return Err(Error::realtime("centrifugo closed before reply".to_owned()));
+            }
+            _ => {}
         }
-        _ => Err(Error::realtime(
-            "unsupported publication data type".to_owned(),
-        )),
     }
+}
+
+fn centrifugo_protocol_error(error: protocol::ProtoError) -> Error {
+    Error::realtime(format!(
+        "centrifugo error {}: {}{}",
+        error.code,
+        error.message,
+        if error.temporary { " (temporary)" } else { "" }
+    ))
 }
 
 #[cfg(test)]
@@ -671,38 +508,10 @@ mod tests {
     }
 
     #[test]
-    fn split_frames_handles_newline_batches() {
-        let frames = split_centrifugo_frames("{\"ping\":{}}\n{\"push\":{\"ping\":{}}}");
-        assert_eq!(frames.len(), 2);
-    }
-
-    #[test]
-    fn handle_frame_replies_to_ping() {
-        assert_eq!(handle_centrifugo_control("{\"ping\":{}}"), Some("{}"));
-        assert_eq!(
-            handle_centrifugo_control("{\"push\":{\"ping\":{}}}"),
-            Some("{}")
-        );
-        assert_eq!(
-            handle_centrifugo_control("{\"push\":{\"pub\":{\"data\":\"x\"}}}"),
-            None
-        );
-    }
-
-    #[test]
-    fn decode_publication_data_supports_base64_and_byte_array() {
-        let b64 = serde_json::json!("AQID");
-        assert_eq!(decode_publication_data(&b64).unwrap(), vec![1, 2, 3]);
-        let arr = serde_json::json!([1, 2, 3]);
-        assert_eq!(decode_publication_data(&arr).unwrap(), vec![1, 2, 3]);
-    }
-
-    #[test]
-    fn publication_payload_extracts_push_pub_data() {
-        let frame = r#"{"push":{"pub":{"data":"AQID"}}}"#;
-        let bytes = publication_payload(frame).unwrap().unwrap();
-        assert_eq!(bytes, vec![1, 2, 3]);
-        assert!(publication_payload(r#"{"ping":{}}"#).is_none());
+    fn protobuf_websocket_subprotocol_is_centrifuge_protobuf() {
+        assert_eq!(CENTRIFUGO_PROTOBUF_SUBPROTOCOL, "centrifuge-protobuf");
+        let value = HeaderValue::from_static(CENTRIFUGO_PROTOBUF_SUBPROTOCOL);
+        assert_eq!(value.to_str().unwrap(), "centrifuge-protobuf");
     }
 
     #[test]
@@ -767,34 +576,6 @@ mod tests {
                 .await
                 .expect("subscribe should not hang");
         assert!(result.is_err(), "initial handshake error must be returned");
-    }
-
-    #[tokio::test]
-    async fn dropping_raw_subscription_signals_stop() {
-        let (stop, mut stop_rx) = watch::channel(false);
-        let (_tx, rx) = mpsc::channel::<String>(1);
-        let alive = Arc::new(AtomicBool::new(true));
-        let (done_tx, done_rx) = tokio::sync::oneshot::channel();
-        let task = tokio::spawn(async move {
-            stop_rx.changed().await.expect("stop sender");
-            let _ = done_tx.send(*stop_rx.borrow());
-        });
-        let subscription = Subscription {
-            rx,
-            stop,
-            alive,
-            task,
-            last_error: Arc::new(Mutex::new(None)),
-        };
-
-        drop(subscription);
-
-        assert!(
-            tokio::time::timeout(Duration::from_secs(1), done_rx)
-                .await
-                .expect("stop timeout")
-                .expect("stop signal")
-        );
     }
 
     #[tokio::test]

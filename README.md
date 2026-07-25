@@ -55,6 +55,13 @@ Full cross-language comparison:
 [SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
 <!-- sdk-capabilities:end -->
 
+Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
+still applies. In particular, whiteboard/social-verification and some
+layout/polychart routes may require a JWT session or may not be mounted.
+Current devnet testing verifies API-key subscription handshakes for API keys,
+API policies, subaccount policies, subaccounts, address-book invalidations, and
+normal trading and ledger streams.
+
 ## Install
 
 The crate is not on crates.io yet. Pin the published git tag:
@@ -63,6 +70,10 @@ The crate is not on crates.io yet. Pin the published git tag:
 [dependencies]
 polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a9" }
 ```
+
+The repository is currently private, so GitHub access and authenticated Git credentials are
+required. If Cargo cannot use your credential helper, run it with
+`CARGO_NET_GIT_FETCH_WITH_CLI=true`.
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included.
 
@@ -81,6 +92,8 @@ Review upstream notes before upgrading.
 
 Create an API key in the Polyester app (**API** in the sidebar). Copy the key id
 and private key when shown — the private key is only displayed once.
+Open the key's **Permissions**, enable **Spot trading**, select the markets it
+may trade, and set a maximum order size appropriate for the strategy.
 
 ```rust,no_run
 use polyester::{Client, Config, Result};
@@ -221,6 +234,11 @@ client
     .await?;
 ```
 
+Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
+`-`. Batch create accepts at most 20 orders. Treat a cancel response as an
+admission acknowledgement and reconcile with `list_open` before releasing local
+state.
+
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
 Do **not** pass floats. Price ticks are Polyester protocol price units (fixed
 1e6), not market tick-size alignment (server validates tick size).
@@ -282,7 +300,8 @@ Public order/trigger write paths take **`Price` / `Quantity` wrappers only**:
 
 Ledger balances have separate **funding** and **trading** buckets per asset.
 
-- Deposits land in **funding**.
+- An external deposit can stop in **funding** or continue to **trading**,
+  depending on its configured route.
 - Spot orders spend **trading** balance.
 - Move funds funding → trading in the Polyester UI (**Funding → Unified Trading**)
   or on-chain via the funding wallet.
@@ -389,6 +408,11 @@ if let Some(markets) = sub.updates().recv().await {
 
 ## Realtime
 
+Realtime is binary-only. The client negotiates the `centrifuge-protobuf`
+WebSocket subprotocol, sends binary length-delimited Centrifugo commands, and
+decodes protobuf publication payloads from `:proto` channels. ConnectRPC's
+optional JSON wire mode does not apply to realtime.
+
 Realtime subscription handles stop their background tasks when explicitly
 closed or dropped. Call `close()` when prompt shutdown matters; `Drop` provides
 the cleanup safety net.
@@ -441,22 +465,26 @@ python3 scripts/check_sdk_coverage.py --write-capabilities  # refresh JSON + REA
 CI refreshes `sdk-capabilities.json` and the README capability table on pushes to
 `main` when they drift (not on pull-request CI).
 
-Live integration tests under `tests/integration/` need
+CI runs unit/lib and compile-fail UI tests only (`cargo test --lib --test ui`).
+Live integration tests under `tests/integration/` are **not** part of CI. They need
 `POLYESTER_API_KEY_ID` / `POLYESTER_API_PRIVATE_KEY` (and usually
-`POLYESTER_ACCOUNT_ID`). Without those env vars they soft-skip.
+`POLYESTER_ACCOUNT_ID`). Without those env vars they soft-skip unless
+`POLYESTER_TEST_STRICT_LIVE=1` is set.
 
 Optional tiers (same gates as Go/Python):
 
 | Env | Enables |
 |---|---|
-| `POLYESTER_TEST_MUTATION=1` | Order/trigger/market-order write round-trips |
-| `POLYESTER_TEST_FUNDED=1` | Balance-changing transfers / fills |
+| `POLYESTER_TEST_MUTATION=1` | State-changing tests, including funded mutations |
+| `POLYESTER_TEST_FUNDED=1` | Balance-changing transfers / fills (also requires the mutation gate) |
 | `POLYESTER_TEST_TRADE_E2E=1` + `POLYESTER_TEST_MAKER_*` | Maker+taker fill e2e |
 | `POLYESTER_TEST_INTERNAL_TRANSFER_DEST` | Internal / unified→user transfers |
+| `POLYESTER_TEST_STRICT_LIVE=1` | Fail the selected live run if any test takes a `skip:` path |
 
 With a local `.env`, `dotenvy` loads it automatically (`.env` is gitignored).
 Run live mutation/funded tests serially so order lifecycle and balance checks do
-not race each other.
+not race each other. Enable strict live mode for release certification after
+configuring every gate and credential required by the selected tests.
 
 CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python).
 

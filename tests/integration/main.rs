@@ -5,6 +5,19 @@
 //! cargo test --test integration -- --nocapture --test-threads=1
 //! ```
 
+// In strict live mode every existing `skip:` path fails closed. This keeps the
+// ordinary credential-optional suite ergonomic while preventing release QA
+// from reporting success when required behavior was not exercised.
+macro_rules! eprintln {
+    ($($arg:tt)*) => {{
+        let message = format!($($arg)*);
+        if crate::support::strict_live_enabled() && message.starts_with("skip:") {
+            panic!("strict live mode rejected soft skip: {message}");
+        }
+        std::eprintln!("{message}");
+    }};
+}
+
 mod account;
 mod account_admin;
 mod auth;

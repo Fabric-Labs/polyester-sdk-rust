@@ -2,8 +2,8 @@
 
 use crate::auth::{Credentials, encode_query_component};
 use crate::errors::{Error, Result};
-use http_body_util::Empty;
-use hyper::header::{HeaderName, HeaderValue};
+use http_body_util::{BodyExt, Empty, Limited};
+use hyper::header::{CONTENT_LENGTH, HeaderName, HeaderValue};
 use hyper::{Method, Request};
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
@@ -14,6 +14,9 @@ type HyperClient = Client<
     hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
     Empty<bytes::Bytes>,
 >;
+
+const TOKEN_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+const MAX_TOKEN_RESPONSE_BYTES: usize = 64 * 1024;
 
 pub fn connection_token_url(api_url: &str) -> String {
     format!("{}/v1/rt/token", api_url.trim_end_matches('/'))
@@ -72,14 +75,24 @@ async fn fetch_rt_token(creds: &Credentials, url: &str, label: &str) -> Result<S
         req.headers_mut().insert(name, value);
     }
 
-    let resp = client
-        .request(req)
+    let resp = tokio::time::timeout(TOKEN_REQUEST_TIMEOUT, client.request(req))
         .await
+        .map_err(|_| {
+            Error::realtime(format!(
+                "{label}: HTTP request timed out after {TOKEN_REQUEST_TIMEOUT:?}"
+            ))
+        })?
         .map_err(|e| Error::realtime(format!("{label}: HTTP request failed: {e}")))?;
     let status = resp.status();
-    let body = http_body_util::BodyExt::collect(resp.into_body())
+    if content_length_exceeds_limit(resp.headers(), MAX_TOKEN_RESPONSE_BYTES) {
+        return Err(Error::realtime(format!(
+            "{label}: response exceeds {MAX_TOKEN_RESPONSE_BYTES} bytes"
+        )));
+    }
+    let body = Limited::new(resp.into_body(), MAX_TOKEN_RESPONSE_BYTES)
+        .collect()
         .await
-        .map_err(|e| Error::realtime(format!("{label}: read body: {e}")))?
+        .map_err(|e| Error::realtime(format!("{label}: read bounded body: {e}")))?
         .to_bytes();
 
     if status.as_u16() == 401 {
@@ -97,6 +110,14 @@ async fn fetch_rt_token(creds: &Credentials, url: &str, label: &str) -> Result<S
         return Err(Error::realtime(format!("{label}: response missing token")));
     }
     Ok(payload.token)
+}
+
+fn content_length_exceeds_limit(headers: &http::HeaderMap, max_bytes: usize) -> bool {
+    headers
+        .get(CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<usize>().ok())
+        .is_some_and(|length| length > max_bytes)
 }
 
 fn build_http_client() -> Result<HyperClient> {
@@ -142,5 +163,26 @@ mod tests {
             !canonical_query(&url).contains("%2D"),
             "hyphens must not be percent-encoded in the signed query"
         );
+    }
+
+    #[test]
+    fn realtime_token_exchange_has_finite_limits() {
+        assert_eq!(TOKEN_REQUEST_TIMEOUT, Duration::from_secs(10));
+        assert_eq!(MAX_TOKEN_RESPONSE_BYTES, 64 * 1024);
+    }
+
+    #[test]
+    fn content_length_above_cap_is_rejected() {
+        let mut headers = http::HeaderMap::new();
+        headers.insert(CONTENT_LENGTH, HeaderValue::from_static("65537"));
+        assert!(content_length_exceeds_limit(
+            &headers,
+            MAX_TOKEN_RESPONSE_BYTES
+        ));
+        headers.insert(CONTENT_LENGTH, HeaderValue::from_static("1024"));
+        assert!(!content_length_exceeds_limit(
+            &headers,
+            MAX_TOKEN_RESPONSE_BYTES
+        ));
     }
 }
