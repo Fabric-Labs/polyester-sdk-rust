@@ -21,7 +21,7 @@ use tokio::sync::OnceCell;
 use crate::realtime::Client as RealtimeClient;
 
 /// Client configuration.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Config {
     pub api_key_id: Option<String>,
     pub api_private_key: Option<String>,
@@ -32,6 +32,25 @@ pub struct Config {
     pub timeout: Duration,
     pub wire_format: WireFormat,
     pub hydrate_catalogs: bool,
+}
+
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("api_key_id", &self.api_key_id)
+            .field(
+                "api_private_key",
+                &self.api_private_key.as_ref().map(|_| "[REDACTED]"),
+            )
+            .field("api_url", &self.api_url)
+            .field("ws_url", &self.ws_url)
+            .field("default_sub_account_id", &self.default_sub_account_id)
+            .field("default_account_id", &self.default_account_id)
+            .field("timeout", &self.timeout)
+            .field("wire_format", &self.wire_format)
+            .field("hydrate_catalogs", &self.hydrate_catalogs)
+            .finish()
+    }
 }
 
 impl Default for Config {
@@ -322,6 +341,19 @@ mod tests {
         assert_eq!(cfg.api_url, DEFAULT_API_URL);
         assert!(cfg.hydrate_catalogs);
         assert!(cfg.api_key_id.is_none());
+    }
+
+    #[test]
+    fn config_debug_redacts_private_key() {
+        let config = Config {
+            api_key_id: Some("ak_test".into()),
+            api_private_key: Some("super-secret-private-key".into()),
+            ..Default::default()
+        };
+        let rendered = format!("{config:?}");
+        assert!(rendered.contains("ak_test"));
+        assert!(rendered.contains("[REDACTED]"));
+        assert!(!rendered.contains("super-secret-private-key"));
     }
 
     #[test]

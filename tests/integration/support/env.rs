@@ -23,6 +23,12 @@ pub fn env_truthy(name: &str) -> bool {
     }
 }
 
+/// Fail every `skip:` path closed during release/staging acceptance QA.
+pub fn strict_live_enabled() -> bool {
+    load_dotenv();
+    env_truthy("POLYESTER_TEST_STRICT_LIVE")
+}
+
 /// Soft-skip unless `POLYESTER_TEST_MUTATION` is truthy. Returns false when skipped.
 pub fn require_mutation() -> bool {
     load_dotenv();

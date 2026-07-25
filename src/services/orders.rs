@@ -840,7 +840,7 @@ impl OrdersService {
         }
     }
 
-    /// Subscribe to private order updates for an account (requires `realtime` feature).
+    /// Subscribe to private order updates for an account.
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,

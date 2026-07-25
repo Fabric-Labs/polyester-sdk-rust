@@ -3,7 +3,8 @@
 //! Gated by `POLYESTER_TEST_CHAIN_USEROP=1` plus `POLYESTER_OWNER_PRIVATE_KEY`.
 
 use crate::support::{
-    call_required, load_dotenv, require_funded, require_live_client, trading_balance_raw,
+    call_required, load_dotenv, require_funded, require_live_client, require_mutation,
+    trading_balance_raw,
 };
 use alloy_primitives::U256;
 use polyester::chain::{
@@ -68,6 +69,9 @@ fn funding_balance_raw(balances: &[polyester::models::AssetBalance], asset_id: u
 
 #[tokio::test]
 async fn funding_to_trading_userop() {
+    if !require_mutation() {
+        return;
+    }
     if !require_funded() {
         return;
     }
@@ -142,6 +146,9 @@ async fn funding_to_trading_userop() {
 
 #[tokio::test]
 async fn funding_withdraw_to_chain_userop() {
+    if !require_mutation() {
+        return;
+    }
     if !require_funded() {
         return;
     }

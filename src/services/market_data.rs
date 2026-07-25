@@ -336,7 +336,7 @@ impl MarketOverviewService {
         Ok(market_overview_list_from_proto(&resp))
     }
 
-    /// Subscribe to public market overview batches (requires `realtime` feature).
+    /// Subscribe to public market overview batches.
     pub async fn subscribe(
         &self,
     ) -> Result<crate::realtime::TypedSubscription<MarketOverviewList>> {
@@ -349,7 +349,7 @@ impl MarketOverviewService {
             .await
     }
 
-    /// Snapshot-then-stream merged overview rows (requires `realtime` feature).
+    /// Snapshot-then-stream merged overview rows.
     pub async fn create_subscription(
         &self,
         opts: MarketOverviewCreateSubscriptionOptions,

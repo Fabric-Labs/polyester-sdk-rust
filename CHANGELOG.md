@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Fixed
+- Realtime now negotiates the `centrifuge-protobuf` WebSocket subprotocol and uses binary, length-delimited Centrifugo commands, replies, pings, and publications. Previous releases selected `:proto` channels while speaking the JSON client protocol, so subscriptions could handshake but receive no binary publications.
+- Concurrent authenticated calls now receive distinct monotonic signing timestamps, preventing identical same-millisecond requests from colliding with replay protection.
+- BUY trailing-stop requests are rejected locally because the wire strategy is SELL-only; they are no longer silently encoded as SELL.
+- Authentication failures without server detail now carry a non-empty fallback message.
+- `Config` Debug output redacts `api_private_key`.
+- Realtime subscription-token HTTP exchange enforces a 10s timeout and 64 KiB response body cap.
+
+### Changed
+- CI runs `cargo test --lib --test ui` only. Live `tests/integration` soft-skips without credentials and is local-only (`POLYESTER_TEST_STRICT_LIVE=1` for release QA).
+- Triggers expose string-ID helpers (`get_by_id` / `pause_by_id` / `resume_by_id` / `cancel_by_id`) for base58 public IDs.
+
 ## 0.1.0a9
 
 Package version: `0.1.0-alpha.9`. Git tag: `v0.1.0a9`.
