@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a11
+
+Package version: `0.1.0-alpha.11`. Git tag: `v0.1.0a11`.
+
 ### Breaking
 - `AssetBalance` drops `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`. Use `trading_revision` (orders trading/reserved/available) and `funding_revision` (orders funding independently) instead (POLY-3668).
 - `Manager::base_quantity_scale_for_symbol` / `base_quantity_scale_for_symbol_id` return `Option<u32>` and no longer invent scale `8` when unknown/unhydrated (POLY-3549). Decode-only paths keep an explicit `unwrap_or(8)`.
