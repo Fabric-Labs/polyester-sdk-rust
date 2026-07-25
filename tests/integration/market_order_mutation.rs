@@ -42,7 +42,10 @@ async fn market_buy_mutation() {
     let price = resolve_post_only_buy_limit_price(&client, &symbol, Some(&pair)).await;
     let qty = min_base_qty_for_pair(Some(&pair), &price);
     let ref_price = market_ref_price(&client, &symbol, "buy", Some(&pair)).await;
-    let scale = client.catalogs.base_quantity_scale_for_symbol(&symbol).expect("catalog scale");
+    let scale = client
+        .catalogs
+        .base_quantity_scale_for_symbol(&symbol)
+        .expect("catalog scale");
     let client_order_id = unique_client_order_id("mkt-buy");
 
     let params = CreateOrderParams {
@@ -140,7 +143,10 @@ async fn market_sell_mutation() {
     if !require_trading_base_balance(&client, &symbol, &qty).await {
         return;
     }
-    let scale = client.catalogs.base_quantity_scale_for_symbol(&symbol).expect("catalog scale");
+    let scale = client
+        .catalogs
+        .base_quantity_scale_for_symbol(&symbol)
+        .expect("catalog scale");
     let client_order_id = unique_client_order_id("mkt-sell");
 
     let params = CreateOrderParams {

@@ -36,7 +36,10 @@ async fn order_round_trip_mutation() {
             return;
         }
     };
-    let scale = client.catalogs.base_quantity_scale_for_symbol(&symbol).expect("catalog scale");
+    let scale = client
+        .catalogs
+        .base_quantity_scale_for_symbol(&symbol)
+        .expect("catalog scale");
     let client_order_id = unique_client_order_id("e2e");
 
     let mut params = CreateOrderParams {
