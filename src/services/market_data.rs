@@ -241,19 +241,38 @@ impl MarketDataService {
                     "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
                 ))
             })?;
-        // Validate timeframe aliases match get_candles.
-        let _ = parse_timeframe(timeframe)?;
+        // Live Centrifugo channels use human labels (`1m`), not REST enum names (`MIN_1`).
+        let resolved = parse_timeframe(timeframe)?;
+        let channel_tf = crate::codecs::decode::timeframe_label(resolved);
+        if channel_tf.is_empty() {
+            return Err(Error::validation(format!(
+                "unsupported candle interval {timeframe:?}"
+            )));
+        }
         let volume_scale = self
             .ctx
             .catalogs
             .base_quantity_scale_for_symbol_id(symbol_id);
-        let channel = format!("public:spot:market:candles:{timeframe}:{symbol_id}:proto");
+        let channel = format!("public:spot:market:candles:{channel_tf}:{symbol_id}:proto");
         let decode = crate::codecs::decode::candle_point_from_bytes(
             symbol_id,
-            timeframe.to_owned(),
+            channel_tf.to_owned(),
             volume_scale,
         );
         self.ctx.realtime.subscribe_proto(&channel, decode).await
+    }
+
+    /// Channel segment for candle subscriptions after alias normalization.
+    #[cfg(test)]
+    pub(crate) fn candle_channel_timeframe(timeframe: &str) -> Result<&'static str> {
+        let resolved = parse_timeframe(timeframe)?;
+        let label = crate::codecs::decode::timeframe_label(resolved);
+        if label.is_empty() {
+            return Err(Error::validation(format!(
+                "unsupported candle interval {timeframe:?}"
+            )));
+        }
+        Ok(label)
     }
 }
 
@@ -370,12 +389,14 @@ impl MarketOverviewService {
         let closed = Arc::new(AtomicBool::new(false));
         let last_error: Arc<Mutex<Option<crate::Error>>> = Arc::new(Mutex::new(None));
         let (tx, rx) = mpsc::channel::<Vec<MarketOverviewEntry>>(50);
+        let tx_slot: Arc<Mutex<Option<mpsc::Sender<Vec<MarketOverviewEntry>>>>> =
+            Arc::new(Mutex::new(Some(tx)));
 
         let emit = {
             let by_symbol_id = by_symbol_id.clone();
             let closed = closed.clone();
             let last_error = last_error.clone();
-            let tx = tx.clone();
+            let tx_slot = tx_slot.clone();
             Arc::new(move || {
                 if closed.load(std::sync::atomic::Ordering::SeqCst) {
                     return;
@@ -386,8 +407,12 @@ impl MarketOverviewService {
                     .values()
                     .cloned()
                     .collect();
+                let guard = tx_slot.lock().expect("tx slot");
+                let Some(tx) = guard.as_ref() else {
+                    return;
+                };
                 let _ = crate::realtime::try_enqueue(
-                    &tx,
+                    tx,
                     rows,
                     &closed,
                     &last_error,
@@ -455,8 +480,13 @@ impl MarketOverviewService {
             on_snapshot_refresh: None,
         });
 
-        let subscription =
-            crate::marketoverview::Subscription::new(rx, stream.clone(), closed, last_error);
+        let subscription = crate::marketoverview::Subscription::new(
+            rx,
+            stream.clone(),
+            closed,
+            last_error,
+            tx_slot,
+        );
         if let Err(err) = stream.start().await {
             subscription.close();
             return Err(err);
@@ -568,13 +598,17 @@ impl OrderbookService {
         let closed = Arc::new(AtomicBool::new(false));
         let last_error: Arc<Mutex<Option<crate::Error>>> = Arc::new(Mutex::new(None));
         let (tx, rx) = mpsc::channel::<OrderbookData>(200);
+        // Dropping this slot closes the consumer channel so recv() cannot hang
+        // forever after close/error.
+        let tx_slot: Arc<Mutex<Option<mpsc::Sender<OrderbookData>>>> =
+            Arc::new(Mutex::new(Some(tx)));
 
         let emit = {
             let state = state.clone();
             let bucket_ticks = bucket_ticks.clone();
             let closed = closed.clone();
             let last_error = last_error.clone();
-            let tx = tx.clone();
+            let tx_slot = tx_slot.clone();
             let symbol = symbol.clone();
             Arc::new(move || {
                 if closed.load(std::sync::atomic::Ordering::SeqCst) {
@@ -594,8 +628,12 @@ impl OrderbookService {
                     ticks,
                     quantity_scale,
                 );
+                let guard = tx_slot.lock().expect("tx slot");
+                let Some(tx) = guard.as_ref() else {
+                    return;
+                };
                 let _ = crate::realtime::try_enqueue(
-                    &tx,
+                    tx,
                     data,
                     &closed,
                     &last_error,
@@ -651,13 +689,30 @@ impl OrderbookService {
                 let state = state.clone();
                 let handle_delta = handle_delta.clone();
                 let emit = emit.clone();
+                let stream_slot = stream_slot.clone();
+                let last_error = last_error.clone();
                 Arc::new(
                     move |snapshot: OrderbookData, buffered: Vec<OrderBookDeltaUpdate>| {
+                        let parsed_seq = match snapshot.book_seq.parse::<u64>() {
+                            Ok(seq) => seq,
+                            Err(_) => {
+                                // Fail toward refresh — never treat garbage as seq 0 silently.
+                                *last_error.lock().expect("error lock") = Some(Error::realtime(
+                                    "orderbook snapshot book_seq is not a valid u64".to_owned(),
+                                ));
+                                if let Some(stream) =
+                                    stream_slot.lock().expect("stream slot").as_ref()
+                                {
+                                    stream.request_refresh();
+                                }
+                                return;
+                            }
+                        };
                         {
                             let mut s = state.lock().expect("book lock");
                             s.bids = levels_from_orderbook_side(&snapshot.bids);
                             s.asks = levels_from_orderbook_side(&snapshot.asks);
-                            s.book_seq = snapshot.book_seq.parse().unwrap_or(0);
+                            s.book_seq = parsed_seq;
                         }
                         for delta in buffered {
                             handle_delta(delta);
@@ -687,6 +742,7 @@ impl OrderbookService {
             bucket_ticks,
             emit,
             last_error,
+            tx_slot,
         );
         if let Err(err) = stream.start().await {
             subscription.close();
@@ -699,5 +755,88 @@ impl OrderbookService {
 struct BookState {
     bids: crate::orderbook::BookSide,
     asks: crate::orderbook::BookSide,
-    book_seq: i64,
+    book_seq: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::{Arc, Mutex};
+    use tokio::sync::mpsc;
+
+    #[test]
+    fn candle_channel_normalizes_aliases_to_human_label() {
+        for alias in ["1m", "MIN_1", "min1", "Min_1"] {
+            assert_eq!(
+                MarketDataService::candle_channel_timeframe(alias).unwrap(),
+                "1m",
+                "alias {alias}"
+            );
+        }
+        assert_eq!(
+            MarketDataService::candle_channel_timeframe("1h").unwrap(),
+            "1h"
+        );
+    }
+
+    #[tokio::test]
+    async fn orderbook_close_unblocks_recv() {
+        let (tx, rx) = mpsc::channel::<crate::models::OrderbookData>(2);
+        let tx_slot = Arc::new(Mutex::new(Some(tx)));
+        let closed = Arc::new(AtomicBool::new(false));
+        let last_error = Arc::new(Mutex::new(None));
+        let stream =
+            crate::realtime::SnapshotThenStream::new(crate::realtime::SnapshotThenStreamConfig {
+                client: crate::realtime::Client::new(
+                    "wss://example.invalid",
+                    "https://example.invalid",
+                    None,
+                    None,
+                ),
+                channel: "public:test".into(),
+                decode: Arc::new(|_: &[u8]| {
+                    Ok(crate::models::OrderBookDeltaUpdate {
+                        symbol_id: 1,
+                        book_seq_start: 1,
+                        book_seq_end: 1,
+                        reset: false,
+                        bids: vec![],
+                        asks: vec![],
+                    })
+                }),
+                fetch_snapshot: Arc::new(|| {
+                    Box::pin(async {
+                        Ok(crate::models::OrderbookData {
+                            symbol: "BTC-USDT".into(),
+                            depth: 1,
+                            book_seq: "1".into(),
+                            bids: vec![],
+                            asks: vec![],
+                        })
+                    })
+                }),
+                read_publication: Arc::new(|d| vec![d]),
+                apply_snapshot: Arc::new(|_, _| {}),
+                apply_live_publications: Arc::new(|_| {}),
+                max_buffered: 10,
+                on_reconnect: None,
+                on_snapshot_refresh: None,
+            });
+        let mut sub = crate::orderbook::Subscription::new(
+            rx,
+            stream,
+            closed,
+            Arc::new(Mutex::new(0)),
+            Arc::new(|| {}),
+            last_error,
+            tx_slot,
+        );
+        sub.close();
+        let finished =
+            tokio::time::timeout(std::time::Duration::from_secs(1), sub.updates().recv())
+                .await
+                .expect("recv must not hang after close");
+        assert!(finished.is_none());
+    }
 }

@@ -158,6 +158,7 @@ impl Client {
         let (stop_tx, stop_rx) = watch::channel(false);
         let alive = Arc::new(AtomicBool::new(true));
         let last_error = Arc::new(Mutex::new(None));
+        let gap = Arc::new(ResubscribeGap::default());
         let (ready_tx, ready_rx) = oneshot::channel();
         let (tx, rx) = mpsc::channel::<T>(self.max_queue);
         let decode = Arc::new(decode);
@@ -166,6 +167,7 @@ impl Client {
         let channel = channel.to_owned();
         let alive_task = alive.clone();
         let error_task = last_error.clone();
+        let gap_task = gap.clone();
         let task = tokio::spawn(async move {
             let _guard = AliveGuard(alive_task.clone());
             let mut ready = Some(ready_tx);
@@ -177,6 +179,7 @@ impl Client {
                         &tx,
                         &stop_rx,
                         &mut ready,
+                        &gap_task,
                     )
                     .await
                 {
@@ -212,6 +215,7 @@ impl Client {
             alive,
             task,
             last_error,
+            gap,
         })
     }
 
@@ -251,6 +255,7 @@ impl Client {
         tx: &mpsc::Sender<T>,
         stop: &watch::Receiver<bool>,
         ready: &mut Option<oneshot::Sender<Result<()>>>,
+        gap: &ResubscribeGap,
     ) -> Result<()>
     where
         F: Fn(&[u8]) -> Result<T>,
@@ -282,6 +287,11 @@ impl Client {
             .await?;
         if let Some(ready) = ready.take() {
             let _ = ready.send(Ok(()));
+        } else {
+            // Successful reconnect after the initial handshake: publications may
+            // have been lost (no Centrifugo recover/offset). Consumers must treat
+            // this as a possible gap.
+            gap.note_resubscribe();
         }
 
         loop {
@@ -292,7 +302,10 @@ impl Client {
                 Ok(Some(Ok(msg))) => msg,
                 Ok(Some(Err(e))) => return Err(Error::realtime(e.to_string())),
                 Ok(None) => return Err(Error::realtime("websocket closed".to_owned())),
-                Err(_) => continue,
+                // Half-open TCP: a read timeout is connection death, not a no-op.
+                Err(_) => {
+                    return Err(Error::realtime("websocket read timeout".to_owned()));
+                }
             };
             if *stop.borrow() {
                 return Ok(());
@@ -348,13 +361,31 @@ impl Client {
     }
 }
 
+#[derive(Default)]
+struct ResubscribeGap {
+    count: std::sync::atomic::AtomicU64,
+    latched: AtomicBool,
+}
+
+impl ResubscribeGap {
+    fn note_resubscribe(&self) {
+        self.count.fetch_add(1, Ordering::SeqCst);
+        self.latched.store(true, Ordering::SeqCst);
+    }
+}
+
 /// Handle for a typed protobuf realtime subscription.
+///
+/// After a transport reconnect the subscription is re-established without a
+/// server-side resume cursor. [`Self::resubscribes`] / [`Self::take_resubscribed`]
+/// signal that gap: publications may have been lost.
 pub struct TypedSubscription<T> {
     rx: mpsc::Receiver<T>,
     stop: watch::Sender<bool>,
     alive: Arc<AtomicBool>,
     task: tokio::task::JoinHandle<()>,
     last_error: Arc<Mutex<Option<Error>>>,
+    gap: Arc<ResubscribeGap>,
 }
 
 impl<T> TypedSubscription<T> {
@@ -375,6 +406,18 @@ impl<T> TypedSubscription<T> {
     /// Take and clear the most recent background error.
     pub fn take_err(&self) -> Option<Error> {
         self.last_error.lock().expect("error lock").take()
+    }
+
+    /// How many times this subscription successfully reconnected after the
+    /// initial connect. Non-zero means the stream may have gaps.
+    pub fn resubscribes(&self) -> u64 {
+        self.gap.count.load(Ordering::SeqCst)
+    }
+
+    /// Reports whether a reconnect/resubscribe happened since the last call and
+    /// clears the latch. The initial connect does not set the latch.
+    pub fn take_resubscribed(&self) -> bool {
+        self.gap.latched.swap(false, Ordering::SeqCst)
     }
 
     pub fn close(&self) {
@@ -578,6 +621,11 @@ mod tests {
         assert!(result.is_err(), "initial handshake error must be returned");
     }
 
+    #[test]
+    fn read_timeout_constant_is_positive() {
+        assert!(CENTRIFUGO_READ_TIMEOUT > Duration::from_secs(0));
+    }
+
     #[tokio::test]
     async fn dropping_typed_subscription_signals_stop() {
         let (stop, mut stop_rx) = watch::channel(false);
@@ -594,6 +642,7 @@ mod tests {
             alive,
             task,
             last_error: Arc::new(Mutex::new(None)),
+            gap: Arc::new(ResubscribeGap::default()),
         };
 
         drop(subscription);

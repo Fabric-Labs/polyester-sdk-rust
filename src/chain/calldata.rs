@@ -137,13 +137,21 @@ pub fn encode_funding_withdraw_to_chain(
     Ok(ChainCall { to, data, value: 0 })
 }
 
-fn resolve_guard_tuple(approval: Option<GuardApproval>) -> GuardApprovalTuple {
+fn resolve_guard_tuple(approval: Option<GuardApproval>) -> Result<GuardApprovalTuple> {
     let guard = approval.unwrap_or_default();
-    GuardApprovalTuple {
-        nonceSpace: alloy_primitives::Uint::<192, 3>::from(guard.nonce_space),
+    // Uint::<192>::from(U256) panics on overflow; validate then truncate via limbs.
+    if guard.nonce_space >= (U256::from(1u64) << 192) {
+        return Err(Error::validation(
+            "guard approval nonce_space exceeds uint192 range",
+        ));
+    }
+    let limbs = guard.nonce_space.into_limbs();
+    let nonce_space = alloy_primitives::Uint::<192, 3>::from_limbs([limbs[0], limbs[1], limbs[2]]);
+    Ok(GuardApprovalTuple {
+        nonceSpace: nonce_space,
         deadline: guard.deadline,
         signature: Bytes::from(guard.signature),
-    }
+    })
 }
 
 /// Encode `setExternalDestinationAllowlistRequired(bool,(uint192,uint256,bytes))`.
@@ -157,7 +165,7 @@ pub fn encode_set_external_destination_allowlist_required(
     let to = normalize_address(funding_account, "funding_account")?;
     let data = setExternalDestinationAllowlistRequiredCall {
         required,
-        guardSigIfFalse: resolve_guard_tuple(approval),
+        guardSigIfFalse: resolve_guard_tuple(approval)?,
     }
     .abi_encode();
     Ok(ChainCall { to, data, value: 0 })
@@ -172,7 +180,7 @@ pub fn encode_set_internal_account_allowlist_required(
     let to = normalize_address(funding_account, "funding_account")?;
     let data = setInternalAccountAllowlistRequiredCall {
         required,
-        guardSigIfFalse: resolve_guard_tuple(approval),
+        guardSigIfFalse: resolve_guard_tuple(approval)?,
     }
     .abi_encode();
     Ok(ChainCall { to, data, value: 0 })
@@ -245,7 +253,7 @@ fn encode_external_destinations(
         .iter()
         .map(|d| Bytes::copy_from_slice(d))
         .collect();
-    let data = pack(chain_id, dest_bytes, resolve_guard_tuple(approval));
+    let data = pack(chain_id, dest_bytes, resolve_guard_tuple(approval)?);
     Ok(ChainCall { to, data, value: 0 })
 }
 
@@ -285,7 +293,7 @@ fn encode_internal_accounts(
         .iter()
         .map(|a| parse_address(a, "accounts"))
         .collect::<Result<Vec<_>>>()?;
-    let data = pack(addrs, resolve_guard_tuple(approval));
+    let data = pack(addrs, resolve_guard_tuple(approval)?);
     Ok(ChainCall { to, data, value: 0 })
 }
 
@@ -310,7 +318,7 @@ pub fn encode_rotate_guard_signer(
     let signer_addr = parse_address(new_signer, "new_signer")?;
     let data = rotateSignerCall {
         newSigner: signer_addr,
-        approval: resolve_guard_tuple(approval),
+        approval: resolve_guard_tuple(approval)?,
     }
     .abi_encode();
     Ok(ChainCall { to, data, value: 0 })
@@ -528,6 +536,26 @@ mod tests {
         assert_eq!(decoded.newSigner, parse_address(SIGNER, "signer").unwrap());
         assert_eq!(decoded.approval.nonceSpace, alloy_primitives::Uint::from(1));
         assert_eq!(decoded.approval.deadline, U256::from(999u64));
+    }
+
+    #[test]
+    fn oversized_nonce_space_is_validation_error_not_panic() {
+        // 2^192 is one past uint192 max.
+        let approval = GuardApproval {
+            nonce_space: U256::from(2u64).pow(U256::from(192u64)),
+            deadline: U256::from(1u64),
+            signature: vec![],
+        };
+        let err = encode_rotate_guard_signer(
+            "0xd71F60FD6f784Cc0aD8c25441568C48705D95f64",
+            "0x7777777777777777777777777777777777777777",
+            Some(approval),
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("uint192"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

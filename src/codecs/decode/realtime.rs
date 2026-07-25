@@ -75,8 +75,8 @@ pub fn orderbook_delta_from_bytes(payload: &[u8]) -> Result<OrderBookDeltaUpdate
     let msg = decode_proto::<OrderBookDelta>(payload)?;
     Ok(OrderBookDeltaUpdate {
         symbol_id: msg.symbol_id,
-        book_seq_start: msg.book_seq_start.to_string(),
-        book_seq_end: msg.book_seq_end.to_string(),
+        book_seq_start: msg.book_seq_start,
+        book_seq_end: msg.book_seq_end,
         reset: msg.reset,
         bids: msg
             .bids

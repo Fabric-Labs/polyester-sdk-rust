@@ -9,8 +9,8 @@ pub struct PriceQtyPair {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderBookDeltaUpdate {
     pub symbol_id: u32,
-    pub book_seq_start: String,
-    pub book_seq_end: String,
+    pub book_seq_start: u64,
+    pub book_seq_end: u64,
     pub reset: bool,
     pub bids: Vec<PriceQtyPair>,
     pub asks: Vec<PriceQtyPair>,

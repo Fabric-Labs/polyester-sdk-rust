@@ -569,13 +569,7 @@ impl OrdersService {
             return Err(Error::validation("batch_modify requires at least one item"));
         }
         let scale_symbol = symbol.unwrap_or("");
-        let scale = if scale_symbol.is_empty() {
-            8
-        } else {
-            self.ctx
-                .catalogs
-                .base_quantity_scale_for_symbol(scale_symbol)
-        };
+        let scale = Self::resolve_batch_modify_scale(&self.ctx.catalogs, scale_symbol, &items)?;
         let mut proto_items = Vec::with_capacity(items.len());
         for item in items {
             let has_order = item.order_id.as_ref().is_some_and(|s| !s.is_empty());
@@ -840,6 +834,41 @@ impl OrdersService {
         }
     }
 
+    /// Resolve quantity scale for batch modify without inventing scale 8.
+    ///
+    /// When `symbol` is present, use the catalog. When absent, every `new_qty`
+    /// must already carry a known scale; otherwise fail loudly.
+    pub(crate) fn resolve_batch_modify_scale(
+        catalogs: &crate::catalogs::Manager,
+        symbol: &str,
+        items: &[BatchModifyItem],
+    ) -> Result<u32> {
+        if !symbol.is_empty() {
+            return Ok(catalogs.base_quantity_scale_for_symbol(symbol));
+        }
+        let mut inferred: Option<u32> = None;
+        for item in items {
+            let Some(qty) = item.new_qty.as_ref() else {
+                continue;
+            };
+            let Some(scale) = qty.scale else {
+                return Err(Error::validation(
+                    "batch_modify requires symbol when new_qty has no known scale",
+                ));
+            };
+            match inferred {
+                None => inferred = Some(scale),
+                Some(existing) if existing != scale => {
+                    return Err(Error::validation(
+                        "batch_modify without symbol requires consistent new_qty scales",
+                    ));
+                }
+                _ => {}
+            }
+        }
+        Ok(inferred.unwrap_or(0))
+    }
+
     /// Subscribe to private order updates for an account.
     pub async fn subscribe(
         &self,
@@ -906,6 +935,7 @@ impl TradesService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::codecs::scalars::format_id;
     use buffa::Message;
     use serde_json::json;
 
@@ -1004,6 +1034,49 @@ mod tests {
         let decimal_wire = client.orders.encode_modify_params(decimal).unwrap();
         let scaled_wire = client.orders.encode_modify_params(scaled).unwrap();
         assert_eq!(decimal_wire.encode_to_vec(), scaled_wire.encode_to_vec());
+    }
+
+    #[test]
+    fn batch_modify_rejects_missing_symbol_without_qty_scale() {
+        let catalogs = crate::catalogs::Manager::new();
+        let items = vec![BatchModifyItem {
+            order_id: Some(format_id(4)),
+            client_order_id: None,
+            new_price: None,
+            new_qty: Some(
+                Quantity::from_scaled(1, None, crate::QuantityDomain::OrderBase, None, None)
+                    .unwrap(),
+            ),
+            new_attached_risk: None,
+            behavior: None,
+            new_client_order_id: None,
+        }];
+        let err = OrdersService::resolve_batch_modify_scale(&catalogs, "", &items).unwrap_err();
+        assert!(
+            err.to_string().contains("requires symbol"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn batch_modify_allows_missing_symbol_when_qty_scale_known() {
+        let catalogs = crate::catalogs::Manager::new();
+        let items = vec![BatchModifyItem {
+            order_id: Some(format_id(4)),
+            client_order_id: None,
+            new_price: None,
+            new_qty: Some(
+                Quantity::from_scaled(1, Some(8), crate::QuantityDomain::OrderBase, None, None)
+                    .unwrap(),
+            ),
+            new_attached_risk: None,
+            behavior: None,
+            new_client_order_id: None,
+        }];
+        assert_eq!(
+            OrdersService::resolve_batch_modify_scale(&catalogs, "", &items).unwrap(),
+            8
+        );
     }
 
     #[test]
