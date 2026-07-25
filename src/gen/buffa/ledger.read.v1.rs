@@ -1242,6 +1242,10 @@ pub const __ASSET_BALANCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetBalancesResponse {
+    /// One entry for every supported unified asset, including assets with zero
+    /// balances. Sorted by available trading amount (highest first), then by
+    /// asset symbol alphabetically.
+    ///
     /// Field 1: `balances`
     #[serde(
         rename = "balances",
@@ -1865,10 +1869,13 @@ pub const __BALANCE_SERIES_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
     from_json: ::buffa::type_registry::any_from_json::<BalanceSeries>,
     is_wkt: false,
 };
+/// GetBalanceHistoryResponse returns aligned balance chart series.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetBalanceHistoryResponse {
+    /// Resolved history window.
+    ///
     /// Field 1: `range`
     #[serde(
         rename = "range",
@@ -1876,6 +1883,8 @@ pub struct GetBalanceHistoryResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub range: ::buffa::EnumValue<BalanceRange>,
+    /// Sampling interval between points, such as "5m" or "1h".
+    ///
     /// Field 2: `bucket`
     #[serde(
         rename = "bucket",
@@ -1883,6 +1892,8 @@ pub struct GetBalanceHistoryResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub bucket: ::buffa::alloc::string::String,
+    /// First point timestamp in seconds since epoch (UTC).
+    ///
     /// Field 3: `start_ts_sec`
     #[serde(
         rename = "startTsSec",
@@ -1891,6 +1902,8 @@ pub struct GetBalanceHistoryResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub start_ts_sec: u32,
+    /// Last point timestamp in seconds since epoch (UTC).
+    ///
     /// Field 4: `end_ts_sec`
     #[serde(
         rename = "endTsSec",
@@ -1899,6 +1912,8 @@ pub struct GetBalanceHistoryResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub end_ts_sec: u32,
+    /// Number of aligned points in each returned series.
+    ///
     /// Field 5: `points`
     #[serde(
         rename = "points",
@@ -1906,6 +1921,8 @@ pub struct GetBalanceHistoryResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub points: u32,
+    /// Balance series ordered by asset ID, then account bucket.
+    ///
     /// Field 6: `series`
     #[serde(
         rename = "series",
@@ -3064,10 +3081,13 @@ pub mod equity_series {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::equity_series::Grouping as GroupingView;
 }
+/// GetEquityHistorySeriesResponse returns aligned equity chart series.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetEquityHistorySeriesResponse {
+    /// Resolved history window.
+    ///
     /// Field 1: `range`
     #[serde(
         rename = "range",
@@ -3075,6 +3095,8 @@ pub struct GetEquityHistorySeriesResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub range: ::buffa::EnumValue<BalanceRange>,
+    /// Sampling interval between points, such as "5m" or "1h".
+    ///
     /// Field 2: `bucket`
     #[serde(
         rename = "bucket",
@@ -3082,6 +3104,8 @@ pub struct GetEquityHistorySeriesResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub bucket: ::buffa::alloc::string::String,
+    /// First point timestamp in seconds since epoch (UTC).
+    ///
     /// Field 3: `start_ts_sec`
     #[serde(
         rename = "startTsSec",
@@ -3090,6 +3114,8 @@ pub struct GetEquityHistorySeriesResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub start_ts_sec: u32,
+    /// Last point timestamp in seconds since epoch (UTC).
+    ///
     /// Field 4: `end_ts_sec`
     #[serde(
         rename = "endTsSec",
@@ -3108,6 +3134,8 @@ pub struct GetEquityHistorySeriesResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub quote_asset: ::buffa::alloc::string::String,
+    /// Number of aligned points in each returned series.
+    ///
     /// Field 7: `points`
     #[serde(
         rename = "points",
@@ -3115,6 +3143,8 @@ pub struct GetEquityHistorySeriesResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub points: u32,
+    /// Equity series ordered by grouping identifier ascending.
+    ///
     /// Field 8: `series`
     #[serde(
         rename = "series",
@@ -4774,6 +4804,8 @@ pub struct HoldRow {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub asset_id: u32,
+    /// Expiration time in nanoseconds since epoch (UTC).
+    ///
     /// Field 4: `expires_at_ns`
     #[serde(
         rename = "expiresAtNs",
@@ -4954,6 +4986,8 @@ pub const __HOLD_ROW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::t
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListHoldsResponse {
+    /// Hold rows in the sort direction requested by the caller.
+    ///
     /// Field 1: `holds`
     #[serde(
         rename = "holds",
@@ -6197,6 +6231,10 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct GetBalancesResponseView<'a> {
+            /// One entry for every supported unified asset, including assets with zero
+            /// balances. Sorted by available trading amount (highest first), then by
+            /// asset symbol alphabetically.
+            ///
             /// Field 1: `balances`
             pub balances: ::buffa::RepeatedView<
                 'a,
@@ -6445,6 +6483,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
+            /// One entry for every supported unified asset, including assets with zero
+            /// balances. Sorted by available trading amount (highest first), then by
+            /// asset symbol alphabetically.
+            ///
             /// Field 1: `balances`
             #[must_use]
             pub fn balances(
@@ -7309,18 +7351,31 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// GetBalanceHistoryResponse returns aligned balance chart series.
         #[derive(Clone, Debug, Default)]
         pub struct GetBalanceHistoryResponseView<'a> {
+            /// Resolved history window.
+            ///
             /// Field 1: `range`
             pub range: ::buffa::EnumValue<super::super::BalanceRange>,
+            /// Sampling interval between points, such as "5m" or "1h".
+            ///
             /// Field 2: `bucket`
             pub bucket: &'a str,
+            /// First point timestamp in seconds since epoch (UTC).
+            ///
             /// Field 3: `start_ts_sec`
             pub start_ts_sec: u32,
+            /// Last point timestamp in seconds since epoch (UTC).
+            ///
             /// Field 4: `end_ts_sec`
             pub end_ts_sec: u32,
+            /// Number of aligned points in each returned series.
+            ///
             /// Field 5: `points`
             pub points: u32,
+            /// Balance series ordered by asset ID, then account bucket.
+            ///
             /// Field 6: `series`
             pub series: ::buffa::RepeatedView<
                 'a,
@@ -7681,31 +7736,43 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
+            /// Resolved history window.
+            ///
             /// Field 1: `range`
             #[must_use]
             pub fn range(&self) -> ::buffa::EnumValue<super::super::BalanceRange> {
                 self.0.reborrow().range
             }
+            /// Sampling interval between points, such as "5m" or "1h".
+            ///
             /// Field 2: `bucket`
             #[must_use]
             pub fn bucket(&self) -> &'_ str {
                 self.0.reborrow().bucket
             }
+            /// First point timestamp in seconds since epoch (UTC).
+            ///
             /// Field 3: `start_ts_sec`
             #[must_use]
             pub fn start_ts_sec(&self) -> u32 {
                 self.0.reborrow().start_ts_sec
             }
+            /// Last point timestamp in seconds since epoch (UTC).
+            ///
             /// Field 4: `end_ts_sec`
             #[must_use]
             pub fn end_ts_sec(&self) -> u32 {
                 self.0.reborrow().end_ts_sec
             }
+            /// Number of aligned points in each returned series.
+            ///
             /// Field 5: `points`
             #[must_use]
             pub fn points(&self) -> u32 {
                 self.0.reborrow().points
             }
+            /// Balance series ordered by asset ID, then account bucket.
+            ///
             /// Field 6: `series`
             #[must_use]
             pub fn series(
@@ -9264,22 +9331,35 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// GetEquityHistorySeriesResponse returns aligned equity chart series.
         #[derive(Clone, Debug, Default)]
         pub struct GetEquityHistorySeriesResponseView<'a> {
+            /// Resolved history window.
+            ///
             /// Field 1: `range`
             pub range: ::buffa::EnumValue<super::super::BalanceRange>,
+            /// Sampling interval between points, such as "5m" or "1h".
+            ///
             /// Field 2: `bucket`
             pub bucket: &'a str,
+            /// First point timestamp in seconds since epoch (UTC).
+            ///
             /// Field 3: `start_ts_sec`
             pub start_ts_sec: u32,
+            /// Last point timestamp in seconds since epoch (UTC).
+            ///
             /// Field 4: `end_ts_sec`
             pub end_ts_sec: u32,
             /// Human-readable quote asset symbol (always "USDT").
             ///
             /// Field 6: `quote_asset`
             pub quote_asset: &'a str,
+            /// Number of aligned points in each returned series.
+            ///
             /// Field 7: `points`
             pub points: u32,
+            /// Equity series ordered by grouping identifier ascending.
+            ///
             /// Field 8: `series`
             pub series: ::buffa::RepeatedView<
                 'a,
@@ -9719,21 +9799,29 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
+            /// Resolved history window.
+            ///
             /// Field 1: `range`
             #[must_use]
             pub fn range(&self) -> ::buffa::EnumValue<super::super::BalanceRange> {
                 self.0.reborrow().range
             }
+            /// Sampling interval between points, such as "5m" or "1h".
+            ///
             /// Field 2: `bucket`
             #[must_use]
             pub fn bucket(&self) -> &'_ str {
                 self.0.reborrow().bucket
             }
+            /// First point timestamp in seconds since epoch (UTC).
+            ///
             /// Field 3: `start_ts_sec`
             #[must_use]
             pub fn start_ts_sec(&self) -> u32 {
                 self.0.reborrow().start_ts_sec
             }
+            /// Last point timestamp in seconds since epoch (UTC).
+            ///
             /// Field 4: `end_ts_sec`
             #[must_use]
             pub fn end_ts_sec(&self) -> u32 {
@@ -9746,11 +9834,15 @@ pub mod __buffa {
             pub fn quote_asset(&self) -> &'_ str {
                 self.0.reborrow().quote_asset
             }
+            /// Number of aligned points in each returned series.
+            ///
             /// Field 7: `points`
             #[must_use]
             pub fn points(&self) -> u32 {
                 self.0.reborrow().points
             }
+            /// Equity series ordered by grouping identifier ascending.
+            ///
             /// Field 8: `series`
             #[must_use]
             pub fn series(
@@ -12175,6 +12267,8 @@ pub mod __buffa {
             ///
             /// Field 3: `asset_id`
             pub asset_id: u32,
+            /// Expiration time in nanoseconds since epoch (UTC).
+            ///
             /// Field 4: `expires_at_ns`
             pub expires_at_ns: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -12522,6 +12616,8 @@ pub mod __buffa {
             pub fn asset_id(&self) -> u32 {
                 self.0.reborrow().asset_id
             }
+            /// Expiration time in nanoseconds since epoch (UTC).
+            ///
             /// Field 4: `expires_at_ns`
             #[must_use]
             pub fn expires_at_ns(&self) -> u64 {
@@ -12560,6 +12656,8 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListHoldsResponseView<'a> {
+            /// Hold rows in the sort direction requested by the caller.
+            ///
             /// Field 1: `holds`
             pub holds: ::buffa::RepeatedView<
                 'a,
@@ -12832,6 +12930,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
+            /// Hold rows in the sort direction requested by the caller.
+            ///
             /// Field 1: `holds`
             #[must_use]
             pub fn holds(
