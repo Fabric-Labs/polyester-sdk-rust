@@ -40,7 +40,7 @@ async fn trigger_pause_resume_cancel() {
                 return;
             }
         };
-    let scale = client.catalogs.base_quantity_scale_for_symbol(&symbol);
+    let scale = client.catalogs.base_quantity_scale_for_symbol(&symbol).expect("catalog scale");
     let client_trigger_id = unique_client_order_id("trg");
 
     let trigger_price = match Price::from_decimal_str(&trigger_price, Some(symbol.clone())) {

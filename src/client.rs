@@ -132,12 +132,15 @@ impl Client {
             None,
         );
 
+        let catalog_ready = Arc::new(OnceCell::new());
         let ctx = ServiceContext {
             factory,
             catalogs: catalogs.clone(),
             default_sub_account_id: config.default_sub_account_id.clone(),
             default_account_id: config.default_account_id.clone(),
             realtime: realtime.clone(),
+            catalog_ready: catalog_ready.clone(),
+            hydrate_catalogs_enabled,
         };
 
         let client = Self {
@@ -172,7 +175,7 @@ impl Client {
             layout: LayoutService::new(ctx.clone()),
             guard_signer: GuardSignerService::new(ctx.clone()),
             withdraw: WithdrawService::new(ctx),
-            catalog_ready: Arc::new(OnceCell::new()),
+            catalog_ready,
             hydrate_catalogs_enabled,
         };
 
@@ -214,12 +217,16 @@ impl Client {
             credentials,
             None,
         );
+        let catalog_ready = Arc::new(OnceCell::new());
+        let hydrate_catalogs_enabled = config.hydrate_catalogs;
         let ctx = ServiceContext {
             factory,
             catalogs: catalogs.clone(),
             default_sub_account_id: config.default_sub_account_id.clone(),
             default_account_id: config.default_account_id.clone(),
             realtime: realtime.clone(),
+            catalog_ready: catalog_ready.clone(),
+            hydrate_catalogs_enabled,
         };
         let client = Self {
             api_url: config.api_url,
@@ -253,8 +260,8 @@ impl Client {
             layout: LayoutService::new(ctx.clone()),
             guard_signer: GuardSignerService::new(ctx.clone()),
             withdraw: WithdrawService::new(ctx),
-            catalog_ready: Arc::new(OnceCell::new()),
-            hydrate_catalogs_enabled: config.hydrate_catalogs,
+            catalog_ready,
+            hydrate_catalogs_enabled,
         };
         client.start_catalog_hydration();
         Ok(client)
@@ -362,7 +369,7 @@ mod tests {
         assert!(!client.api_url.is_empty());
         assert_eq!(
             client.catalogs.base_quantity_scale_for_symbol("BTC-USDT"),
-            8
+            None
         );
         // Touch service handles so the surface stays wired.
         let _ = (
