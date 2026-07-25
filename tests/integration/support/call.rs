@@ -98,13 +98,23 @@ pub fn is_internal_order_error(err: &Error) -> bool {
 }
 
 pub fn is_notional_validation(err: &Error) -> bool {
-    matches!(
-        err,
-        Error::Validation(msg) if msg.to_ascii_lowercase().contains("notional")
-    ) || matches!(
-        err,
-        Error::Api { message, .. } if message.to_ascii_lowercase().contains("notional")
-    )
+    fn is_minimum_notional_text(message: &str) -> bool {
+        let message = message.to_ascii_lowercase();
+        message.contains("min notional")
+            || message.contains("minimum notional")
+            || message.contains("below min notional")
+            || message.contains("below the minimum notional")
+    }
+
+    matches!(err, Error::Validation(message) if is_minimum_notional_text(message))
+        || matches!(
+            err,
+            Error::Api { code, message, .. }
+                if matches!(
+                    code.to_ascii_uppercase().as_str(),
+                    "ERROR_CODE_MIN_NOTIONAL" | "MIN_NOTIONAL"
+                ) || is_minimum_notional_text(message)
+        )
 }
 
 /// Run a required live RPC (fail on route-not-found).
@@ -163,5 +173,22 @@ mod tests {
              authentication failed",
         );
         assert!(!devnet_proto_mismatch(&err));
+    }
+
+    #[test]
+    fn maximum_policy_notional_is_not_minimum_order_sizing() {
+        let maximum = Error::Api {
+            message: "Order notional exceeds the maximum allowed".into(),
+            code: "ERROR_CODE_POLICY_MAX_NOTIONAL".into(),
+            metadata: Vec::new(),
+        };
+        assert!(!is_notional_validation(&maximum));
+
+        let minimum = Error::Api {
+            message: "Order sizing below minimum notional".into(),
+            code: "ERROR_CODE_MIN_NOTIONAL".into(),
+            metadata: Vec::new(),
+        };
+        assert!(is_notional_validation(&minimum));
     }
 }

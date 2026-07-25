@@ -88,6 +88,20 @@ impl TriggersService {
         Ok(get_trigger_from_proto(&resp))
     }
 
+    /// Retrieve a trigger using the public string ID returned by create and list calls.
+    pub async fn get_by_id(
+        &self,
+        trigger_id: &str,
+        subaccount_id: Option<u64>,
+    ) -> Result<Option<Trigger>> {
+        self.get(GetTriggerRequest {
+            trigger_id: id_to_u64(trigger_id, "trigger_id")?,
+            subaccount_id,
+            ..Default::default()
+        })
+        .await
+    }
+
     fn encode_create_params(&self, params: &CreateTriggerParams) -> Result<CreateTriggerRequest> {
         let scale = self
             .ctx
@@ -143,8 +157,10 @@ impl TriggersService {
                 }
             }
             CreateTriggerType::TrailingStop => {
-                // Trailing stop is an implicit SELL market-IOC strategy; side,
-                // order_type, tif, and post_only are ignored.
+                // The wire strategy has no side field and executes as SELL.
+                if !matches!(params.side, CreateSide::Sell) {
+                    return Err(Error::validation("trailing_stop only supports side=sell"));
+                }
                 let mut trailing = TrailingStopTrigger::default();
                 if let Some(ticks) = params.trailing_distance_ticks {
                     trailing.trailing_distance =
@@ -391,6 +407,20 @@ impl TriggersService {
         Ok(trigger_mutation_from_cancel(&resp))
     }
 
+    /// Cancel a trigger using the public string ID returned by create and list calls.
+    pub async fn cancel_by_id(
+        &self,
+        trigger_id: &str,
+        subaccount_id: Option<u64>,
+    ) -> Result<TriggerMutationResult> {
+        self.cancel(CancelTriggerRequest {
+            trigger_id: id_to_u64(trigger_id, "trigger_id")?,
+            subaccount_id,
+            ..Default::default()
+        })
+        .await
+    }
+
     pub async fn pause(&self, req: PauseTriggerRequest) -> Result<TriggerMutationResult> {
         let client = self.client();
         let resp = unary::await_auth(
@@ -404,6 +434,20 @@ impl TriggersService {
         Ok(trigger_mutation_from_pause(&resp))
     }
 
+    /// Pause a trigger using the public string ID returned by create and list calls.
+    pub async fn pause_by_id(
+        &self,
+        trigger_id: &str,
+        subaccount_id: Option<u64>,
+    ) -> Result<TriggerMutationResult> {
+        self.pause(PauseTriggerRequest {
+            trigger_id: id_to_u64(trigger_id, "trigger_id")?,
+            subaccount_id,
+            ..Default::default()
+        })
+        .await
+    }
+
     pub async fn resume(&self, req: ResumeTriggerRequest) -> Result<TriggerMutationResult> {
         let client = self.client();
         let resp = unary::await_auth(
@@ -415,6 +459,20 @@ impl TriggersService {
         .await?
         .into_owned();
         Ok(trigger_mutation_from_resume(&resp))
+    }
+
+    /// Resume a trigger using the public string ID returned by create and list calls.
+    pub async fn resume_by_id(
+        &self,
+        trigger_id: &str,
+        subaccount_id: Option<u64>,
+    ) -> Result<TriggerMutationResult> {
+        self.resume(ResumeTriggerRequest {
+            trigger_id: id_to_u64(trigger_id, "trigger_id")?,
+            subaccount_id,
+            ..Default::default()
+        })
+        .await
     }
 
     /// Modify a trigger. Price fields must be `Price` wrappers.
@@ -590,6 +648,58 @@ mod tests {
     }
 
     #[test]
+    fn trailing_stop_rejects_buy() {
+        let client = client();
+        let mut params = create_params(
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+        params.trigger_type = CreateTriggerType::TrailingStop;
+        params.side = CreateSide::Buy;
+        params.trailing_distance_bps = Some(100);
+        let err = client.triggers.encode_create_params(&params).unwrap_err();
+        assert!(err.to_string().contains("only supports side=sell"), "{err}");
+    }
+
+    #[test]
+    fn trailing_stop_sell_encodes_trailing_strategy() {
+        use crate::proto::triggers::v1::trigger_intent::Strategy;
+
+        let client = client();
+        let mut params = create_params(
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+        params.trigger_type = CreateTriggerType::TrailingStop;
+        params.side = CreateSide::Sell;
+        params.trailing_distance_bps = Some(100);
+        params.trigger_price = None;
+        params.limit_price = None;
+        let wire = client.triggers.encode_create_params(&params).unwrap();
+        let intent = wire.trigger.expect("trigger intent");
+        assert!(
+            matches!(intent.strategy, Some(Strategy::TrailingStop(_))),
+            "expected TrailingStop strategy, got {:?}",
+            intent.strategy
+        );
+    }
+
+    #[test]
+    fn lifecycle_helpers_accept_base58_trigger_ids() {
+        let client = client();
+        let encoded = bs58::encode(42_u64.to_be_bytes()).into_string();
+        let params = ModifyTriggerParams {
+            trigger_id: encoded,
+            trailing_distance_bps: Some(50),
+            ..modify_params(None, None, None)
+        };
+        let wire = client.triggers.encode_modify_params(&params).unwrap();
+        assert_eq!(wire.trigger_id, 42);
+    }
+
+    #[test]
     fn trigger_modify_requires_a_patch() {
         let client = client();
         let params = ModifyTriggerParams {
@@ -604,6 +714,13 @@ mod tests {
             max_slippage_bps: None,
         };
         assert!(client.triggers.encode_modify_params(&params).is_err());
+    }
+
+    #[test]
+    fn public_trigger_ids_convert_for_lifecycle_helpers() {
+        let encoded = bs58::encode(42_u64.to_be_bytes()).into_string();
+        assert_eq!(id_to_u64(&encoded, "trigger_id").unwrap(), 42);
+        assert!(id_to_u64("not a trigger id", "trigger_id").is_err());
     }
 
     fn modify_params(
