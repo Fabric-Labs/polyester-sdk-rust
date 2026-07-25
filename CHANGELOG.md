@@ -4,6 +4,10 @@
 
 ### Breaking
 - `AssetBalance` drops `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`. Use `trading_revision` (orders trading/reserved/available) and `funding_revision` (orders funding independently) instead (POLY-3668).
+- `Manager::base_quantity_scale_for_symbol` / `base_quantity_scale_for_symbol_id` return `Option<u32>` and no longer invent scale `8` when unknown/unhydrated (POLY-3549). Decode-only paths keep an explicit `unwrap_or(8)`.
+
+### Fixed
+- Order/trigger write paths wait for catalog hydration before resolving pair quantity scale, preventing first-order false `INSUFFICIENT_FUNDS` when a pair (e.g. ETH-USDT scale 6) was encoded at invented scale 8 (POLY-3549).
 
 ## 0.1.0a10
 

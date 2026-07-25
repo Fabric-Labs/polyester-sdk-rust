@@ -191,7 +191,8 @@ impl MarketDataService {
         let volume_scale = self
             .ctx
             .catalogs
-            .base_quantity_scale_for_symbol_id(symbol_id);
+            .base_quantity_scale_for_symbol_id(symbol_id)
+            .unwrap_or(8);
         let req = GetCandlesRequest {
             symbol_id,
             timeframe: timeframe.into(),
@@ -252,7 +253,8 @@ impl MarketDataService {
         let volume_scale = self
             .ctx
             .catalogs
-            .base_quantity_scale_for_symbol_id(symbol_id);
+            .base_quantity_scale_for_symbol_id(symbol_id)
+            .unwrap_or(8);
         let channel = format!("public:spot:market:candles:{channel_tf}:{symbol_id}:proto");
         let decode = crate::codecs::decode::candle_point_from_bytes(
             symbol_id,
@@ -529,7 +531,11 @@ impl OrderbookService {
             depth: depth_enum.into(),
             ..Default::default()
         };
-        let quantity_scale = self.ctx.catalogs.base_quantity_scale_for_symbol(symbol);
+        let quantity_scale = self
+            .ctx
+            .catalogs
+            .base_quantity_scale_for_symbol(symbol)
+            .unwrap_or(8);
         let client = OrderbookServiceClient::new(
             self.ctx.factory.transport(false),
             self.ctx.factory.connect_config(false),
@@ -585,7 +591,11 @@ impl OrderbookService {
             )));
         };
         let channel = format!("public:spot:orderbook:deltas:depth:{ws_depth}:{symbol_id}:proto");
-        let quantity_scale = self.ctx.catalogs.base_quantity_scale_for_symbol(&symbol);
+        let quantity_scale = self
+            .ctx
+            .catalogs
+            .base_quantity_scale_for_symbol(&symbol)
+            .unwrap_or(8);
         let bucket_ticks = Arc::new(Mutex::new(parse_bucket_ticks(
             opts.bucket.as_deref().unwrap_or(""),
         )));
