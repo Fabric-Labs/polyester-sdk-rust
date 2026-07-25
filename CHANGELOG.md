@@ -9,6 +9,18 @@
 - Authentication failures without server detail now carry a non-empty fallback message.
 - `Config` Debug output redacts `api_private_key`.
 - Realtime subscription-token HTTP exchange enforces a 10s timeout and 64 KiB response body cap.
+- Public ID parsing prefers canonical base58 when an all-digit string round-trips via `format_id` (e.g. `format_id(4) == "5"` no longer cancels order 5).
+- `batch_modify` no longer invents quantity scale 8 when `symbol` is missing; unscaled `new_qty` requires a symbol or a Quantity with known scale.
+- WebSocket read timeout is treated as connection death (reconnect / error) instead of a silent no-op that freezes half-open feeds.
+- Typed subscriptions expose `resubscribes` / `take_resubscribed` after reconnect gaps (no Centrifugo recover cursor).
+- Orderbook / market-overview `close()` drops the update sender so `recv()` cannot hang forever.
+- `SnapshotThenStream` Drop stops the background loop when the last handle is released.
+- Orderbook sequence numbers stay `u64` end-to-end; inverted/invalid seq fails toward refresh instead of disabling gap detection.
+- Candle subscriptions normalize aliases (`MIN_1` / `min1`) to the live channel label (`1m`).
+- `GetTrades` results expose `next_page_token`.
+- Fully filled orders preserve `leaves_qty == 0` / `cum_qty` instead of mapping zero to `None`.
+- `AssetAmount` fields are private; `as_i64` uses fallible `try_from` (no truncation).
+- Guard-approval `nonce_space` values above uint192 return `Error::Validation` instead of panicking.
 
 ### Changed
 - CI runs `cargo test --lib --test ui` only. Live `tests/integration` soft-skips without credentials and is local-only (`POLYESTER_TEST_STRICT_LIVE=1` for release QA).

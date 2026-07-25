@@ -18,6 +18,7 @@ pub struct Subscription {
     bucket_ticks: Arc<Mutex<i64>>,
     emit: Arc<dyn Fn() + Send + Sync>,
     last_error: Arc<Mutex<Option<Error>>>,
+    tx_slot: Arc<Mutex<Option<mpsc::Sender<OrderbookData>>>>,
 }
 
 impl Subscription {
@@ -28,6 +29,7 @@ impl Subscription {
         bucket_ticks: Arc<Mutex<i64>>,
         emit: Arc<dyn Fn() + Send + Sync>,
         last_error: Arc<Mutex<Option<Error>>>,
+        tx_slot: Arc<Mutex<Option<mpsc::Sender<OrderbookData>>>>,
     ) -> Self {
         Self {
             rx,
@@ -36,6 +38,7 @@ impl Subscription {
             bucket_ticks,
             emit,
             last_error,
+            tx_slot,
         }
     }
 
@@ -72,6 +75,8 @@ impl Subscription {
         if self.closed.swap(true, Ordering::SeqCst) {
             return;
         }
+        // Drop the sender so `updates().recv()` unblocks with None.
+        let _ = self.tx_slot.lock().expect("tx slot").take();
         self.stream.close();
     }
 }

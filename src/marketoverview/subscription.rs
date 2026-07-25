@@ -16,6 +16,7 @@ pub struct Subscription {
     stream: SnapshotThenStream<MarketOverviewList, MarketOverviewList>,
     closed: Arc<AtomicBool>,
     last_error: Arc<Mutex<Option<Error>>>,
+    tx_slot: Arc<Mutex<Option<mpsc::Sender<Vec<MarketOverviewEntry>>>>>,
 }
 
 impl Subscription {
@@ -24,12 +25,14 @@ impl Subscription {
         stream: SnapshotThenStream<MarketOverviewList, MarketOverviewList>,
         closed: Arc<AtomicBool>,
         last_error: Arc<Mutex<Option<Error>>>,
+        tx_slot: Arc<Mutex<Option<mpsc::Sender<Vec<MarketOverviewEntry>>>>>,
     ) -> Self {
         Self {
             rx,
             stream,
             closed,
             last_error,
+            tx_slot,
         }
     }
 
@@ -57,6 +60,7 @@ impl Subscription {
         if self.closed.swap(true, Ordering::SeqCst) {
             return;
         }
+        let _ = self.tx_slot.lock().expect("tx slot").take();
         self.stream.close();
     }
 }

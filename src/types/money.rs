@@ -214,12 +214,15 @@ impl Quantity {
 }
 
 /// Resolved asset/ledger amount.
+///
+/// Fields are private so invariants from [`AssetAmount::from_scaled`] cannot be
+/// bypassed via struct literals.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssetAmount {
-    pub scaled: i128,
-    pub scale: Option<u32>,
-    pub domain: QuantityDomain,
-    pub asset_id: Option<u32>,
+    scaled: i128,
+    scale: Option<u32>,
+    domain: QuantityDomain,
+    asset_id: Option<u32>,
 }
 
 impl AssetAmount {
@@ -271,14 +274,23 @@ impl AssetAmount {
     }
 
     pub fn as_i64(&self) -> Result<i64> {
-        if self.scaled > i64::MAX as i128 {
-            return Err(Error::validation("amount exceeds int64 range"));
-        }
-        Ok(self.scaled as i64)
+        i64::try_from(self.scaled).map_err(|_| Error::validation("amount exceeds int64 range"))
     }
 
     pub fn as_scaled(&self) -> i128 {
         self.scaled
+    }
+
+    pub fn scale(&self) -> Option<u32> {
+        self.scale
+    }
+
+    pub fn domain(&self) -> QuantityDomain {
+        self.domain
+    }
+
+    pub fn asset_id(&self) -> Option<u32> {
+        self.asset_id
     }
 
     pub fn compatible_with(
@@ -440,5 +452,17 @@ mod tests {
         assert!(
             resolve_asset_amount_scaled(&amount, 18, QuantityDomain::LedgerE18, Some(7)).is_err()
         );
+    }
+
+    #[test]
+    fn asset_amount_as_i64_rejects_overflow_not_truncate() {
+        let amount = AssetAmount::from_scaled(
+            i128::from(u64::MAX) + 1,
+            Some(18),
+            QuantityDomain::LedgerE18,
+            None,
+        )
+        .unwrap();
+        assert!(amount.as_i64().is_err());
     }
 }

@@ -70,17 +70,22 @@ pub fn levels_from_orderbook_side(levels: &[OrderbookLevel]) -> BookSide {
 pub fn apply_delta(
     bids: &mut BookSide,
     asks: &mut BookSide,
-    mut current_seq: i64,
+    mut current_seq: u64,
     delta: &OrderBookDeltaUpdate,
-) -> (i64, bool) {
+) -> (u64, bool) {
     if delta.reset {
         bids.clear();
         asks.clear();
         current_seq = 0;
     }
-    let seq_start = delta.book_seq_start.parse::<i64>().unwrap_or(0);
-    let seq_end = delta.book_seq_end.parse::<i64>().unwrap_or(0);
-    if current_seq != 0 && seq_start > current_seq + 1 {
+    // Keep seq as u64 end-to-end. Never coerce parse failures to 0 (that disables
+    // gap detection). Invalid/overflowing sequences fail toward refresh.
+    let seq_start = delta.book_seq_start;
+    let seq_end = delta.book_seq_end;
+    if seq_end < seq_start {
+        return (current_seq, true);
+    }
+    if current_seq != 0 && seq_start > current_seq.saturating_add(1) {
         return (current_seq, true);
     }
     if seq_end <= current_seq {
@@ -135,7 +140,7 @@ fn side_to_levels(
 pub fn build_orderbook_data(
     symbol: &str,
     depth: u32,
-    book_seq: i64,
+    book_seq: u64,
     bids: &BookSide,
     asks: &BookSide,
     bucket_ticks: i64,
@@ -157,16 +162,16 @@ mod tests {
     use crate::models::PriceQtyPair;
 
     fn delta(
-        start: &str,
-        end: &str,
+        start: u64,
+        end: u64,
         bids: &[(i64, i64)],
         asks: &[(i64, i64)],
         reset: bool,
     ) -> OrderBookDeltaUpdate {
         OrderBookDeltaUpdate {
             symbol_id: 1,
-            book_seq_start: start.to_owned(),
-            book_seq_end: end.to_owned(),
+            book_seq_start: start,
+            book_seq_end: end,
             reset,
             bids: bids
                 .iter()
@@ -203,7 +208,7 @@ mod tests {
             &mut bids,
             &mut asks,
             3,
-            &delta("5", "6", &[(100, 7)], &[], false),
+            &delta(5, 6, &[(100, 7)], &[], false),
         );
         assert!(needs_refresh);
         assert_eq!(seq, 3);
@@ -218,7 +223,7 @@ mod tests {
             &mut bids,
             &mut asks,
             3,
-            &delta("3", "4", &[(100, 7)], &[], false),
+            &delta(3, 4, &[(100, 7)], &[], false),
         );
         assert!(!needs_refresh);
         assert_eq!(seq, 4);
@@ -233,10 +238,25 @@ mod tests {
             &mut bids,
             &mut asks,
             5,
-            &delta("3", "4", &[(100, 9)], &[], false),
+            &delta(3, 4, &[(100, 9)], &[], false),
         );
         assert!(!needs_refresh);
         assert_eq!(seq, 5);
+        assert_eq!(bids.get(&100), Some(&5));
+    }
+
+    #[test]
+    fn apply_delta_inverted_seq_fails_toward_refresh() {
+        let mut bids = BookSide::from([(100, 5)]);
+        let mut asks = BookSide::new();
+        let (seq, needs_refresh) = apply_delta(
+            &mut bids,
+            &mut asks,
+            3,
+            &delta(9, 2, &[(100, 9)], &[], false),
+        );
+        assert!(needs_refresh);
+        assert_eq!(seq, 3);
         assert_eq!(bids.get(&100), Some(&5));
     }
 
@@ -248,7 +268,7 @@ mod tests {
             &mut bids,
             &mut asks,
             9,
-            &delta("1", "2", &[(101, 4)], &[], true),
+            &delta(1, 2, &[(101, 4)], &[], true),
         );
         assert!(!needs_refresh);
         assert_eq!(seq, 2);

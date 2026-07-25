@@ -3,7 +3,7 @@
 use super::enums::{
     enum_value_order_status, enum_value_order_type, enum_value_side, enum_value_time_in_force,
 };
-use super::money::{decode_price_ticks, decode_qty_scaled};
+use super::money::{decode_price_ticks, decode_qty_scaled, decode_qty_scaled_allow_zero};
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
     AttachedRisk, BatchCancelOrdersResult, BatchCancelResultItem, BatchCreateOrdersResult,
@@ -38,8 +38,8 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Order {
         order_type: enum_value_order_type(msg.order_type).to_owned(),
         tif: enum_value_time_in_force(msg.time_in_force).to_owned(),
         orig_qty: decode_qty_scaled(msg.orig_qty_scaled, None, None, symbol_id_opt),
-        cum_qty: decode_qty_scaled(msg.cum_qty_scaled, None, None, symbol_id_opt),
-        leaves_qty: decode_qty_scaled(msg.leaves_qty_scaled, None, None, symbol_id_opt),
+        cum_qty: decode_qty_scaled_allow_zero(msg.cum_qty_scaled, None, None, symbol_id_opt),
+        leaves_qty: decode_qty_scaled_allow_zero(msg.leaves_qty_scaled, None, None, symbol_id_opt),
         price: decode_price_ticks(msg.price_ticks, None),
         avg_px: decode_price_ticks(msg.avg_price_ticks, None),
         created_ts_ns: if msg.created_ts_ns == 0 {
@@ -492,6 +492,21 @@ mod tests {
         assert_eq!(sl.trigger_price.as_ticks(), 4900);
         assert_eq!(sl.order_type, Some(CreateOrderType::Limit));
         assert_eq!(sl.limit_price.as_ref().unwrap().as_ticks(), 4890);
+    }
+
+    #[test]
+    fn filled_order_preserves_zero_leaves_and_cum_qty() {
+        let msg = ProtoOrder {
+            order_id: 1,
+            symbol_id: 1,
+            orig_qty_scaled: 100,
+            cum_qty_scaled: 100,
+            leaves_qty_scaled: 0,
+            ..Default::default()
+        };
+        let order = order_from_proto(&msg);
+        assert_eq!(order.cum_qty.as_ref().map(|q| q.as_scaled()), Some(100));
+        assert_eq!(order.leaves_qty.as_ref().map(|q| q.as_scaled()), Some(0));
     }
 
     #[test]

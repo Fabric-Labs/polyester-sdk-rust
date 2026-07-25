@@ -125,7 +125,7 @@ mod tests {
         assert_eq!(result.transfer_id, "xfer");
         assert_eq!(result.asset_id, 7);
         assert_eq!(
-            result.quantity.as_ref().unwrap().scaled,
+            result.quantity.as_ref().unwrap().as_scaled(),
             1_000_000_000_000_000_000
         );
     }

@@ -196,6 +196,26 @@ where
     }
 }
 
+impl<TSnapshot, TPublication> Drop for SnapshotThenStream<TSnapshot, TPublication> {
+    fn drop(&mut self) {
+        // Shared via Arc (Clone). Only the last handle should stop the loop.
+        // Inline close body so Drop does not require T: Send bounds on the struct.
+        if Arc::strong_count(&self.inner) != 1 {
+            return;
+        }
+        if self.inner.disposed.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        self.inner.generation.fetch_add(1, Ordering::SeqCst);
+        {
+            let mut pending = self.inner.pending.lock().expect("pending lock");
+            pending.clear();
+        }
+        self.inner.ready.store(false, Ordering::SeqCst);
+        let _ = self.inner.stop_tx.send(true);
+    }
+}
+
 impl<TSnapshot, TPublication> Clone for SnapshotThenStream<TSnapshot, TPublication> {
     fn clone(&self) -> Self {
         Self {

@@ -71,6 +71,7 @@ pub struct MarketTrade {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarketTradesResult {
     pub trades: Vec<MarketTrade>,
+    pub next_page_token: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
