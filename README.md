@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.10`, git tag `v0.1.0a10`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.11`, git tag `v0.1.0a11`). Proprietary license
 (not open source). API-key only — no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -68,7 +68,7 @@ The crate is not on crates.io yet. Pin the published git tag:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a10" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a11" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
