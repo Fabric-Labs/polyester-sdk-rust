@@ -521,6 +521,8 @@ impl ::buffa::Enumeration for HeatmapQuantityMode {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct HeatmapTimeRange {
+    /// Inclusive lower bound in UTC. Omit to leave the lower bound open.
+    ///
     /// Field 1: `start_time`
     #[serde(
         rename = "startTime",
@@ -528,6 +530,8 @@ pub struct HeatmapTimeRange {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub start_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Inclusive upper bound in UTC. Omit to leave the upper bound open.
+    ///
     /// Field 2: `end_time`
     #[serde(
         rename = "endTime",
@@ -1508,18 +1512,24 @@ pub struct HeatmapKeyframe {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub mid_ticks: i64,
+    /// Complete bid-side levels at the snapshot.
+    ///
     /// Field 5: `bids`
     #[serde(
         rename = "bids",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub bids: ::buffa::MessageField<HeatmapLevels>,
+    /// Complete ask-side levels at the snapshot.
+    ///
     /// Field 6: `asks`
     #[serde(
         rename = "asks",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub asks: ::buffa::MessageField<HeatmapLevels>,
+    /// Monotonic order book sequence at the snapshot.
+    ///
     /// Field 7: `book_seq`
     #[serde(
         rename = "bookSeq",
@@ -1766,12 +1776,16 @@ pub struct HeatmapDeltaBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
+    /// Sparse bid-side level changes in this bucket.
+    ///
     /// Field 2: `bids`
     #[serde(
         rename = "bids",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub bids: ::buffa::MessageField<HeatmapDeltaLevels>,
+    /// Sparse ask-side level changes in this bucket.
+    ///
     /// Field 3: `asks`
     #[serde(
         rename = "asks",
@@ -1788,6 +1802,8 @@ pub struct HeatmapDeltaBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub updates_in_bucket: u32,
+    /// Earliest monotonic order book sequence represented by this bucket.
+    ///
     /// Field 5: `book_seq_start`
     #[serde(
         rename = "bookSeqStart",
@@ -1796,6 +1812,8 @@ pub struct HeatmapDeltaBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub book_seq_start: u64,
+    /// Latest monotonic order book sequence represented by this bucket.
+    ///
     /// Field 6: `book_seq_end`
     #[serde(
         rename = "bookSeqEnd",
@@ -2440,6 +2458,8 @@ pub const __HEATMAP_LIVE_BUCKET_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct HeatmapDeltaChain {
+    /// Full-book snapshot from which to apply the returned deltas.
+    ///
     /// Field 1: `base_keyframe`
     #[serde(
         rename = "baseKeyframe",
@@ -2447,6 +2467,8 @@ pub struct HeatmapDeltaChain {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub base_keyframe: ::buffa::MessageField<HeatmapKeyframe>,
+    /// Sparse update buckets ordered oldest-first by timestamp.
+    ///
     /// Field 2: `deltas`
     #[serde(
         rename = "deltas",
@@ -8118,10 +8140,14 @@ pub mod __buffa {
         /// At least one bound is required.
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapTimeRangeView<'a> {
+            /// Inclusive lower bound in UTC. Omit to leave the lower bound open.
+            ///
             /// Field 1: `start_time`
             pub start_time: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Inclusive upper bound in UTC. Omit to leave the upper bound open.
+            ///
             /// Field 2: `end_time`
             pub end_time: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
@@ -8442,6 +8468,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
+            /// Inclusive lower bound in UTC. Omit to leave the lower bound open.
+            ///
             /// Field 1: `start_time`
             #[must_use]
             pub fn start_time(
@@ -8451,6 +8479,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().start_time
             }
+            /// Inclusive upper bound in UTC. Omit to leave the upper bound open.
+            ///
             /// Field 2: `end_time`
             #[must_use]
             pub fn end_time(
@@ -9802,14 +9832,20 @@ pub mod __buffa {
             ///
             /// Field 4: `mid_ticks`
             pub mid_ticks: i64,
+            /// Complete bid-side levels at the snapshot.
+            ///
             /// Field 5: `bids`
             pub bids: ::buffa::MessageFieldView<
                 super::super::__buffa::view::HeatmapLevelsView<'a>,
             >,
+            /// Complete ask-side levels at the snapshot.
+            ///
             /// Field 6: `asks`
             pub asks: ::buffa::MessageFieldView<
                 super::super::__buffa::view::HeatmapLevelsView<'a>,
             >,
+            /// Monotonic order book sequence at the snapshot.
+            ///
             /// Field 7: `book_seq`
             pub book_seq: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -10268,6 +10304,8 @@ pub mod __buffa {
             pub fn mid_ticks(&self) -> i64 {
                 self.0.reborrow().mid_ticks
             }
+            /// Complete bid-side levels at the snapshot.
+            ///
             /// Field 5: `bids`
             #[must_use]
             pub fn bids(
@@ -10277,6 +10315,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().bids
             }
+            /// Complete ask-side levels at the snapshot.
+            ///
             /// Field 6: `asks`
             #[must_use]
             pub fn asks(
@@ -10286,6 +10326,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().asks
             }
+            /// Monotonic order book sequence at the snapshot.
+            ///
             /// Field 7: `book_seq`
             #[must_use]
             pub fn book_seq(&self) -> u64 {
@@ -10329,10 +10371,14 @@ pub mod __buffa {
             ///
             /// Field 1: `ts_sec`
             pub ts_sec: u64,
+            /// Sparse bid-side level changes in this bucket.
+            ///
             /// Field 2: `bids`
             pub bids: ::buffa::MessageFieldView<
                 super::super::__buffa::view::HeatmapDeltaLevelsView<'a>,
             >,
+            /// Sparse ask-side level changes in this bucket.
+            ///
             /// Field 3: `asks`
             pub asks: ::buffa::MessageFieldView<
                 super::super::__buffa::view::HeatmapDeltaLevelsView<'a>,
@@ -10341,8 +10387,12 @@ pub mod __buffa {
             ///
             /// Field 4: `updates_in_bucket`
             pub updates_in_bucket: u32,
+            /// Earliest monotonic order book sequence represented by this bucket.
+            ///
             /// Field 5: `book_seq_start`
             pub book_seq_start: u64,
+            /// Latest monotonic order book sequence represented by this bucket.
+            ///
             /// Field 6: `book_seq_end`
             pub book_seq_end: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -10762,6 +10812,8 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
+            /// Sparse bid-side level changes in this bucket.
+            ///
             /// Field 2: `bids`
             #[must_use]
             pub fn bids(
@@ -10771,6 +10823,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().bids
             }
+            /// Sparse ask-side level changes in this bucket.
+            ///
             /// Field 3: `asks`
             #[must_use]
             pub fn asks(
@@ -10787,11 +10841,15 @@ pub mod __buffa {
             pub fn updates_in_bucket(&self) -> u32 {
                 self.0.reborrow().updates_in_bucket
             }
+            /// Earliest monotonic order book sequence represented by this bucket.
+            ///
             /// Field 5: `book_seq_start`
             #[must_use]
             pub fn book_seq_start(&self) -> u64 {
                 self.0.reborrow().book_seq_start
             }
+            /// Latest monotonic order book sequence represented by this bucket.
+            ///
             /// Field 6: `book_seq_end`
             #[must_use]
             pub fn book_seq_end(&self) -> u64 {
@@ -11544,10 +11602,14 @@ pub mod __buffa {
         /// Deltas are ordered oldest-first by ts_sec.
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapDeltaChainView<'a> {
+            /// Full-book snapshot from which to apply the returned deltas.
+            ///
             /// Field 1: `base_keyframe`
             pub base_keyframe: ::buffa::MessageFieldView<
                 super::super::__buffa::view::HeatmapKeyframeView<'a>,
             >,
+            /// Sparse update buckets ordered oldest-first by timestamp.
+            ///
             /// Field 2: `deltas`
             pub deltas: ::buffa::RepeatedView<
                 'a,
@@ -11853,6 +11915,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
+            /// Full-book snapshot from which to apply the returned deltas.
+            ///
             /// Field 1: `base_keyframe`
             #[must_use]
             pub fn base_keyframe(
@@ -11862,6 +11926,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().base_keyframe
             }
+            /// Sparse update buckets ordered oldest-first by timestamp.
+            ///
             /// Field 2: `deltas`
             #[must_use]
             pub fn deltas(
