@@ -37,9 +37,8 @@ pub fn asset_balance_from_proto(msg: &ProtoAssetBalance) -> AssetBalance {
         funding: u128_field(msg.funding.as_option()),
         reserved: u128_field(msg.reserved.as_option()),
         available: u128_field(msg.available.as_option()),
-        trading_updated_at_ns: msg.trading_updated_at_ns,
-        funding_updated_at_ns: msg.funding_updated_at_ns,
-        reserved_updated_at_ns: msg.reserved_updated_at_ns,
+        trading_revision: msg.trading_revision,
+        funding_revision: msg.funding_revision,
     }
 }
 
@@ -171,9 +170,8 @@ mod tests {
                     ..Default::default()
                 }
                 .into(),
-                trading_updated_at_ns: u64::MAX - 2,
-                funding_updated_at_ns: u64::MAX - 1,
-                reserved_updated_at_ns: u64::MAX,
+                trading_revision: u64::MAX - 2,
+                funding_revision: u64::MAX - 1,
                 ..Default::default()
             }],
             ..Default::default()
@@ -182,9 +180,8 @@ mod tests {
         assert_eq!(list.balances.len(), 1);
         assert_eq!(list.balances[0].asset_id, 7);
         assert_eq!(list.balances[0].trading, "500");
-        assert_eq!(list.balances[0].trading_updated_at_ns, u64::MAX - 2);
-        assert_eq!(list.balances[0].funding_updated_at_ns, u64::MAX - 1);
-        assert_eq!(list.balances[0].reserved_updated_at_ns, u64::MAX);
+        assert_eq!(list.balances[0].trading_revision, u64::MAX - 2);
+        assert_eq!(list.balances[0].funding_revision, u64::MAX - 1);
     }
 
     #[test]
