@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a10
+
+Package version: `0.1.0-alpha.10`. Git tag: `v0.1.0a10`.
+
 ### Fixed
 - Realtime now negotiates the `centrifuge-protobuf` WebSocket subprotocol and uses binary, length-delimited Centrifugo commands, replies, pings, and publications. Previous releases selected `:proto` channels while speaking the JSON client protocol, so subscriptions could handshake but receive no binary publications.
 - Concurrent authenticated calls now receive distinct monotonic signing timestamps, preventing identical same-millisecond requests from colliding with replay protection.
