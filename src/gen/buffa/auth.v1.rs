@@ -14388,6 +14388,8 @@ pub struct SubaccountInvite {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub grantee_username: ::buffa::alloc::string::String,
+    /// Username of the account that sent the invitation, when available.
+    ///
     /// Field 10: `inviter_username`
     #[serde(
         rename = "inviterUsername",
@@ -65550,6 +65552,8 @@ pub mod __buffa {
             ///
             /// Field 9: `grantee_username`
             pub grantee_username: &'a str,
+            /// Username of the account that sent the invitation, when available.
+            ///
             /// Field 10: `inviter_username`
             pub inviter_username: &'a str,
             /// Optional label for the target sub-account, for display in invite lists.
@@ -66258,6 +66262,8 @@ pub mod __buffa {
             pub fn grantee_username(&self) -> &'_ str {
                 self.0.reborrow().grantee_username
             }
+            /// Username of the account that sent the invitation, when available.
+            ///
             /// Field 10: `inviter_username`
             #[must_use]
             pub fn inviter_username(&self) -> &'_ str {

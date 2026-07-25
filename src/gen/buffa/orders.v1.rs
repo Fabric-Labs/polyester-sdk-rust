@@ -8702,7 +8702,7 @@ pub struct BatchCreateOrdersResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub results: ::buffa::alloc::vec::Vec<BatchCreateResultItem>,
-    /// Aggregate counts.
+    /// Number of requested orders that were accepted.
     ///
     /// Field 2: `accepted_count`
     #[serde(
@@ -8712,6 +8712,8 @@ pub struct BatchCreateOrdersResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub accepted_count: u32,
+    /// Number of requested orders that were rejected.
+    ///
     /// Field 3: `rejected_count`
     #[serde(
         rename = "rejectedCount",
@@ -9602,7 +9604,7 @@ pub struct ModifyOrderResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub code: ::buffa::alloc::string::String,
-    /// Trigger IDs for updated attached risk controls (when applicable).
+    /// Trigger ID for attached take-profit after modification, when configured.
     ///
     /// Field 5: `take_profit_trigger_id`
     #[serde(
@@ -9612,6 +9614,8 @@ pub struct ModifyOrderResponse {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub take_profit_trigger_id: ::core::option::Option<u64>,
+    /// Trigger ID for attached stop-loss after modification, when configured.
+    ///
     /// Field 6: `stop_loss_trigger_id`
     #[serde(
         rename = "stopLossTriggerId",
@@ -9620,6 +9624,8 @@ pub struct ModifyOrderResponse {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub stop_loss_trigger_id: ::core::option::Option<u64>,
+    /// Trigger ID for attached trailing stop after modification, when configured.
+    ///
     /// Field 7: `trailing_stop_trigger_id`
     #[serde(
         rename = "trailingStopTriggerId",
@@ -11924,7 +11930,7 @@ pub struct BatchCancelOrdersResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub results: ::buffa::alloc::vec::Vec<BatchCancelResultItem>,
-    /// Aggregate counts.
+    /// Number of requested cancellations that were accepted.
     ///
     /// Field 2: `accepted_count`
     #[serde(
@@ -11934,6 +11940,8 @@ pub struct BatchCancelOrdersResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub accepted_count: u32,
+    /// Number of requested cancellations that were rejected.
+    ///
     /// Field 3: `rejected_count`
     #[serde(
         rename = "rejectedCount",
@@ -28188,10 +28196,12 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::BatchCreateResultItemView<'a>,
             >,
-            /// Aggregate counts.
+            /// Number of requested orders that were accepted.
             ///
             /// Field 2: `accepted_count`
             pub accepted_count: u32,
+            /// Number of requested orders that were rejected.
+            ///
             /// Field 3: `rejected_count`
             pub rejected_count: u32,
             /// Server timestamp.
@@ -28586,13 +28596,15 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().results
             }
-            /// Aggregate counts.
+            /// Number of requested orders that were accepted.
             ///
             /// Field 2: `accepted_count`
             #[must_use]
             pub fn accepted_count(&self) -> u32 {
                 self.0.reborrow().accepted_count
             }
+            /// Number of requested orders that were rejected.
+            ///
             /// Field 3: `rejected_count`
             #[must_use]
             pub fn rejected_count(&self) -> u32 {
@@ -29302,12 +29314,16 @@ pub mod __buffa {
             ///
             /// Field 4: `code`
             pub code: &'a str,
-            /// Trigger IDs for updated attached risk controls (when applicable).
+            /// Trigger ID for attached take-profit after modification, when configured.
             ///
             /// Field 5: `take_profit_trigger_id`
             pub take_profit_trigger_id: ::core::option::Option<u64>,
+            /// Trigger ID for attached stop-loss after modification, when configured.
+            ///
             /// Field 6: `stop_loss_trigger_id`
             pub stop_loss_trigger_id: ::core::option::Option<u64>,
+            /// Trigger ID for attached trailing stop after modification, when configured.
+            ///
             /// Field 7: `trailing_stop_trigger_id`
             pub trailing_stop_trigger_id: ::core::option::Option<u64>,
             /// Server timestamp.
@@ -29785,18 +29801,22 @@ pub mod __buffa {
             pub fn code(&self) -> &'_ str {
                 self.0.reborrow().code
             }
-            /// Trigger IDs for updated attached risk controls (when applicable).
+            /// Trigger ID for attached take-profit after modification, when configured.
             ///
             /// Field 5: `take_profit_trigger_id`
             #[must_use]
             pub fn take_profit_trigger_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().take_profit_trigger_id
             }
+            /// Trigger ID for attached stop-loss after modification, when configured.
+            ///
             /// Field 6: `stop_loss_trigger_id`
             #[must_use]
             pub fn stop_loss_trigger_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().stop_loss_trigger_id
             }
+            /// Trigger ID for attached trailing stop after modification, when configured.
+            ///
             /// Field 7: `trailing_stop_trigger_id`
             #[must_use]
             pub fn trailing_stop_trigger_id(&self) -> ::core::option::Option<u64> {
@@ -32980,10 +33000,12 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::BatchCancelResultItemView<'a>,
             >,
-            /// Aggregate counts.
+            /// Number of requested cancellations that were accepted.
             ///
             /// Field 2: `accepted_count`
             pub accepted_count: u32,
+            /// Number of requested cancellations that were rejected.
+            ///
             /// Field 3: `rejected_count`
             pub rejected_count: u32,
             /// Server timestamp.
@@ -33378,13 +33400,15 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().results
             }
-            /// Aggregate counts.
+            /// Number of requested cancellations that were accepted.
             ///
             /// Field 2: `accepted_count`
             #[must_use]
             pub fn accepted_count(&self) -> u32 {
                 self.0.reborrow().accepted_count
             }
+            /// Number of requested cancellations that were rejected.
+            ///
             /// Field 3: `rejected_count`
             #[must_use]
             pub fn rejected_count(&self) -> u32 {
