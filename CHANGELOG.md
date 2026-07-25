@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Breaking
+- `AssetBalance` drops `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`. Use `trading_revision` (orders trading/reserved/available) and `funding_revision` (orders funding independently) instead (POLY-3668).
+
 ## 0.1.0a10
 
 Package version: `0.1.0-alpha.10`. Git tag: `v0.1.0a10`.

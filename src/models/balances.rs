@@ -7,9 +7,10 @@ pub struct AssetBalance {
     pub funding: String,
     pub reserved: String,
     pub available: String,
-    pub trading_updated_at_ns: u64,
-    pub funding_updated_at_ns: u64,
-    pub reserved_updated_at_ns: u64,
+    /// Orders the atomic trading/reserved/available state.
+    pub trading_revision: u64,
+    /// Orders funding state independently of trading.
+    pub funding_revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
