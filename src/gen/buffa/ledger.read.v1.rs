@@ -958,8 +958,8 @@ pub struct AssetBalance {
     pub reserved: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
-    /// Available amount in the trading bucket at fixed 18-decimal ledger scale.
-    /// This is computed as max(trading - reserved, 0).
+    /// Amount currently available for new trading activity at fixed 18-decimal
+    /// ledger scale. This value already accounts for active reservations.
     ///
     /// Field 5: `available`
     #[serde(
@@ -969,39 +969,28 @@ pub struct AssetBalance {
     pub available: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
-    /// Source timestamp for the trading component in Unix nanoseconds. Zero until
-    /// the component has been observed.
+    /// Opaque monotonic revision for the atomic trading, reserved, and available
+    /// values. Higher means newer; zero means no trading state has been observed.
     ///
-    /// Field 6: `trading_updated_at_ns`
+    /// Field 6: `trading_revision`
     #[serde(
-        rename = "tradingUpdatedAtNs",
-        alias = "trading_updated_at_ns",
+        rename = "tradingRevision",
+        alias = "trading_revision",
         with = "::buffa::json_helpers::uint64",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
-    pub trading_updated_at_ns: u64,
-    /// Source timestamp for the funding component in Unix nanoseconds. Zero until
-    /// the component has been observed.
+    pub trading_revision: u64,
+    /// Opaque monotonic revision for the funding value. Higher means newer; zero
+    /// means no funding state has been observed.
     ///
-    /// Field 7: `funding_updated_at_ns`
+    /// Field 7: `funding_revision`
     #[serde(
-        rename = "fundingUpdatedAtNs",
-        alias = "funding_updated_at_ns",
+        rename = "fundingRevision",
+        alias = "funding_revision",
         with = "::buffa::json_helpers::uint64",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
-    pub funding_updated_at_ns: u64,
-    /// Source timestamp for the reserved component in Unix nanoseconds. Zero until
-    /// the component has been observed.
-    ///
-    /// Field 8: `reserved_updated_at_ns`
-    #[serde(
-        rename = "reservedUpdatedAtNs",
-        alias = "reserved_updated_at_ns",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub reserved_updated_at_ns: u64,
+    pub funding_revision: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1014,9 +1003,8 @@ impl ::core::fmt::Debug for AssetBalance {
             .field("funding", &self.funding)
             .field("reserved", &self.reserved)
             .field("available", &self.available)
-            .field("trading_updated_at_ns", &self.trading_updated_at_ns)
-            .field("funding_updated_at_ns", &self.funding_updated_at_ns)
-            .field("reserved_updated_at_ns", &self.reserved_updated_at_ns)
+            .field("trading_revision", &self.trading_revision)
+            .field("funding_revision", &self.funding_revision)
             .finish()
     }
 }
@@ -1080,23 +1068,15 @@ impl ::buffa::Message for AssetBalance {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if self.trading_updated_at_ns != 0u64 {
+        if self.trading_revision != 0u64 {
             size
                 += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.trading_updated_at_ns)
-                        as u32;
+                    + ::buffa::types::uint64_encoded_len(self.trading_revision) as u32;
         }
-        if self.funding_updated_at_ns != 0u64 {
+        if self.funding_revision != 0u64 {
             size
                 += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.funding_updated_at_ns)
-                        as u32;
-        }
-        if self.reserved_updated_at_ns != 0u64 {
-            size
-                += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.reserved_updated_at_ns)
-                        as u32;
+                    + ::buffa::types::uint64_encoded_len(self.funding_revision) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -1127,14 +1107,11 @@ impl ::buffa::Message for AssetBalance {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.available.write_to(__cache, buf);
         }
-        if self.trading_updated_at_ns != 0u64 {
-            ::buffa::types::put_uint64_field(6u32, self.trading_updated_at_ns, buf);
+        if self.trading_revision != 0u64 {
+            ::buffa::types::put_uint64_field(6u32, self.trading_revision, buf);
         }
-        if self.funding_updated_at_ns != 0u64 {
-            ::buffa::types::put_uint64_field(7u32, self.funding_updated_at_ns, buf);
-        }
-        if self.reserved_updated_at_ns != 0u64 {
-            ::buffa::types::put_uint64_field(8u32, self.reserved_updated_at_ns, buf);
+        if self.funding_revision != 0u64 {
+            ::buffa::types::put_uint64_field(7u32, self.funding_revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1205,21 +1182,14 @@ impl ::buffa::Message for AssetBalance {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.trading_updated_at_ns = ::buffa::types::decode_uint64(buf)?;
+                self.trading_revision = ::buffa::types::decode_uint64(buf)?;
             }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.funding_updated_at_ns = ::buffa::types::decode_uint64(buf)?;
-            }
-            8u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.reserved_updated_at_ns = ::buffa::types::decode_uint64(buf)?;
+                self.funding_revision = ::buffa::types::decode_uint64(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -1234,9 +1204,8 @@ impl ::buffa::Message for AssetBalance {
         self.funding = ::buffa::MessageField::none();
         self.reserved = ::buffa::MessageField::none();
         self.available = ::buffa::MessageField::none();
-        self.trading_updated_at_ns = 0u64;
-        self.funding_updated_at_ns = 0u64;
-        self.reserved_updated_at_ns = 0u64;
+        self.trading_revision = 0u64;
+        self.funding_revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5608,8 +5577,8 @@ pub mod __buffa {
                     'a,
                 >,
             >,
-            /// Available amount in the trading bucket at fixed 18-decimal ledger scale.
-            /// This is computed as max(trading - reserved, 0).
+            /// Amount currently available for new trading activity at fixed 18-decimal
+            /// ledger scale. This value already accounts for active reservations.
             ///
             /// Field 5: `available`
             pub available: ::buffa::MessageFieldView<
@@ -5617,21 +5586,16 @@ pub mod __buffa {
                     'a,
                 >,
             >,
-            /// Source timestamp for the trading component in Unix nanoseconds. Zero until
-            /// the component has been observed.
+            /// Opaque monotonic revision for the atomic trading, reserved, and available
+            /// values. Higher means newer; zero means no trading state has been observed.
             ///
-            /// Field 6: `trading_updated_at_ns`
-            pub trading_updated_at_ns: u64,
-            /// Source timestamp for the funding component in Unix nanoseconds. Zero until
-            /// the component has been observed.
+            /// Field 6: `trading_revision`
+            pub trading_revision: u64,
+            /// Opaque monotonic revision for the funding value. Higher means newer; zero
+            /// means no funding state has been observed.
             ///
-            /// Field 7: `funding_updated_at_ns`
-            pub funding_updated_at_ns: u64,
-            /// Source timestamp for the reserved component in Unix nanoseconds. Zero until
-            /// the component has been observed.
-            ///
-            /// Field 8: `reserved_updated_at_ns`
-            pub reserved_updated_at_ns: u64,
+            /// Field 7: `funding_revision`
+            pub funding_revision: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AssetBalanceView<'a> {
@@ -5777,27 +5741,14 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.trading_updated_at_ns = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
+                        view.trading_revision = ::buffa::types::decode_uint64(&mut cur)?;
                     }
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.funding_updated_at_ns = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    8u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.reserved_updated_at_ns = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
+                        view.funding_revision = ::buffa::types::decode_uint64(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -5861,9 +5812,8 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    trading_updated_at_ns: self.trading_updated_at_ns,
-                    funding_updated_at_ns: self.funding_updated_at_ns,
-                    reserved_updated_at_ns: self.reserved_updated_at_ns,
+                    trading_revision: self.trading_revision,
+                    funding_revision: self.funding_revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -5915,26 +5865,17 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if self.trading_updated_at_ns != 0u64 {
+                if self.trading_revision != 0u64 {
                     size
                         += 1u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.trading_updated_at_ns,
-                            ) as u32;
+                            + ::buffa::types::uint64_encoded_len(self.trading_revision)
+                                as u32;
                 }
-                if self.funding_updated_at_ns != 0u64 {
+                if self.funding_revision != 0u64 {
                     size
                         += 1u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.funding_updated_at_ns,
-                            ) as u32;
-                }
-                if self.reserved_updated_at_ns != 0u64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.reserved_updated_at_ns,
-                            ) as u32;
+                            + ::buffa::types::uint64_encoded_len(self.funding_revision)
+                                as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -5982,26 +5923,11 @@ pub mod __buffa {
                     );
                     self.available.write_to(__cache, buf);
                 }
-                if self.trading_updated_at_ns != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        6u32,
-                        self.trading_updated_at_ns,
-                        buf,
-                    );
+                if self.trading_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(6u32, self.trading_revision, buf);
                 }
-                if self.funding_updated_at_ns != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        7u32,
-                        self.funding_updated_at_ns,
-                        buf,
-                    );
-                }
-                if self.reserved_updated_at_ns != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        8u32,
-                        self.reserved_updated_at_ns,
-                        buf,
-                    );
+                if self.funding_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(7u32, self.funding_revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -6053,37 +5979,18 @@ pub mod __buffa {
                         __map.serialize_entry("available", __v)?;
                     }
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.trading_updated_at_ns,
-                ) {
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.trading_revision) {
                     __map
                         .serialize_entry(
-                            "tradingUpdatedAtNs",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.trading_updated_at_ns,
-                            ),
+                            "tradingRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.trading_revision),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.funding_updated_at_ns,
-                ) {
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.funding_revision) {
                     __map
                         .serialize_entry(
-                            "fundingUpdatedAtNs",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.funding_updated_at_ns,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.reserved_updated_at_ns,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "reservedUpdatedAtNs",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.reserved_updated_at_ns,
-                            ),
+                            "fundingRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.funding_revision),
                         )?;
                 }
                 __map.end()
@@ -6227,8 +6134,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().reserved
             }
-            /// Available amount in the trading bucket at fixed 18-decimal ledger scale.
-            /// This is computed as max(trading - reserved, 0).
+            /// Amount currently available for new trading activity at fixed 18-decimal
+            /// ledger scale. This value already accounts for active reservations.
             ///
             /// Field 5: `available`
             #[must_use]
@@ -6241,29 +6148,21 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().available
             }
-            /// Source timestamp for the trading component in Unix nanoseconds. Zero until
-            /// the component has been observed.
+            /// Opaque monotonic revision for the atomic trading, reserved, and available
+            /// values. Higher means newer; zero means no trading state has been observed.
             ///
-            /// Field 6: `trading_updated_at_ns`
+            /// Field 6: `trading_revision`
             #[must_use]
-            pub fn trading_updated_at_ns(&self) -> u64 {
-                self.0.reborrow().trading_updated_at_ns
+            pub fn trading_revision(&self) -> u64 {
+                self.0.reborrow().trading_revision
             }
-            /// Source timestamp for the funding component in Unix nanoseconds. Zero until
-            /// the component has been observed.
+            /// Opaque monotonic revision for the funding value. Higher means newer; zero
+            /// means no funding state has been observed.
             ///
-            /// Field 7: `funding_updated_at_ns`
+            /// Field 7: `funding_revision`
             #[must_use]
-            pub fn funding_updated_at_ns(&self) -> u64 {
-                self.0.reborrow().funding_updated_at_ns
-            }
-            /// Source timestamp for the reserved component in Unix nanoseconds. Zero until
-            /// the component has been observed.
-            ///
-            /// Field 8: `reserved_updated_at_ns`
-            #[must_use]
-            pub fn reserved_updated_at_ns(&self) -> u64 {
-                self.0.reborrow().reserved_updated_at_ns
+            pub fn funding_revision(&self) -> u64 {
+                self.0.reborrow().funding_revision
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AssetBalanceView<'static>>>
