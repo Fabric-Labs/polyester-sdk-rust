@@ -111,7 +111,7 @@ async fn market_order_fill() {
         return;
     }
 
-    let scale = client.catalogs.base_quantity_scale_for_symbol(&symbol);
+    let scale = client.catalogs.base_quantity_scale_for_symbol(&symbol).expect("catalog scale");
     let maker_cid = unique_client_order_id("maker-mkt");
     let taker_cid = unique_client_order_id("taker-mkt");
 

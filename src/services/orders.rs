@@ -180,11 +180,20 @@ impl OrdersService {
     /// Build the transport-independent [`OrderIntent`] shared by single and batch
     /// create. The flat public params (`order_type`/`time_in_force`/`post_only`)
     /// are mapped onto the appropriate execution variant.
+    fn require_quantity_scale(&self, symbol: &str, qty_scale: Option<u32>) -> Result<u32> {
+        if let Some(scale) = self.ctx.catalogs.base_quantity_scale_for_symbol(symbol) {
+            return Ok(scale);
+        }
+        if let Some(scale) = qty_scale {
+            return Ok(scale);
+        }
+        Err(Error::validation(format!(
+            "quantity scale for {symbol:?} is unavailable; await client.wait_for_catalogs() before placing orders, or pass a scaled Quantity"
+        )))
+    }
+
     fn order_intent_from_params(&self, params: &CreateOrderParams) -> Result<OrderIntent> {
-        let scale = self
-            .ctx
-            .catalogs
-            .base_quantity_scale_for_symbol(&params.symbol);
+        let scale = self.require_quantity_scale(&params.symbol, params.quantity.scale)?;
         let qty = resolve_qty_scaled(
             &params.quantity,
             scale,
@@ -419,10 +428,10 @@ impl OrdersService {
                 "modify requires new_price, new_qty, and/or new_attached_risk",
             ));
         }
-        let scale = self
-            .ctx
-            .catalogs
-            .base_quantity_scale_for_symbol(&params.symbol);
+        let scale = self.require_quantity_scale(
+            &params.symbol,
+            params.new_qty.as_ref().and_then(|q| q.scale),
+        )?;
         let mut req = ModifyOrderRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
             request_id: params.request_id.unwrap_or_else(|| Self::request_id("mod")),
@@ -464,6 +473,7 @@ impl OrdersService {
 
     /// Place an order. Quantity and price must be `Quantity` / `Price` wrappers.
     pub async fn create(&self, params: CreateOrderParams) -> Result<OrderMutationResult> {
+        self.ctx.wait_for_catalogs().await?;
         let req = self.encode_create_params(&params)?;
         let client = self.write_client();
         let resp = unary::await_auth(
@@ -483,6 +493,7 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         request_id: Option<String>,
     ) -> Result<BatchCreateOrdersResult> {
+        self.ctx.wait_for_catalogs().await?;
         if items.is_empty() {
             return Err(Error::validation("batch_create requires at least one item"));
         }
@@ -565,6 +576,7 @@ impl OrdersService {
         behavior_default: Option<&str>,
         allow_partial: bool,
     ) -> Result<BatchModifyOrdersResult> {
+        self.ctx.wait_for_catalogs().await?;
         if items.is_empty() {
             return Err(Error::validation("batch_modify requires at least one item"));
         }
@@ -799,6 +811,7 @@ impl OrdersService {
 
     /// Modify an order. `new_price` / `new_qty` must be `Price` / `Quantity` wrappers.
     pub async fn modify(&self, params: ModifyOrderParams) -> Result<ModifyOrderResult> {
+        self.ctx.wait_for_catalogs().await?;
         let req = self.encode_modify_params(params)?;
         let client = self.write_client();
         let resp = unary::await_auth(
@@ -844,7 +857,11 @@ impl OrdersService {
         items: &[BatchModifyItem],
     ) -> Result<u32> {
         if !symbol.is_empty() {
-            return Ok(catalogs.base_quantity_scale_for_symbol(symbol));
+            return catalogs.base_quantity_scale_for_symbol(symbol).ok_or_else(|| {
+                Error::validation(format!(
+                    "quantity scale for {symbol:?} is unavailable; await client.wait_for_catalogs() before placing orders, or pass a scaled Quantity"
+                ))
+            });
         }
         let mut inferred: Option<u32> = None;
         for item in items {

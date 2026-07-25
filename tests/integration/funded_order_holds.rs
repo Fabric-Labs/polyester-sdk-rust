@@ -49,7 +49,7 @@ async fn order_hold_visible_while_open() {
             return;
         }
     };
-    let scale = client.catalogs.base_quantity_scale_for_symbol(&symbol);
+    let scale = client.catalogs.base_quantity_scale_for_symbol(&symbol).expect("catalog scale");
     let client_order_id = unique_client_order_id("hold");
 
     let params = CreateOrderParams {
