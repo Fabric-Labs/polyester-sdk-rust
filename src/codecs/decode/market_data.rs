@@ -72,6 +72,7 @@ pub fn market_trade_from_proto(msg: &ProtoMarketTrade) -> MarketTrade {
 pub fn market_trades_from_proto(msg: &GetTradesResponse) -> MarketTradesResult {
     MarketTradesResult {
         trades: msg.trades.iter().map(market_trade_from_proto).collect(),
+        next_page_token: msg.next_page_token.clone(),
     }
 }
 
@@ -177,10 +178,12 @@ mod tests {
                 ts_ns: 42,
                 ..Default::default()
             }],
+            next_page_token: "page-2".into(),
             ..Default::default()
         };
         let list = market_trades_from_proto(&msg);
         assert_eq!(list.trades.len(), 1);
+        assert_eq!(list.next_page_token, "page-2");
         let t = &list.trades[0];
         assert_eq!(t.symbol_id, 3);
         assert_eq!(t.match_id, "99");

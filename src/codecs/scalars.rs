@@ -227,18 +227,7 @@ fn format_scaled(value: i128, scale: u32) -> String {
     if neg { format!("-{raw}") } else { raw }
 }
 
-pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
-    let value = value.trim();
-    if value.is_empty() {
-        return Err(Error::validation(format!(
-            "{label} must be base58 or decimal uint64"
-        )));
-    }
-    if value.chars().all(|c| c.is_ascii_digit()) {
-        return value
-            .parse::<u64>()
-            .map_err(|_| Error::validation(format!("{label} exceeds uint64 range")));
-    }
+fn base58_to_u64(value: &str, label: &str) -> Result<u64> {
     let bytes = bs58::decode(value)
         .into_vec()
         .map_err(|_| Error::validation(format!("{label} must be base58 or decimal uint64")))?;
@@ -248,6 +237,32 @@ pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
     let mut buf = [0u8; 8];
     buf[8 - bytes.len()..].copy_from_slice(&bytes);
     Ok(u64::from_be_bytes(buf))
+}
+
+/// Parse a public id that may be base58 or decimal.
+///
+/// All-digit strings are ambiguous: `format_id(4)` is `"5"`, which is also a
+/// valid decimal. Prefer the canonical base58 decode when `format_id(b) == input`;
+/// otherwise treat the value as decimal.
+pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(Error::validation(format!(
+            "{label} must be base58 or decimal uint64"
+        )));
+    }
+    if value.chars().all(|c| c.is_ascii_digit()) {
+        let decimal = value
+            .parse::<u64>()
+            .map_err(|_| Error::validation(format!("{label} exceeds uint64 range")))?;
+        if let Ok(canonical) = base58_to_u64(value, label)
+            && format_id(canonical) == value
+        {
+            return Ok(canonical);
+        }
+        return Ok(decimal);
+    }
+    base58_to_u64(value, label)
 }
 
 pub fn format_id(id: u64) -> String {
@@ -349,5 +364,36 @@ mod tests {
         assert!(format_ledger_u128("-1", 18).is_err());
         assert!(format_ledger_u128("1.5", 18).is_err());
         assert!(format_ledger_u128("340282366920938463463374607431768211456", 18).is_err());
+    }
+
+    #[test]
+    fn id_round_trip_prefers_canonical_base58_for_all_digit_encodings() {
+        // format_id(4) == "5"; decimal parse would wrongly yield 5.
+        assert_eq!(format_id(4), "5");
+        assert_eq!(id_to_u64("5", "order_id").unwrap(), 4);
+        // format_id(0) intentionally aliases to the same encoding as 1 (Go parity).
+        assert_eq!(format_id(0), format_id(1));
+        for id in 1u64..200 {
+            let encoded = format_id(id);
+            assert_eq!(
+                id_to_u64(&encoded, "id").unwrap(),
+                id,
+                "round-trip failed for id={id} encoded={encoded}"
+            );
+        }
+    }
+
+    #[test]
+    fn id_to_u64_still_accepts_non_canonical_decimal() {
+        // "10" is not the canonical encoding of any small id via format_id.
+        assert_ne!(format_id(10), "10");
+        assert_eq!(id_to_u64("10", "order_id").unwrap(), 10);
+        assert_eq!(id_to_u64("100", "order_id").unwrap(), 100);
+    }
+
+    #[test]
+    fn id_to_u64_rejects_invalid() {
+        assert!(id_to_u64("", "id").is_err());
+        assert!(id_to_u64("not a trigger id", "id").is_err());
     }
 }
