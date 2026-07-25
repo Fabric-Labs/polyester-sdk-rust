@@ -11,7 +11,10 @@ use std::time::{Duration, Instant};
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-    if env::var("POLYESTER_API_KEY_ID").ok().filter(|s| !s.is_empty()).is_none()
+    if env::var("POLYESTER_API_KEY_ID")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .is_none()
         || env::var("POLYESTER_API_PRIVATE_KEY")
             .ok()
             .filter(|s| !s.is_empty())
