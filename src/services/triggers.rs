@@ -106,7 +106,14 @@ impl TriggersService {
         let scale = self
             .ctx
             .catalogs
-            .base_quantity_scale_for_symbol(&params.symbol);
+            .base_quantity_scale_for_symbol(&params.symbol)
+            .or(params.qty.scale)
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "quantity scale for {:?} is unavailable; await client.wait_for_catalogs() before creating triggers, or pass a scaled Quantity",
+                    params.symbol
+                ))
+            })?;
         let qty = resolve_qty_scaled(
             &params.qty,
             scale,
@@ -381,6 +388,7 @@ impl TriggersService {
 
     /// Create a trigger. Prices/qty must be `Price` / `Quantity` wrappers.
     pub async fn create(&self, params: CreateTriggerParams) -> Result<TriggerMutationResult> {
+        self.ctx.wait_for_catalogs().await?;
         let req = self.encode_create_params(&params)?;
         let client = self.client();
         let resp = unary::await_auth(

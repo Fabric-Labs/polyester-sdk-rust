@@ -126,20 +126,22 @@ impl Manager {
         self.inner.read().ok()?.symbol_to_id.get(symbol).copied()
     }
 
-    pub fn base_quantity_scale_for_symbol(&self, symbol: &str) -> u32 {
+    /// Returns the pair base quantity scale, or `None` when unknown/unhydrated.
+    ///
+    /// Never invents scale 8 for missing symbols — callers that need a decode
+    /// fallback must choose it explicitly (POLY-3549).
+    pub fn base_quantity_scale_for_symbol(&self, symbol: &str) -> Option<u32> {
         self.inner
             .read()
             .ok()
             .and_then(|i| i.symbol_to_base_scale.get(symbol).copied())
-            .unwrap_or(DEFAULT_BASE_QTY_SCALE)
     }
 
-    pub fn base_quantity_scale_for_symbol_id(&self, id: u32) -> u32 {
+    pub fn base_quantity_scale_for_symbol_id(&self, id: u32) -> Option<u32> {
         self.inner
             .read()
             .ok()
             .and_then(|i| i.id_to_base_scale.get(&id).copied())
-            .unwrap_or(DEFAULT_BASE_QTY_SCALE)
     }
 
     pub fn quantity_scale_for_zipped_asset_id(&self, id: u32) -> u32 {
@@ -218,8 +220,8 @@ mod tests {
             }]
         }));
         assert_eq!(mgr.symbol_id_for_symbol("BTC-USDT"), Some(1));
-        assert_eq!(mgr.base_quantity_scale_for_symbol("BTC-USDT"), 8);
-        assert_eq!(mgr.base_quantity_scale_for_symbol_id(1), 8);
+        assert_eq!(mgr.base_quantity_scale_for_symbol("BTC-USDT"), Some(8));
+        assert_eq!(mgr.base_quantity_scale_for_symbol_id(1), Some(8));
         assert_eq!(
             mgr.orderbook_price_buckets_for_symbol("BTC-USDT"),
             vec!["0.01".to_owned(), "0.1".to_owned(), "1.0".to_owned()]
@@ -241,12 +243,23 @@ mod tests {
     }
 
     #[test]
-    fn unknown_symbol_falls_back_to_default_scale() {
+    fn unknown_symbol_returns_none_not_default_scale() {
         let mgr = Manager::new();
-        assert_eq!(
-            mgr.base_quantity_scale_for_symbol("NOPE"),
-            DEFAULT_BASE_QTY_SCALE
-        );
+        assert_eq!(mgr.base_quantity_scale_for_symbol("NOPE"), None);
+        assert_eq!(mgr.base_quantity_scale_for_symbol("ETH-USDT"), None);
+    }
+
+    #[test]
+    fn hydrated_eth_usdt_uses_scale_6() {
+        let mgr = Manager::new();
+        mgr.hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "ETH-USDT",
+                "symbol_id": 2,
+                "base_quantity_scale": 6
+            }]
+        }));
+        assert_eq!(mgr.base_quantity_scale_for_symbol("ETH-USDT"), Some(6));
     }
 
     #[test]

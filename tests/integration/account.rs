@@ -18,6 +18,9 @@ async fn hydrate_catalogs_best_effort() {
         .await
         .expect("hydrate_catalogs should not fail hard");
     let _ = client.catalogs.symbol_id_for_symbol("BTC-USDT");
-    let scale = client.catalogs.base_quantity_scale_for_symbol("BTC-USDT");
+    let scale = client
+        .catalogs
+        .base_quantity_scale_for_symbol("BTC-USDT")
+        .expect("catalog scale");
     assert!(scale > 0);
 }
