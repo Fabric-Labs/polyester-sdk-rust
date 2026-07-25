@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "sdk": "rust",
-  "generatedAt": "2026-07-24T16:36:26Z",
-  "publicDescriptorSha256": "2e9db62c9ef16ade53a4e9e65aa200cf3799d881d24ec41280c3440101dee653",
+  "generatedAt": "2026-07-25T13:15:06Z",
+  "publicDescriptorSha256": "1174de3c6930f04ba7e72a85495b40dbbd3077896854fa3fde4612200cf90fb3",
   "capabilities": [
     {
       "id": "market_data",
