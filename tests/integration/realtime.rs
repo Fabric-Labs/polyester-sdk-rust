@@ -33,15 +33,24 @@ async fn public_trades_subscription_survives_centrifugo_ping() {
     };
 
     let deadline = tokio::time::Instant::now() + REALTIME_HEARTBEAT_HOLD;
+    let mut publications = 0_usize;
     while tokio::time::Instant::now() < deadline {
         if !sub.is_alive() {
             panic!(
                 "public trades subscription closed before Centrifugo heartbeat window elapsed ({REALTIME_HEARTBEAT_HOLD:?})"
             );
         }
-        let _ = tokio::time::timeout(Duration::from_secs(2), sub.recv()).await;
+        match tokio::time::timeout(Duration::from_secs(2), sub.recv()).await {
+            Ok(Some(_)) => publications += 1,
+            Ok(None) => panic!("public trades subscription ended before the heartbeat window"),
+            Err(_) => {}
+        }
     }
     sub.close();
+    assert!(
+        publications > 0,
+        "protobuf subscription stayed open but delivered no publications"
+    );
 }
 
 #[tokio::test]

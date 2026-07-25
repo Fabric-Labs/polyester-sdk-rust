@@ -1,8 +1,8 @@
 use crate::support::{
     LEDGER_SCALE, call_optional, call_required, devnet_unavailable, hydrate_spot_and_zipper,
     internal_transfer_dest, min_trading_quote, quote_asset_id, require_funded, require_live_client,
-    require_trading_quote_balance, scaled_quantity_string, smoke_symbol, trading_balance_raw,
-    unique_client_order_id,
+    require_mutation, require_trading_quote_balance, scaled_quantity_string, smoke_symbol,
+    trading_balance_raw, unique_client_order_id,
 };
 use polyester::models::CreateInternalTransferParams;
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
@@ -10,6 +10,9 @@ use polyester::types::{AssetAmount, QuantityDomain};
 
 #[tokio::test]
 async fn internal_transfer_tiny() {
+    if !require_mutation() {
+        return;
+    }
     if !require_funded() {
         return;
     }

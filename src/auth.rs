@@ -4,6 +4,10 @@ use crate::errors::{Error, Result};
 use ed25519_dalek::{Signer, SigningKey};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const API_KEY_ID_ENV: &str = "POLYESTER_API_KEY_ID";
@@ -19,6 +23,7 @@ pub const HEADER_SIGNATURE: &str = "X-API-SIGNATURE";
 pub struct Credentials {
     pub key_id: String,
     signing_key: SigningKey,
+    last_timestamp_ms: Arc<AtomicU64>,
 }
 
 impl std::fmt::Debug for Credentials {
@@ -26,6 +31,7 @@ impl std::fmt::Debug for Credentials {
         f.debug_struct("Credentials")
             .field("key_id", &self.key_id)
             .field("signing_key", &"<redacted>")
+            .field("last_timestamp_ms", &"<internal>")
             .finish()
     }
 }
@@ -41,6 +47,7 @@ impl Credentials {
         Ok(Self {
             key_id,
             signing_key,
+            last_timestamp_ms: Arc::new(AtomicU64::new(0)),
         })
     }
 
@@ -87,13 +94,9 @@ impl Credentials {
         body: &[u8],
         timestamp_ms: Option<&str>,
     ) -> BTreeMap<String, String> {
-        let ts = timestamp_ms.map(str::to_owned).unwrap_or_else(|| {
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("clock")
-                .as_millis()
-                .to_string()
-        });
+        let ts = timestamp_ms
+            .map(str::to_owned)
+            .unwrap_or_else(|| self.next_timestamp_ms().to_string());
         let canonical = canonical_signing_string(&ts, method, raw_url, body);
         let sig = self.signing_key.sign(canonical.as_bytes());
         let mut headers = BTreeMap::new();
@@ -101,6 +104,29 @@ impl Credentials {
         headers.insert(HEADER_TIMESTAMP.to_owned(), ts);
         headers.insert(HEADER_SIGNATURE.to_owned(), hex::encode(sig.to_bytes()));
         headers
+    }
+
+    fn next_timestamp_ms(&self) -> u64 {
+        let now = u64::try_from(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock")
+                .as_millis(),
+        )
+        .expect("Unix timestamp milliseconds fit in u64");
+        let mut observed = self.last_timestamp_ms.load(Ordering::Relaxed);
+        loop {
+            let next = now.max(observed.saturating_add(1));
+            match self.last_timestamp_ms.compare_exchange_weak(
+                observed,
+                next,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return next,
+                Err(actual) => observed = actual,
+            }
+        }
     }
 }
 
@@ -306,6 +332,46 @@ mod tests {
         assert_eq!(headers.get(HEADER_KEY_ID).unwrap(), "key_123");
         assert_eq!(headers.get(HEADER_TIMESTAMP).unwrap(), "123");
         assert_eq!(headers.get(HEADER_SIGNATURE).unwrap().len(), 128);
+    }
+
+    #[test]
+    fn automatic_timestamps_are_unique_across_concurrent_clones() {
+        use std::collections::HashSet;
+        use std::sync::{Arc, Barrier};
+
+        let (seed, _) = generate_ed25519_keypair();
+        let creds = Credentials::new("key_123", &seed).unwrap();
+        let barrier = Arc::new(Barrier::new(32));
+        let handles = (0..32)
+            .map(|_| {
+                let creds = creds.clone();
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    creds.sign_request("POST", "https://api.example.test/foo", b"{}", None)
+                })
+            })
+            .collect::<Vec<_>>();
+        let headers = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            headers
+                .iter()
+                .map(|headers| headers[HEADER_TIMESTAMP].clone())
+                .collect::<HashSet<_>>()
+                .len(),
+            32
+        );
+        assert_eq!(
+            headers
+                .iter()
+                .map(|headers| headers[HEADER_SIGNATURE].clone())
+                .collect::<HashSet<_>>()
+                .len(),
+            32
+        );
     }
 
     #[test]
