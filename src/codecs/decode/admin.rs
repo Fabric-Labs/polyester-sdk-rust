@@ -1,19 +1,15 @@
 //! API key and resolve-account decoders.
 
+use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{ApiKeySummary, ApiKeysList, ResolvedAccount, ResolvedAccountsList};
 use crate::proto::auth::v1::{
     ApiKey as ProtoApiKey, CreateApiKeyResponse, GetApiKeyResponse, ListApiKeysResponse,
     ResolveAccountResponse, ResolvedAccount as ProtoResolvedAccount, UpdateApiKeyResponse,
 };
-use buffa::Enumeration;
 
 pub fn api_key_from_proto(msg: &ProtoApiKey) -> ApiKeySummary {
-    let status = msg
-        .status
-        .as_known()
-        .map(|s| s.proto_name().to_owned())
-        .unwrap_or_default();
+    let status = enum_proto_name(&msg.status);
     ApiKeySummary {
         key_id: msg.key_id.clone(),
         label: msg.label.clone(),

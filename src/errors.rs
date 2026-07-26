@@ -84,6 +84,35 @@ impl Error {
         Self::QueueOverflow(msg.into())
     }
 
+    /// Whether retrying may succeed after backoff.
+    ///
+    /// This is a transport-level classification, not a guarantee that a
+    /// mutation was not applied. For mutations, preserve the same idempotency
+    /// key and reconcile server state before retrying when
+    /// [`Self::mutation_outcome_unknown`] is true.
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::Transport(_) | Self::RateLimit { .. } | Self::Server(_)
+        )
+    }
+
+    /// Whether this error can occur after the server accepted a mutation.
+    ///
+    /// Callers must treat these failures as ambiguous: reconcile first and
+    /// reuse the original idempotency key if a retry is necessary.
+    pub fn mutation_outcome_unknown(&self) -> bool {
+        matches!(self, Self::Transport(_) | Self::Server(_))
+    }
+
+    /// Server-requested retry delay in seconds, when supplied.
+    pub fn retry_after(&self) -> Option<f64> {
+        match self {
+            Self::RateLimit { retry_after, .. } => *retry_after,
+            _ => None,
+        }
+    }
+
     /// Structured auth.v1.AuthErrorDetail code when this is an [`Error::Api`].
     pub fn auth_error_code(&self) -> Option<&str> {
         match self {
@@ -125,6 +154,25 @@ fn decode_auth_error_detail(detail: &ErrorDetail) -> Option<AuthErrorDetail> {
     AuthErrorDetail::decode_from_slice(&bytes).ok()
 }
 
+fn parse_nonnegative_f64(value: &http::HeaderValue) -> Option<f64> {
+    let parsed = value.to_str().ok()?.trim().parse::<f64>().ok()?;
+    (parsed.is_finite() && parsed >= 0.0).then_some(parsed)
+}
+
+fn retry_after_seconds(err: &ConnectError) -> Option<f64> {
+    for headers in [err.response_headers(), err.trailers()] {
+        if let Some(seconds) = headers.get("retry-after").and_then(parse_nonnegative_f64) {
+            return Some(seconds);
+        }
+        for name in ["retry-after-ms", "grpc-retry-pushback-ms"] {
+            if let Some(milliseconds) = headers.get(name).and_then(parse_nonnegative_f64) {
+                return Some(milliseconds / 1_000.0);
+            }
+        }
+    }
+    None
+}
+
 /// Map a ConnectRPC error into an SDK error.
 pub fn map_connect_error(err: ConnectError) -> Error {
     let fallback_message = {
@@ -155,12 +203,13 @@ pub fn map_connect_error(err: ConnectError) -> Error {
         }
     }
     let code = err.code;
+    let retry_after = retry_after_seconds(&err);
     let message = fallback_message;
     match code {
         ErrorCode::Unauthenticated | ErrorCode::PermissionDenied => Error::Auth(message),
         ErrorCode::ResourceExhausted => Error::RateLimit {
             message,
-            retry_after: None,
+            retry_after,
         },
         ErrorCode::Unavailable | ErrorCode::Internal => Error::Server(message),
         ErrorCode::DeadlineExceeded => Error::Transport(message),
@@ -227,20 +276,51 @@ mod tests {
 
     #[test]
     fn map_connect_error_surfaces_rate_limits() {
-        let mapped = map_connect_error(ConnectError::new(
-            ErrorCode::ResourceExhausted,
-            "request rate exceeded",
-        ));
+        let mut headers = http::HeaderMap::new();
+        headers.insert("retry-after", http::HeaderValue::from_static("2.5"));
+        let mapped = map_connect_error(
+            ConnectError::new(ErrorCode::ResourceExhausted, "request rate exceeded")
+                .with_headers(headers),
+        );
         match mapped {
             Error::RateLimit {
                 message,
                 retry_after,
             } => {
                 assert_eq!(message, "resource_exhausted: request rate exceeded");
-                assert_eq!(retry_after, None);
+                assert_eq!(retry_after, Some(2.5));
             }
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn map_connect_error_reads_retry_pushback_milliseconds_from_trailers() {
+        let mut trailers = http::HeaderMap::new();
+        trailers.insert(
+            "grpc-retry-pushback-ms",
+            http::HeaderValue::from_static("1250"),
+        );
+        let mapped = map_connect_error(
+            ConnectError::new(ErrorCode::ResourceExhausted, "slow down").with_trailers(trailers),
+        );
+        assert_eq!(mapped.retry_after(), Some(1.25));
+    }
+
+    #[test]
+    fn retry_classification_is_conservative_for_mutations() {
+        let timeout = Error::transport("deadline exceeded");
+        assert!(timeout.is_retryable());
+        assert!(timeout.mutation_outcome_unknown());
+
+        let limited = Error::RateLimit {
+            message: "slow down".into(),
+            retry_after: Some(1.0),
+        };
+        assert!(limited.is_retryable());
+        assert!(!limited.mutation_outcome_unknown());
+
+        assert!(!Error::validation("bad price").is_retryable());
     }
 
     #[test]

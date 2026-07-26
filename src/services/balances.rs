@@ -26,8 +26,8 @@ impl BalancesService {
 
     fn client(&self) -> LedgerReadServiceClient<crate::transport::SharedTransport> {
         LedgerReadServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         )
     }
 

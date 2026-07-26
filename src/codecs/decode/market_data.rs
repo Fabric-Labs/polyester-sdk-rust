@@ -1,5 +1,7 @@
 //! Public market-data decoders (trades / candles).
 
+use serde_json::Value;
+
 use super::common::api_data_from_proto;
 use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::{format_price_ticks, format_qty_scaled};
@@ -11,9 +13,21 @@ use crate::proto::marketdata::v1::{
 };
 
 pub fn spot_config_from_proto(msg: &GetSpotConfigResponse) -> SpotConfig {
-    SpotConfig {
-        raw: api_data_from_proto(msg).raw,
+    let mut raw = api_data_from_proto(msg).raw;
+    // proto3 omits scalar zeroes during proto-JSON conversion. Quantity scale
+    // zero is nevertheless valid, so restore the typed wire value rather than
+    // treating an omitted JSON key as an unknown scale.
+    if let Some(pairs) = raw.get_mut("pairs").and_then(Value::as_array_mut) {
+        for (pair, typed) in pairs.iter_mut().zip(&msg.pairs) {
+            if let Some(object) = pair.as_object_mut() {
+                object.insert(
+                    "base_quantity_scale".to_owned(),
+                    Value::from(typed.base_quantity_scale),
+                );
+            }
+        }
     }
+    SpotConfig { raw }
 }
 
 pub fn timeframe_label(tf: Timeframe) -> &'static str {
@@ -36,12 +50,11 @@ pub fn timeframe_label(tf: Timeframe) -> &'static str {
 fn enum_value_timeframe(value: buffa::EnumValue<Timeframe>) -> String {
     value
         .as_known()
-        .map(timeframe_label)
-        .unwrap_or("")
-        .to_owned()
+        .map(|known| timeframe_label(known).to_owned())
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
-pub fn market_trade_from_proto(msg: &ProtoMarketTrade) -> MarketTrade {
+pub fn market_trade_from_proto(msg: &ProtoMarketTrade, quantity_scale: u32) -> MarketTrade {
     let symbol_id = msg.symbol_id;
     let symbol_id_opt = if symbol_id == 0 {
         None
@@ -56,7 +69,7 @@ pub fn market_trade_from_proto(msg: &ProtoMarketTrade) -> MarketTrade {
             msg.match_id.to_string()
         },
         price: decode_price_ticks(msg.price_ticks, None),
-        qty: decode_qty_scaled(msg.qty_scaled, None, None, symbol_id_opt),
+        qty: decode_qty_scaled(msg.qty_scaled, Some(quantity_scale), None, symbol_id_opt),
         ts_ns: if msg.ts_ns == 0 {
             String::new()
         } else {
@@ -70,9 +83,16 @@ pub fn market_trade_from_proto(msg: &ProtoMarketTrade) -> MarketTrade {
     }
 }
 
-pub fn market_trades_from_proto(msg: &GetTradesResponse) -> MarketTradesResult {
+pub fn market_trades_from_proto(
+    msg: &GetTradesResponse,
+    quantity_scale: u32,
+) -> MarketTradesResult {
     MarketTradesResult {
-        trades: msg.trades.iter().map(market_trade_from_proto).collect(),
+        trades: msg
+            .trades
+            .iter()
+            .map(|trade| market_trade_from_proto(trade, quantity_scale))
+            .collect(),
         next_page_token: msg.next_page_token.clone(),
     }
 }
@@ -188,7 +208,7 @@ mod tests {
             next_page_token: "page-2".into(),
             ..Default::default()
         };
-        let list = market_trades_from_proto(&msg);
+        let list = market_trades_from_proto(&msg, 6);
         assert_eq!(list.trades.len(), 1);
         assert_eq!(list.next_page_token, "page-2");
         let t = &list.trades[0];
@@ -197,7 +217,35 @@ mod tests {
         assert_eq!(t.side, "buy");
         assert_eq!(t.price.as_ref().unwrap().as_ticks(), 1_500_000);
         assert_eq!(t.qty.as_ref().unwrap().as_scaled(), 100);
+        assert_eq!(t.qty.as_ref().unwrap().format(None).unwrap(), "0.0001");
         assert_eq!(t.ts_ns, "42");
+    }
+
+    #[test]
+    fn spot_config_preserves_valid_zero_quantity_scale() {
+        let msg = GetSpotConfigResponse {
+            pairs: vec![crate::proto::marketdata::v1::PairConfig {
+                symbol: "WHOLE-USDT".into(),
+                symbol_id: 9,
+                base_quantity_scale: 0,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let spot = spot_config_from_proto(&msg);
+        assert_eq!(spot.raw["pairs"][0]["base_quantity_scale"], 0);
+    }
+
+    #[test]
+    fn unknown_timeframe_preserves_numeric_value() {
+        let msg = GetCandlesResponse {
+            timeframe: buffa::EnumValue::from(77),
+            ..Default::default()
+        };
+        assert_eq!(
+            candles_from_proto(&msg, 8).unwrap().timeframe,
+            "UNKNOWN(77)"
+        );
     }
 
     #[test]

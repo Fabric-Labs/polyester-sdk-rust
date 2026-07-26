@@ -76,7 +76,7 @@ async fn fetch_rt_token(
         timeout
     };
     let client = build_http_client()?;
-    let headers = creds.sign_request("GET", url, b"", None);
+    let headers = creds.sign_request("GET", url, b"", None)?;
     let uri: hyper::Uri = url
         .parse()
         .map_err(|e| Error::realtime(format!("{label}: invalid url: {e}")))?;
@@ -222,11 +222,11 @@ mod tests {
             "https://api.example.test/v1/rt/subscribe?channel=private%3Aauth%3Aapi-keys%3Aaccount%3Aproto"
         );
         assert_eq!(
-            canonical_query(&url),
+            canonical_query(&url).unwrap(),
             "channel=private%3Aauth%3Aapi-keys%3Aaccount%3Aproto"
         );
         assert!(
-            !canonical_query(&url).contains("%2D"),
+            !canonical_query(&url).unwrap().contains("%2D"),
             "hyphens must not be percent-encoded in the signed query"
         );
     }

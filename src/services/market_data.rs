@@ -33,8 +33,8 @@ impl MarketDataService {
 
     fn client(&self) -> MarketDataServiceClient<crate::transport::SharedTransport> {
         MarketDataServiceClient::new(
-            self.ctx.factory.transport(false),
-            self.ctx.factory.connect_config(false),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         )
     }
 
@@ -58,6 +58,18 @@ impl MarketDataService {
             .ok_or_else(|| {
                 Error::validation(format!(
                     "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
+                ))
+            })
+    }
+
+    fn require_quantity_scale(&self, symbol_id: u32, label: &str) -> Result<u32> {
+        self.ctx
+            .catalogs
+            .base_quantity_scale_for_symbol_id(symbol_id)
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "{label} requires a catalog quantity scale for symbol_id {symbol_id}; \
+                     wait_for_catalogs or hydrate the spot catalog first"
                 ))
             })
     }
@@ -98,6 +110,7 @@ impl MarketDataService {
     pub async fn get_trades_with(&self, opts: GetTradesOpts) -> Result<MarketTradesResult> {
         let symbol_id =
             self.resolve_symbol_id(opts.symbol.as_deref(), opts.symbol_id, "get_trades")?;
+        let quantity_scale = self.require_quantity_scale(symbol_id, "get_trades")?;
         let req = GetTradesRequest {
             symbol_id,
             limit: opts.limit.unwrap_or(0),
@@ -109,7 +122,7 @@ impl MarketDataService {
         let resp = unary::await_public(self.client().get_trades(req))
             .await?
             .into_owned();
-        Ok(market_trades_from_proto(&resp))
+        Ok(market_trades_from_proto(&resp, quantity_scale))
     }
 
     /// Candle series for a symbol. `interval` accepts values like `"1m"`, `"MIN_1"`, `"5m"`.
@@ -188,11 +201,7 @@ impl MarketDataService {
             opts.timeframe.as_str()
         };
         let timeframe = parse_timeframe(timeframe_label)?;
-        let volume_scale = self
-            .ctx
-            .catalogs
-            .base_quantity_scale_for_symbol_id(symbol_id)
-            .unwrap_or(8);
+        let volume_scale = self.require_quantity_scale(symbol_id, "get_candles")?;
         let req = GetCandlesRequest {
             symbol_id,
             timeframe: timeframe.into(),
@@ -220,10 +229,14 @@ impl MarketDataService {
                     "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
                 ))
             })?;
+        let quantity_scale = self.require_quantity_scale(symbol_id, "subscribe_trades")?;
         let channel = format!("public:spot:market:trades:{symbol_id}:proto");
         self.ctx
             .realtime
-            .subscribe_proto(&channel, crate::codecs::decode::market_trade_from_bytes)
+            .subscribe_proto(
+                &channel,
+                crate::codecs::decode::market_trade_from_bytes(quantity_scale),
+            )
             .await
     }
 
@@ -250,11 +263,7 @@ impl MarketDataService {
                 "unsupported candle interval {timeframe:?}"
             )));
         }
-        let volume_scale = self
-            .ctx
-            .catalogs
-            .base_quantity_scale_for_symbol_id(symbol_id)
-            .unwrap_or(8);
+        let volume_scale = self.require_quantity_scale(symbol_id, "subscribe_candles")?;
         let channel = format!("public:spot:market:candles:{channel_tf}:{symbol_id}:proto");
         let decode = crate::codecs::decode::candle_point_from_bytes(
             symbol_id,
@@ -348,8 +357,8 @@ impl MarketOverviewService {
             ..Default::default()
         };
         let client = MarketOverviewServiceClient::new(
-            self.ctx.factory.transport(false),
-            self.ctx.factory.connect_config(false),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         );
         let resp = unary::await_public(client.list_market_overview(req))
             .await?
@@ -403,13 +412,12 @@ impl MarketOverviewService {
                 if closed.load(std::sync::atomic::Ordering::SeqCst) {
                     return;
                 }
-                let rows: Vec<MarketOverviewEntry> = by_symbol_id
-                    .lock()
-                    .expect("overview lock")
-                    .values()
-                    .cloned()
-                    .collect();
-                let guard = tx_slot.lock().expect("tx slot");
+                let rows: Vec<MarketOverviewEntry> =
+                    crate::realtime::lock_unpoisoned(&by_symbol_id)
+                        .values()
+                        .cloned()
+                        .collect();
+                let guard = crate::realtime::lock_unpoisoned(&tx_slot);
                 let Some(tx) = guard.as_ref() else {
                     return;
                 };
@@ -426,7 +434,7 @@ impl MarketOverviewService {
         let apply_rows = {
             let by_symbol_id = by_symbol_id.clone();
             Arc::new(move |rows: Vec<MarketOverviewEntry>| {
-                let mut map = by_symbol_id.lock().expect("overview lock");
+                let mut map = crate::realtime::lock_unpoisoned(&by_symbol_id);
                 for row in rows {
                     map.insert(row.symbol_id, row);
                 }
@@ -458,7 +466,7 @@ impl MarketOverviewService {
                 let by_symbol_id = by_symbol_id.clone();
                 Arc::new(
                     move |snapshot: MarketOverviewList, buffered: Vec<MarketOverviewList>| {
-                        by_symbol_id.lock().expect("overview lock").clear();
+                        crate::realtime::lock_unpoisoned(&by_symbol_id).clear();
                         apply_rows(snapshot.markets);
                         for batch in buffered {
                             apply_rows(batch.markets);
@@ -480,6 +488,7 @@ impl MarketOverviewService {
             max_buffered: 2000,
             on_reconnect: None,
             on_snapshot_refresh: None,
+            on_error: None,
         });
 
         let subscription = crate::marketoverview::Subscription::new(
@@ -535,10 +544,15 @@ impl OrderbookService {
             .ctx
             .catalogs
             .base_quantity_scale_for_symbol(symbol)
-            .unwrap_or(8);
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "orderbook get requires a catalog quantity scale for {symbol}; \
+                     wait_for_catalogs or hydrate the spot catalog first"
+                ))
+            })?;
         let client = OrderbookServiceClient::new(
-            self.ctx.factory.transport(false),
-            self.ctx.factory.connect_config(false),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         );
         let resp = unary::await_public(client.get_order_book(req))
             .await?
@@ -595,7 +609,12 @@ impl OrderbookService {
             .ctx
             .catalogs
             .base_quantity_scale_for_symbol(&symbol)
-            .unwrap_or(8);
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "orderbook subscription requires a catalog quantity scale for {symbol}; \
+                     wait_for_catalogs or hydrate the spot catalog first"
+                ))
+            })?;
         let bucket_ticks = Arc::new(Mutex::new(parse_bucket_ticks(
             opts.bucket.as_deref().unwrap_or(""),
         )));
@@ -625,10 +644,10 @@ impl OrderbookService {
                     return;
                 }
                 let (bids, asks, book_seq) = {
-                    let s = state.lock().expect("book lock");
+                    let s = crate::realtime::lock_unpoisoned(&state);
                     (s.bids.clone(), s.asks.clone(), s.book_seq)
                 };
-                let ticks = *bucket_ticks.lock().expect("bucket lock");
+                let ticks = *crate::realtime::lock_unpoisoned(&bucket_ticks);
                 let data = build_orderbook_data(
                     &symbol,
                     ws_depth,
@@ -638,7 +657,7 @@ impl OrderbookService {
                     ticks,
                     quantity_scale,
                 );
-                let guard = tx_slot.lock().expect("tx slot");
+                let guard = crate::realtime::lock_unpoisoned(&tx_slot);
                 let Some(tx) = guard.as_ref() else {
                     return;
                 };
@@ -663,7 +682,7 @@ impl OrderbookService {
             let stream_slot = stream_slot.clone();
             Arc::new(move |delta: OrderBookDeltaUpdate| {
                 let needs_refresh = {
-                    let mut s = state.lock().expect("book lock");
+                    let mut s = crate::realtime::lock_unpoisoned(&state);
                     let BookState {
                         bids,
                         asks,
@@ -674,7 +693,7 @@ impl OrderbookService {
                     needs_refresh
                 };
                 if needs_refresh {
-                    if let Some(stream) = stream_slot.lock().expect("stream slot").as_ref() {
+                    if let Some(stream) = crate::realtime::lock_unpoisoned(&stream_slot).as_ref() {
                         stream.request_refresh();
                     }
                     return;
@@ -707,11 +726,12 @@ impl OrderbookService {
                             Ok(seq) => seq,
                             Err(_) => {
                                 // Fail toward refresh — never treat garbage as seq 0 silently.
-                                *last_error.lock().expect("error lock") = Some(Error::realtime(
-                                    "orderbook snapshot book_seq is not a valid u64".to_owned(),
-                                ));
+                                *crate::realtime::lock_unpoisoned(&last_error) =
+                                    Some(Error::realtime(
+                                        "orderbook snapshot book_seq is not a valid u64".to_owned(),
+                                    ));
                                 if let Some(stream) =
-                                    stream_slot.lock().expect("stream slot").as_ref()
+                                    crate::realtime::lock_unpoisoned(&stream_slot).as_ref()
                                 {
                                     stream.request_refresh();
                                 }
@@ -719,7 +739,7 @@ impl OrderbookService {
                             }
                         };
                         {
-                            let mut s = state.lock().expect("book lock");
+                            let mut s = crate::realtime::lock_unpoisoned(&state);
                             s.bids = levels_from_orderbook_side(&snapshot.bids);
                             s.asks = levels_from_orderbook_side(&snapshot.asks);
                             s.book_seq = parsed_seq;
@@ -742,8 +762,9 @@ impl OrderbookService {
             max_buffered: 200,
             on_reconnect: None,
             on_snapshot_refresh: None,
+            on_error: None,
         });
-        *stream_slot.lock().expect("stream slot") = Some(stream.clone());
+        *crate::realtime::lock_unpoisoned(&stream_slot) = Some(stream.clone());
 
         let subscription = crate::orderbook::Subscription::new(
             rx,
@@ -832,6 +853,7 @@ mod tests {
                 max_buffered: 10,
                 on_reconnect: None,
                 on_snapshot_refresh: None,
+                on_error: None,
             });
         let mut sub = crate::orderbook::Subscription::new(
             rx,

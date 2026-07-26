@@ -1,7 +1,6 @@
 //! Address book decoders.
 
-use buffa::Enumeration;
-
+use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::{format_id, format_uint64_id};
 use crate::models::{
     AddressBookEntriesList, AddressBookEntry, AddressBookTag, AddressBookViewInvalidation,
@@ -13,13 +12,6 @@ use crate::proto::auth::v1::{
     CreateAddressBookTagResponse, ListAddressBookEntriesResponse, ListAddressBooksResponse,
     UpdateAddressBookEntryResponse, UpdateAddressBookTagResponse,
 };
-
-fn enum_label<T: Enumeration>(value: &buffa::EnumValue<T>) -> String {
-    value
-        .as_known()
-        .map(|e| e.proto_name().to_owned())
-        .unwrap_or_default()
-}
 
 pub fn list_books_from_proto(msg: &ListAddressBooksResponse) -> AddressBooksList {
     AddressBooksList {
@@ -35,7 +27,7 @@ fn entry_from_proto(msg: &ProtoAddressBookEntry) -> AddressBookEntry {
     AddressBookEntry {
         address_book_entry_id: format_uint64_id(msg.address_book_entry_id),
         label: msg.label.clone(),
-        kind: enum_label(&msg.kind),
+        kind: enum_proto_name(&msg.kind),
         revision: msg.revision,
     }
 }

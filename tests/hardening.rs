@@ -5,6 +5,7 @@
 
 mod hardening_support;
 
+use buffa::Message;
 use futures_util::future::FutureExt;
 use hardening_support::{
     GET_BALANCES_PATH, GET_ORDER_PATH, GET_TRADES_PATH, MockHttpServer, MockWsServer,
@@ -29,6 +30,413 @@ use std::time::{Duration, Instant};
 const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const PRIVATE_CHANNEL: &str = "private:spot:orders:acct:proto";
 const PUBLIC_CHANNEL: &str = "public:spot:market:trades:1:proto";
+type PublicationDecoder =
+    Arc<dyn Fn(&[u8]) -> polyester::Result<()> + Send + Sync + std::panic::RefUnwindSafe>;
+
+fn publication_decoders() -> Vec<(&'static str, PublicationDecoder)> {
+    use polyester::codecs::decode::{
+        account_identity_from_bytes, address_book_invalidation_from_bytes, api_key_from_bytes,
+        api_policy_from_bytes, asset_balance_from_bytes, candle_point_from_bytes,
+        flow_detail_from_bytes, flow_summary_from_bytes, heatmap_live_bucket_from_bytes,
+        ledger_transfer_from_bytes, market_overview_batch_from_bytes, market_trade_from_bytes,
+        order_from_bytes, orderbook_delta_from_bytes, subaccount_from_bytes,
+        subaccount_policy_from_bytes, trigger_event_from_bytes, trigger_from_bytes,
+        user_trade_from_bytes, zipped_asset_supply_batch_from_bytes,
+    };
+
+    macro_rules! decoder {
+        ($name:literal, $decode:expr) => {
+            (
+                $name,
+                Arc::new(move |bytes: &[u8]| ($decode)(bytes).map(|_| ())) as PublicationDecoder,
+            )
+        };
+    }
+
+    vec![
+        decoder!("order", order_from_bytes),
+        decoder!("user_trade", user_trade_from_bytes),
+        decoder!("asset_balance", asset_balance_from_bytes),
+        decoder!("ledger_transfer", ledger_transfer_from_bytes),
+        decoder!("trigger", trigger_from_bytes),
+        decoder!("trigger_event", trigger_event_from_bytes),
+        decoder!("market_trade", market_trade_from_bytes(8)),
+        decoder!("orderbook_delta", orderbook_delta_from_bytes),
+        decoder!("flow_summary", flow_summary_from_bytes),
+        decoder!("flow_detail", flow_detail_from_bytes),
+        decoder!("account_identity", account_identity_from_bytes),
+        decoder!(
+            "candle_point",
+            candle_point_from_bytes(1, "1m".to_owned(), 8)
+        ),
+        decoder!("heatmap_live_bucket", heatmap_live_bucket_from_bytes),
+        decoder!("market_overview_batch", market_overview_batch_from_bytes),
+        decoder!("zipped_asset_supply_batch", |bytes| {
+            zipped_asset_supply_batch_from_bytes(bytes, |_| Some(18))
+        }),
+        decoder!("api_key", api_key_from_bytes),
+        decoder!("subaccount", subaccount_from_bytes),
+        decoder!("subaccount_policy", subaccount_policy_from_bytes),
+        decoder!("api_policy", api_policy_from_bytes),
+        decoder!(
+            "address_book_invalidation",
+            address_book_invalidation_from_bytes
+        ),
+    ]
+}
+
+#[test]
+fn l2_all_publication_decoders_are_panic_free_for_adversarial_protobuf() {
+    let decoders = publication_decoders();
+    let fixed_corpus: &[&[u8]] = &[
+        &[],
+        &[0x0f],
+        &[0x0a],
+        &[0x0a, 0xff],
+        &[0x80; 11],
+        &[0xff; 32],
+        &[0x0a, 0xff, 0xff, 0xff, 0xff, 0x0f],
+    ];
+
+    for (name, decode) in &decoders {
+        for payload in fixed_corpus {
+            let result = std::panic::catch_unwind(|| decode(payload));
+            assert!(result.is_ok(), "{name} panicked for {payload:02x?}");
+            assert!(
+                result.unwrap().is_err(),
+                "{name} accepted malformed protobuf {payload:02x?}"
+            );
+        }
+    }
+
+    // Deterministic corpus: 5,000 arbitrary byte strings and 5,000
+    // structurally well-framed protobuf messages, each exercised against all
+    // 20 publication decoders (200,000 decoder invocations). The latter gets
+    // beyond the first tag and into nested/manual conversion logic.
+    let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+    for case in 0..5_000_usize {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let len = 1 + (usize::try_from(state).unwrap_or(usize::MAX) % 512);
+        let mut payload = vec![0_u8; len];
+        for byte in &mut payload {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            *byte = state as u8;
+        }
+        for (name, decode) in &decoders {
+            let result = std::panic::catch_unwind(|| decode(&payload));
+            assert!(result.is_ok(), "{name} panicked for mutation case {case}");
+        }
+    }
+    for case in 0..5_000_usize {
+        let mut payload = Vec::new();
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let fields = 1 + (state as usize % 8);
+        for _ in 0..fields {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let field_number = 1 + (state as u8 % 20);
+            match state % 3 {
+                0 => {
+                    payload.push(field_number << 3);
+                    let mut value = state;
+                    loop {
+                        let byte = (value & 0x7f) as u8;
+                        value >>= 7;
+                        if value == 0 {
+                            payload.push(byte);
+                            break;
+                        }
+                        payload.push(byte | 0x80);
+                    }
+                }
+                1 => {
+                    payload.push((field_number << 3) | 1);
+                    payload.extend_from_slice(&state.to_le_bytes());
+                }
+                _ => {
+                    payload.push((field_number << 3) | 2);
+                    let len = state as usize % 24;
+                    payload.push(len as u8);
+                    for _ in 0..len {
+                        state ^= state << 13;
+                        state ^= state >> 7;
+                        state ^= state << 17;
+                        payload.push(state as u8);
+                    }
+                }
+            }
+        }
+        for (name, decode) in &decoders {
+            let result = std::panic::catch_unwind(|| decode(&payload));
+            assert!(
+                result.is_ok(),
+                "{name} panicked for well-framed mutation case {case}"
+            );
+        }
+    }
+
+    let oversized = vec![0_u8; MAX_REALTIME_MESSAGE_BYTES + 1];
+    for (name, decode) in &decoders {
+        let error = decode(&oversized).expect_err("oversized publication must fail closed");
+        assert!(
+            error.to_string().contains("exceeds"),
+            "{name} returned the wrong oversized-payload error: {error}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn l2_all_publication_decode_errors_surface_through_the_public_websocket_api() {
+    let active = Arc::new(AtomicUsize::new(0));
+    let ws = MockWsServer::spawn_centrifugo_publication_after_handshake(active.clone(), vec![0x0f])
+        .await;
+    let rt = RealtimeClient::new(ws.ws_url(), "", None, None);
+
+    for (name, decode) in publication_decoders() {
+        let mut sub = rt
+            .subscribe_proto_with_options(PUBLIC_CHANNEL, move |bytes| decode(bytes), false)
+            .await
+            .unwrap_or_else(|err| panic!("{name} handshake failed: {err}"));
+        let error = tokio::time::timeout(Duration::from_secs(2), sub.recv_result())
+            .await
+            .unwrap_or_else(|_| panic!("{name} decode failure did not terminate the feed"))
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("proto decode"),
+            "{name} returned the wrong error: {error}"
+        );
+        assert!(
+            !sub.is_alive(),
+            "{name} feed remained alive after decode error"
+        );
+        sub.close();
+    }
+
+    wait_until(
+        || active.load(Ordering::SeqCst) == 0,
+        Duration::from_secs(2),
+    )
+    .await;
+}
+
+#[test]
+fn l2_auth_100k_concurrent_signatures_do_not_drift_into_the_future() {
+    use polyester::auth::HEADER_TIMESTAMP;
+    use std::sync::Barrier;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    const THREADS: usize = 16;
+    const PER_THREAD: usize = 6_250;
+
+    let credentials = Arc::new(test_credentials("ak_test", TEST_KEY));
+    let barrier = Arc::new(Barrier::new(THREADS));
+    let handles = (0..THREADS)
+        .map(|_| {
+            let credentials = Arc::clone(&credentials);
+            let barrier = Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                barrier.wait();
+                let mut maximum = 0_u64;
+                for sequence in 0..PER_THREAD {
+                    let body = sequence.to_le_bytes();
+                    let headers = credentials
+                        .sign_request(
+                            "POST",
+                            "https://api.example.test/orders.v1.OrdersService/CreateOrder",
+                            &body,
+                            None,
+                        )
+                        .unwrap();
+                    maximum = maximum.max(headers[HEADER_TIMESTAMP].parse().unwrap());
+                }
+                maximum
+            })
+        })
+        .collect::<Vec<_>>();
+    let maximum = handles
+        .into_iter()
+        .map(|handle| handle.join().unwrap())
+        .max()
+        .unwrap();
+    let wall_clock_after = u64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )
+    .unwrap();
+    assert!(
+        maximum <= wall_clock_after,
+        "maximum signed timestamp {maximum} exceeded wall clock {wall_clock_after}"
+    );
+
+    let later = credentials
+        .sign_request(
+            "GET",
+            "https://api.example.test/auth.v1.AuthService/Me",
+            b"",
+            None,
+        )
+        .unwrap()[HEADER_TIMESTAMP]
+        .parse::<u64>()
+        .unwrap();
+    let wall_clock_later = u64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )
+    .unwrap();
+    assert!(later <= wall_clock_later);
+}
+
+#[tokio::test]
+async fn l2_scale_dependent_public_paths_fail_closed_without_catalogs() {
+    let client = Client::new(Config {
+        api_url: "http://127.0.0.1:1".into(),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let orderbook_err = client
+        .orderbook
+        .get("ETH-USDT", Some(50))
+        .await
+        .expect_err("orderbook must not guess scale 8");
+    assert!(matches!(orderbook_err, Error::Validation(_)));
+    assert!(orderbook_err.to_string().contains("catalog quantity scale"));
+
+    let trades_err = client
+        .market_data
+        .get_trades_with(polyester::models::GetTradesOpts {
+            symbol_id: Some(2),
+            ..Default::default()
+        })
+        .await
+        .expect_err("explicit symbol id must still require a known scale");
+    assert!(matches!(trades_err, Error::Validation(_)));
+    assert!(trades_err.to_string().contains("catalog quantity scale"));
+}
+
+#[test]
+fn l2_contradictory_catalog_refreshes_fail_atomically_through_public_manager() {
+    let client = Client::new(Config {
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+    let err = client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [
+                {"symbol": "ETH-USDT", "symbol_id": 2, "base_quantity_scale": 6},
+                {"symbol": "SOL-USDT", "symbol_id": 2, "base_quantity_scale": 8}
+            ]
+        }))
+        .unwrap_err();
+    assert!(err.to_string().contains("symbol_id 2"));
+    assert_eq!(
+        client.catalogs.base_quantity_scale_for_symbol("BTC-USDT"),
+        Some(8)
+    );
+    assert_eq!(
+        client.catalogs.base_quantity_scale_for_symbol("ETH-USDT"),
+        None
+    );
+}
+
+#[tokio::test]
+async fn l2_rest_and_realtime_market_trades_attach_catalog_scale_metadata() {
+    use polyester::proto::marketdata::v1::{GetTradesResponse, MarketTrade as ProtoMarketTrade};
+
+    for (symbol, symbol_id, scale, expected) in
+        [("ETH-USDT", 2_u32, 6_u32, "1"), ("BTC-USDT", 1, 8, "0.01")]
+    {
+        let proto_trade = ProtoMarketTrade {
+            symbol_id,
+            match_id: 7,
+            qty_scaled: 1_000_000,
+            price_ticks: 1_000_000,
+            ..Default::default()
+        };
+        let response = GetTradesResponse {
+            trades: vec![proto_trade.clone()],
+            ..Default::default()
+        };
+        let http = MockHttpServer::spawn(move |req| {
+            if req.path == GET_TRADES_PATH {
+                connect_proto_ok(&response)
+            } else {
+                hardening_support::HttpScript::NotFound
+            }
+        })
+        .await;
+        let active = Arc::new(AtomicUsize::new(0));
+        let ws = MockWsServer::spawn_centrifugo_publication_after_handshake(
+            active,
+            proto_trade.encode_to_vec(),
+        )
+        .await;
+        let client = Client::new(Config {
+            api_url: http.base_url(),
+            ws_url: ws.ws_url(),
+            hydrate_catalogs: false,
+            timeout: Duration::from_secs(2),
+            ..Default::default()
+        })
+        .unwrap();
+        client
+            .catalogs
+            .hydrate_spot_config_json(json!({
+                "pairs": [{
+                    "symbol": symbol,
+                    "symbol_id": symbol_id,
+                    "base_quantity_scale": scale
+                }]
+            }))
+            .unwrap();
+
+        let rest = client
+            .market_data
+            .get_trades(symbol, Some(1))
+            .await
+            .unwrap();
+        assert_eq!(
+            rest.trades[0].qty.as_ref().unwrap().format(None).unwrap(),
+            expected
+        );
+
+        let mut realtime = client.market_data.subscribe_trades(symbol).await.unwrap();
+        let streamed = tokio::time::timeout(Duration::from_secs(2), realtime.recv_result())
+            .await
+            .expect("realtime publication deadline")
+            .unwrap()
+            .expect("realtime publication");
+        assert_eq!(
+            streamed.qty.as_ref().unwrap().format(None).unwrap(),
+            expected
+        );
+        realtime.close();
+    }
+}
 
 fn private_rt(ws: &MockWsServer, http: &MockHttpServer, timeout: Duration) -> RealtimeClient {
     RealtimeClient::with_timeout(
@@ -731,7 +1139,7 @@ async fn l2_close_during_reconnect_backoff_no_extra_connect() {
         Duration::from_secs(2),
     )
     .await;
-    // After forced disconnect, client sleeps ~1s then reconnects. Close during backoff.
+    // After forced disconnect, the client enters its jittered reconnect backoff.
     wait_until(
         || active.load(Ordering::SeqCst) == 0,
         Duration::from_secs(2),
@@ -746,6 +1154,53 @@ async fn l2_close_during_reconnect_backoff_no_extra_connect() {
         "close during reconnect backoff must not start an extra connect ({connects_before} -> {connects_after})"
     );
     assert!(!sub.is_alive());
+}
+
+#[tokio::test]
+async fn l2_realtime_terminal_error_is_callback_and_result_observable() {
+    let active = Arc::new(AtomicUsize::new(0));
+    let ws = MockWsServer::spawn_centrifugo_disconnect_after_handshake(active.clone()).await;
+    let rt = RealtimeClient::new(ws.ws_url(), "", None, None);
+    let mut sub = rt
+        .subscribe_proto_with_options(PUBLIC_CHANNEL, |bytes| Ok(bytes.to_vec()), false)
+        .await
+        .expect("initial handshake");
+
+    let (error_tx, mut error_rx) = tokio::sync::mpsc::unbounded_channel();
+    sub.set_on_error(move |err| {
+        let _ = error_tx.send(err);
+    });
+
+    let callback_error = tokio::time::timeout(Duration::from_millis(750), error_rx.recv())
+        .await
+        .expect("error callback must be prompt")
+        .expect("error callback channel");
+    let callback_message = callback_error.to_string().to_ascii_lowercase();
+    assert!(
+        callback_message.contains("closed")
+            || callback_message.contains("reset")
+            || callback_message.contains("eof"),
+        "unexpected callback error: {callback_error}"
+    );
+
+    let result_error = tokio::time::timeout(Duration::from_millis(750), sub.recv_result())
+        .await
+        .expect("recv_result must unblock")
+        .expect_err("terminal feed failure must not look like clean EOF");
+    let result_message = result_error.to_string().to_ascii_lowercase();
+    assert!(
+        result_message.contains("closed")
+            || result_message.contains("reset")
+            || result_message.contains("eof"),
+        "unexpected recv_result error: {result_error}"
+    );
+    assert!(!sub.is_alive());
+    sub.close();
+    wait_until(
+        || active.load(Ordering::SeqCst) == 0,
+        Duration::from_millis(750),
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -821,6 +1276,7 @@ async fn l2_close_during_reconnect_snapshot_retry_cancels_fetch_and_socket() {
         max_buffered: 8,
         on_reconnect: None,
         on_snapshot_refresh: None,
+        on_error: None,
     });
 
     sts.start().await.expect("initial snapshot");
@@ -1110,6 +1566,107 @@ async fn l2_concurrent_wait_for_catalogs_share_one_attempt() {
 }
 
 #[tokio::test]
+async fn l2_snapshot_then_stream_start_survives_immediate_disconnect_repeatedly() {
+    const ATTEMPTS: usize = 60;
+    let active = Arc::new(AtomicUsize::new(0));
+    let ws = MockWsServer::spawn_centrifugo_disconnect_after_handshake(active.clone()).await;
+
+    for attempt in 1..=ATTEMPTS {
+        let rt =
+            RealtimeClient::with_timeout(ws.ws_url(), "", None, None, Duration::from_millis(500));
+        let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+            client: rt,
+            channel: PUBLIC_CHANNEL.into(),
+            decode: Arc::new(|_b| Ok(1u8)),
+            fetch_snapshot: Arc::new(|| async { Ok("initial".to_string()) }.boxed()),
+            read_publication: Arc::new(|p| vec![p]),
+            apply_snapshot: Arc::new(|_s, _p| {}),
+            apply_live_publications: Arc::new(|_p| {}),
+            max_buffered: 8,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
+            on_error: None,
+        });
+
+        let started = Instant::now();
+        tokio::time::timeout(Duration::from_millis(750), sts.start())
+            .await
+            .unwrap_or_else(|_| panic!("attempt {attempt}/{ATTEMPTS}: start hung"))
+            .unwrap_or_else(|err| {
+                panic!("attempt {attempt}/{ATTEMPTS}: valid handshake failed: {err}")
+            });
+        assert!(
+            started.elapsed() < Duration::from_millis(750),
+            "attempt {attempt}/{ATTEMPTS}: start exceeded its bound"
+        );
+        sts.close();
+    }
+
+    wait_until(
+        || active.load(Ordering::SeqCst) == 0,
+        Duration::from_millis(750),
+    )
+    .await;
+    assert_eq!(
+        active.load(Ordering::SeqCst),
+        0,
+        "repeated immediate disconnects leaked sockets"
+    );
+}
+
+#[tokio::test]
+async fn l2_snapshot_then_stream_start_obeys_configured_deadline() {
+    let active = Arc::new(AtomicUsize::new(0));
+    let ws = MockWsServer::spawn_hang_after_accept_counted(active.clone()).await;
+    let configured_timeout = Duration::from_millis(150);
+    let rt = RealtimeClient::with_timeout(ws.ws_url(), "", None, None, configured_timeout);
+    let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+        client: rt,
+        channel: PUBLIC_CHANNEL.into(),
+        decode: Arc::new(|_b| Ok(1u8)),
+        fetch_snapshot: Arc::new(|| async { Ok("unreachable".to_string()) }.boxed()),
+        read_publication: Arc::new(|p| vec![p]),
+        apply_snapshot: Arc::new(|_s, _p| {}),
+        apply_live_publications: Arc::new(|_p| {}),
+        max_buffered: 8,
+        on_reconnect: None,
+        on_snapshot_refresh: None,
+        on_error: None,
+    });
+
+    let started = Instant::now();
+    let err = tokio::time::timeout(Duration::from_millis(750), sts.start())
+        .await
+        .expect("configured startup deadline must terminate")
+        .expect_err("stalled Centrifugo handshake must fail");
+    assert!(
+        started.elapsed() >= configured_timeout,
+        "startup returned before its configured deadline"
+    );
+    assert!(
+        started.elapsed() < Duration::from_millis(750),
+        "startup exceeded its configured deadline plus test slack"
+    );
+    assert!(
+        err.to_string().to_ascii_lowercase().contains("timed out"),
+        "unexpected startup error: {err}"
+    );
+    assert!(sts.is_disposed());
+    assert!(sts.err().is_some());
+
+    wait_until(
+        || active.load(Ordering::SeqCst) == 0,
+        Duration::from_millis(750),
+    )
+    .await;
+    assert_eq!(
+        active.load(Ordering::SeqCst),
+        0,
+        "startup timeout leaked the stalled websocket"
+    );
+}
+
+#[tokio::test]
 async fn l2_snapshot_then_stream_reconnect_snapshot_fail_sets_err_and_not_ready() {
     use std::sync::atomic::AtomicBool;
 
@@ -1121,6 +1678,8 @@ async fn l2_snapshot_then_stream_reconnect_snapshot_fail_sets_err_and_not_ready(
     // Succeed until the initial start marks ready; fail on reconnect refresh.
     let fail_after_ready = Arc::new(AtomicBool::new(false));
     let fail_flag = fail_after_ready.clone();
+    let reported_errors = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let reported_errors_cb = reported_errors.clone();
     let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
         client: rt,
         channel: PUBLIC_CHANNEL.into(),
@@ -1143,6 +1702,12 @@ async fn l2_snapshot_then_stream_reconnect_snapshot_fail_sets_err_and_not_ready(
         max_buffered: 8,
         on_reconnect: None,
         on_snapshot_refresh: None,
+        on_error: Some(Arc::new(move |err| {
+            reported_errors_cb
+                .lock()
+                .expect("reported errors")
+                .push(err.to_string());
+        })),
     });
     sts.start().await.expect("initial start");
     assert!(sts.is_ready());
@@ -1155,6 +1720,17 @@ async fn l2_snapshot_then_stream_reconnect_snapshot_fail_sets_err_and_not_ready(
     .await;
     assert!(sts.err().is_some());
     assert!(!sts.is_ready());
+    assert!(
+        sts.is_disposed(),
+        "exhausted snapshot recovery must terminate fail-closed"
+    );
+    let reported_errors = reported_errors.lock().expect("reported errors");
+    assert!(
+        reported_errors
+            .iter()
+            .any(|err| err.contains("snapshot refresh failed")),
+        "snapshot refresh failure was not surfaced to on_error: {reported_errors:?}"
+    );
     assert!(
         attempts.load(Ordering::SeqCst) >= 2,
         "expected initial success + reconnect retries"
@@ -1616,6 +2192,7 @@ async fn l2_snapshot_then_stream_recovery_success_clears_err() {
         max_buffered: 8,
         on_reconnect: None,
         on_snapshot_refresh: None,
+        on_error: None,
     });
 
     // Drive buffer retention without waiting on WS publications: inject via refresh path.

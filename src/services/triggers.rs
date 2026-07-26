@@ -37,8 +37,8 @@ impl TriggersService {
 
     fn client(&self) -> TriggersServiceClient<crate::transport::SharedTransport> {
         TriggersServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         )
     }
 

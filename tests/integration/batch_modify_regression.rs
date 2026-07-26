@@ -72,8 +72,7 @@ fn assert_complete_batch_result(
     for item in &result.results {
         assert!(
             !item.status.eq_ignore_ascii_case("rejected"),
-            "round {round}: rejected item {:?}",
-            item
+            "round {round}: rejected item {item:?}"
         );
     }
     true

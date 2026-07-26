@@ -4,13 +4,14 @@ mod auth;
 mod protocol;
 mod snapshot_then_stream;
 
-pub use snapshot_then_stream::{SnapshotThenStream, SnapshotThenStreamConfig};
+pub use snapshot_then_stream::{SnapshotErrorFn, SnapshotThenStream, SnapshotThenStreamConfig};
 
 use crate::auth::Credentials;
 use crate::errors::{Error, Result};
 use futures_util::{SinkExt, StreamExt};
+use rand_core::{OsRng, RngCore};
 use std::sync::{
-    Arc, Mutex,
+    Arc, Mutex, MutexGuard,
     atomic::{AtomicBool, Ordering},
 };
 use tokio::sync::{mpsc, oneshot, watch};
@@ -28,8 +29,95 @@ use tokio_tungstenite::{
 const WS_PATH: &str = "/connection/websocket";
 const DEFAULT_QUEUE: usize = 1000;
 const CENTRIFUGO_READ_TIMEOUT: Duration = Duration::from_secs(30);
-const CENTRIFUGO_RECONNECT_DELAY: Duration = Duration::from_secs(1);
+const RECONNECT_INITIAL_CAP: Duration = Duration::from_millis(500);
+const RECONNECT_MAX_CAP: Duration = Duration::from_secs(30);
 const CENTRIFUGO_PROTOBUF_SUBPROTOCOL: &str = "centrifuge-protobuf";
+
+type ErrorCallback = Arc<dyn Fn(Error) + Send + Sync>;
+
+pub(crate) fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[derive(Default)]
+struct SubscriptionErrorState {
+    last: Option<Error>,
+    callback: Option<ErrorCallback>,
+}
+
+struct SubscriptionAttempt<'a> {
+    stop: &'a mut watch::Receiver<bool>,
+    ready: &'a mut Option<oneshot::Sender<Result<()>>>,
+    gap: &'a ResubscribeGap,
+    error_state: &'a Arc<Mutex<SubscriptionErrorState>>,
+    connected: &'a mut bool,
+}
+
+fn invoke_error_callback(callback: ErrorCallback, err: Error) {
+    // A consumer callback must not be able to kill the websocket worker.
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| callback(err)));
+}
+
+fn record_subscription_error(state: &Arc<Mutex<SubscriptionErrorState>>, err: Error) {
+    let callback = {
+        let mut state = lock_unpoisoned(state);
+        state.last = Some(err.clone());
+        state.callback.clone()
+    };
+    if let Some(callback) = callback {
+        invoke_error_callback(callback, err);
+    }
+}
+
+fn clear_subscription_error(state: &Arc<Mutex<SubscriptionErrorState>>) {
+    lock_unpoisoned(state).last = None;
+}
+
+struct ReconnectBackoff {
+    failures: u32,
+    jitter_state: u64,
+}
+
+impl ReconnectBackoff {
+    fn new() -> Self {
+        let mut rng = OsRng;
+        Self::with_seed(rng.next_u64())
+    }
+
+    fn with_seed(seed: u64) -> Self {
+        Self {
+            failures: 0,
+            jitter_state: if seed == 0 {
+                0x9e37_79b9_7f4a_7c15
+            } else {
+                seed
+            },
+        }
+    }
+
+    fn reset(&mut self) {
+        self.failures = 0;
+    }
+
+    fn next_delay(&mut self) -> Duration {
+        let multiplier = 1u64 << self.failures.min(16);
+        let cap_ms = (RECONNECT_INITIAL_CAP.as_millis() as u64)
+            .saturating_mul(multiplier)
+            .min(RECONNECT_MAX_CAP.as_millis() as u64);
+        self.failures = self.failures.saturating_add(1);
+
+        // Xorshift64 gives each subscription a cheap independent jitter stream
+        // after the OS-random seed, avoiding fleet-wide synchronized reconnects.
+        self.jitter_state ^= self.jitter_state << 13;
+        self.jitter_state ^= self.jitter_state >> 7;
+        self.jitter_state ^= self.jitter_state << 17;
+        let floor_ms = cap_ms / 2;
+        let delay_ms = floor_ms + self.jitter_state % (cap_ms - floor_ms + 1);
+        Duration::from_millis(delay_ms)
+    }
+}
 
 /// Maximum accepted binary Centrifugo WebSocket message and frame size.
 ///
@@ -52,7 +140,7 @@ pub fn try_enqueue<T>(
         Ok(()) => true,
         Err(mpsc::error::TrySendError::Full(_)) => {
             closed.store(true, Ordering::SeqCst);
-            *last_error.lock().expect("error lock") = Some(Error::queue_overflow(message));
+            *lock_unpoisoned(last_error) = Some(Error::queue_overflow(message));
             false
         }
         Err(mpsc::error::TrySendError::Closed(_)) => {
@@ -115,6 +203,10 @@ impl Client {
                 timeout
             },
         }
+    }
+
+    pub(crate) fn request_timeout(&self) -> Duration {
+        self.timeout
     }
 
     fn ws_endpoint(&self) -> String {
@@ -186,7 +278,7 @@ impl Client {
 
         let (stop_tx, mut stop_rx) = watch::channel(false);
         let alive = Arc::new(AtomicBool::new(true));
-        let last_error = Arc::new(Mutex::new(None));
+        let error_state = Arc::new(Mutex::new(SubscriptionErrorState::default()));
         let gap = Arc::new(ResubscribeGap::default());
         let (ready_tx, ready_rx) = oneshot::channel();
         let (tx, rx) = mpsc::channel::<T>(self.max_queue);
@@ -195,31 +287,36 @@ impl Client {
         let this = self.clone();
         let channel = channel.to_owned();
         let alive_task = alive.clone();
-        let error_task = last_error.clone();
+        let error_task = error_state.clone();
         let gap_task = gap.clone();
         let task = tokio::spawn(async move {
             let _guard = AliveGuard(alive_task.clone());
             let mut ready = Some(ready_tx);
+            let mut backoff = ReconnectBackoff::new();
             while !*stop_rx.borrow() {
+                let mut connected_this_attempt = false;
+                let mut attempt = SubscriptionAttempt {
+                    stop: &mut stop_rx,
+                    ready: &mut ready,
+                    gap: &gap_task,
+                    error_state: &error_task,
+                    connected: &mut connected_this_attempt,
+                };
                 match this
-                    .run_proto_subscription_once(
-                        &channel,
-                        decode.as_ref(),
-                        &tx,
-                        &mut stop_rx,
-                        &mut ready,
-                        &gap_task,
-                    )
+                    .run_proto_subscription_once(&channel, decode.as_ref(), &tx, &mut attempt)
                     .await
                 {
                     Ok(()) => break,
                     Err(_) if *stop_rx.borrow() => break,
                     Err(err) if matches!(err, Error::QueueOverflow(_)) => {
-                        *error_task.lock().expect("error lock") = Some(err);
+                        record_subscription_error(&error_task, err);
                         break;
                     }
                     Err(err) => {
-                        *error_task.lock().expect("error lock") = Some(err.clone());
+                        if connected_this_attempt {
+                            backoff.reset();
+                        }
+                        record_subscription_error(&error_task, err.clone());
                         if let Some(ready) = ready.take() {
                             let _ = ready.send(Err(err));
                             break;
@@ -227,14 +324,16 @@ impl Client {
                         if *stop_rx.borrow() || !auto_reconnect {
                             break;
                         }
-                        // Interruptible backoff so close/Drop can abort promptly.
+                        // Per-subscription exponential backoff with jitter avoids
+                        // synchronized reconnect storms while remaining cancellable.
+                        let delay = backoff.next_delay();
                         tokio::select! {
                             _ = stop_rx.changed() => {
                                 if *stop_rx.borrow() {
                                     break;
                                 }
                             }
-                            _ = tokio::time::sleep(CENTRIFUGO_RECONNECT_DELAY) => {}
+                            _ = tokio::time::sleep(delay) => {}
                         }
                     }
                 }
@@ -260,7 +359,7 @@ impl Client {
             stop: stop_tx,
             alive,
             task,
-            last_error,
+            error_state,
             gap,
         })
     }
@@ -300,9 +399,7 @@ impl Client {
         channel: &str,
         decode: &F,
         tx: &mpsc::Sender<T>,
-        stop: &mut watch::Receiver<bool>,
-        ready: &mut Option<oneshot::Sender<Result<()>>>,
-        gap: &ResubscribeGap,
+        attempt: &mut SubscriptionAttempt<'_>,
     ) -> Result<()>
     where
         F: Fn(&[u8]) -> Result<T>,
@@ -338,22 +435,24 @@ impl Client {
         let (mut write, mut read) = ws.split();
         self.handshake_channel(&mut write, &mut read, channel)
             .await?;
-        if let Some(ready) = ready.take() {
+        *attempt.connected = true;
+        clear_subscription_error(attempt.error_state);
+        if let Some(ready) = attempt.ready.take() {
             let _ = ready.send(Ok(()));
         } else {
             // Successful reconnect after the initial handshake: publications may
             // have been lost (no Centrifugo recover/offset). Consumers must treat
             // this as a possible gap.
-            gap.note_resubscribe();
+            attempt.gap.note_resubscribe();
         }
 
         loop {
-            if *stop.borrow() {
+            if *attempt.stop.borrow() {
                 return Ok(());
             }
             let msg = tokio::select! {
-                changed = stop.changed() => {
-                    if changed.is_err() || *stop.borrow() {
+                changed = attempt.stop.changed() => {
+                    if changed.is_err() || *attempt.stop.borrow() {
                         return Ok(());
                     }
                     None
@@ -447,13 +546,46 @@ pub struct TypedSubscription<T> {
     stop: watch::Sender<bool>,
     alive: Arc<AtomicBool>,
     task: tokio::task::JoinHandle<()>,
-    last_error: Arc<Mutex<Option<Error>>>,
+    error_state: Arc<Mutex<SubscriptionErrorState>>,
     gap: Arc<ResubscribeGap>,
 }
 
 impl<T> TypedSubscription<T> {
     pub async fn recv(&mut self) -> Option<T> {
         self.rx.recv().await
+    }
+
+    /// Receive one publication while preserving terminal delivery failures.
+    ///
+    /// Unlike [`Self::recv`], a closed feed with a recorded error returns that
+    /// error instead of being indistinguishable from a clean shutdown.
+    pub async fn recv_result(&mut self) -> Result<Option<T>> {
+        match self.rx.recv().await {
+            Some(item) => Ok(Some(item)),
+            None => match self.take_err() {
+                Some(err) => Err(err),
+                None => Ok(None),
+            },
+        }
+    }
+
+    /// Register a callback for background transport/protocol errors.
+    ///
+    /// If an error was already recorded, the callback is invoked immediately.
+    /// Callback panics are isolated from the websocket worker.
+    pub fn set_on_error<F>(&self, callback: F)
+    where
+        F: Fn(Error) + Send + Sync + 'static,
+    {
+        let callback: ErrorCallback = Arc::new(callback);
+        let current = {
+            let mut state = lock_unpoisoned(&self.error_state);
+            state.callback = Some(callback.clone());
+            state.last.clone()
+        };
+        if let Some(err) = current {
+            invoke_error_callback(callback, err);
+        }
     }
 
     /// True while the background websocket task is still running.
@@ -463,12 +595,12 @@ impl<T> TypedSubscription<T> {
 
     /// Most recent connection or terminal delivery error.
     pub fn err(&self) -> Option<Error> {
-        self.last_error.lock().expect("error lock").clone()
+        lock_unpoisoned(&self.error_state).last.clone()
     }
 
     /// Take and clear the most recent background error.
     pub fn take_err(&self) -> Option<Error> {
-        self.last_error.lock().expect("error lock").take()
+        lock_unpoisoned(&self.error_state).last.take()
     }
 
     /// How many times this subscription successfully reconnected after the
@@ -717,7 +849,7 @@ mod tests {
             stop,
             alive,
             task,
-            last_error: Arc::new(Mutex::new(None)),
+            error_state: Arc::new(Mutex::new(SubscriptionErrorState::default())),
             gap: Arc::new(ResubscribeGap::default()),
         };
 
@@ -731,5 +863,36 @@ mod tests {
                 .is_err(),
             "JoinHandle must be aborted on Drop"
         );
+    }
+
+    #[test]
+    fn reconnect_backoff_is_bounded_exponential_and_jittered() {
+        let mut first = ReconnectBackoff::with_seed(1);
+        let mut second = ReconnectBackoff::with_seed(2);
+        let mut first_delays = Vec::new();
+        let mut second_delays = Vec::new();
+
+        for attempt in 0..12 {
+            let first_delay = first.next_delay();
+            let second_delay = second.next_delay();
+            let cap_ms = (RECONNECT_INITIAL_CAP.as_millis() as u64)
+                .saturating_mul(1u64 << attempt.min(16))
+                .min(RECONNECT_MAX_CAP.as_millis() as u64);
+            let floor = Duration::from_millis(cap_ms / 2);
+            let cap = Duration::from_millis(cap_ms);
+            assert!((floor..=cap).contains(&first_delay));
+            assert!((floor..=cap).contains(&second_delay));
+            first_delays.push(first_delay);
+            second_delays.push(second_delay);
+        }
+
+        assert_ne!(
+            first_delays, second_delays,
+            "independent subscriptions must not share one reconnect schedule"
+        );
+        assert!(first_delays.iter().all(|delay| *delay <= RECONNECT_MAX_CAP));
+
+        first.reset();
+        assert!(first.next_delay() <= RECONNECT_INITIAL_CAP);
     }
 }

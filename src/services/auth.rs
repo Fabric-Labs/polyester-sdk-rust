@@ -23,8 +23,8 @@ impl AuthService {
 
     pub async fn me(&self) -> Result<MeResult> {
         let client = AuthServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         );
         let req = MeRequest::default();
         let resp = unary::await_auth(

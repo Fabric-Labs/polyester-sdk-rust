@@ -1,25 +1,17 @@
 //! Lifecycle flow decoders.
 
-use buffa::Enumeration;
-
+use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{LifecycleFlowSummary, LifecycleFlowsList};
 use crate::proto::chain::lifecycle::v1::{
     FlowSummaryView, FlowTxMatchView, GetFlowResponse, ListFlowsByTxResponse, ListFlowsResponse,
 };
 
-fn enum_label<T: Enumeration>(value: &buffa::EnumValue<T>) -> String {
-    value
-        .as_known()
-        .map(|e| e.proto_name().to_owned())
-        .unwrap_or_default()
-}
-
 fn flow_summary_from_proto(msg: &FlowSummaryView) -> LifecycleFlowSummary {
     LifecycleFlowSummary {
         intent_id: msg.flow_id.clone(),
-        flow_kind: enum_label(&msg.flow_kind),
-        latest_step: enum_label(&msg.current_step),
+        flow_kind: enum_proto_name(&msg.flow_kind),
+        latest_step: enum_proto_name(&msg.current_step),
         is_open: msg.is_open,
         is_terminal: msg.is_terminal,
         owner_account_id: format_uint64_id(msg.owner_account_id),
@@ -41,8 +33,8 @@ pub fn flows_list_from_proto(msg: &ListFlowsResponse) -> LifecycleFlowsList {
 fn flow_tx_match_from_proto(msg: &FlowTxMatchView) -> LifecycleFlowSummary {
     LifecycleFlowSummary {
         intent_id: msg.flow_id.clone(),
-        flow_kind: enum_label(&msg.flow_kind),
-        latest_step: enum_label(&msg.current_step),
+        flow_kind: enum_proto_name(&msg.flow_kind),
+        latest_step: enum_proto_name(&msg.current_step),
         is_open: msg.is_open,
         is_terminal: msg.is_terminal,
         owner_account_id: String::new(),

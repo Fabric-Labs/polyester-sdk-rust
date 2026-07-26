@@ -321,6 +321,61 @@ impl MockWsServer {
         }
     }
 
+    /// Accept connect+subscribe, then send one Centrifugo publication.
+    pub async fn spawn_centrifugo_publication_after_handshake(
+        active: Arc<AtomicUsize>,
+        payload: Vec<u8>,
+    ) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind ws");
+        let addr = listener.local_addr().expect("addr").to_string();
+        let connects = Arc::new(AtomicUsize::new(0));
+        let connects_task = connects.clone();
+        let active_task = active.clone();
+        let join = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let active = active_task.clone();
+                let connects = connects_task.clone();
+                let payload = payload.clone();
+                tokio::spawn(async move {
+                    let Ok(mut ws) = accept_protobuf_ws(stream).await else {
+                        return;
+                    };
+                    connects.fetch_add(1, Ordering::SeqCst);
+                    active.fetch_add(1, Ordering::SeqCst);
+                    let _guard = ConnGuard(active);
+                    let mut replies = 0u8;
+                    while let Some(msg) = ws.next().await {
+                        let Ok(msg) = msg else { break };
+                        if let Message::Binary(_) = msg
+                            && replies < 2
+                        {
+                            replies += 1;
+                            let _ = ws
+                                .send(Message::Binary(
+                                    centrifugo_ok_reply(u32::from(replies)).into(),
+                                ))
+                                .await;
+                            if replies == 2 {
+                                let _ = ws
+                                    .send(Message::Binary(centrifugo_publication(&payload).into()))
+                                    .await;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+        Self {
+            addr,
+            connects,
+            active,
+            _join: join,
+        }
+    }
+
     /// Accept connect+subscribe, then send one binary message of `message_bytes`.
     pub async fn spawn_centrifugo_oversized_after_handshake(
         active: Arc<AtomicUsize>,
@@ -517,6 +572,22 @@ pub fn centrifugo_ok_reply(id: u32) -> Vec<u8> {
     message.push(0x08);
     put_varint(&mut message, u64::from(id));
     length_delimit(message)
+}
+
+pub fn centrifugo_publication(payload: &[u8]) -> Vec<u8> {
+    let mut publication = Vec::new();
+    put_bytes_field(&mut publication, 4, payload);
+    let mut push = Vec::new();
+    put_bytes_field(&mut push, 4, &publication);
+    let mut reply = Vec::new();
+    put_bytes_field(&mut reply, 4, &push);
+    length_delimit(reply)
+}
+
+fn put_bytes_field(buf: &mut Vec<u8>, field: u32, value: &[u8]) {
+    put_varint(buf, u64::from((field << 3) | 2));
+    put_varint(buf, value.len() as u64);
+    buf.extend_from_slice(value);
 }
 
 fn put_varint(buf: &mut Vec<u8>, mut value: u64) {

@@ -2,7 +2,7 @@
 
 use crate::errors::{Error, Result};
 use crate::models::{MarketOverviewEntry, MarketOverviewList};
-use crate::realtime::SnapshotThenStream;
+use crate::realtime::{SnapshotThenStream, lock_unpoisoned};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -43,11 +43,18 @@ impl Subscription {
 
     /// Terminal subscription error, if the stream failed (e.g. queue overflow).
     pub fn err(&self) -> Option<Error> {
-        self.last_error
-            .lock()
-            .expect("error lock")
+        lock_unpoisoned(&self.last_error)
             .clone()
             .or_else(|| self.stream.err())
+    }
+
+    /// Register a callback for background transport, decode, snapshot, or
+    /// terminal buffering errors.
+    pub fn set_on_error<F>(&self, callback: F)
+    where
+        F: Fn(Error) + Send + Sync + 'static,
+    {
+        self.stream.set_on_error(callback);
     }
 
     /// Refetch the REST snapshot.
@@ -60,7 +67,7 @@ impl Subscription {
         if self.closed.swap(true, Ordering::SeqCst) {
             return;
         }
-        let _ = self.tx_slot.lock().expect("tx slot").take();
+        let _ = lock_unpoisoned(&self.tx_slot).take();
         self.stream.close();
     }
 }

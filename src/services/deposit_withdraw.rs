@@ -23,6 +23,39 @@ use crate::proto::chain::withdraw::v1::{
 };
 use crate::proto::chain::zipper::v1::GetDepositWithdrawConfigRequest;
 use crate::types::{AssetAmount, QuantityDomain, resolve_asset_amount_scaled};
+use rand_core::{OsRng, RngCore};
+
+/// Generate a cryptographically random withdrawal idempotency key.
+///
+/// Generate this once per logical withdrawal, persist it with the signed
+/// payload, and reuse it unchanged for every retry.
+pub fn new_trading_withdraw_idempotency_key() -> Result<String> {
+    let mut random = [0_u8; 16];
+    OsRng
+        .try_fill_bytes(&mut random)
+        .map_err(|err| Error::transport(format!("secure randomness unavailable: {err}")))?;
+    Ok(format!("wd-{}", hex::encode(random)))
+}
+
+/// Generate a cryptographically random, non-zero withdrawal nonce.
+///
+/// Generate and persist this alongside the idempotency key before signing the
+/// payload. The SDK never changes it during submission or retry.
+pub fn new_trading_withdraw_nonce() -> Result<u128> {
+    for _ in 0..2 {
+        let mut random = [0_u8; 16];
+        OsRng
+            .try_fill_bytes(&mut random)
+            .map_err(|err| Error::transport(format!("secure randomness unavailable: {err}")))?;
+        let nonce = u128::from_be_bytes(random);
+        if nonce != 0 {
+            return Ok(nonce);
+        }
+    }
+    Err(Error::transport(
+        "secure random source returned a zero withdrawal nonce twice",
+    ))
+}
 
 struct EncodeWithdrawPayload<'a> {
     action: TradingWithdrawAction,
@@ -33,7 +66,7 @@ struct EncodeWithdrawPayload<'a> {
     destination_chain_id: u64,
     destination_address: String,
     deadline_ts_sec: Option<u64>,
-    nonce: Option<u128>,
+    nonce: u128,
 }
 
 #[derive(Clone)]
@@ -48,8 +81,8 @@ impl DepositService {
 
     pub async fn list_addresses(&self) -> Result<DepositAddressesList> {
         let client = DepositAddressServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         );
         let req = ListDepositAddressesRequest::default();
         let resp = unary::await_auth(
@@ -65,8 +98,8 @@ impl DepositService {
 
     pub async fn create_address(&self, req: CreateDepositAddressRequest) -> Result<DepositAddress> {
         let client = DepositAddressServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         );
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -90,16 +123,24 @@ impl WithdrawService {
         Self { ctx }
     }
 
-    pub fn connect_client(&self) -> WithdrawServiceClient<crate::transport::SharedTransport> {
+    pub(crate) fn connect_client(
+        &self,
+    ) -> WithdrawServiceClient<crate::transport::SharedTransport> {
         WithdrawServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         )
     }
 
     fn encode_payload(opts: EncodeWithdrawPayload<'_>) -> Result<TradingWithdrawIntentPayload> {
         if opts.amount_scale.is_some_and(|s| s == 0) {
             return Err(Error::validation("amount_scale must be positive"));
+        }
+        if opts.idempotency_key.trim().is_empty() {
+            return Err(Error::validation("idempotency_key is required"));
+        }
+        if opts.nonce == 0 {
+            return Err(Error::validation("nonce must be non-zero"));
         }
         let scale = opts.amount_scale.unwrap_or(LEDGER_SCALE);
         let scaled = resolve_asset_amount_scaled(
@@ -114,14 +155,14 @@ impl WithdrawService {
             destination_chain_id: opts.destination_chain_id,
             destination_address: opts.destination_address,
             idempotency_key: opts.idempotency_key,
-            deadline_ts_sec: opts
-                .deadline_ts_sec
-                .unwrap_or_else(Self::default_deadline_ts_sec),
+            deadline_ts_sec: match opts.deadline_ts_sec {
+                Some(deadline) => deadline,
+                None => Self::default_deadline_ts_sec()?,
+            },
             ..Default::default()
         };
         *payload.amount_e18.get_or_insert_default() = i128_to_u128(scaled)?;
-        *payload.nonce.get_or_insert_default() =
-            u128_to_proto(opts.nonce.unwrap_or_else(Self::default_nonce));
+        *payload.nonce.get_or_insert_default() = u128_to_proto(opts.nonce);
         if payload
             .amount_e18
             .as_option()
@@ -132,29 +173,13 @@ impl WithdrawService {
         Ok(payload)
     }
 
-    fn default_deadline_ts_sec() -> u64 {
-        std::time::SystemTime::now()
+    fn default_deadline_ts_sec() -> Result<u64> {
+        let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs() + 5 * 60)
-            .unwrap_or(0)
-    }
-
-    fn default_nonce() -> u128 {
-        let n = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(1);
-        if n == 0 { 1 } else { n }
-    }
-
-    fn new_idempotency_key() -> String {
-        format!(
-            "wd-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        )
+            .map_err(|_| Error::validation("system clock is before UNIX_EPOCH"))?
+            .as_secs();
+        now.checked_add(5 * 60)
+            .ok_or_else(|| Error::validation("withdraw deadline overflow"))
     }
 
     /// Withdraw from trading to funding. Amount must be an [`crate::types::AssetAmount`].
@@ -167,17 +192,12 @@ impl WithdrawService {
                 "payload_signature is required for trading withdraw",
             ));
         }
-        let key = params
-            .idempotency_key
-            .clone()
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(Self::new_idempotency_key);
         let payload = Self::encode_payload(EncodeWithdrawPayload {
             action: TradingWithdrawAction::ToFunding,
             asset_id: params.asset_id,
             amount: &params.amount,
             amount_scale: params.amount_scale,
-            idempotency_key: key,
+            idempotency_key: params.idempotency_key,
             destination_chain_id: 0,
             destination_address: params.destination_address,
             deadline_ts_sec: params.deadline_ts_sec,
@@ -207,17 +227,12 @@ impl WithdrawService {
                 "destination_address is required for external-chain withdraw",
             ));
         }
-        let key = params
-            .idempotency_key
-            .clone()
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(Self::new_idempotency_key);
         let payload = Self::encode_payload(EncodeWithdrawPayload {
             action: TradingWithdrawAction::ToExternalChain,
             asset_id: params.asset_id,
             amount: &params.amount,
             amount_scale: params.amount_scale,
-            idempotency_key: key,
+            idempotency_key: params.idempotency_key,
             destination_chain_id,
             destination_address: params.destination_address,
             deadline_ts_sec: params.deadline_ts_sec,
@@ -311,8 +326,8 @@ impl ZipperService {
 
     pub async fn get_deposit_withdraw_config(&self) -> Result<DepositWithdrawConfig> {
         let client = ZipperServiceClient::new(
-            self.ctx.factory.transport(false),
-            self.ctx.factory.connect_config(false),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         );
         let resp = unary::await_public(
             client.get_deposit_withdraw_config(GetDepositWithdrawConfigRequest::default()),
@@ -362,7 +377,7 @@ mod tests {
             destination_chain_id: 0,
             destination_address: String::new(),
             deadline_ts_sec: Some(1_800_000_000),
-            nonce: Some(42),
+            nonce: 42,
         })
     }
 
@@ -404,12 +419,60 @@ mod tests {
                 .unwrap(),
             payload_signature: Vec::new(),
             destination_address: String::new(),
-            idempotency_key: Some("missing-signature".into()),
+            idempotency_key: "missing-signature".into(),
             amount_scale: Some(18),
             deadline_ts_sec: Some(1_800_000_000),
-            nonce: Some(42),
+            nonce: 42,
         };
         let err = client.withdraw.create_to_funding(params).await.unwrap_err();
         assert!(err.to_string().contains("payload_signature"));
+    }
+
+    #[test]
+    fn withdraw_rejects_empty_idempotency_key() {
+        let amount =
+            AssetAmount::from_scaled(100, Some(18), QuantityDomain::LedgerE18, Some(7)).unwrap();
+        let err = WithdrawService::encode_payload(EncodeWithdrawPayload {
+            action: TradingWithdrawAction::ToFunding,
+            asset_id: 7,
+            amount: &amount,
+            amount_scale: Some(18),
+            idempotency_key: "  ".into(),
+            destination_chain_id: 0,
+            destination_address: String::new(),
+            deadline_ts_sec: Some(1_800_000_000),
+            nonce: 42,
+        })
+        .unwrap_err();
+        assert!(err.to_string().contains("idempotency_key"));
+    }
+
+    #[test]
+    fn withdraw_rejects_zero_nonce() {
+        let amount =
+            AssetAmount::from_scaled(100, Some(18), QuantityDomain::LedgerE18, Some(7)).unwrap();
+        let err = WithdrawService::encode_payload(EncodeWithdrawPayload {
+            action: TradingWithdrawAction::ToFunding,
+            asset_id: 7,
+            amount: &amount,
+            amount_scale: Some(18),
+            idempotency_key: "stable-withdraw".into(),
+            destination_chain_id: 0,
+            destination_address: String::new(),
+            deadline_ts_sec: Some(1_800_000_000),
+            nonce: 0,
+        })
+        .unwrap_err();
+        assert!(err.to_string().contains("nonce"));
+    }
+
+    #[test]
+    fn withdrawal_generators_return_explicit_unique_values() {
+        let first_key = new_trading_withdraw_idempotency_key().unwrap();
+        let second_key = new_trading_withdraw_idempotency_key().unwrap();
+        assert!(first_key.starts_with("wd-"));
+        assert_eq!(first_key.len(), 35);
+        assert_ne!(first_key, second_key);
+        assert_ne!(new_trading_withdraw_nonce().unwrap(), 0);
     }
 }

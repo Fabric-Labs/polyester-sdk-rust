@@ -81,9 +81,9 @@ impl Price {
     }
 
     pub fn as_decimal(&self) -> Decimal {
-        format_price_ticks(self.ticks.get())
-            .parse()
-            .unwrap_or_default()
+        // Price ticks always use the protocol's fixed 1e6 scale, so this
+        // conversion is exact and cannot silently substitute Decimal::ZERO.
+        Decimal::new(self.ticks.get(), 6)
     }
 
     pub fn format(&self) -> String {
@@ -378,6 +378,12 @@ mod tests {
     #[test]
     fn price_from_ticks_rejects_negative() {
         assert!(Price::from_ticks(-1, None).is_err());
+    }
+
+    #[test]
+    fn price_as_decimal_is_exact_at_the_maximum_tick_value() {
+        let price = Price::from_ticks(i64::MAX, None).unwrap();
+        assert_eq!(price.as_decimal(), Decimal::new(i64::MAX, 6));
     }
 
     #[test]

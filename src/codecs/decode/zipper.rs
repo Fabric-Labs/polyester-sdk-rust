@@ -85,9 +85,14 @@ pub fn deposit_withdraw_config_from_proto(
 
 pub fn zipped_asset_supply_update_from_proto(
     msg: &ProtoZippedAssetSupplyUpdate,
-    scale_fn: impl Fn(u32) -> u32,
+    scale_fn: impl Fn(u32) -> Option<u32>,
 ) -> Result<ZippedAssetSupplyUpdate> {
-    let scale = scale_fn(msg.zipped_asset_id);
+    let scale = scale_fn(msg.zipped_asset_id).ok_or_else(|| {
+        Error::validation(format!(
+            "unknown quantity scale for zipped_asset_id {}; hydrate catalogs first",
+            msg.zipped_asset_id
+        ))
+    })?;
     Ok(ZippedAssetSupplyUpdate {
         zipped_asset_id: msg.zipped_asset_id,
         supply: format_ledger_u64(msg.supply_q, scale).map_err(|e| {
@@ -101,7 +106,7 @@ pub fn zipped_asset_supply_update_from_proto(
 
 pub fn zipped_asset_supply_batch_from_proto(
     msg: &ProtoZippedAssetSupplyBatch,
-    scale_fn: impl Fn(u32) -> u32,
+    scale_fn: impl Fn(u32) -> Option<u32>,
 ) -> Result<ZippedAssetSupplyBatch> {
     let mut updates = Vec::with_capacity(msg.updates.len());
     for u in &msg.updates {
@@ -149,8 +154,19 @@ mod tests {
             supply_q: 1_000,
             ..Default::default()
         };
-        let err =
-            zipped_asset_supply_update_from_proto(&msg, |_| 65535).expect_err("invalid scale");
+        let err = zipped_asset_supply_update_from_proto(&msg, |_| Some(65535))
+            .expect_err("invalid scale");
         assert!(err.to_string().to_ascii_lowercase().contains("scale"));
+    }
+
+    #[test]
+    fn zipped_supply_decode_rejects_unknown_catalog_scale() {
+        let msg = ProtoZippedAssetSupplyUpdate {
+            zipped_asset_id: 99,
+            supply_q: 1_000,
+            ..Default::default()
+        };
+        let err = zipped_asset_supply_update_from_proto(&msg, |_| None).unwrap_err();
+        assert!(err.to_string().contains("zipped_asset_id 99"));
     }
 }
