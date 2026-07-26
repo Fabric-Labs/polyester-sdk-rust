@@ -61,6 +61,7 @@ pub mod chain;
 
 pub use client::{Client, Config};
 pub use errors::{Error, Result, auth_codes};
+pub use services::{new_trading_withdraw_idempotency_key, new_trading_withdraw_nonce};
 pub use types::{
     AssetAmount, Price, PriceTicks, QtyScaled, Quantity, QuantityDomain,
     resolve_asset_amount_scaled, resolve_price_ticks, resolve_qty_scaled,

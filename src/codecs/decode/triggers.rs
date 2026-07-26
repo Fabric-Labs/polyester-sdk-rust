@@ -55,8 +55,8 @@ fn enum_value_trigger_status(value: buffa::EnumValue<TriggerStatus>) -> String {
     value
         .as_known()
         .map(trigger_status_label)
-        .unwrap_or("")
-        .to_owned()
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
 fn trigger_price_source_label(value: buffa::EnumValue<TriggerPriceSource>) -> String {
@@ -64,7 +64,8 @@ fn trigger_price_source_label(value: buffa::EnumValue<TriggerPriceSource>) -> St
         Some(TriggerPriceSource::LastPrice) => "last".to_owned(),
         Some(TriggerPriceSource::IndexPrice) => "index".to_owned(),
         Some(TriggerPriceSource::MarkPrice) => "mark".to_owned(),
-        _ => String::new(),
+        Some(_) => String::new(),
+        None => format!("UNKNOWN({})", value.to_i32()),
     }
 }
 
@@ -72,7 +73,8 @@ fn trigger_direction_label(value: buffa::EnumValue<TriggerDirection>) -> String 
     match value.as_known() {
         Some(TriggerDirection::Above) => "above".to_owned(),
         Some(TriggerDirection::Below) => "below".to_owned(),
-        _ => String::new(),
+        Some(_) => String::new(),
+        None => format!("UNKNOWN({})", value.to_i32()),
     }
 }
 
@@ -80,7 +82,8 @@ fn fee_source_label(value: buffa::EnumValue<FeeSource>) -> String {
     match value.as_known() {
         Some(FeeSource::Quote) => "quote".to_owned(),
         Some(FeeSource::Received) => "received".to_owned(),
-        _ => String::new(),
+        Some(_) => String::new(),
+        None => format!("UNKNOWN({})", value.to_i32()),
     }
 }
 
@@ -89,7 +92,8 @@ fn stp_mode_label(value: buffa::EnumValue<SelfTradePreventionMode>) -> String {
         Some(SelfTradePreventionMode::ExpireTaker) => "expire_taker".to_owned(),
         Some(SelfTradePreventionMode::ExpireMaker) => "expire_maker".to_owned(),
         Some(SelfTradePreventionMode::ExpireBoth) => "expire_both".to_owned(),
-        _ => String::new(),
+        Some(_) => String::new(),
+        None => format!("UNKNOWN({})", value.to_i32()),
     }
 }
 
@@ -98,7 +102,8 @@ fn ladder_distribution_label(value: buffa::EnumValue<LadderDistribution>) -> Str
         Some(LadderDistribution::Linear) => "linear".to_owned(),
         Some(LadderDistribution::Geometric) => "geometric".to_owned(),
         Some(LadderDistribution::WeightedFavorable) => "weighted_favorable".to_owned(),
-        _ => String::new(),
+        Some(_) => String::new(),
+        None => format!("UNKNOWN({})", value.to_i32()),
     }
 }
 
@@ -421,7 +426,7 @@ fn enum_proto_name<E: Enumeration>(value: buffa::EnumValue<E>) -> String {
     value
         .as_known()
         .map(|e| e.proto_name().to_owned())
-        .unwrap_or_default()
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
 pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> TriggerEvent {
@@ -557,5 +562,15 @@ mod tests {
         });
         assert_eq!(listed.events.len(), 1);
         assert_eq!(listed.next_page_token, "evt-page-2");
+    }
+
+    #[test]
+    fn trigger_event_preserves_unknown_event_type_number() {
+        let event = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 1,
+            event_type: buffa::EnumValue::Unknown(321),
+            ..Default::default()
+        });
+        assert_eq!(event.event_type, "UNKNOWN(321)");
     }
 }

@@ -21,8 +21,10 @@ pub struct BalancesList {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BalanceHistorySeries {
     pub asset_id: u32,
-    pub account_code: u32,
-    pub balance_q: Vec<i64>,
+    /// Raw protobuf enum value; unknown/negative future values are preserved.
+    pub account_code: i32,
+    /// Unsigned scaled balance values from the ledger protocol.
+    pub balance_q: Vec<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -85,7 +85,6 @@ async fn internal_transfer_tiny() {
     }
     let _ = min_trading_quote();
 
-    let _ = client.internal_transfers.connect_client();
     let params = CreateInternalTransferParams {
         asset_id,
         quantity: amount,

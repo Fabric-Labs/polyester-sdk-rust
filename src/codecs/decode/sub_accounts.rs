@@ -1,7 +1,6 @@
 //! Sub-account decoders.
 
-use buffa::Enumeration;
-
+use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
     CreateSubaccountResult, GetSubaccountResult, SubAccount, SubAccountActivityEvent,
@@ -22,18 +21,12 @@ fn timestamp_ms(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> i64 {
     }
 }
 
-fn enum_label<T: Enumeration>(value: &buffa::EnumValue<T>) -> String {
-    value
-        .as_known()
-        .map(|e| e.proto_name().to_owned())
-        .unwrap_or_default()
-}
-
-fn activity_label<T: Enumeration>(value: &buffa::EnumValue<T>, prefix: &str) -> String {
-    enum_label(value)
-        .strip_prefix(prefix)
-        .unwrap_or_default()
-        .to_ascii_lowercase()
+fn activity_label<T: buffa::Enumeration>(value: &buffa::EnumValue<T>, prefix: &str) -> String {
+    let label = enum_proto_name(value);
+    match label.strip_prefix(prefix) {
+        Some(known) => known.to_ascii_lowercase(),
+        None => label,
+    }
 }
 
 pub fn subaccount_from_proto(msg: &Subaccount) -> SubAccount {
@@ -69,7 +62,7 @@ pub fn create_subaccount_from_proto(msg: &CreateSubaccountResponse) -> CreateSub
 fn member_from_proto(msg: &SubaccountMemberView) -> SubAccountMember {
     SubAccountMember {
         grantee_account_id: format_uint64_id(msg.account_id),
-        role: enum_label(&msg.role),
+        role: enum_proto_name(&msg.role),
     }
 }
 
@@ -85,8 +78,8 @@ fn invite_from_proto(msg: &SubaccountInvite) -> SubAccountInvite {
     SubAccountInvite {
         invite_id: format_uint64_id(msg.id),
         grantee_account_id: format_uint64_id(msg.grantee_account_id),
-        role: enum_label(&msg.role),
-        status: enum_label(&msg.status),
+        role: enum_proto_name(&msg.role),
+        status: enum_proto_name(&msg.status),
     }
 }
 
