@@ -637,12 +637,12 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
     },
     {
         "id": "api_keys",
-        "label": "API keys (list/get/subscribe/generate_keypair)",
+        "label": "API keys (list/get/subscribe/local keypair generation)",
         "any_services": ["auth.v1.ApiKeyService"],
     },
     {
         "id": "subaccounts",
-        "label": "Subaccounts (reads/subscribe)",
+        "label": "Subaccounts (list/get/members/invites/activity/subscribe)",
         "any_services": [
             "auth.v1.SubaccountService",
             "auth.v1.SubaccountViewService",
@@ -650,7 +650,7 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
     },
     {
         "id": "address_book",
-        "label": "Address book (reads/subscribe)",
+        "label": "Address book (list/view/subscribe)",
         "any_services": ["auth.v1.AddressBookService"],
     },
     {

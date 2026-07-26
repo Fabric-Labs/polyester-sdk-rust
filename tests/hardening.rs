@@ -19,6 +19,7 @@ use polyester::realtime::Client as RealtimeClient;
 use polyester::realtime::{
     MAX_REALTIME_MESSAGE_BYTES, SnapshotThenStream, SnapshotThenStreamConfig,
 };
+use polyester::transport::MAX_CONNECT_RESPONSE_BYTES;
 use polyester::{Client, Config, Quantity, QuantityDomain};
 use serde_json::json;
 use std::sync::Arc;
@@ -99,6 +100,38 @@ async fn l2_token_no_headers_times_out_via_subscribe_raw() {
     let msg = err.to_string().to_ascii_lowercase();
     assert!(
         msg.contains("timed out") || msg.contains("timeout"),
+        "{err}"
+    );
+}
+
+#[tokio::test]
+async fn l2_token_slow_drip_obeys_one_overall_deadline() {
+    let timeout = Duration::from_millis(180);
+    let chunks = br#"{"token":"connection-ok"}"#.iter().map(|byte| vec![*byte]).collect::<Vec<_>>();
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path.starts_with("/v1/rt/") {
+            hardening_support::HttpScript::SlowDrip {
+                status: 200,
+                headers: vec![("Content-Type".into(), "application/json".into())],
+                chunks: chunks.clone(),
+                inter_chunk_delay: Duration::from_millis(30),
+            }
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let ws = MockWsServer::spawn_hang_after_accept().await;
+    let rt = private_rt(&ws, &http, timeout);
+    let started = Instant::now();
+    let err = subscribe_raw_err(&rt, PRIVATE_CHANNEL).await;
+    assert!(
+        started.elapsed() < timeout + Duration::from_millis(800),
+        "slow-drip token body escaped the overall deadline"
+    );
+    let message = err.to_string().to_ascii_lowercase();
+    assert!(
+        message.contains("timeout") || message.contains("timed out"),
         "{err}"
     );
 }
@@ -283,6 +316,33 @@ async fn l2_jsonrpc_no_headers_times_out() {
 }
 
 #[tokio::test]
+async fn l2_jsonrpc_slow_drip_obeys_one_overall_deadline() {
+    let timeout = Duration::from_millis(180);
+    let chunks = br#"{"jsonrpc":"2.0","id":1,"result":"0x1"}"#
+        .iter()
+        .map(|byte| vec![*byte])
+        .collect::<Vec<_>>();
+    let http = MockHttpServer::spawn(move |_| hardening_support::HttpScript::SlowDrip {
+        status: 200,
+        headers: vec![("Content-Type".into(), "application/json".into())],
+        chunks: chunks.clone(),
+        inter_chunk_delay: Duration::from_millis(30),
+    })
+    .await;
+    let rpc = JsonRpcClient::new(http.base_url(), timeout);
+    let started = Instant::now();
+    let err = rpc
+        .request("eth_chainId", json!([]))
+        .await
+        .expect_err("slow-drip JSON-RPC body must time out");
+    assert!(
+        started.elapsed() < timeout + Duration::from_millis(800),
+        "slow-drip JSON-RPC body escaped the overall deadline"
+    );
+    assert!(err.to_string().to_ascii_lowercase().contains("timeout"));
+}
+
+#[tokio::test]
 async fn l2_jsonrpc_rejects_oversized_and_bad_envelope() {
     let http = MockHttpServer::spawn(|req| {
         if req.path.contains("big") {
@@ -335,6 +395,42 @@ async fn l2_jsonrpc_rejects_oversized_and_bad_envelope() {
     let noid = JsonRpcClient::new(format!("{}/noid", http.base_url()), Duration::from_secs(2));
     let err = noid.request("eth_call", json!([])).await.unwrap_err();
     assert!(err.to_string().to_ascii_lowercase().contains("id"), "{err}");
+}
+
+#[tokio::test]
+async fn l2_jsonrpc_rejects_all_remaining_invalid_envelopes() {
+    let http = MockHttpServer::spawn(|req| {
+        let body = if req.path.contains("missing-version") {
+            br#"{"id":1,"result":1}"#.to_vec()
+        } else if req.path.contains("wrong-id") {
+            br#"{"jsonrpc":"2.0","id":999,"result":1}"#.to_vec()
+        } else if req.path.contains("neither") {
+            br#"{"jsonrpc":"2.0","id":1}"#.to_vec()
+        } else {
+            br#"{"jsonrpc":"2.0","id":1,"error":"not-an-object"}"#.to_vec()
+        };
+        hardening_support::HttpScript::Json { status: 200, body }
+    })
+    .await;
+
+    for path in ["missing-version", "wrong-id", "neither", "malformed-error"] {
+        let rpc = JsonRpcClient::new(
+            format!("{}/{path}", http.base_url()),
+            Duration::from_secs(2),
+        );
+        let err = rpc.request("eth_call", json!([])).await.expect_err(path);
+        let message = err.to_string().to_ascii_lowercase();
+        match path {
+            "missing-version" => assert!(message.contains("version"), "{err}"),
+            "wrong-id" => assert!(message.contains("id"), "{err}"),
+            "neither" => assert!(
+                message.contains("result") || message.contains("error"),
+                "{err}"
+            ),
+            "malformed-error" => assert!(message.contains("object"), "{err}"),
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[tokio::test]
@@ -855,6 +951,40 @@ async fn l2_wait_for_catalogs_fail_closed_on_empty_body() {
 }
 
 #[tokio::test]
+async fn l2_wait_for_catalogs_fail_closed_on_malformed_protobuf() {
+    let http = MockHttpServer::spawn(|req| {
+        if req.path == SPOT_CONFIG_PATH {
+            hardening_support::HttpScript::Raw {
+                status: 200,
+                headers: vec![
+                    ("Content-Type".into(), "application/proto".into()),
+                    ("Content-Length".into(), "1".into()),
+                ],
+                // Field zero with an unsupported wire type cannot decode as a
+                // protobuf GetSpotConfigResponse.
+                body: vec![0x0f],
+            }
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        timeout: Duration::from_millis(500),
+        hydrate_catalogs: true,
+        ..Default::default()
+    })
+    .expect("client");
+    let err = client
+        .wait_for_catalogs()
+        .await
+        .expect_err("malformed protobuf must fail closed");
+    assert!(!client.catalogs.is_ready(), "{err}");
+    assert!(client.catalogs_last_error().is_some());
+}
+
+#[tokio::test]
 async fn l2_wait_for_catalogs_fail_closed_on_malformed_config() {
     let http = MockHttpServer::spawn(|_| hardening_support::HttpScript::Json {
         status: 200,
@@ -877,6 +1007,78 @@ async fn l2_wait_for_catalogs_fail_closed_on_malformed_config() {
         err.to_string().contains("scale") || err.to_string().contains("catalog"),
         "{err}"
     );
+}
+
+#[tokio::test]
+async fn l2_wait_for_catalogs_rejects_oversized_content_length_response() {
+    let body = vec![0u8; MAX_CONNECT_RESPONSE_BYTES + 1];
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path == SPOT_CONFIG_PATH {
+            hardening_support::HttpScript::Raw {
+                status: 200,
+                headers: vec![
+                    ("Content-Type".into(), "application/proto".into()),
+                    ("Content-Length".into(), body.len().to_string()),
+                ],
+                body: body.clone(),
+            }
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        timeout: Duration::from_secs(2),
+        hydrate_catalogs: true,
+        ..Default::default()
+    })
+    .expect("client");
+
+    let err = client
+        .wait_for_catalogs()
+        .await
+        .expect_err("oversized catalog response must fail closed");
+    let message = err.to_string().to_ascii_lowercase();
+    assert!(
+        message.contains("size")
+            || message.contains("limit")
+            || message.contains("resource exhausted")
+            || message.contains("catalog"),
+        "{err}"
+    );
+    assert!(!client.catalogs.is_ready());
+    assert!(client.catalogs_last_error().is_some());
+}
+
+#[tokio::test]
+async fn l2_wait_for_catalogs_rejects_oversized_chunked_response() {
+    let http = MockHttpServer::spawn(|req| {
+        if req.path == SPOT_CONFIG_PATH {
+            hardening_support::HttpScript::ChunkedBody {
+                status: 200,
+                total_bytes: MAX_CONNECT_RESPONSE_BYTES + 1,
+                chunk_size: 64 * 1024,
+            }
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        timeout: Duration::from_secs(2),
+        hydrate_catalogs: true,
+        ..Default::default()
+    })
+    .expect("client");
+
+    client
+        .wait_for_catalogs()
+        .await
+        .expect_err("oversized chunked catalog response must fail closed");
+    assert!(!client.catalogs.is_ready());
+    assert!(client.catalogs_last_error().is_some());
 }
 
 #[tokio::test]

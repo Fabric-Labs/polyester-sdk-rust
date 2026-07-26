@@ -1,9 +1,9 @@
 use crate::support::{
     base_asset_id, call_optional, call_required, far_above_buy_stop_price, hydrate_spot_and_zipper,
     is_internal_order_error, is_notional_validation, maker_client_from_env, market_ref_price,
-    min_base_qty_for_pair, pair_for_symbol, quote_asset_id, require_funded, require_live_client,
-    require_mutation, require_trading_quote_balance, trade_e2e_enabled, trade_symbol,
-    trading_balance_human, unique_client_order_id,
+    min_base_qty_for_pair, pair_for_symbol, quote_asset_id, require_account_wide_cleanup,
+    require_funded, require_live_client, require_mutation, require_trading_quote_balance,
+    trade_e2e_enabled, trade_symbol, trading_balance_human, unique_client_order_id,
 };
 use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
@@ -13,6 +13,9 @@ use std::time::Duration;
 
 #[tokio::test]
 async fn market_order_fill() {
+    if !require_account_wide_cleanup() {
+        return;
+    }
     if !require_mutation() {
         return;
     }

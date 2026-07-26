@@ -62,6 +62,24 @@ pub fn require_funded() -> bool {
     }
 }
 
+/// Require an explicit dedicated-account gate before a test may call a
+/// non-dry-run account-wide cancellation endpoint.
+pub fn require_account_wide_cleanup() -> bool {
+    load_dotenv();
+    if env_truthy("POLYESTER_TEST_ACCOUNT_WIDE_CLEANUP") {
+        true
+    } else if strict_live_enabled() {
+        panic!(
+            "STRICT_LIVE: Set POLYESTER_TEST_ACCOUNT_WIDE_CLEANUP=1 only for a dedicated test account"
+        );
+    } else {
+        eprintln!(
+            "skip: Set POLYESTER_TEST_ACCOUNT_WIDE_CLEANUP=1 only for a dedicated test account"
+        );
+        false
+    }
+}
+
 pub fn trade_e2e_enabled() -> bool {
     load_dotenv();
     env_truthy("POLYESTER_TEST_TRADE_E2E")
