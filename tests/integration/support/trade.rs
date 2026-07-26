@@ -14,8 +14,6 @@ fn spot_proto(spot: &SpotConfig) -> GetSpotConfigResponse {
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 
-const SMOKE_CANDIDATES: &[&str] = &["ETH-USDT", "BTC-USDT", "SOL-USDT", "BNB-USDT"];
-
 const FAR_BELOW_BUY_HINTS: &[(&str, &str)] = &[
     ("ETH-USDT", "100"),
     ("BTC-USDT", "1000"),
@@ -32,43 +30,18 @@ const FAR_ABOVE_BUY_STOP_HINTS: &[(&str, &str)] = &[
 
 pub const LEDGER_SCALE: u32 = 18;
 
-/// Prefer `POLYESTER_TEST_SMOKE_SYMBOL`, else first liquid candidate present, else first pair.
+/// Canonical symbol selection for read-only smoke tests.
+///
+/// This intentionally delegates to [`trade_symbol`], so every live test honors
+/// only `POLYESTER_TEST_TRADE_SYMBOL` (F-23).
 pub fn smoke_symbol(spot: &SpotConfig) -> String {
-    load_dotenv();
-    if let Ok(sym) = std::env::var("POLYESTER_TEST_SMOKE_SYMBOL") {
-        let trimmed = sym.trim();
-        if !trimmed.is_empty() {
-            return trimmed.to_owned();
-        }
-    }
-    if let Ok(sym) = std::env::var("POLYESTER_SMOKE_SYMBOL") {
-        let trimmed = sym.trim();
-        if !trimmed.is_empty() {
-            return trimmed.to_owned();
-        }
-    }
-    let proto = spot_proto(spot);
-    let symbols: Vec<&str> = proto
-        .pairs
-        .iter()
-        .map(|p| p.symbol.trim())
-        .filter(|s| !s.is_empty())
-        .collect();
-    for candidate in SMOKE_CANDIDATES {
-        if symbols.iter().any(|s| s == candidate) {
-            return (*candidate).to_owned();
-        }
-    }
-    symbols
-        .first()
-        .map(|s| (*s).to_owned())
-        .unwrap_or_else(|| "BTC-USDT".to_owned())
+    trade_symbol(spot)
 }
 
 /// Canonical trade symbol for funded / mutation / heartbeat paths.
 ///
-/// Honors `POLYESTER_TEST_TRADE_SYMBOL` only — never `POLYESTER_TEST_SMOKE_SYMBOL`
-/// (F-23 / B5). When unset, prefers BTC-USDT then first listed pair.
+/// Honors only `POLYESTER_TEST_TRADE_SYMBOL` (F-23 / B5). When unset, prefers
+/// BTC-USDT and then the first listed pair.
 pub fn trade_symbol(spot: &SpotConfig) -> String {
     load_dotenv();
     let override_sym = env_trade_symbol();
