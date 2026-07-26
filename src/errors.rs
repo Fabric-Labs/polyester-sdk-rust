@@ -16,6 +16,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     #[error("{0}")]
     Auth(String),
+    #[error("{context}: permission denied (HTTP {status}, code {code}): {message} [{endpoint}]")]
+    PermissionDenied {
+        message: String,
+        status: u16,
+        code: String,
+        context: String,
+        endpoint: String,
+    },
     #[error("{0}")]
     Validation(String),
     #[error("{0}")]

@@ -134,6 +134,9 @@ where
 
 /// True when the API-key lacks a required permission (F-24 structured Auth/403).
 pub fn is_permission_denied(err: &Error) -> bool {
+    if matches!(err, Error::PermissionDenied { .. }) {
+        return true;
+    }
     let msg = err.to_string().to_ascii_lowercase();
     let auth_permission = matches!(err, Error::Auth(_))
         && (msg.contains("permission denied")

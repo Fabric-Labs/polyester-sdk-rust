@@ -16,11 +16,12 @@ use std::sync::{
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::time::{Duration, timeout};
 use tokio_tungstenite::{
-    connect_async,
+    connect_async_with_config,
     tungstenite::{
         Message,
         client::IntoClientRequest,
         http::{HeaderValue, header::SEC_WEBSOCKET_PROTOCOL},
+        protocol::WebSocketConfig,
     },
 };
 
@@ -29,6 +30,11 @@ const DEFAULT_QUEUE: usize = 1000;
 const CENTRIFUGO_READ_TIMEOUT: Duration = Duration::from_secs(30);
 const CENTRIFUGO_RECONNECT_DELAY: Duration = Duration::from_secs(1);
 const CENTRIFUGO_PROTOBUF_SUBPROTOCOL: &str = "centrifuge-protobuf";
+
+/// Maximum accepted binary Centrifugo WebSocket message and frame size.
+///
+/// This bounds transport buffering and the subsequent protobuf decoder copy.
+pub const MAX_REALTIME_MESSAGE_BYTES: usize = 8 * 1024 * 1024;
 
 /// Enqueue a publication without blocking. On a full queue, mark the
 /// subscription closed and return [`Error::QueueOverflow`] — never silently drop.
@@ -309,10 +315,16 @@ impl Client {
             SEC_WEBSOCKET_PROTOCOL,
             HeaderValue::from_static(CENTRIFUGO_PROTOBUF_SUBPROTOCOL),
         );
-        let (ws, response) = timeout(CENTRIFUGO_READ_TIMEOUT, connect_async(request))
-            .await
-            .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
-            .map_err(|e| Error::realtime(format!("ws connect: {e}")))?;
+        let websocket_config = WebSocketConfig::default()
+            .max_message_size(Some(MAX_REALTIME_MESSAGE_BYTES))
+            .max_frame_size(Some(MAX_REALTIME_MESSAGE_BYTES));
+        let (ws, response) = timeout(
+            CENTRIFUGO_READ_TIMEOUT,
+            connect_async_with_config(request, Some(websocket_config), false),
+        )
+        .await
+        .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
+        .map_err(|e| Error::realtime(format!("ws connect: {e}")))?;
         if response
             .headers()
             .get(SEC_WEBSOCKET_PROTOCOL)

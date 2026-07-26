@@ -5,6 +5,7 @@
 //! `centrifugal/protocol/definitions/client.proto` schema. Polyester only needs
 //! connect, subscribe, errors, pings, and publication payloads.
 
+use super::MAX_REALTIME_MESSAGE_BYTES;
 use crate::errors::{Error, Result};
 
 const WIRE_VARINT: u8 = 0;
@@ -57,10 +58,22 @@ fn command(id: u32, field: u32, request: &[u8]) -> Vec<u8> {
 }
 
 pub(super) fn decode_replies(frame: &[u8]) -> Result<Vec<Incoming>> {
+    if frame.len() > MAX_REALTIME_MESSAGE_BYTES {
+        return Err(Error::realtime(format!(
+            "centrifugo protobuf message exceeds {MAX_REALTIME_MESSAGE_BYTES} bytes"
+        )));
+    }
     let mut cursor = Cursor::new(frame);
     let mut out = Vec::new();
     while !cursor.is_empty() {
-        let length = cursor.varint()? as usize;
+        let length = cursor.varint()?;
+        if length > MAX_REALTIME_MESSAGE_BYTES as u64 {
+            return Err(Error::realtime(format!(
+                "centrifugo protobuf record exceeds {MAX_REALTIME_MESSAGE_BYTES} bytes"
+            )));
+        }
+        let length = usize::try_from(length)
+            .map_err(|_| Error::realtime("centrifugo protobuf length exceeds usize".to_owned()))?;
         let reply = cursor.take(length)?;
         decode_reply(reply, &mut out)?;
     }
@@ -229,7 +242,14 @@ impl<'a> Cursor<'a> {
     }
 
     fn len_bytes(&mut self) -> Result<&'a [u8]> {
-        let length = self.varint()? as usize;
+        let length = self.varint()?;
+        if length > MAX_REALTIME_MESSAGE_BYTES as u64 {
+            return Err(Error::realtime(format!(
+                "centrifugo protobuf field exceeds {MAX_REALTIME_MESSAGE_BYTES} bytes"
+            )));
+        }
+        let length = usize::try_from(length)
+            .map_err(|_| Error::realtime("centrifugo protobuf length exceeds usize".to_owned()))?;
         self.take(length)
     }
 
@@ -314,6 +334,14 @@ mod tests {
                 }),
             }]
         );
+    }
+
+    #[test]
+    fn rejects_declared_record_above_message_limit_without_allocating() {
+        let mut frame = Vec::new();
+        put_varint(&mut frame, MAX_REALTIME_MESSAGE_BYTES as u64 + 1);
+        let err = decode_replies(&frame).expect_err("oversized record must fail closed");
+        assert!(err.to_string().contains("exceeds"), "{err}");
     }
 
     #[test]

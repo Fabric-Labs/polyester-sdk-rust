@@ -52,7 +52,7 @@ async fn main() {
     }
     println!("OK: concurrent list_open 32/32");
 
-    let symbol = env::var("POLYESTER_TEST_SMOKE_SYMBOL").unwrap_or_else(|_| "BTC-USDT".into());
+    let symbol = env::var("POLYESTER_TEST_TRADE_SYMBOL").unwrap_or_else(|_| "BTC-USDT".into());
     let mut sub = match client.market_data.subscribe_trades(&symbol).await {
         Ok(s) => s,
         Err(err) => {
