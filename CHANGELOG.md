@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.1.0a13
+
+Package version: `0.1.0-alpha.13`. Git tag: `v0.1.0a13`.
+
+### Breaking
+- Realtime HTTP 401/403 token responses map to structured `Error::PermissionDenied { message, status, code, context, endpoint }` (richer than the a12 Auth mapping).
+
+### Fixed
+- Realtime WebSocket messages, frames, and protobuf record/field lengths are capped at 8 MiB before publication decoding.
+- `SnapshotThenStream` tracks public handles independently from background `Arc` references; dropping the last handle now stops the coordinator, and close interrupts reconnect delays and in-flight snapshot retries.
+
+### Testing
+- Hardening L2 covers oversized realtime messages and combined reconnect/retry/cancellation fault injection.
+- Live/smoke helpers exclusively use `POLYESTER_TEST_TRADE_SYMBOL` (legacy smoke-symbol fallbacks removed).
+
 ## 0.1.0a12
 
 Package version: `0.1.0-alpha.12`. Git tag: `v0.1.0a12`.

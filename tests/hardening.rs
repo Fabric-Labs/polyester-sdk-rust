@@ -16,7 +16,9 @@ use polyester::auth::Credentials;
 use polyester::chain::JsonRpcClient;
 use polyester::codecs::{MAX_PROTOCOL_SCALE, format_ledger_u128, format_qty_scaled};
 use polyester::realtime::Client as RealtimeClient;
-use polyester::realtime::{SnapshotThenStream, SnapshotThenStreamConfig};
+use polyester::realtime::{
+    MAX_REALTIME_MESSAGE_BYTES, SnapshotThenStream, SnapshotThenStreamConfig,
+};
 use polyester::{Client, Config, Quantity, QuantityDomain};
 use serde_json::json;
 use std::sync::Arc;
@@ -201,9 +203,14 @@ async fn l2_token_malformed_json_rejected_via_subscribe_raw() {
 }
 
 #[tokio::test]
-async fn l2_token_http_403_maps_to_auth_not_realtime() {
+async fn l2_token_http_403_maps_to_structured_permission_denied() {
     let http = MockHttpServer::spawn(|req| {
-        if req.path.starts_with("/v1/rt/") {
+        if req.path == "/v1/rt/token" {
+            hardening_support::HttpScript::Json {
+                status: 200,
+                body: br#"{"token":"connection-ok"}"#.to_vec(),
+            }
+        } else if req.path.starts_with("/v1/rt/subscribe") {
             hardening_support::HttpScript::Json {
                 status: 403,
                 body: br#"{"code":"permission_denied","message":"missing transfer:read"}"#.to_vec(),
@@ -213,16 +220,25 @@ async fn l2_token_http_403_maps_to_auth_not_realtime() {
         }
     })
     .await;
-    let ws = MockWsServer::spawn_hang_after_accept().await;
+    let active = Arc::new(AtomicUsize::new(0));
+    let ws = MockWsServer::spawn_centrifugo_public(active).await;
     let rt = private_rt(&ws, &http, Duration::from_secs(2));
     let err = subscribe_raw_err(&rt, "private:auth:transfers:acct:proto").await;
     match err {
-        Error::Auth(msg) => {
-            assert!(msg.contains("permission denied"));
-            assert!(msg.contains("HTTP 403"));
-            assert!(msg.contains("transfer:read"));
+        Error::PermissionDenied {
+            message,
+            status,
+            code,
+            context,
+            endpoint,
+        } => {
+            assert_eq!(message, "missing transfer:read");
+            assert_eq!(status, 403);
+            assert_eq!(code, "permission_denied");
+            assert!(context.contains("private:auth:transfers:acct:proto"));
+            assert!(endpoint.contains("/v1/rt/subscribe?channel="));
         }
-        other => panic!("expected Auth permission error, got {other:?}"),
+        other => panic!("expected structured permission error, got {other:?}"),
     }
 }
 
@@ -634,6 +650,105 @@ async fn l2_close_during_reconnect_backoff_no_extra_connect() {
         "close during reconnect backoff must not start an extra connect ({connects_before} -> {connects_after})"
     );
     assert!(!sub.is_alive());
+}
+
+#[tokio::test]
+async fn l2_realtime_oversized_binary_message_fails_closed() {
+    let active = Arc::new(AtomicUsize::new(0));
+    let ws = MockWsServer::spawn_centrifugo_oversized_after_handshake(
+        active.clone(),
+        MAX_REALTIME_MESSAGE_BYTES + 1,
+    )
+    .await;
+    let rt = RealtimeClient::new(ws.ws_url(), "", None, None);
+    let sub = rt
+        .subscribe_proto_with_options(PUBLIC_CHANNEL, |bytes| Ok(bytes.to_vec()), false)
+        .await
+        .expect("initial handshake");
+    wait_until(
+        || sub.err().is_some() && !sub.is_alive(),
+        Duration::from_secs(3),
+    )
+    .await;
+    let error = sub.err().expect("oversized message error").to_string();
+    let error = error.to_ascii_lowercase();
+    assert!(
+        error.contains("size")
+            || error.contains("too long")
+            || error.contains("capacity")
+            || error.contains("space limit"),
+        "unexpected oversized-message error: {error}"
+    );
+    wait_until(
+        || active.load(Ordering::SeqCst) == 0,
+        Duration::from_millis(750),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn l2_close_during_reconnect_snapshot_retry_cancels_fetch_and_socket() {
+    let active = Arc::new(AtomicUsize::new(0));
+    let ws = MockWsServer::spawn_centrifugo_disconnect_once_then_idle(active.clone()).await;
+    let rt = RealtimeClient::new(ws.ws_url(), "", None, None);
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let fetch_attempts = attempts.clone();
+    let (stalled_tx, stalled_rx) = tokio::sync::oneshot::channel::<()>();
+    let stalled_rx = Arc::new(std::sync::Mutex::new(Some(stalled_rx)));
+    let fetch_stalled_rx = stalled_rx.clone();
+    let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+        client: rt,
+        channel: PUBLIC_CHANNEL.into(),
+        decode: Arc::new(|_bytes| Ok(1u8)),
+        fetch_snapshot: Arc::new(move || {
+            let attempt = fetch_attempts.fetch_add(1, Ordering::SeqCst);
+            if attempt == 0 {
+                return async { Ok("initial".to_owned()) }.boxed();
+            }
+            if attempt == 1 {
+                return async { Err(Error::transport("retry once")) }.boxed();
+            }
+            let stalled = fetch_stalled_rx
+                .lock()
+                .expect("stalled snapshot lock")
+                .take()
+                .expect("only one stalled retry");
+            async move {
+                let _ = stalled.await;
+                Ok("late snapshot".to_owned())
+            }
+            .boxed()
+        }),
+        read_publication: Arc::new(|p| vec![p]),
+        apply_snapshot: Arc::new(|_snapshot, _pending| {}),
+        apply_live_publications: Arc::new(|_publications| {}),
+        max_buffered: 8,
+        on_reconnect: None,
+        on_snapshot_refresh: None,
+    });
+
+    sts.start().await.expect("initial snapshot");
+    wait_until(
+        || attempts.load(Ordering::SeqCst) >= 3 && active.load(Ordering::SeqCst) == 1,
+        Duration::from_secs(5),
+    )
+    .await;
+    let started = Instant::now();
+    sts.close();
+    wait_until(
+        || active.load(Ordering::SeqCst) == 0,
+        Duration::from_millis(750),
+    )
+    .await;
+    assert!(
+        stalled_tx.send(()).is_err(),
+        "closing during the second refresh attempt must drop the stalled fetch future"
+    );
+    assert!(
+        started.elapsed() < Duration::from_millis(750),
+        "combined retry/cancellation cleanup lingered {:?}",
+        started.elapsed()
+    );
 }
 
 #[tokio::test]

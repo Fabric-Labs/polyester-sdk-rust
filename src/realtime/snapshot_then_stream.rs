@@ -3,7 +3,7 @@
 use crate::errors::{Error, Result};
 use crate::realtime::{Client, TypedSubscription};
 use futures_util::future::BoxFuture;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::watch;
 
@@ -33,6 +33,7 @@ pub struct SnapshotThenStreamConfig<TSnapshot, TPublication> {
 /// Coordinates REST snapshot hydration with a live protobuf channel.
 pub struct SnapshotThenStream<TSnapshot, TPublication> {
     inner: Arc<Inner<TSnapshot, TPublication>>,
+    counts_handle: bool,
 }
 
 struct Inner<TSnapshot, TPublication> {
@@ -54,6 +55,7 @@ struct Inner<TSnapshot, TPublication> {
     stop_tx: watch::Sender<bool>,
     connection_tx: watch::Sender<Option<Result<()>>>,
     started: AtomicBool,
+    handles: AtomicUsize,
 }
 
 impl<TSnapshot, TPublication> SnapshotThenStream<TSnapshot, TPublication>
@@ -89,7 +91,9 @@ where
                 stop_tx,
                 connection_tx,
                 started: AtomicBool::new(false),
+                handles: AtomicUsize::new(1),
             }),
+            counts_handle: true,
         }
     }
 
@@ -138,7 +142,11 @@ where
         // Do not clear pending here: publications buffered during a failed fetch
         // must survive for the next successful refresh.
 
-        let snapshot = match (self.inner.fetch_snapshot)().await {
+        let mut stop_rx = self.inner.stop_tx.subscribe();
+        let snapshot = match tokio::select! {
+            _ = stop_rx.changed() => return Ok(()),
+            snapshot = (self.inner.fetch_snapshot)() => snapshot,
+        } {
             Ok(snapshot) => snapshot,
             Err(err) => {
                 *self.inner.last_error.lock().expect("error lock") = Some(err.clone());
@@ -173,7 +181,10 @@ where
     ///
     /// Failures are persisted on [`Self::err`] and clear readiness (fail-closed).
     pub fn request_refresh(&self) {
-        let this = self.clone();
+        let this = Self {
+            inner: self.inner.clone(),
+            counts_handle: false,
+        };
         tokio::spawn(async move {
             if let Err(err) = this.refresh_snapshot().await {
                 this.inner.ready.store(false, Ordering::SeqCst);
@@ -206,15 +217,19 @@ where
             pending.clear();
         }
         self.inner.ready.store(false, Ordering::SeqCst);
+        self.inner.connection_tx.send_replace(Some(Ok(())));
         let _ = self.inner.stop_tx.send(true);
     }
 }
 
 impl<TSnapshot, TPublication> Drop for SnapshotThenStream<TSnapshot, TPublication> {
     fn drop(&mut self) {
-        // Shared via Arc (Clone). Only the last handle should stop the loop.
-        // Inline close body so Drop does not require T: Send bounds on the struct.
-        if Arc::strong_count(&self.inner) != 1 {
+        if !self.counts_handle {
+            return;
+        }
+        // Background tasks also hold Arc references, so Arc::strong_count cannot
+        // identify the last public handle. Track public clones explicitly.
+        if self.inner.handles.fetch_sub(1, Ordering::SeqCst) != 1 {
             return;
         }
         if self.inner.disposed.swap(true, Ordering::SeqCst) {
@@ -226,14 +241,17 @@ impl<TSnapshot, TPublication> Drop for SnapshotThenStream<TSnapshot, TPublicatio
             pending.clear();
         }
         self.inner.ready.store(false, Ordering::SeqCst);
+        self.inner.connection_tx.send_replace(Some(Ok(())));
         let _ = self.inner.stop_tx.send(true);
     }
 }
 
 impl<TSnapshot, TPublication> Clone for SnapshotThenStream<TSnapshot, TPublication> {
     fn clone(&self) -> Self {
+        self.inner.handles.fetch_add(1, Ordering::SeqCst);
         Self {
             inner: self.inner.clone(),
+            counts_handle: true,
         }
     }
 }
@@ -273,7 +291,15 @@ where
                             if self.disposed.load(Ordering::SeqCst) {
                                 break;
                             }
-                            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                            let stopped = tokio::select! {
+                                changed = stop_rx.changed() => {
+                                    changed.is_err() || *stop_rx.borrow()
+                                }
+                                _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => false,
+                            };
+                            if stopped {
+                                break;
+                            }
                             self.connection_tx.send_replace(None);
                             continue;
                         }
@@ -290,6 +316,7 @@ where
                 }
                 let this = SnapshotThenStream {
                     inner: self.clone(),
+                    counts_handle: false,
                 };
                 // One bounded retry, then fail-closed with err() set.
                 let mut refresh = this.refresh_snapshot().await;
@@ -309,7 +336,13 @@ where
             if self.disposed.load(Ordering::SeqCst) || *stop_rx.borrow() {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            let stopped = tokio::select! {
+                changed = stop_rx.changed() => changed.is_err() || *stop_rx.borrow(),
+                _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => false,
+            };
+            if stopped {
+                break;
+            }
         }
     }
 
@@ -521,5 +554,39 @@ mod tests {
         sts.inner.handle_publication(2);
         assert!(sts.is_disposed());
         assert!(matches!(sts.err(), Some(Error::QueueOverflow(_))));
+    }
+
+    #[test]
+    fn dropping_last_public_handle_disposes_background_coordinator() {
+        let client = Client::new(
+            "wss://example.invalid",
+            "https://example.invalid",
+            None,
+            None,
+        );
+        let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+            client,
+            channel: "public:test".into(),
+            decode: Arc::new(|_b| Ok(1u8)),
+            fetch_snapshot: Arc::new(|| async { Ok("snap".to_string()) }.boxed()),
+            read_publication: Arc::new(|p| vec![p]),
+            apply_snapshot: Arc::new(|_s, _p| {}),
+            apply_live_publications: Arc::new(|_p| {}),
+            max_buffered: 1,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
+        });
+        let clone = sts.clone();
+        let observer = sts.inner.clone();
+        drop(sts);
+        assert!(
+            !observer.disposed.load(Ordering::SeqCst),
+            "one public clone remains"
+        );
+        drop(clone);
+        assert!(
+            observer.disposed.load(Ordering::SeqCst),
+            "last public handle must stop the coordinator even when tasks hold Arc references"
+        );
     }
 }

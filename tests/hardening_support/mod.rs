@@ -288,6 +288,61 @@ impl MockWsServer {
         }
     }
 
+    /// Accept connect+subscribe, then send one binary message of `message_bytes`.
+    pub async fn spawn_centrifugo_oversized_after_handshake(
+        active: Arc<AtomicUsize>,
+        message_bytes: usize,
+    ) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind ws");
+        let addr = listener.local_addr().expect("addr").to_string();
+        let connects = Arc::new(AtomicUsize::new(0));
+        let connects_task = connects.clone();
+        let active_task = active.clone();
+        let join = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let active = active_task.clone();
+                let connects = connects_task.clone();
+                tokio::spawn(async move {
+                    let Ok(mut ws) = accept_protobuf_ws(stream).await else {
+                        return;
+                    };
+                    connects.fetch_add(1, Ordering::SeqCst);
+                    active.fetch_add(1, Ordering::SeqCst);
+                    let _guard = ConnGuard(active);
+                    let mut replies = 0u8;
+                    while let Some(msg) = ws.next().await {
+                        let Ok(msg) = msg else { break };
+                        if let Message::Binary(_) = msg
+                            && replies < 2
+                        {
+                            replies += 1;
+                            let _ = ws
+                                .send(Message::Binary(
+                                    centrifugo_ok_reply(u32::from(replies)).into(),
+                                ))
+                                .await;
+                            if replies == 2 {
+                                let _ = ws
+                                    .send(Message::Binary(vec![0; message_bytes].into()))
+                                    .await;
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+        Self {
+            addr,
+            connects,
+            active,
+            _join: join,
+        }
+    }
+
     /// Accept connect+subscribe, then drop the socket so the client reconnects.
     pub async fn spawn_centrifugo_disconnect_after_handshake(active: Arc<AtomicUsize>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind ws");
@@ -322,6 +377,58 @@ impl MockWsServer {
                                 ))
                                 .await;
                             if replies == 2 {
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+        Self {
+            addr,
+            connects,
+            active,
+            _join: join,
+        }
+    }
+
+    /// Disconnect the first subscribed socket, then keep its replacement idle.
+    pub async fn spawn_centrifugo_disconnect_once_then_idle(active: Arc<AtomicUsize>) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind ws");
+        let addr = listener.local_addr().expect("addr").to_string();
+        let connects = Arc::new(AtomicUsize::new(0));
+        let connects_task = connects.clone();
+        let active_task = active.clone();
+        let join = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let active = active_task.clone();
+                let connects = connects_task.clone();
+                tokio::spawn(async move {
+                    let Ok(mut ws) = accept_protobuf_ws(stream).await else {
+                        return;
+                    };
+                    let connection_index = connects.fetch_add(1, Ordering::SeqCst);
+                    active.fetch_add(1, Ordering::SeqCst);
+                    let _guard = ConnGuard(active);
+                    let mut replies = 0u8;
+                    while let Some(msg) = ws.next().await {
+                        let Ok(msg) = msg else { break };
+                        if let Message::Binary(_) = msg
+                            && replies < 2
+                        {
+                            replies += 1;
+                            let _ = ws
+                                .send(Message::Binary(
+                                    centrifugo_ok_reply(u32::from(replies)).into(),
+                                ))
+                                .await;
+                            if replies == 2 && connection_index == 0 {
+                                // Let SnapshotThenStream finish its initial snapshot
+                                // before forcing the reconnect under test.
+                                tokio::time::sleep(Duration::from_millis(100)).await;
                                 break;
                             }
                         }
