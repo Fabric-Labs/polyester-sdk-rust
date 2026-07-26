@@ -43,15 +43,15 @@ impl OrdersService {
 
     fn write_client(&self) -> OrdersServiceClient<crate::transport::SharedTransport> {
         OrdersServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         )
     }
 
     fn read_client(&self) -> OrdersReadServiceClient<crate::transport::SharedTransport> {
         OrdersReadServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         )
     }
 
@@ -560,7 +560,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(batch_create_from_proto(&resp))
+        batch_create_from_proto(&resp)
     }
 
     pub async fn batch_cancel(
@@ -965,8 +965,8 @@ impl TradesService {
             ..Default::default()
         };
         let client = OrdersReadServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         );
         let resp = unary::await_auth(
             &self.ctx.factory,

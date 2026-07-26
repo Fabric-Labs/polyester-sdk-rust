@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+## 0.1.0a15
+
+Package version: `0.1.0-alpha.15`. Git tag: `v0.1.0a15`.
+
+### Breaking
+- `BalanceHistorySeries.balance_q` is now `Vec<u64>`, matching the protobuf wire type and preserving values above `i64::MAX`.
+- `BalanceHistorySeries.account_code` is now `i32`, preserving unknown negative protobuf enum values instead of wrapping them into large unsigned values.
+- Trading withdrawals now require an explicit non-empty `idempotency_key` and non-zero `nonce`; retrying never creates a new request identity implicitly.
+- API request signing returns an error for unusable clocks or malformed absolute URLs.
+- Service-owned `connect_client()` escape hatches are no longer public. Use the high-level service methods, which apply request signing, or construct an explicitly low-level generated client from `polyester::connect`.
+
+### Features
+- `TypedSubscription::recv_result` and `set_on_error` make terminal realtime failures directly observable.
+- Errors expose `is_retryable`, `mutation_outcome_unknown`, and `retry_after`; withdrawal helpers generate cryptographically random keys/nonces.
+
+### Fixed
+- Batch-create decoding rejects missing outcomes and inconsistent aggregate counts; unknown rejection enum values retain their numeric code.
+- Realtime reconnects use capped exponential backoff with per-subscription jitter.
+- `SnapshotThenStream::start` cannot miss transient initial readiness and now obeys the configured startup deadline.
+- Signing timestamps remain at wall clock under 100k-request bursts instead of drifting into the future.
+- Catalog hydration rejects conflicting identities atomically; scale-dependent market data, orderbooks, and Zipper supply fail closed instead of guessing a scale. Valid proto3 scale `0` values survive protobuf-to-JSON conversion.
+- REST and realtime public market trades carry catalog quantity-scale metadata.
+- Unknown enum values are preserved as `UNKNOWN(n)` rather than collapsing to an empty string.
+- Removed the dead per-service `authenticated` transport flag and duplicate Connect configuration; authentication is enforced only where it actually occurs, in signed high-level service calls.
+- Realtime publication decoders reject empty and oversized payloads before protobuf conversion.
+
+### Testing
+- All 20 publication decoders used by the 22 typed subscription APIs are exercised against malformed lengths/tags, 4,096 deterministic mutation cases, and oversized payloads. A local WebSocket fault-injection test verifies every decoder error terminates the feed and reaches `recv_result()`.
+- Added a `cargo-fuzz` target covering the same decoder surface for coverage-guided malformed-protobuf campaigns.
+- Integration tests no longer trip `clippy::uninlined_format_args` under `-D warnings`.
+
 ## 0.1.0a14
 
 Package version: `0.1.0-alpha.14`. Git tag: `v0.1.0a14`.

@@ -33,6 +33,17 @@ use crate::proto::orders::v1::{Order as ProtoOrder, UserTrade as ProtoUserTrade}
 use crate::proto::triggers::v1::{Trigger as ProtoTrigger, TriggerEvent as ProtoTriggerEvent};
 
 fn decode_proto<M: Message + Default>(payload: &[u8]) -> Result<M> {
+    if payload.is_empty() {
+        return Err(Error::realtime(
+            "proto decode: empty publication payload".to_owned(),
+        ));
+    }
+    if payload.len() > crate::realtime::MAX_REALTIME_MESSAGE_BYTES {
+        return Err(Error::realtime(format!(
+            "proto decode: publication exceeds {} bytes",
+            crate::realtime::MAX_REALTIME_MESSAGE_BYTES
+        )));
+    }
     M::decode_from_slice(payload).map_err(|e| Error::realtime(format!("proto decode: {e}")))
 }
 
@@ -66,9 +77,13 @@ pub fn trigger_event_from_bytes(payload: &[u8]) -> Result<TriggerEvent> {
     Ok(trigger_event_from_proto(&msg))
 }
 
-pub fn market_trade_from_bytes(payload: &[u8]) -> Result<MarketTrade> {
-    let msg = decode_proto::<ProtoMarketTrade>(payload)?;
-    Ok(market_trade_from_proto(&msg))
+pub fn market_trade_from_bytes(
+    quantity_scale: u32,
+) -> impl Fn(&[u8]) -> Result<MarketTrade> + Send + Sync + 'static {
+    move |payload: &[u8]| {
+        let msg = decode_proto::<ProtoMarketTrade>(payload)?;
+        Ok(market_trade_from_proto(&msg, quantity_scale))
+    }
 }
 
 pub fn orderbook_delta_from_bytes(payload: &[u8]) -> Result<OrderBookDeltaUpdate> {
@@ -104,11 +119,10 @@ pub fn flow_summary_from_bytes(payload: &[u8]) -> Result<LifecycleFlowSummary> {
 
 pub fn flow_detail_from_bytes(payload: &[u8]) -> Result<LifecycleFlowSummary> {
     let msg = decode_proto::<FlowDetailView>(payload)?;
-    Ok(msg
-        .summary
+    msg.summary
         .as_option()
         .map(flow_summary_message_from_proto)
-        .unwrap_or_default())
+        .ok_or_else(|| Error::realtime("proto decode: flow detail is missing summary".to_owned()))
 }
 
 pub fn account_identity_from_bytes(payload: &[u8]) -> Result<AccountIdentity> {
@@ -139,7 +153,7 @@ pub fn market_overview_batch_from_bytes(payload: &[u8]) -> Result<MarketOverview
 
 pub fn zipped_asset_supply_batch_from_bytes(
     payload: &[u8],
-    scale_fn: impl Fn(u32) -> u32,
+    scale_fn: impl Fn(u32) -> Option<u32>,
 ) -> Result<ZippedAssetSupplyBatch> {
     let msg = decode_proto::<ProtoZippedAssetSupplyBatch>(payload)?;
     zipped_asset_supply_batch_from_proto(&msg, scale_fn)
@@ -242,8 +256,23 @@ mod tests {
             ..Default::default()
         };
         let bytes = msg.encode_to_vec();
-        let trade = market_trade_from_bytes(&bytes).expect("decode");
+        let trade = market_trade_from_bytes(6)(&bytes).expect("decode");
         assert_eq!(trade.match_id, "99");
         assert_eq!(trade.side, "buy");
+        assert_eq!(
+            trade.qty.as_ref().unwrap().format(None).unwrap(),
+            "0.000005"
+        );
+    }
+
+    #[test]
+    fn flow_detail_without_required_summary_fails_closed() {
+        let msg = FlowDetailView {
+            from_live_state: true,
+            ..Default::default()
+        };
+        let error = flow_detail_from_bytes(&msg.encode_to_vec())
+            .expect_err("missing flow summary must not become an empty success");
+        assert!(error.to_string().contains("missing summary"));
     }
 }

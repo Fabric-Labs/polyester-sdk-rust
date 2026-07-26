@@ -15,7 +15,10 @@ mod unary;
 pub use api_keys::ApiKeysService;
 pub use auth::AuthService;
 pub use balances::BalancesService;
-pub use deposit_withdraw::{DepositService, WithdrawService, ZipperService};
+pub use deposit_withdraw::{
+    DepositService, WithdrawService, ZipperService, new_trading_withdraw_idempotency_key,
+    new_trading_withdraw_nonce,
+};
 pub use market_data::{
     CreateSubscriptionOptions, ListMarketOverviewOptions, MarketDataService,
     MarketOverviewCreateSubscriptionOptions, MarketOverviewService, OrderbookService,

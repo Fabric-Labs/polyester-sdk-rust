@@ -26,7 +26,8 @@ fn balance_range_label(range: buffa::EnumValue<BalanceRange>) -> String {
         Some(BalanceRange::Day90) => "90d".to_owned(),
         Some(BalanceRange::Day180) => "180d".to_owned(),
         Some(BalanceRange::Day365) => "365d".to_owned(),
-        _ => String::new(),
+        Some(_) => String::new(),
+        None => format!("UNKNOWN({})", range.to_i32()),
     }
 }
 
@@ -60,8 +61,8 @@ pub fn balance_history_from_proto(msg: &GetBalanceHistoryResponse) -> BalanceHis
             .iter()
             .map(|s| BalanceHistorySeries {
                 asset_id: s.asset_id,
-                account_code: s.account_code.to_i32() as u32,
-                balance_q: s.balance_q.iter().map(|v| *v as i64).collect(),
+                account_code: s.account_code.to_i32(),
+                balance_q: s.balance_q.clone(),
             })
             .collect(),
     }
@@ -221,6 +222,28 @@ mod tests {
         assert_eq!(result.bucket, "1h");
         assert_eq!(result.series.len(), 1);
         assert_eq!(result.series[0].balance_q, vec![100, 200]);
+    }
+
+    #[test]
+    fn balance_history_preserves_full_u64_range() {
+        use crate::proto::ledger::read::v1::BalanceSeries;
+
+        let msg = GetBalanceHistoryResponse {
+            series: vec![BalanceSeries {
+                asset_id: 1,
+                account_code: buffa::EnumValue::from(-7),
+                balance_q: vec![i64::MAX as u64 + 1, u64::MAX],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        let result = balance_history_from_proto(&msg);
+        assert_eq!(
+            result.series[0].balance_q,
+            vec![i64::MAX as u64 + 1, u64::MAX]
+        );
+        assert_eq!(result.series[0].account_code, -7);
     }
 
     #[test]
