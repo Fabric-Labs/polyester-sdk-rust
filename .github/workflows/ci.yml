@@ -78,9 +78,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
-      # Unit/lib + compile-fail UI tests only. Live integration soft-skips without
-      # credentials and must not run in CI (false-green). Locally:
-      #   cargo test --test integration -- --test-threads=1
-      #   POLYESTER_TEST_STRICT_LIVE=1 for release QA.
-      - name: Test
-        run: cargo test --all-features --lib --test ui
+      # Required PR gate: unit/UI plus deterministic local HTTP/WS L2 tests.
+      # Credentialed staging tests remain a separate fail-closed release job.
+      - name: Test unit and local L2
+        run: cargo test --all-features --lib --test ui --test hardening --test a7_strict_live

@@ -1,4 +1,13 @@
 //! Live private-channel realtime coverage (auth + trading/ledger streams).
+//!
+//! Permission fixtures (F-24 / B6b): each subscribe group needs the matching
+//! API-key scope. Missing permission returns structured Auth/403 and soft-skips
+//! (fails closed under `POLYESTER_TEST_STRICT_LIVE=1`):
+//! - `address_book.subscribe` → address-book read
+//! - `transfers.subscribe` → transfer:read
+//! - `orders` / `trades` / `triggers` → trading read
+//! - `balances.subscribe` → ledger read
+//! - `api_keys` / `policies` / `sub_accounts` → auth admin read
 
 use crate::support::{call_optional, require_live_client};
 use std::time::Duration;

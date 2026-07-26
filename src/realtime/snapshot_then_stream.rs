@@ -122,6 +122,10 @@ where
     }
 
     /// Fetch a REST snapshot and merge buffered publications.
+    ///
+    /// On failure, readiness stays false, [`Self::err`] is set, and the pending
+    /// buffer is retained so a successful retry merges each buffered publication
+    /// exactly once (POLY-3746). Success clears `err`.
     pub async fn refresh_snapshot(&self) -> Result<()> {
         if self.inner.disposed.load(Ordering::SeqCst) {
             return match self.err() {
@@ -131,12 +135,16 @@ where
         }
         let generation = self.inner.generation.fetch_add(1, Ordering::SeqCst) + 1;
         self.inner.ready.store(false, Ordering::SeqCst);
-        {
-            let mut pending = self.inner.pending.lock().expect("pending lock");
-            pending.clear();
-        }
+        // Do not clear pending here: publications buffered during a failed fetch
+        // must survive for the next successful refresh.
 
-        let snapshot = (self.inner.fetch_snapshot)().await?;
+        let snapshot = match (self.inner.fetch_snapshot)().await {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                *self.inner.last_error.lock().expect("error lock") = Some(err.clone());
+                return Err(err);
+            }
+        };
 
         if self.inner.disposed.load(Ordering::SeqCst)
             || self.inner.generation.load(Ordering::SeqCst) != generation
@@ -154,6 +162,7 @@ where
             return Ok(());
         }
         self.inner.ready.store(true, Ordering::SeqCst);
+        *self.inner.last_error.lock().expect("error lock") = None;
         if let Some(cb) = &self.inner.on_snapshot_refresh {
             cb();
         }
@@ -161,10 +170,15 @@ where
     }
 
     /// Request a snapshot refresh from a sync context (e.g. sequence gap handler).
+    ///
+    /// Failures are persisted on [`Self::err`] and clear readiness (fail-closed).
     pub fn request_refresh(&self) {
         let this = self.clone();
         tokio::spawn(async move {
-            let _ = this.refresh_snapshot().await;
+            if let Err(err) = this.refresh_snapshot().await {
+                this.inner.ready.store(false, Ordering::SeqCst);
+                *this.inner.last_error.lock().expect("error lock") = Some(err);
+            }
         });
     }
 
@@ -277,7 +291,17 @@ where
                 let this = SnapshotThenStream {
                     inner: self.clone(),
                 };
-                let _ = this.refresh_snapshot().await;
+                // One bounded retry, then fail-closed with err() set.
+                let mut refresh = this.refresh_snapshot().await;
+                if refresh.is_err() {
+                    refresh = this.refresh_snapshot().await;
+                }
+                if let Err(err) = refresh {
+                    self.ready.store(false, Ordering::SeqCst);
+                    *self.last_error.lock().expect("error lock") = Some(err);
+                    sub.close();
+                    break;
+                }
             }
             first = false;
             self.pump_subscription(sub, &mut stop_rx).await;
@@ -409,9 +433,65 @@ mod tests {
         });
 
         assert!(sts.refresh_snapshot().await.is_err());
+        assert!(sts.err().is_some());
+        assert!(!sts.is_ready());
         sts.refresh_snapshot().await.expect("snapshot retry");
         assert_eq!(attempts.load(Ordering::SeqCst), 2);
         assert!(sts.is_ready());
+        assert!(sts.err().is_none());
+        sts.close();
+    }
+
+    #[tokio::test]
+    async fn refresh_snapshot_failure_retains_buffer_for_successful_retry() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let fetch_attempts = attempts.clone();
+        let merged = Arc::new(Mutex::new(Vec::<u8>::new()));
+        let merged_cb = merged.clone();
+        let client = Client::new(
+            "wss://example.invalid",
+            "https://example.invalid",
+            None,
+            None,
+        );
+        let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+            client,
+            channel: "public:test".into(),
+            decode: Arc::new(|_b| Ok(1u8)),
+            fetch_snapshot: Arc::new(move || {
+                let attempt = fetch_attempts.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    if attempt == 0 {
+                        Err(crate::Error::transport("transient snapshot failure"))
+                    } else {
+                        Ok("snap".to_string())
+                    }
+                }
+                .boxed()
+            }),
+            read_publication: Arc::new(|p| vec![p]),
+            apply_snapshot: Arc::new(move |_s, pending| {
+                merged_cb.lock().expect("merged").extend(pending);
+            }),
+            apply_live_publications: Arc::new(|_p| {}),
+            max_buffered: 8,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
+        });
+
+        // Simulate publications arriving while not ready / during failed fetch.
+        sts.inner.handle_publication(10);
+        sts.inner.handle_publication(11);
+        assert!(sts.refresh_snapshot().await.is_err());
+        sts.inner.handle_publication(12);
+        sts.refresh_snapshot().await.expect("retry");
+        let got = merged.lock().expect("merged").clone();
+        assert_eq!(
+            got,
+            vec![10, 11, 12],
+            "each buffered pub merged exactly once"
+        );
+        assert!(sts.err().is_none());
         sts.close();
     }
 

@@ -1,6 +1,7 @@
 //! Zipper deposit/withdraw config decoder.
 
 use crate::codecs::scalars::format_ledger_u64;
+use crate::errors::{Error, Result};
 use crate::models::{
     DepositWithdrawConfig, ZippedAssetSupplyBatch, ZippedAssetSupplyUpdate,
     ZipperAssetChainVariant, ZipperAssetConfig, ZipperChainConfig, ZipperChainContractConfig,
@@ -85,25 +86,28 @@ pub fn deposit_withdraw_config_from_proto(
 pub fn zipped_asset_supply_update_from_proto(
     msg: &ProtoZippedAssetSupplyUpdate,
     scale_fn: impl Fn(u32) -> u32,
-) -> ZippedAssetSupplyUpdate {
+) -> Result<ZippedAssetSupplyUpdate> {
     let scale = scale_fn(msg.zipped_asset_id);
-    ZippedAssetSupplyUpdate {
+    Ok(ZippedAssetSupplyUpdate {
         zipped_asset_id: msg.zipped_asset_id,
-        supply: format_ledger_u64(msg.supply_q, scale),
-    }
+        supply: format_ledger_u64(msg.supply_q, scale).map_err(|e| {
+            Error::validation(format!(
+                "zipped asset {} supply scale invalid: {e}",
+                msg.zipped_asset_id
+            ))
+        })?,
+    })
 }
 
 pub fn zipped_asset_supply_batch_from_proto(
     msg: &ProtoZippedAssetSupplyBatch,
     scale_fn: impl Fn(u32) -> u32,
-) -> ZippedAssetSupplyBatch {
-    ZippedAssetSupplyBatch {
-        updates: msg
-            .updates
-            .iter()
-            .map(|u| zipped_asset_supply_update_from_proto(u, &scale_fn))
-            .collect(),
+) -> Result<ZippedAssetSupplyBatch> {
+    let mut updates = Vec::with_capacity(msg.updates.len());
+    for u in &msg.updates {
+        updates.push(zipped_asset_supply_update_from_proto(u, &scale_fn)?);
     }
+    Ok(ZippedAssetSupplyBatch { updates })
 }
 
 #[cfg(test)]
@@ -136,5 +140,17 @@ mod tests {
         assert_eq!(cfg.chains[0].code, "ethereum");
         assert_eq!(cfg.assets[0].asset, "USDT");
         assert_eq!(cfg.assets[0].ledger_id, 7);
+    }
+
+    #[test]
+    fn zipped_supply_decode_rejects_invalid_catalog_scale() {
+        let msg = ProtoZippedAssetSupplyUpdate {
+            zipped_asset_id: 1,
+            supply_q: 1_000,
+            ..Default::default()
+        };
+        let err =
+            zipped_asset_supply_update_from_proto(&msg, |_| 65535).expect_err("invalid scale");
+        assert!(err.to_string().to_ascii_lowercase().contains("scale"));
     }
 }

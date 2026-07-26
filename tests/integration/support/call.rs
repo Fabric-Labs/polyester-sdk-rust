@@ -132,7 +132,26 @@ where
     }
 }
 
+/// True when the API-key lacks a required permission (F-24 structured Auth/403).
+pub fn is_permission_denied(err: &Error) -> bool {
+    let msg = err.to_string().to_ascii_lowercase();
+    let auth_permission = matches!(err, Error::Auth(_))
+        && (msg.contains("permission denied")
+            || msg.contains("permission_denied")
+            || msg.contains("http 403"));
+    let api_permission = matches!(
+        err,
+        Error::Api { code, .. } if code.to_ascii_lowercase().contains("permission_denied")
+    );
+    auth_permission || api_permission
+}
+
 /// Run an optional live RPC; soft-skip (None) when unavailable.
+///
+/// Permission-denied (HTTP 403 / Auth) soft-skips with an explicit permission
+/// message so private realtime fixtures never panic on missing scopes. Under
+/// `POLYESTER_TEST_STRICT_LIVE=1` those skips fail closed via the integration
+/// `eprintln!` macro.
 pub async fn call_optional<T, F, Fut>(label: &str, f: F) -> Option<T>
 where
     F: FnOnce() -> Fut,
@@ -142,6 +161,12 @@ where
         Ok(v) => Some(v),
         Err(err) if route_unavailable(&err) => {
             eprintln!("skip: {label} not mounted on API host: {err}");
+            None
+        }
+        Err(err) if is_permission_denied(&err) => {
+            eprintln!(
+                "skip: {label} missing required API-key permission (declare fixture scopes): {err}"
+            );
             None
         }
         Err(err) if jwt_session_only(&err) => {

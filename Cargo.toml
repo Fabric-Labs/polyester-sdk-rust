@@ -1,6 +1,6 @@
 [package]
 name = "polyester-sdk"
-version = "0.1.0-alpha.11"
+version = "0.1.0-alpha.12"
 edition = "2024"
 rust-version = "1.88"
 description = "Official Rust SDK for Polyester APIs."
@@ -23,6 +23,18 @@ exclude = [
 [lib]
 name = "polyester"
 path = "src/lib.rs"
+
+[[test]]
+name = "integration"
+path = "tests/integration/main.rs"
+
+[[test]]
+name = "hardening"
+path = "tests/hardening.rs"
+
+[[test]]
+name = "a7_strict_live"
+path = "tests/a7_strict_live.rs"
 
 [features]
 # Always-on stubs so existing `features = ["realtime"]` / `["chain"]` keep working.

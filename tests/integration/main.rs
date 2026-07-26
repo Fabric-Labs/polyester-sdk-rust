@@ -2,8 +2,15 @@
 //!
 //! Run:
 //! ```bash
-//! cargo test --test integration -- --nocapture --test-threads=1
+//! # Public / offline (no API key)
+//! cargo test --test integration money::
+//!
+//! # Credentialed live (STRICT_LIVE fails closed on soft skips; min executed via A7)
+//! POLYESTER_TEST_STRICT_LIVE=1 cargo test --test integration -- --nocapture --test-threads=1
 //! ```
+//!
+//! Permission fixtures for private realtime groups are declared in
+//! `private_realtime.rs` (address-book / transfer:read / trading / ledger / auth admin).
 
 // In strict live mode every existing `skip:` path fails closed. This keeps the
 // ordinary credential-optional suite ergonomic while preventing release QA
@@ -22,6 +29,7 @@ mod account;
 mod account_admin;
 mod auth;
 mod balances;
+mod batch_modify_regression;
 mod funded_chain_userop;
 mod funded_internal_transfer;
 mod funded_market_fill;
@@ -30,6 +38,7 @@ mod funded_spot_fill;
 mod lifecycle_app;
 mod market;
 mod market_order_mutation;
+mod market_roundtrip;
 mod money;
 mod orders;
 mod orders_mutation;

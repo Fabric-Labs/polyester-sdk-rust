@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+## 0.1.0a12
+
+Package version: `0.1.0-alpha.12`. Git tag: `v0.1.0a12`.
+
+### Breaking
+- `wait_for_catalogs` / `hydrate_catalogs` return `Err` when spot/zipper hydration fails or catalogs are unusable (was Ok-after-fail). Use `catalogs_last_error()` to inspect (POLY-3746 / F-19).
+- `format_qty_scaled` / `format_ledger_u64` return `Result<String>` and reject scales above `MAX_PROTOCOL_SCALE` (36) instead of panicking on pathological `format!` widths (POLY-3746 / E9).
+- Catalog hydrate rejects oversized IDs/scales (no silent `as u32` truncation) and scales > 36 (POLY-3746 / E9b).
+- Realtime HTTP 403 token responses map to `Error::Auth` (status, label, truncated body) instead of opaque `Error::Realtime("… HTTP 403")` (POLY-3746 / F-24).
+- Candle decode (`candles_from_proto` / `candles_columns_from_proto` / realtime candle decode) and zipped supply decode now return `Result` and reject invalid protocol scales instead of mapping them to empty strings via `unwrap_or_default` (POLY-3746). Public `MarketDataService::get_candles*` propagates the error.
+- `AssetAmount::from_scaled` validates optional scale against `MAX_PROTOCOL_SCALE` (same as `Quantity::from_scaled`).
+
+### Fixed
+- Realtime token exchange applies one deadline to request **and** bounded body collect; timeout sourced from `Config.timeout` (POLY-3746 / F-18).
+- JSON-RPC applies the same e2e deadline, caps bodies at 1 MiB, and validates `jsonrpc=="2.0"`, matching `id`, and exactly one of `result`|`error` (POLY-3746 / E5).
+- `TypedSubscription::close` / Drop aborts the JoinHandle; read loop `select!`s stop vs WS read so close does not linger up to 30s (POLY-3746 / E6).
+- `SnapshotThenStream` surfaces reconnect/`request_refresh` errors via `err()`, retries once, then fail-closes (POLY-3746 / E7).
+- Catalog hydrate is atomic: invalid later rows and zipper failure after a successful spot fetch no longer leave a partially installed catalog (POLY-3746).
+- Catalog readiness now requires usable spot and zipper snapshots, and `wait_for_catalogs` can recover after a transient failed hydration instead of remaining permanently poisoned.
+- Construction outside Tokio records an immediate catalog-readiness error; `wait_for_catalogs` retries on the caller's runtime instead of order paths polling an initializer that never started.
+- ConnectRPC `ResourceExhausted` responses map to `Error::RateLimit` instead of generic `Error::Api`.
+- `SnapshotThenStream::refresh_snapshot` retains the pending buffer across failed attempts, sets `err()` on failure, and clears it on success so recovery merges each buffered publication exactly once (POLY-3746).
+- `wait_for_order_trades_complete` requires a terminal order, uses checked trade-quantity accumulation, and applies its deadline to in-flight `GetOrder` calls.
+
+### Features
+- `OrdersService::wait_for_order_trades_complete` polls until sum(trade qtys) equals `cum_qty` or timeout (POLY-3750 / D1).
+- `MAX_PROTOCOL_SCALE = 36` exported from `codecs`.
+
+### Testing
+- L1+L2 local mock HTTP/WS suite (`tests/hardening.rs`) for token stall, 403, JSON-RPC, close/100-sub soak, catalogs, and scale.
+- Live: heartbeat uses `POLYESTER_TEST_TRADE_SYMBOL`; market BUY→SELL roundtrip carries filled qty; BatchModify 5×40 regression (gated).
+
 ## 0.1.0a11
 
 Package version: `0.1.0-alpha.11`. Git tag: `v0.1.0a11`.

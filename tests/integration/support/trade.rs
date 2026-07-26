@@ -65,11 +65,41 @@ pub fn smoke_symbol(spot: &SpotConfig) -> String {
         .unwrap_or_else(|| "BTC-USDT".to_owned())
 }
 
+/// Canonical trade symbol for funded / mutation / heartbeat paths.
+///
+/// Honors `POLYESTER_TEST_TRADE_SYMBOL` only — never `POLYESTER_TEST_SMOKE_SYMBOL`
+/// (F-23 / B5). When unset, prefers BTC-USDT then first listed pair.
 pub fn trade_symbol(spot: &SpotConfig) -> String {
-    if let Some(override_sym) = env_trade_symbol() {
-        return override_sym;
+    load_dotenv();
+    let override_sym = env_trade_symbol();
+    trade_symbol_with_override(spot, override_sym.as_deref())
+}
+
+pub(super) fn trade_symbol_with_override(spot: &SpotConfig, override_sym: Option<&str>) -> String {
+    if let Some(override_sym) = override_sym
+        .map(str::trim)
+        .filter(|symbol| !symbol.is_empty())
+    {
+        eprintln!("trade_symbol={override_sym}");
+        return override_sym.to_owned();
     }
-    smoke_symbol(spot)
+    let proto = spot_proto(spot);
+    let symbols: Vec<&str> = proto
+        .pairs
+        .iter()
+        .map(|p| p.symbol.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let resolved = if symbols.contains(&"BTC-USDT") {
+        "BTC-USDT".to_owned()
+    } else {
+        symbols
+            .first()
+            .map(|s| (*s).to_owned())
+            .unwrap_or_else(|| "BTC-USDT".to_owned())
+    };
+    eprintln!("trade_symbol={resolved}");
+    resolved
 }
 
 pub fn pair_for_symbol(spot: &SpotConfig, symbol: &str) -> Option<PairConfig> {
@@ -82,11 +112,11 @@ pub fn pair_for_symbol(spot: &SpotConfig, symbol: &str) -> Option<PairConfig> {
 /// Hydrate catalogs from spot + zipper; returns spot config.
 pub async fn hydrate_spot_and_zipper(client: &Client) -> Result<SpotConfig> {
     let spot = client.market_data.get_spot_config().await?;
-    client.catalogs.hydrate_spot_config_json(spot.raw.clone());
+    client.catalogs.hydrate_spot_config_json(spot.raw.clone())?;
     if let Ok(zipper) = client.zipper.get_deposit_withdraw_config().await
         && let Ok(json) = serde_json::to_value(&zipper)
     {
-        client.catalogs.hydrate_zipper_config_json(json);
+        client.catalogs.hydrate_zipper_config_json(json)?;
     }
     Ok(spot)
 }
@@ -130,6 +160,15 @@ pub fn trading_balance_raw(balances: &[AssetBalance], asset_id: u32) -> u128 {
     for row in balances {
         if row.asset_id == asset_id {
             return u128_raw_from_str(&row.trading);
+        }
+    }
+    0
+}
+
+pub fn reserved_balance_raw(balances: &[AssetBalance], asset_id: u32) -> u128 {
+    for row in balances {
+        if row.asset_id == asset_id {
+            return u128_raw_from_str(&row.reserved);
         }
     }
     0
@@ -192,6 +231,20 @@ fn far_below_hint(symbol: &str) -> String {
         .find(|(s, _)| *s == symbol)
         .map(|(_, p)| (*p).to_owned())
         .unwrap_or_else(|| "100".to_owned())
+}
+
+/// Static far-below buy price (no live book). Safer for long-lived resting batches.
+pub fn far_below_buy_limit_price(symbol: &str) -> String {
+    load_dotenv();
+    for key in ["POLYESTER_TEST_PRICE", "POLYESTER_SMOKE_PRICE"] {
+        if let Ok(v) = std::env::var(key) {
+            let t = v.trim();
+            if !t.is_empty() {
+                return t.to_owned();
+            }
+        }
+    }
+    far_below_hint(symbol)
 }
 
 fn post_only_buy_price_from_book(book: &OrderbookData, tick_size: &str) -> Option<String> {

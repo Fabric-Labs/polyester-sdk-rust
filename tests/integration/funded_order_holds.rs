@@ -3,7 +3,7 @@
 use crate::support::{
     call_optional, hydrate_spot_and_zipper, is_internal_order_error, quote_asset_id,
     require_funded, require_live_client, require_mutation, require_trading_quote_balance,
-    smoke_symbol, unique_client_order_id, usdt_funded_buy_limit_params, wait_for_open_order,
+    trade_symbol, unique_client_order_id, usdt_funded_buy_limit_params, wait_for_open_order,
 };
 use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
 use polyester::proto::ledger::read::v1::ListHoldsRequest;
@@ -28,7 +28,7 @@ async fn order_hold_visible_while_open() {
             return;
         }
     };
-    let symbol = smoke_symbol(&spot);
+    let symbol = trade_symbol(&spot);
     if !require_trading_quote_balance(&client, &symbol).await {
         return;
     }
