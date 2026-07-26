@@ -150,6 +150,10 @@ pub fn map_connect_error(err: ConnectError) -> Error {
     let message = fallback_message;
     match code {
         ErrorCode::Unauthenticated | ErrorCode::PermissionDenied => Error::Auth(message),
+        ErrorCode::ResourceExhausted => Error::RateLimit {
+            message,
+            retry_after: None,
+        },
         ErrorCode::Unavailable | ErrorCode::Internal => Error::Server(message),
         ErrorCode::DeadlineExceeded => Error::Transport(message),
         ErrorCode::Unimplemented => {
@@ -209,6 +213,24 @@ mod tests {
         let mapped = map_connect_error(ConnectError::unauthenticated(""));
         match mapped {
             Error::Auth(message) => assert!(!message.trim().is_empty()),
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn map_connect_error_surfaces_rate_limits() {
+        let mapped = map_connect_error(ConnectError::new(
+            ErrorCode::ResourceExhausted,
+            "request rate exceeded",
+        ));
+        match mapped {
+            Error::RateLimit {
+                message,
+                retry_after,
+            } => {
+                assert_eq!(message, "resource_exhausted: request rate exceeded");
+                assert_eq!(retry_after, None);
+            }
             other => panic!("unexpected error: {other:?}"),
         }
     }

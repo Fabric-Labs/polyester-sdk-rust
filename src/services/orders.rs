@@ -29,6 +29,7 @@ use crate::proto::orders::v1::{
     risk_policy, trailing_stop_policy,
 };
 use crate::types::{Price, Quantity, resolve_price_ticks, resolve_qty_scaled};
+use std::time::Duration;
 
 #[derive(Clone)]
 pub struct OrdersService {
@@ -175,6 +176,49 @@ impl OrdersService {
         .await?
         .into_owned();
         Ok(get_order_from_proto(&resp))
+    }
+
+    /// Poll [`Self::get`] until the order is terminal and projected trade
+    /// quantities sum to order `cum_qty`.
+    ///
+    /// GetOrder can report `cum_qty` before every fill is visible on the trades
+    /// list (POLY-3750 eventual consistency). Prefer this helper after fills
+    /// instead of treating a single get as final trade projection.
+    pub async fn wait_for_order_trades_complete(
+        &self,
+        client_order_id: Option<&str>,
+        order_id: Option<&str>,
+        timeout: Duration,
+    ) -> Result<GetOrderResult> {
+        let timeout = if timeout.is_zero() {
+            Duration::from_secs(15)
+        } else {
+            timeout
+        };
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let last = tokio::time::timeout_at(deadline, self.get(client_order_id, order_id, None))
+                .await
+                .map_err(|_| {
+                    Error::transport(format!(
+                        "timed out waiting for order trades to match cum_qty \
+                     (order_id={order_id:?}, client_order_id={client_order_id:?})"
+                    ))
+                })??;
+            if order_trades_projection_complete(&last) {
+                return Ok(last);
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return Err(Error::transport(format!(
+                    "timed out waiting for order trades to match cum_qty \
+                     (order_id={order_id:?}, client_order_id={client_order_id:?})"
+                )));
+            }
+            tokio::time::sleep_until(
+                deadline.min(tokio::time::Instant::now() + Duration::from_millis(100)),
+            )
+            .await;
+        }
     }
 
     /// Build the transport-independent [`OrderIntent`] shared by single and batch
@@ -949,6 +993,33 @@ impl TradesService {
     }
 }
 
+fn order_trades_projection_complete(result: &GetOrderResult) -> bool {
+    let Some(order) = result.order.as_ref() else {
+        return false;
+    };
+    if !matches!(order.status.as_str(), "filled" | "canceled" | "rejected") {
+        return false;
+    }
+    let Some(cum) = order.cum_qty.as_ref() else {
+        return false;
+    };
+    let cum = cum.as_scaled();
+    if cum == 0 {
+        return true;
+    }
+    let mut trade_sum = 0_i64;
+    for trade in &result.trades {
+        let Some(qty) = trade.qty.as_ref() else {
+            return false;
+        };
+        let Some(sum) = trade_sum.checked_add(qty.as_scaled()) else {
+            return false;
+        };
+        trade_sum = sum;
+    }
+    trade_sum == cum
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -962,13 +1033,16 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        client.catalogs.hydrate_spot_config_json(json!({
-            "pairs": [{
-                "symbol": "BTC-USDT",
-                "symbol_id": 7,
-                "base_quantity_scale": 8
-            }]
-        }));
+        client
+            .catalogs
+            .hydrate_spot_config_json(json!({
+                "pairs": [{
+                    "symbol": "BTC-USDT",
+                    "symbol_id": 7,
+                    "base_quantity_scale": 8
+                }]
+            }))
+            .expect("hydrate");
         client
     }
 
@@ -1154,5 +1228,84 @@ mod tests {
         modify.new_attached_risk = Some(risk);
         let modify_wire = client.orders.encode_modify_params(modify).unwrap();
         assert!(modify_wire.new_attached_risk.is_set());
+    }
+
+    #[test]
+    fn wait_helper_detects_trade_projection_complete() {
+        let incomplete = GetOrderResult {
+            order: Some(Order {
+                order_id: "1".into(),
+                symbol_id: 7,
+                client_order_id: "c".into(),
+                side: "buy".into(),
+                status: "filled".into(),
+                order_type: "market".into(),
+                tif: "ioc".into(),
+                orig_qty: None,
+                cum_qty: Some(
+                    Quantity::from_scaled(
+                        100,
+                        Some(8),
+                        crate::QuantityDomain::OrderBase,
+                        None,
+                        None,
+                    )
+                    .unwrap(),
+                ),
+                leaves_qty: None,
+                price: None,
+                avg_px: None,
+                created_ts_ns: String::new(),
+                version: 1,
+                post_only: false,
+                attached_risk: None,
+            }),
+            trades: vec![],
+        };
+        assert!(!order_trades_projection_complete(&incomplete));
+
+        let open_unfilled = GetOrderResult {
+            order: Some(Order {
+                status: "working".into(),
+                cum_qty: Some(
+                    Quantity::from_scaled(0, Some(8), crate::QuantityDomain::OrderBase, None, None)
+                        .unwrap(),
+                ),
+                ..incomplete.order.clone().unwrap()
+            }),
+            trades: vec![],
+        };
+        assert!(
+            !order_trades_projection_complete(&open_unfilled),
+            "an unfilled working order is not a stable projection"
+        );
+
+        let complete = GetOrderResult {
+            order: Some(Order {
+                status: "filled".into(),
+                ..incomplete.order.clone().unwrap()
+            }),
+            trades: vec![UserTrade {
+                symbol_id: 7,
+                match_id: "m".into(),
+                order_id: "1".into(),
+                side: "buy".into(),
+                is_maker: false,
+                price: None,
+                qty: Some(
+                    Quantity::from_scaled(
+                        100,
+                        Some(8),
+                        crate::QuantityDomain::OrderBase,
+                        None,
+                        None,
+                    )
+                    .unwrap(),
+                ),
+                fee_scaled: "0".into(),
+                ts_ns: String::new(),
+            }],
+        };
+        assert!(order_trades_projection_complete(&complete));
     }
 }

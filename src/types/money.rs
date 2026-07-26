@@ -123,6 +123,9 @@ impl Quantity {
         if scaled < 0 {
             return Err(Error::validation("scaled must be non-negative"));
         }
+        if let Some(scale) = scale {
+            crate::codecs::scalars::validate_protocol_scale(scale)?;
+        }
         Ok(Self {
             scaled: QtyScaled::new(scaled),
             scale,
@@ -172,7 +175,7 @@ impl Quantity {
         let resolved = scale.or(self.scale).ok_or_else(|| {
             Error::validation("format requires a known scale; pass scale= or construct with scale=")
         })?;
-        Ok(format_qty_scaled(self.scaled.get(), resolved))
+        format_qty_scaled(self.scaled.get(), resolved)
     }
 
     pub fn compatible_with(
@@ -239,6 +242,9 @@ impl AssetAmount {
             return Err(Error::validation(
                 "AssetAmount domain must be asset or ledger_e18",
             ));
+        }
+        if let Some(scale) = scale {
+            crate::codecs::scalars::validate_protocol_scale(scale)?;
         }
         if domain != QuantityDomain::LedgerE18 && scaled > crate::codecs::scalars::INT64_MAX {
             return Err(Error::validation("scaled exceeds int64 range"));

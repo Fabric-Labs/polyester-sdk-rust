@@ -3,6 +3,7 @@
 use super::common::api_data_from_proto;
 use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::{format_price_ticks, format_qty_scaled};
+use crate::errors::{Error, Result};
 use crate::models::{Candle, CandlesResult, MarketTrade, MarketTradesResult, SpotConfig};
 use crate::proto::marketdata::v1::{
     CandlePoint, GetCandlesColumnsResponse, GetCandlesResponse, GetSpotConfigResponse,
@@ -81,43 +82,54 @@ pub fn candle_point_from_proto(
     volume_scale: u32,
     symbol_id: u32,
     timeframe: &str,
-) -> Candle {
-    Candle {
+) -> Result<Candle> {
+    Ok(Candle {
         ts_sec: msg.ts_sec as i64,
         open: format_price_ticks(msg.open),
         high: format_price_ticks(msg.high),
         low: format_price_ticks(msg.low),
         close: format_price_ticks(msg.close),
-        volume: format_qty_scaled(msg.volume, volume_scale),
+        volume: format_qty_scaled(msg.volume, volume_scale)
+            .map_err(|e| Error::validation(format!("candle volume scale invalid: {e}")))?,
         symbol_id,
         timeframe: timeframe.to_owned(),
-    }
+    })
 }
 
-pub fn candles_from_proto(msg: &GetCandlesResponse, volume_scale: u32) -> CandlesResult {
+pub fn candles_from_proto(msg: &GetCandlesResponse, volume_scale: u32) -> Result<CandlesResult> {
     let timeframe = enum_value_timeframe(msg.timeframe);
     let symbol_id = msg.symbol_id;
-    CandlesResult {
-        symbol_id,
-        timeframe: timeframe.clone(),
-        candles: msg
-            .candles
-            .iter()
-            .map(|c| candle_point_from_proto(c, volume_scale, symbol_id, &timeframe))
-            .collect(),
-        next_page_token: msg.next_page_token.clone(),
+    let mut candles = Vec::with_capacity(msg.candles.len());
+    for c in &msg.candles {
+        candles.push(candle_point_from_proto(
+            c,
+            volume_scale,
+            symbol_id,
+            &timeframe,
+        )?);
     }
+    Ok(CandlesResult {
+        symbol_id,
+        timeframe,
+        candles,
+        next_page_token: msg.next_page_token.clone(),
+    })
 }
 
 /// Decode columnar OHLCV into row-oriented [`CandlesResult`] (Go `CandlesColumnsFromProto`).
 pub fn candles_columns_from_proto(
     msg: &GetCandlesColumnsResponse,
     volume_scale: u32,
-) -> CandlesResult {
+) -> Result<CandlesResult> {
     let timeframe = enum_value_timeframe(msg.timeframe);
     let symbol_id = msg.symbol_id;
     let mut candles = Vec::with_capacity(msg.ts_sec.len());
     for (i, &ts) in msg.ts_sec.iter().enumerate() {
+        let volume = match msg.volume.get(i).copied() {
+            Some(v) => format_qty_scaled(v, volume_scale)
+                .map_err(|e| Error::validation(format!("candle volume scale invalid: {e}")))?,
+            None => String::new(),
+        };
         candles.push(Candle {
             ts_sec: ts as i64,
             open: msg
@@ -144,22 +156,17 @@ pub fn candles_columns_from_proto(
                 .copied()
                 .map(format_price_ticks)
                 .unwrap_or_default(),
-            volume: msg
-                .volume
-                .get(i)
-                .copied()
-                .map(|v| format_qty_scaled(v, volume_scale))
-                .unwrap_or_default(),
+            volume,
             symbol_id,
             timeframe: timeframe.clone(),
         });
     }
-    CandlesResult {
+    Ok(CandlesResult {
         symbol_id,
         timeframe,
         candles,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -209,7 +216,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let result = candles_from_proto(&msg, 8);
+        let result = candles_from_proto(&msg, 8).expect("candles");
         assert_eq!(result.symbol_id, 1);
         assert_eq!(result.timeframe, "1m");
         assert_eq!(result.candles.len(), 1);
@@ -220,5 +227,34 @@ mod tests {
         assert_eq!(c.low, "0.5");
         assert_eq!(c.close, "1.5");
         assert_eq!(c.volume, "1");
+    }
+
+    #[test]
+    fn candle_decode_rejects_invalid_volume_scale() {
+        let msg = GetCandlesResponse {
+            symbol_id: 1,
+            timeframe: Timeframe::Min1.into(),
+            candles: vec![CandlePoint {
+                ts_sec: 10,
+                volume: 1,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let err = candles_from_proto(&msg, 65535).expect_err("invalid scale");
+        assert!(err.to_string().to_ascii_lowercase().contains("scale"));
+    }
+
+    #[test]
+    fn candles_columns_decode_rejects_invalid_volume_scale() {
+        let msg = GetCandlesColumnsResponse {
+            symbol_id: 1,
+            timeframe: Timeframe::Min1.into(),
+            ts_sec: vec![10],
+            volume: vec![1],
+            ..Default::default()
+        };
+        let err = candles_columns_from_proto(&msg, 65535).expect_err("invalid scale");
+        assert!(err.to_string().to_ascii_lowercase().contains("scale"));
     }
 }

@@ -50,3 +50,13 @@ fn asset_amount_dual_constructors_and_domain_safety() {
     assert_eq!(decimal.as_scaled(), scaled.as_scaled());
     assert!(resolve_asset_amount_scaled(&decimal, 18, QuantityDomain::Asset, Some(7)).is_err());
 }
+
+#[test]
+fn asset_amount_rejects_protocol_scale_above_max() {
+    let err = AssetAmount::from_scaled(1, Some(65535), QuantityDomain::LedgerE18, None)
+        .expect_err("scale above MAX_PROTOCOL_SCALE");
+    assert!(
+        err.to_string().to_ascii_lowercase().contains("scale"),
+        "{err}"
+    );
+}

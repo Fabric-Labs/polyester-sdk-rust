@@ -1,21 +1,28 @@
 //! Live client builders.
 
-use super::env::{has_live_creds, load_dotenv};
+use super::env::{has_live_creds, load_dotenv, strict_live_enabled};
 use polyester::{Client, Config};
 
+fn fail_or_skip(message: &str) -> Option<Client> {
+    if strict_live_enabled() {
+        panic!("STRICT_LIVE: {message}");
+    }
+    eprintln!("skip: {message}");
+    None
+}
+
 /// Build a live client or soft-skip (returns None) when API-key env is missing.
+///
+/// Under `POLYESTER_TEST_STRICT_LIVE=1`, missing/bad credentials fail the test
+/// instead of soft-skipping (A7 false-green fix).
 pub fn require_live_client() -> Option<Client> {
     load_dotenv();
     if !has_live_creds() {
-        eprintln!("skip: POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY required");
-        return None;
+        return fail_or_skip("POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY required");
     }
     match Client::from_env() {
         Ok(client) => Some(client),
-        Err(err) => {
-            eprintln!("skip: failed to build client: {err}");
-            None
-        }
+        Err(err) => fail_or_skip(&format!("failed to build client: {err}")),
     }
 }
 
