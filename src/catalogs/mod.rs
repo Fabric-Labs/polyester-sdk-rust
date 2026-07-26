@@ -226,7 +226,7 @@ impl Manager {
 
     /// Validate spot + zipper, then commit both under one write lock.
     ///
-    /// On any validation error neither catalog is mutated (POLY-3746 atomicity).
+    /// On any validation error neither catalog is mutated.
     pub fn hydrate_spot_and_zipper_json(&self, spot: Value, zipper: Value) -> Result<()> {
         let spot_snap = build_spot_snapshot(spot)?;
         let zipper_snap = build_zipper_snapshot(zipper)?;
@@ -243,7 +243,7 @@ impl Manager {
     /// Returns the pair base quantity scale, or `None` when unknown/unhydrated.
     ///
     /// Never invents scale 8 for missing symbols — callers that need a decode
-    /// fallback must choose it explicitly (POLY-3549).
+    /// fallback must choose it explicitly.
     pub fn base_quantity_scale_for_symbol(&self, symbol: &str) -> Option<u32> {
         self.inner
             .read()

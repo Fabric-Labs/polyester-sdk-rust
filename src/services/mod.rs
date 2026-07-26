@@ -47,7 +47,7 @@ pub struct ServiceContext {
 }
 
 impl ServiceContext {
-    /// Wait for construction-time catalog hydration when enabled (POLY-3549).
+    /// Wait for construction-time catalog hydration when enabled.
     ///
     /// Propagates hydration failure so order paths do not proceed with empty catalogs.
     pub async fn wait_for_catalogs(&self) -> Result<()> {

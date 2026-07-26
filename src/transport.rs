@@ -13,6 +13,12 @@ use std::time::Duration;
 
 pub const DEFAULT_API_URL: &str = "https://api-devnet.polyester.ai";
 pub const DEFAULT_WS_URL: &str = "wss://api-devnet.polyester.ai";
+/// Maximum decompressed ConnectRPC response message accepted by the SDK.
+///
+/// This is set explicitly instead of relying on the transport dependency's
+/// default so catalog and other unary responses remain allocation-bounded
+/// across dependency upgrades.
+pub const MAX_CONNECT_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 
 /// Wire encoding for Connect unary calls.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -73,9 +79,12 @@ impl Factory {
 
         let transport = build_http_client(&config.api_url)?;
 
-        let mut connect_config =
-            ClientConfig::new(uri.clone()).with_default_timeout(config.timeout);
-        let mut connect_config_auth = ClientConfig::new(uri).with_default_timeout(config.timeout);
+        let mut connect_config = ClientConfig::new(uri.clone())
+            .with_default_timeout(config.timeout)
+            .with_default_max_message_size(MAX_CONNECT_RESPONSE_BYTES);
+        let mut connect_config_auth = ClientConfig::new(uri)
+            .with_default_timeout(config.timeout)
+            .with_default_max_message_size(MAX_CONNECT_RESPONSE_BYTES);
 
         if config.wire_format == WireFormat::Json {
             connect_config = connect_config.json();

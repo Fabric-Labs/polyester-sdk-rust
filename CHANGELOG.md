@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.1.0a14
+
+Package version: `0.1.0-alpha.14`. Git tag: `v0.1.0a14`.
+
+### Fixed
+- ConnectRPC responses are capped at 4 MiB explicitly, including catalog hydration.
+- The funded market roundtrip can use external order-book liquidity when dedicated maker credentials are unavailable and cleans up only its own client order IDs.
+
+### Testing
+- Hardening coverage now injects corrupt protobuf catalog responses and slow-drip token/JSON-RPC bodies.
+- Tests that use non-dry-run `cancel_all` require an explicit dedicated-account cleanup gate.
+
 ## 0.1.0a13
 
 Package version: `0.1.0-alpha.13`. Git tag: `v0.1.0a13`.
@@ -22,27 +34,27 @@ Package version: `0.1.0-alpha.13`. Git tag: `v0.1.0a13`.
 Package version: `0.1.0-alpha.12`. Git tag: `v0.1.0a12`.
 
 ### Breaking
-- `wait_for_catalogs` / `hydrate_catalogs` return `Err` when spot/zipper hydration fails or catalogs are unusable (was Ok-after-fail). Use `catalogs_last_error()` to inspect (POLY-3746 / F-19).
-- `format_qty_scaled` / `format_ledger_u64` return `Result<String>` and reject scales above `MAX_PROTOCOL_SCALE` (36) instead of panicking on pathological `format!` widths (POLY-3746 / E9).
-- Catalog hydrate rejects oversized IDs/scales (no silent `as u32` truncation) and scales > 36 (POLY-3746 / E9b).
-- Realtime HTTP 403 token responses map to `Error::Auth` (status, label, truncated body) instead of opaque `Error::Realtime("… HTTP 403")` (POLY-3746 / F-24).
-- Candle decode (`candles_from_proto` / `candles_columns_from_proto` / realtime candle decode) and zipped supply decode now return `Result` and reject invalid protocol scales instead of mapping them to empty strings via `unwrap_or_default` (POLY-3746). Public `MarketDataService::get_candles*` propagates the error.
+- `wait_for_catalogs` / `hydrate_catalogs` return `Err` when spot/zipper hydration fails or catalogs are unusable (was Ok-after-fail). Use `catalogs_last_error()` to inspect.
+- `format_qty_scaled` / `format_ledger_u64` return `Result<String>` and reject scales above `MAX_PROTOCOL_SCALE` (36) instead of panicking on pathological `format!` widths.
+- Catalog hydrate rejects oversized IDs/scales (no silent `as u32` truncation) and scales > 36.
+- Realtime HTTP 403 token responses map to `Error::Auth` (status, label, truncated body) instead of opaque `Error::Realtime("… HTTP 403")`.
+- Candle decode (`candles_from_proto` / `candles_columns_from_proto` / realtime candle decode) and zipped supply decode now return `Result` and reject invalid protocol scales instead of mapping them to empty strings via `unwrap_or_default`. Public `MarketDataService::get_candles*` propagates the error.
 - `AssetAmount::from_scaled` validates optional scale against `MAX_PROTOCOL_SCALE` (same as `Quantity::from_scaled`).
 
 ### Fixed
-- Realtime token exchange applies one deadline to request **and** bounded body collect; timeout sourced from `Config.timeout` (POLY-3746 / F-18).
-- JSON-RPC applies the same e2e deadline, caps bodies at 1 MiB, and validates `jsonrpc=="2.0"`, matching `id`, and exactly one of `result`|`error` (POLY-3746 / E5).
-- `TypedSubscription::close` / Drop aborts the JoinHandle; read loop `select!`s stop vs WS read so close does not linger up to 30s (POLY-3746 / E6).
-- `SnapshotThenStream` surfaces reconnect/`request_refresh` errors via `err()`, retries once, then fail-closes (POLY-3746 / E7).
-- Catalog hydrate is atomic: invalid later rows and zipper failure after a successful spot fetch no longer leave a partially installed catalog (POLY-3746).
+- Realtime token exchange applies one deadline to request **and** bounded body collect; timeout sourced from `Config.timeout`.
+- JSON-RPC applies the same e2e deadline, caps bodies at 1 MiB, and validates `jsonrpc=="2.0"`, matching `id`, and exactly one of `result`|`error`.
+- `TypedSubscription::close` / Drop aborts the JoinHandle; read loop `select!`s stop vs WS read so close does not linger up to 30s.
+- `SnapshotThenStream` surfaces reconnect/`request_refresh` errors via `err()`, retries once, then fail-closes.
+- Catalog hydrate is atomic: invalid later rows and zipper failure after a successful spot fetch no longer leave a partially installed catalog.
 - Catalog readiness now requires usable spot and zipper snapshots, and `wait_for_catalogs` can recover after a transient failed hydration instead of remaining permanently poisoned.
 - Construction outside Tokio records an immediate catalog-readiness error; `wait_for_catalogs` retries on the caller's runtime instead of order paths polling an initializer that never started.
 - ConnectRPC `ResourceExhausted` responses map to `Error::RateLimit` instead of generic `Error::Api`.
-- `SnapshotThenStream::refresh_snapshot` retains the pending buffer across failed attempts, sets `err()` on failure, and clears it on success so recovery merges each buffered publication exactly once (POLY-3746).
+- `SnapshotThenStream::refresh_snapshot` retains the pending buffer across failed attempts, sets `err()` on failure, and clears it on success so recovery merges each buffered publication exactly once.
 - `wait_for_order_trades_complete` requires a terminal order, uses checked trade-quantity accumulation, and applies its deadline to in-flight `GetOrder` calls.
 
 ### Features
-- `OrdersService::wait_for_order_trades_complete` polls until sum(trade qtys) equals `cum_qty` or timeout (POLY-3750 / D1).
+- `OrdersService::wait_for_order_trades_complete` polls until sum(trade qtys) equals `cum_qty` or timeout.
 - `MAX_PROTOCOL_SCALE = 36` exported from `codecs`.
 
 ### Testing
@@ -54,11 +66,11 @@ Package version: `0.1.0-alpha.12`. Git tag: `v0.1.0a12`.
 Package version: `0.1.0-alpha.11`. Git tag: `v0.1.0a11`.
 
 ### Breaking
-- `AssetBalance` drops `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`. Use `trading_revision` (orders trading/reserved/available) and `funding_revision` (orders funding independently) instead (POLY-3668).
-- `Manager::base_quantity_scale_for_symbol` / `base_quantity_scale_for_symbol_id` return `Option<u32>` and no longer invent scale `8` when unknown/unhydrated (POLY-3549). Decode-only paths keep an explicit `unwrap_or(8)`.
+- `AssetBalance` drops `trading_updated_at_ns` / `funding_updated_at_ns` / `reserved_updated_at_ns`. Use `trading_revision` (orders trading/reserved/available) and `funding_revision` (orders funding independently) instead.
+- `Manager::base_quantity_scale_for_symbol` / `base_quantity_scale_for_symbol_id` return `Option<u32>` and no longer invent scale `8` when unknown/unhydrated. Decode-only paths keep an explicit `unwrap_or(8)`.
 
 ### Fixed
-- Order/trigger write paths wait for catalog hydration before resolving pair quantity scale, preventing first-order false `INSUFFICIENT_FUNDS` when a pair (e.g. ETH-USDT scale 6) was encoded at invented scale 8 (POLY-3549).
+- Order/trigger write paths wait for catalog hydration before resolving pair quantity scale, preventing first-order false `INSUFFICIENT_FUNDS` when a pair (e.g. ETH-USDT scale 6) was encoded at invented scale 8.
 
 ## 0.1.0a10
 
@@ -100,7 +112,7 @@ Package version: `0.1.0-alpha.9`. Git tag: `v0.1.0a9`.
 Package version: `0.1.0-alpha.8`. Git tag: `v0.1.0a8`.
 
 ### Breaking
-- Stable MFA auth error codes (POLY-2919): `AUTH_API_KEY_MFA_REQUIRED` is removed; use `AUTH_MFA_NOT_ENROLLED`, `AUTH_STEP_UP_REQUIRED`, `AUTH_MFA_ELEVATION_REQUIRED`, and `AUTH_MFA_LAST_FACTOR_REQUIRED` from `AuthErrorDetail`
+- Stable MFA auth error codes: `AUTH_API_KEY_MFA_REQUIRED` is removed; use `AUTH_MFA_NOT_ENROLLED`, `AUTH_STEP_UP_REQUIRED`, `AUTH_MFA_ELEVATION_REQUIRED`, and `AUTH_MFA_LAST_FACTOR_REQUIRED` from `AuthErrorDetail`
 - Remove JWT/session-only handwritten wrappers that cannot work with API-key auth:
   - `PoliciesService`: all unary list/get/create/update/delete/set methods and policy update builders/params (`UpdateApiPolicyParams`, `UpdateSubaccountPolicyParams`, `build_update_*_policy_request`)
   - `ApiKeysService`: `create` / `update` / `delete` (and `UpdateApiKeyParams` / `build_update_api_key_request`)
@@ -113,7 +125,7 @@ Package version: `0.1.0-alpha.8`. Git tag: `v0.1.0a8`.
 ### Features
 - `Error::is_mfa_enrollment_required` / `is_step_up_required` / `is_mfa_elevation_required` / `is_mfa_last_factor_required` classify MFA control flow from structured auth codes only (no message heuristics)
 - `errors::auth_codes` constants and public method-option `MFARequirement` documentation metadata
-- POLY-3739: `PoliciesService::subscribe_api_policies` typed subscribe for `private:auth:api-policies:{account}:proto`
+- `PoliciesService::subscribe_api_policies` typed subscribe for `private:auth:api-policies:{account}:proto`
 - `PoliciesService::subscribe_subaccount_policies` alias for the existing subaccount-policies subscribe path
 
 ### Testing
@@ -141,7 +153,7 @@ Package version: `0.1.0-alpha.8`. Git tag: `v0.1.0a8`.
 Package version: `0.1.0-alpha.7`. Git tag: `v0.1.0a7`.
 
 ### Breaking
-- Order and trigger create now map onto the POLY-3701 execution variants. `CreateOrderRequest`/`BatchCreateOrdersRequest` carry `OrderIntent`s; `CreateTriggerRequest` carries a `TriggerIntent` with a strategy oneof. The flat public `CreateOrderParams` / `CreateTriggerParams` APIs are unchanged.
+- Order and trigger create now map onto the execution variants. `CreateOrderRequest`/`BatchCreateOrdersRequest` carry `OrderIntent`s; `CreateTriggerRequest` carries a `TriggerIntent` with a strategy oneof. The flat public `CreateOrderParams` / `CreateTriggerParams` APIs are unchanged.
 - `OrdersService::batch_create` drops the `allow_partial` argument (removed from the wire).
 - Invalid `post_only` combinations are rejected: `post_only` is only honored on GTC limit orders/triggers (market, IOC, and FOK reject it).
 - Ladder triggers only support the `linear` distribution; any other value is rejected.

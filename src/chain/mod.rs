@@ -1,4 +1,4 @@
-//! On-chain Funding / smart-account helpers (POLY-3569).
+//! On-chain Funding and smart-account helpers.
 //!
 //! Encodes FundingAccount / TradingGateway calldata and can submit wallet-signed
 //! UserOperations (owner key → derive Polyester Safe → bundler). Separate from

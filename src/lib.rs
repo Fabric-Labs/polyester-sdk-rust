@@ -54,7 +54,7 @@ pub mod types;
 
 pub mod realtime;
 
-/// On-chain Funding / smart-account helpers (POLY-3569).
+/// On-chain Funding and smart-account helpers.
 ///
 /// Calldata encoders, Safe CREATE2 prediction, and UserOperation submit.
 pub mod chain;

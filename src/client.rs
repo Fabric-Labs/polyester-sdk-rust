@@ -317,7 +317,7 @@ impl Client {
         catalogs: Arc<CatalogManager>,
     ) -> Result<()> {
         // Fetch both configs before mutating catalogs so a zipper failure cannot
-        // leave a partially installed spot catalog (POLY-3746 atomic hydrate).
+        // leave a partially installed spot catalog.
         let spot = market_data.get_spot_config().await.map_err(|e| {
             Error::validation(format!("catalog hydration failed (spot config): {e}"))
         })?;

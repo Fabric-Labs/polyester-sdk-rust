@@ -5,8 +5,8 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.13`, git tag `v0.1.0a13`). Proprietary license
-(not open source). API-key only — no browser login or JWT flows.
+**Status:** Alpha (`0.1.0-alpha.14`, git tag `v0.1.0a14`). Proprietary license
+(not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
 
@@ -25,9 +25,9 @@ on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Conne
 | Wallet / browser login | No |
 | Session MFA enrollment and challenges | No |
 | Profile (identity subscribe) | Yes |
-| API keys (list/get/subscribe/generate_keypair) | Yes |
-| Subaccounts (reads/subscribe) | Yes |
-| Address book (reads/subscribe) | Yes |
+| API keys (list/get/subscribe/local keypair generation) | Yes |
+| Subaccounts (list/get/members/invites/activity/subscribe) | Yes |
+| Address book (list/view/subscribe) | Yes |
 | Policies (realtime subscribe) | Yes |
 | Guard signer | Yes |
 | Balances, holds, equity history | Yes |
@@ -58,9 +58,10 @@ Full cross-language comparison:
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
 still applies. In particular, whiteboard/social-verification and some
 layout/polychart routes may require a JWT session or may not be mounted.
-Current devnet testing verifies API-key subscription handshakes for API keys,
-API policies, subaccount policies, subaccounts, address-book invalidations, and
-normal trading and ledger streams.
+Private streams require an Account ID and the corresponding API-key permission.
+A successful subscribe call means the token exchange and realtime handshake
+completed. Treat a structured permission denial as non-transient and update the
+API-key policy before retrying.
 
 ## Install
 
@@ -68,7 +69,7 @@ The crate is not on crates.io yet. Pin the published git tag:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a13" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a14" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -91,7 +92,7 @@ Review upstream notes before upgrading.
 ## Quick start
 
 Create an API key in the Polyester app (**API** in the sidebar). Copy the key id
-and private key when shown — the private key is only displayed once.
+and private key when shown. The private key is only displayed once.
 Open the key's **Permissions**, enable **Spot trading**, select the markets it
 may trade, and set a maximum order size appropriate for the strategy.
 
@@ -151,7 +152,7 @@ some ledger writes.
 
 ## Authentication patterns
 
-**Recommended — explicit config:**
+**Recommended: explicit config**
 
 ```rust,no_run
 use polyester::{Client, Config};
@@ -181,7 +182,7 @@ let client = Client::new(Config {
 
 `Client::new` never implicitly reads the process environment.
 
-**Scripts and local tests only** — `Client::from_env()` loads
+**Scripts and local tests only:** `Client::from_env()` loads
 `POLYESTER_API_KEY_ID`, `POLYESTER_API_PRIVATE_KEY`, and optionally
 `POLYESTER_ACCOUNT_ID` / `POLYESTER_API_URL`. This is a convenience helper, not
 the primary integration pattern.
@@ -210,11 +211,12 @@ need catalog lookup solely to scale the value.
 
 ```rust,no_run
 use polyester::models::{CreateOrderType, CreateSide, CreateTimeInForce};
+use polyester::services::OrdersService;
 use polyester::types::{Price, Quantity};
 
 client.wait_for_catalogs().await?;
 
-let mut params = client.orders.create_params(
+let mut params = OrdersService::create_params(
     "BNB-USDT",
     CreateSide::Buy,
     CreateOrderType::Limit,
@@ -245,13 +247,14 @@ Do **not** pass floats. Price ticks are Polyester protocol price units (fixed
 
 ### For bots (scaled integers)
 
-Stay in integer space — no string round-trip:
+Stay in integer space; no string round-trip:
 
 ```rust,no_run
 use polyester::models::{CreateOrderType, CreateSide};
+use polyester::services::OrdersService;
 use polyester::types::{Price, Quantity};
 
-let params = client.orders.create_params(
+let params = OrdersService::create_params(
     "BNB-USDT",
     CreateSide::Buy,
     CreateOrderType::Limit,
@@ -291,8 +294,8 @@ Public order/trigger write paths take **`Price` / `Quantity` wrappers only**:
 | Humans / demos | `Price::from_decimal_str` / `Quantity::from_decimal_str` (or `from_decimal`) |
 | Bots / MMs | `Price::from_ticks` / `Quantity::from_scaled` |
 
-- **Reject floats** (`f32`/`f64`) — they are not accepted on these APIs.
-- **Reject bare integers** on public order APIs — use the named constructors.
+- **Reject floats** (`f32`/`f64`); they are not accepted on these APIs.
+- **Reject bare integers** on public order APIs; use the named constructors.
 - **Reject excess fractional digits** on decimal→scaled conversion (no silent floor).
 - Price ticks are fixed **1e6**; qty scale comes from pair `base_quantity_scale` (catalog).
 
@@ -310,7 +313,7 @@ SDK notes:
 
 - **Funding → trading:** on-chain `TradingGateway.deposit` (not an API-key RPC).
   Either encode calldata or submit a UserOp via `PolyesterSmartAccount` with a
-  caller-supplied owner EOA key (SDK derives the Polyester Safe — no UI-exported
+  caller-supplied owner EOA key (SDK derives the Polyester Safe; no UI-exported
   owner key).
 - **Funding → external:** on-chain `FundingAccount.withdrawToChain` (same
   `polyester::chain`); quote fees with `quote_zipper_fee` first.
@@ -329,6 +332,8 @@ use polyester::chain::{
 };
 use std::time::Duration;
 
+let owner_private_key = "0x...";
+let u_asset_id = "0x...";
 let account = PolyesterSmartAccount::new(owner_private_key, None, 0, Duration::from_secs(60))?;
 let call = encode_trading_gateway_deposit(
     POLYESTER_TESTNET_ENVIRONMENT.contracts.trading_gateway_address,
@@ -478,6 +483,7 @@ Optional tiers (same gates as Go/Python):
 |---|---|
 | `POLYESTER_TEST_MUTATION=1` | State-changing tests, including funded mutations |
 | `POLYESTER_TEST_FUNDED=1` | Balance-changing transfers / fills (also requires the mutation gate) |
+| `POLYESTER_TEST_ACCOUNT_WIDE_CLEANUP=1` | Legacy `cancel_all` stress tests; dedicated test accounts only |
 | `POLYESTER_TEST_TRADE_E2E=1` + `POLYESTER_TEST_MAKER_*` | Maker+taker fill e2e |
 | `POLYESTER_TEST_INTERNAL_TRANSFER_DEST` | Internal / unified→user transfers |
 | `POLYESTER_TEST_STRICT_LIVE=1` | Fail the selected live run if any test takes a `skip:` path |
@@ -493,7 +499,7 @@ CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python)
 
 | Path | Role |
 |---|---|
-| `src/gen/buffa`, `src/gen/connect` | Checked-in Buffa + Connect codegen (Yvan / monorepo sync) |
+| `src/gen/buffa`, `src/gen/connect` | Checked-in Buffa + Connect codegen |
 | `src/proto`, `src/connect_gen` | Module tree mounting gen as `crate::proto` / `crate::connect` |
 | `src/auth`, `src/transport` | Ed25519 API-key signing + Connect `HttpClient` |
 | `src/types`, `src/codecs` | `Price` / `Quantity` / scalars |
@@ -535,4 +541,4 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-Proprietary — see [LICENSE](LICENSE).
+Proprietary. See [LICENSE](LICENSE).
