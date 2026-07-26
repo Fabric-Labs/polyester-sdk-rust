@@ -15,8 +15,10 @@ type HyperClient = Client<
     Empty<bytes::Bytes>,
 >;
 
-const TOKEN_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+/// Default when callers do not pass an SDK config timeout.
+pub const DEFAULT_TOKEN_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_TOKEN_RESPONSE_BYTES: usize = 64 * 1024;
+const MAX_ERROR_BODY_CHARS: usize = 256;
 
 pub fn connection_token_url(api_url: &str) -> String {
     format!("{}/v1/rt/token", api_url.trim_end_matches('/'))
@@ -37,26 +39,42 @@ struct TokenResponse {
     token: String,
 }
 
-pub async fn fetch_connection_token(creds: &Credentials, api_url: &str) -> Result<String> {
+pub async fn fetch_connection_token(
+    creds: &Credentials,
+    api_url: &str,
+    timeout: Duration,
+) -> Result<String> {
     let url = connection_token_url(api_url);
-    fetch_rt_token(creds, &url, "realtime connection token").await
+    fetch_rt_token(creds, &url, "realtime connection token", timeout).await
 }
 
 pub async fn fetch_subscription_token(
     creds: &Credentials,
     api_url: &str,
     channel: &str,
+    timeout: Duration,
 ) -> Result<String> {
     let url = subscription_token_url(api_url, channel);
     fetch_rt_token(
         creds,
         &url,
         &format!("realtime subscription token for {channel}"),
+        timeout,
     )
     .await
 }
 
-async fn fetch_rt_token(creds: &Credentials, url: &str, label: &str) -> Result<String> {
+async fn fetch_rt_token(
+    creds: &Credentials,
+    url: &str,
+    label: &str,
+    timeout: Duration,
+) -> Result<String> {
+    let timeout = if timeout.is_zero() {
+        DEFAULT_TOKEN_REQUEST_TIMEOUT
+    } else {
+        timeout
+    };
     let client = build_http_client()?;
     let headers = creds.sign_request("GET", url, b"", None);
     let uri: hyper::Uri = url
@@ -75,33 +93,42 @@ async fn fetch_rt_token(creds: &Credentials, url: &str, label: &str) -> Result<S
         req.headers_mut().insert(name, value);
     }
 
-    let resp = tokio::time::timeout(TOKEN_REQUEST_TIMEOUT, client.request(req))
-        .await
-        .map_err(|_| {
-            Error::realtime(format!(
-                "{label}: HTTP request timed out after {TOKEN_REQUEST_TIMEOUT:?}"
-            ))
-        })?
-        .map_err(|e| Error::realtime(format!("{label}: HTTP request failed: {e}")))?;
-    let status = resp.status();
-    if content_length_exceeds_limit(resp.headers(), MAX_TOKEN_RESPONSE_BYTES) {
-        return Err(Error::realtime(format!(
-            "{label}: response exceeds {MAX_TOKEN_RESPONSE_BYTES} bytes"
+    // One deadline covers headers + bounded body collect (F-18).
+    let outcome = tokio::time::timeout(timeout, async {
+        let resp = client
+            .request(req)
+            .await
+            .map_err(|e| Error::realtime(format!("{label}: HTTP request failed: {e}")))?;
+        let status = resp.status();
+        if content_length_exceeds_limit(resp.headers(), MAX_TOKEN_RESPONSE_BYTES) {
+            return Err(Error::realtime(format!(
+                "{label}: response exceeds {MAX_TOKEN_RESPONSE_BYTES} bytes"
+            )));
+        }
+        let body = Limited::new(resp.into_body(), MAX_TOKEN_RESPONSE_BYTES)
+            .collect()
+            .await
+            .map_err(|e| Error::realtime(format!("{label}: read bounded body: {e}")))?
+            .to_bytes();
+        Ok::<_, Error>((status, body))
+    })
+    .await
+    .map_err(|_| Error::realtime(format!("{label}: HTTP request timed out after {timeout:?}")))??;
+
+    let (status, body) = outcome;
+    let status_code = status.as_u16();
+    if status_code == 401 {
+        return Err(Error::auth(format!(
+            "{label}: authentication failed (HTTP 401)"
         )));
     }
-    let body = Limited::new(resp.into_body(), MAX_TOKEN_RESPONSE_BYTES)
-        .collect()
-        .await
-        .map_err(|e| Error::realtime(format!("{label}: read bounded body: {e}")))?
-        .to_bytes();
-
-    if status.as_u16() == 401 {
-        return Err(Error::auth(format!("{label}: authentication failed")));
+    if status_code == 403 {
+        return Err(map_permission_denied(label, status_code, &body));
     }
     if !status.is_success() {
         return Err(Error::realtime(format!(
-            "{label}: HTTP {}",
-            status.as_u16()
+            "{label}: HTTP {status_code}: {}",
+            truncate_body(&body)
         )));
     }
     let payload: TokenResponse = serde_json::from_slice(&body)
@@ -110,6 +137,27 @@ async fn fetch_rt_token(creds: &Credentials, url: &str, label: &str) -> Result<S
         return Err(Error::realtime(format!("{label}: response missing token")));
     }
     Ok(payload.token)
+}
+
+fn map_permission_denied(label: &str, status: u16, body: &[u8]) -> Error {
+    let truncated = truncate_body(body);
+    Error::auth(format!(
+        "{label}: permission denied (HTTP {status}): {truncated}"
+    ))
+}
+
+fn truncate_body(body: &[u8]) -> String {
+    let text = String::from_utf8_lossy(body);
+    let trimmed = text.trim();
+    if trimmed.chars().count() <= MAX_ERROR_BODY_CHARS {
+        return trimmed.to_owned();
+    }
+    let mut out = trimmed
+        .chars()
+        .take(MAX_ERROR_BODY_CHARS)
+        .collect::<String>();
+    out.push('…');
+    out
 }
 
 fn content_length_exceeds_limit(headers: &http::HeaderMap, max_bytes: usize) -> bool {
@@ -167,7 +215,7 @@ mod tests {
 
     #[test]
     fn realtime_token_exchange_has_finite_limits() {
-        assert_eq!(TOKEN_REQUEST_TIMEOUT, Duration::from_secs(10));
+        assert_eq!(DEFAULT_TOKEN_REQUEST_TIMEOUT, Duration::from_secs(10));
         assert_eq!(MAX_TOKEN_RESPONSE_BYTES, 64 * 1024);
     }
 
@@ -184,5 +232,23 @@ mod tests {
             &headers,
             MAX_TOKEN_RESPONSE_BYTES
         ));
+    }
+
+    #[test]
+    fn http_403_maps_to_auth_permission_denied() {
+        let err = map_permission_denied(
+            "realtime connection token",
+            403,
+            br#"{"code":"permission_denied","message":"missing transfer:read"}"#,
+        );
+        match err {
+            Error::Auth(msg) => {
+                assert!(msg.contains("permission denied"));
+                assert!(msg.contains("HTTP 403"));
+                assert!(msg.contains("realtime connection token"));
+                assert!(msg.contains("transfer:read"));
+            }
+            other => panic!("expected Auth, got {other:?}"),
+        }
     }
 }

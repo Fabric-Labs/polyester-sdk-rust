@@ -550,13 +550,16 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        client.catalogs.hydrate_spot_config_json(json!({
-            "pairs": [{
-                "symbol": "BTC-USDT",
-                "symbol_id": 7,
-                "base_quantity_scale": 8
-            }]
-        }));
+        client
+            .catalogs
+            .hydrate_spot_config_json(json!({
+                "pairs": [{
+                    "symbol": "BTC-USDT",
+                    "symbol_id": 7,
+                    "base_quantity_scale": 8
+                }]
+            }))
+            .expect("hydrate");
         client
     }
 

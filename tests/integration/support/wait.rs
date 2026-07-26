@@ -100,25 +100,41 @@ pub async fn wait_for_no_open_order(
     client_order_id: &str,
     timeout: Duration,
 ) -> Result<()> {
+    wait_until_no_open_client_ids(client, &[client_order_id], timeout).await
+}
+
+/// Poll `list_open` until none of the given client order IDs remain open.
+pub async fn wait_until_no_open_client_ids(
+    client: &Client,
+    client_order_ids: &[&str],
+    timeout: Duration,
+) -> Result<()> {
     let timeout = if timeout.is_zero() {
         Duration::from_secs(10)
     } else {
         timeout
     };
+    if client_order_ids.is_empty() {
+        return Ok(());
+    }
+    let wanted: std::collections::HashSet<&str> = client_order_ids.iter().copied().collect();
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
         let listed = client.orders.list_open(None).await?;
-        let found = listed
+        let remaining: Vec<&str> = listed
             .orders
             .iter()
-            .any(|o| o.client_order_id == client_order_id);
-        if !found {
+            .map(|o| o.client_order_id.as_str())
+            .filter(|cid| wanted.contains(cid))
+            .collect();
+        if remaining.is_empty() {
             return Ok(());
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
     Err(Error::validation(format!(
-        "order {client_order_id} still open after {timeout:?}"
+        "client orders {:?} still open after {timeout:?}",
+        client_order_ids
     )))
 }
 

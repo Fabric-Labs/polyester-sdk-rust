@@ -71,6 +71,8 @@ pub struct Client {
     api_url: String,
     credentials: Option<Credentials>,
     max_queue: usize,
+    /// Deadline for private-channel HTTP token exchange (request + body).
+    timeout: Duration,
 }
 
 impl Client {
@@ -80,11 +82,32 @@ impl Client {
         credentials: Option<Credentials>,
         max_queue: Option<usize>,
     ) -> Self {
+        Self::with_timeout(
+            ws_url,
+            api_url,
+            credentials,
+            max_queue,
+            auth::DEFAULT_TOKEN_REQUEST_TIMEOUT,
+        )
+    }
+
+    pub fn with_timeout(
+        ws_url: impl Into<String>,
+        api_url: impl Into<String>,
+        credentials: Option<Credentials>,
+        max_queue: Option<usize>,
+        timeout: Duration,
+    ) -> Self {
         Self {
             ws_url: ws_url.into(),
             api_url: api_url.into(),
             credentials,
             max_queue: max_queue.unwrap_or(DEFAULT_QUEUE).max(1),
+            timeout: if timeout.is_zero() {
+                auth::DEFAULT_TOKEN_REQUEST_TIMEOUT
+            } else {
+                timeout
+            },
         }
     }
 
@@ -155,7 +178,7 @@ impl Client {
     {
         self.validate_channel(channel)?;
 
-        let (stop_tx, stop_rx) = watch::channel(false);
+        let (stop_tx, mut stop_rx) = watch::channel(false);
         let alive = Arc::new(AtomicBool::new(true));
         let last_error = Arc::new(Mutex::new(None));
         let gap = Arc::new(ResubscribeGap::default());
@@ -177,7 +200,7 @@ impl Client {
                         &channel,
                         decode.as_ref(),
                         &tx,
-                        &stop_rx,
+                        &mut stop_rx,
                         &mut ready,
                         &gap_task,
                     )
@@ -198,16 +221,33 @@ impl Client {
                         if *stop_rx.borrow() || !auto_reconnect {
                             break;
                         }
-                        tokio::time::sleep(CENTRIFUGO_RECONNECT_DELAY).await;
+                        // Interruptible backoff so close/Drop can abort promptly.
+                        tokio::select! {
+                            _ = stop_rx.changed() => {
+                                if *stop_rx.borrow() {
+                                    break;
+                                }
+                            }
+                            _ = tokio::time::sleep(CENTRIFUGO_RECONNECT_DELAY) => {}
+                        }
                     }
                 }
             }
             alive_task.store(false, Ordering::SeqCst);
             drop(tx);
         });
-        ready_rx
+        // If the caller cancels while awaiting readiness, abort the setup task
+        // so in-flight HTTP token / WS handshake work does not linger.
+        let mut abort_on_cancel = AbortOnDrop(Some(task));
+        let ready_result = ready_rx
             .await
-            .map_err(|_| Error::realtime("realtime task ended before handshake".to_owned()))??;
+            .map_err(|_| Error::realtime("realtime task ended before handshake".to_owned()))
+            .and_then(|inner| inner);
+        let task = abort_on_cancel
+            .0
+            .take()
+            .expect("subscription task present after ready");
+        ready_result?;
 
         Ok(TypedSubscription {
             rx,
@@ -236,10 +276,11 @@ impl Client {
                 .credentials
                 .as_ref()
                 .ok_or_else(|| Error::auth("private channel requires credentials"))?;
-            let connection_token = auth::fetch_connection_token(creds, &self.api_url).await?;
+            let connection_token =
+                auth::fetch_connection_token(creds, &self.api_url, self.timeout).await?;
             centrifugo_connect(write, read, Some(&connection_token)).await?;
             let subscription_token =
-                auth::fetch_subscription_token(creds, &self.api_url, channel).await?;
+                auth::fetch_subscription_token(creds, &self.api_url, channel, self.timeout).await?;
             centrifugo_subscribe(write, read, channel, Some(&subscription_token)).await?;
         } else {
             centrifugo_connect(write, read, None).await?;
@@ -253,7 +294,7 @@ impl Client {
         channel: &str,
         decode: &F,
         tx: &mpsc::Sender<T>,
-        stop: &watch::Receiver<bool>,
+        stop: &mut watch::Receiver<bool>,
         ready: &mut Option<oneshot::Sender<Result<()>>>,
         gap: &ResubscribeGap,
     ) -> Result<()>
@@ -298,18 +339,28 @@ impl Client {
             if *stop.borrow() {
                 return Ok(());
             }
-            let msg = match timeout(CENTRIFUGO_READ_TIMEOUT, read.next()).await {
-                Ok(Some(Ok(msg))) => msg,
-                Ok(Some(Err(e))) => return Err(Error::realtime(e.to_string())),
-                Ok(None) => return Err(Error::realtime("websocket closed".to_owned())),
-                // Half-open TCP: a read timeout is connection death, not a no-op.
-                Err(_) => {
-                    return Err(Error::realtime("websocket read timeout".to_owned()));
+            let msg = tokio::select! {
+                changed = stop.changed() => {
+                    if changed.is_err() || *stop.borrow() {
+                        return Ok(());
+                    }
+                    None
+                }
+                msg = timeout(CENTRIFUGO_READ_TIMEOUT, read.next()) => {
+                    Some(match msg {
+                        Ok(Some(Ok(msg))) => msg,
+                        Ok(Some(Err(e))) => return Err(Error::realtime(e.to_string())),
+                        Ok(None) => return Err(Error::realtime("websocket closed".to_owned())),
+                        // Half-open TCP: a read timeout is connection death, not a no-op.
+                        Err(_) => {
+                            return Err(Error::realtime("websocket read timeout".to_owned()));
+                        }
+                    })
                 }
             };
-            if *stop.borrow() {
-                return Ok(());
-            }
+            let Some(msg) = msg else {
+                continue;
+            };
             match msg {
                 Message::Binary(frame) => {
                     for incoming in protocol::decode_replies(&frame)? {
@@ -422,12 +473,14 @@ impl<T> TypedSubscription<T> {
 
     pub fn close(&self) {
         let _ = self.stop.send(true);
+        self.task.abort();
     }
 }
 
 impl<T> Drop for TypedSubscription<T> {
     fn drop(&mut self) {
-        self.close();
+        let _ = self.stop.send(true);
+        self.task.abort();
     }
 }
 
@@ -436,6 +489,17 @@ struct AliveGuard(Arc<AtomicBool>);
 impl Drop for AliveGuard {
     fn drop(&mut self) {
         self.0.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Aborts a JoinHandle if dropped before the handle is taken (cancel-safe setup).
+struct AbortOnDrop(Option<tokio::task::JoinHandle<()>>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        if let Some(task) = self.0.take() {
+            task.abort();
+        }
     }
 }
 
@@ -627,14 +691,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dropping_typed_subscription_signals_stop() {
-        let (stop, mut stop_rx) = watch::channel(false);
+    async fn dropping_typed_subscription_signals_stop_and_aborts() {
+        let (stop, stop_rx) = watch::channel(false);
         let (_tx, rx) = mpsc::channel::<u8>(1);
         let alive = Arc::new(AtomicBool::new(true));
-        let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+        let (marker_tx, marker_rx) = tokio::sync::oneshot::channel::<()>();
         let task = tokio::spawn(async move {
-            stop_rx.changed().await.expect("stop sender");
-            let _ = done_tx.send(*stop_rx.borrow());
+            let _marker = marker_tx;
+            std::future::pending::<()>().await
         });
         let subscription = TypedSubscription {
             rx,
@@ -647,11 +711,13 @@ mod tests {
 
         drop(subscription);
 
+        assert!(*stop_rx.borrow(), "close/Drop must signal stop");
         assert!(
-            tokio::time::timeout(Duration::from_secs(1), done_rx)
+            tokio::time::timeout(Duration::from_millis(500), marker_rx)
                 .await
-                .expect("stop timeout")
-                .expect("stop signal")
+                .expect("abort should drop task locals promptly")
+                .is_err(),
+            "JoinHandle must be aborted on Drop"
         );
     }
 }

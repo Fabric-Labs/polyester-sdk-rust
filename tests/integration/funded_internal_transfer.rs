@@ -1,7 +1,7 @@
 use crate::support::{
     LEDGER_SCALE, call_optional, call_required, devnet_unavailable, hydrate_spot_and_zipper,
     internal_transfer_dest, min_trading_quote, quote_asset_id, require_funded, require_live_client,
-    require_mutation, require_trading_quote_balance, scaled_quantity_string, smoke_symbol,
+    require_mutation, require_trading_quote_balance, scaled_quantity_string, trade_symbol,
     trading_balance_raw, unique_client_order_id,
 };
 use polyester::models::CreateInternalTransferParams;
@@ -35,7 +35,7 @@ async fn internal_transfer_tiny() {
             return;
         }
     };
-    let symbol = smoke_symbol(&spot);
+    let symbol = trade_symbol(&spot);
     if !require_trading_quote_balance(&client, &symbol).await {
         return;
     }

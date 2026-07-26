@@ -2,7 +2,7 @@
 
 use crate::support::{
     call_optional, hydrate_spot_and_zipper, realtime_heartbeat_enabled, require_live_client,
-    smoke_symbol,
+    trade_symbol,
 };
 use std::time::Duration;
 
@@ -26,7 +26,8 @@ async fn public_trades_subscription_survives_centrifugo_ping() {
             return;
         }
     };
-    let symbol = smoke_symbol(&spot);
+    let symbol = trade_symbol(&spot);
+    eprintln!("heartbeat using POLYESTER_TEST_TRADE_SYMBOL-resolved symbol={symbol}");
     let mut sub = match client.market_data.subscribe_trades(&symbol).await {
         Ok(s) => s,
         Err(err) => panic!("subscribe_trades failed: {err}"),

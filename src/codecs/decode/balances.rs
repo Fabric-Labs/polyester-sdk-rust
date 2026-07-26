@@ -182,6 +182,23 @@ mod tests {
         assert_eq!(list.balances[0].trading, "500");
         assert_eq!(list.balances[0].trading_revision, u64::MAX - 2);
         assert_eq!(list.balances[0].funding_revision, u64::MAX - 1);
+
+        // M5: 1e18 ledger integer must stay as the scaled string (not re-scaled to "1").
+        let one_e18 = GetBalancesResponse {
+            balances: vec![ProtoAssetBalance {
+                asset_id: 1,
+                trading: U128 {
+                    hi: 0,
+                    lo: 1_000_000_000_000_000_000,
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let list = balances_list_from_proto(&one_e18);
+        assert_eq!(list.balances[0].trading, "1000000000000000000");
     }
 
     #[test]

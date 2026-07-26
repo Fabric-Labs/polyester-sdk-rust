@@ -133,7 +133,7 @@ impl MarketDataService {
         let resp = unary::await_public(self.client().get_candles(req))
             .await?
             .into_owned();
-        Ok(candles_from_proto(&resp, volume_scale))
+        candles_from_proto(&resp, volume_scale)
     }
 
     /// Latest candle for a symbol/timeframe (limit=1, include_incomplete).
@@ -176,7 +176,7 @@ impl MarketDataService {
         let resp = unary::await_public(self.client().get_candles_columns(req))
             .await?
             .into_owned();
-        Ok(candles_columns_from_proto(&resp, volume_scale))
+        candles_columns_from_proto(&resp, volume_scale)
     }
 
     fn build_candles_request(&self, opts: &GetCandlesOpts) -> Result<(GetCandlesRequest, u32)> {

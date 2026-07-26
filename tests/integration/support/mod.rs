@@ -4,6 +4,8 @@ mod call;
 mod client;
 mod env;
 mod trade;
+#[cfg(test)]
+mod trade_symbol_test;
 mod wait;
 
 pub use call::*;
