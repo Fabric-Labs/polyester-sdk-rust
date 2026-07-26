@@ -43,6 +43,14 @@ pub enum HttpScript {
         total_bytes: usize,
         chunk_size: usize,
     },
+    /// Fixed-length response whose body arrives slowly enough to exceed a
+    /// whole-request deadline while each individual read still succeeds.
+    SlowDrip {
+        status: u16,
+        headers: Vec<(String, String)>,
+        chunks: Vec<Vec<u8>>,
+        inter_chunk_delay: Duration,
+    },
 }
 
 pub struct MockHttpServer {
@@ -172,6 +180,31 @@ impl MockHttpServer {
                                 sent += n;
                             }
                             let _ = stream.write_all(b"0\r\n\r\n").await;
+                        }
+                        HttpScript::SlowDrip {
+                            status,
+                            headers,
+                            chunks,
+                            inter_chunk_delay,
+                        } => {
+                            let total_bytes = chunks.iter().map(Vec::len).sum::<usize>();
+                            let mut head = format!("HTTP/1.1 {status} OK\r\n");
+                            for (k, v) in headers {
+                                head.push_str(&format!("{k}: {v}\r\n"));
+                            }
+                            head.push_str(&format!(
+                                "Content-Length: {total_bytes}\r\nConnection: close\r\n\r\n"
+                            ));
+                            if stream.write_all(head.as_bytes()).await.is_err() {
+                                return;
+                            }
+                            for chunk in chunks {
+                                if stream.write_all(&chunk).await.is_err() {
+                                    break;
+                                }
+                                let _ = stream.flush().await;
+                                tokio::time::sleep(inter_chunk_delay).await;
+                            }
                         }
                     }
                 });

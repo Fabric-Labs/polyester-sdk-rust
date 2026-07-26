@@ -129,7 +129,7 @@ where
     ///
     /// On failure, readiness stays false, [`Self::err`] is set, and the pending
     /// buffer is retained so a successful retry merges each buffered publication
-    /// exactly once (POLY-3746). Success clears `err`.
+    /// exactly once. Success clears `err`.
     pub async fn refresh_snapshot(&self) -> Result<()> {
         if self.inner.disposed.load(Ordering::SeqCst) {
             return match self.err() {
@@ -430,6 +430,70 @@ mod tests {
         sts.refresh_snapshot().await.expect("refresh");
         assert_eq!(fired.load(Ordering::SeqCst), 1);
         assert!(sts.is_ready());
+    }
+
+    #[tokio::test]
+    async fn failed_refresh_retains_buffer_and_success_merges_each_item_once() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let fetch_attempts = attempts.clone();
+        let merged = Arc::new(Mutex::new(Vec::<u8>::new()));
+        let merged_cb = merged.clone();
+        let client = Client::new(
+            "wss://example.invalid",
+            "https://example.invalid",
+            None,
+            None,
+        );
+        let sts = SnapshotThenStream::new(SnapshotThenStreamConfig {
+            client,
+            channel: "public:test".into(),
+            decode: Arc::new(|_b| Ok(1u8)),
+            fetch_snapshot: Arc::new(move || {
+                let attempt = fetch_attempts.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    if attempt == 0 {
+                        Err(Error::transport("snapshot refresh failed"))
+                    } else {
+                        Ok("recovered".to_owned())
+                    }
+                }
+                .boxed()
+            }),
+            read_publication: Arc::new(|p| vec![p]),
+            apply_snapshot: Arc::new(move |_snapshot, pending| {
+                merged_cb.lock().expect("merged lock").extend(pending);
+            }),
+            apply_live_publications: Arc::new(|_publications| {}),
+            max_buffered: 8,
+            on_reconnect: None,
+            on_snapshot_refresh: None,
+        });
+
+        assert!(sts.refresh_snapshot().await.is_err());
+        assert!(!sts.is_ready());
+        assert!(sts.err().is_some());
+
+        sts.inner.handle_publication(7);
+        sts.inner.handle_publication(9);
+        assert_eq!(
+            sts.inner.pending.lock().expect("pending lock").as_slice(),
+            &[7, 9]
+        );
+
+        sts.refresh_snapshot().await.expect("retry succeeds");
+        assert!(sts.is_ready());
+        assert!(sts.err().is_none());
+        assert_eq!(merged.lock().expect("merged lock").as_slice(), &[7, 9]);
+        assert!(sts.inner.pending.lock().expect("pending lock").is_empty());
+
+        sts.refresh_snapshot()
+            .await
+            .expect("later refresh succeeds");
+        assert_eq!(
+            merged.lock().expect("merged lock").as_slice(),
+            &[7, 9],
+            "buffered publications must be applied exactly once"
+        );
     }
 
     #[tokio::test]
