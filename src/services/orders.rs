@@ -182,7 +182,7 @@ impl OrdersService {
     /// quantities sum to order `cum_qty`.
     ///
     /// GetOrder can report `cum_qty` before every fill is visible on the trades
-    /// list (POLY-3750 eventual consistency). Prefer this helper after fills
+    /// list. Prefer this helper after fills
     /// instead of treating a single get as final trade projection.
     pub async fn wait_for_order_trades_complete(
         &self,

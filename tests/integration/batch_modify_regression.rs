@@ -5,9 +5,9 @@
 
 use crate::support::{
     far_below_buy_limit_price, hydrate_spot_and_zipper, is_internal_order_error,
-    min_base_qty_for_pair, pair_for_symbol, require_funded, require_live_client, require_mutation,
-    require_trading_quote_balance, strict_live_enabled, trade_symbol, unique_client_order_id,
-    wait_for_open_order, wait_until_no_open_client_ids,
+    min_base_qty_for_pair, pair_for_symbol, require_account_wide_cleanup, require_funded,
+    require_live_client, require_mutation, require_trading_quote_balance, strict_live_enabled,
+    trade_symbol, unique_client_order_id, wait_for_open_order, wait_until_no_open_client_ids,
 };
 use polyester::models::{
     BatchModifyItem, BatchModifyOrdersResult, CreateOrderParams, CreateOrderType, CreateSide,
@@ -97,6 +97,9 @@ fn result_fingerprint(result: &BatchModifyOrdersResult) -> Vec<(String, String, 
 
 #[tokio::test]
 async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
+    if !require_account_wide_cleanup() {
+        return;
+    }
     if !require_mutation() {
         return;
     }

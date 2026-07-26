@@ -182,6 +182,29 @@ fn a7_permission_declarations_cover_private_realtime_groups() {
 }
 
 #[test]
+fn a7_non_dry_run_cancel_all_tests_require_dedicated_account_gate() {
+    let integration = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/integration");
+    let mut unguarded = Vec::new();
+    for entry in std::fs::read_dir(integration).expect("read integration tests") {
+        let path = entry.expect("integration entry").path();
+        if path.extension().and_then(|value| value.to_str()) != Some("rs") {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).expect("read integration test");
+        if source.contains(".cancel_all(")
+            && source.contains(", false,")
+            && !source.contains("require_account_wide_cleanup")
+        {
+            unguarded.push(path);
+        }
+    }
+    assert!(
+        unguarded.is_empty(),
+        "unguarded cancel_all tests: {unguarded:?}"
+    );
+}
+
+#[test]
 fn a7_public_vs_credentialed_suite_filters_documented() {
     // Public suite: pure money constructors (no network / no API key).
     // Credentialed suite: full integration target under STRICT_LIVE.

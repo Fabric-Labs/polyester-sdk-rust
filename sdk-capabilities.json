@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "sdk": "rust",
-  "generatedAt": "2026-07-25T13:24:29Z",
+  "generatedAt": "2026-07-26T18:10:43Z",
   "publicDescriptorSha256": "075c41163ab9adba3448373e1312e47ad7ced65d88d8c5db738c470470f10208",
   "capabilities": [
     {
@@ -48,17 +48,17 @@
     },
     {
       "id": "api_keys",
-      "label": "API keys (list/get/subscribe/generate_keypair)",
+      "label": "API keys (list/get/subscribe/local keypair generation)",
       "supported": true
     },
     {
       "id": "subaccounts",
-      "label": "Subaccounts (reads/subscribe)",
+      "label": "Subaccounts (list/get/members/invites/activity/subscribe)",
       "supported": true
     },
     {
       "id": "address_book",
-      "label": "Address book (reads/subscribe)",
+      "label": "Address book (list/view/subscribe)",
       "supported": true
     },
     {
