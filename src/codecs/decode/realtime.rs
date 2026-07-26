@@ -123,12 +123,7 @@ pub fn candle_point_from_bytes(
 ) -> impl Fn(&[u8]) -> Result<Candle> + Send + Sync + 'static {
     move |payload: &[u8]| {
         let point = decode_proto::<CandlePoint>(payload)?;
-        Ok(candle_point_from_proto(
-            &point,
-            volume_scale,
-            symbol_id,
-            &timeframe,
-        ))
+        candle_point_from_proto(&point, volume_scale, symbol_id, &timeframe)
     }
 }
 
@@ -147,7 +142,7 @@ pub fn zipped_asset_supply_batch_from_bytes(
     scale_fn: impl Fn(u32) -> u32,
 ) -> Result<ZippedAssetSupplyBatch> {
     let msg = decode_proto::<ProtoZippedAssetSupplyBatch>(payload)?;
-    Ok(zipped_asset_supply_batch_from_proto(&msg, scale_fn))
+    zipped_asset_supply_batch_from_proto(&msg, scale_fn)
 }
 
 pub fn api_key_from_bytes(payload: &[u8]) -> Result<ApiKeySummary> {

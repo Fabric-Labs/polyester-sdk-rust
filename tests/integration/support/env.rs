@@ -4,6 +4,9 @@ use std::path::PathBuf;
 
 /// Load dotenv files if present (repo `.env`, then sibling Python SDK `.env`).
 pub fn load_dotenv() {
+    if env_truthy("POLYESTER_TEST_DISABLE_DOTENV") {
+        return;
+    }
     let _ = dotenvy::dotenv();
     if std::env::var("POLYESTER_API_KEY_ID").is_err() {
         let sibling =
@@ -30,10 +33,14 @@ pub fn strict_live_enabled() -> bool {
 }
 
 /// Soft-skip unless `POLYESTER_TEST_MUTATION` is truthy. Returns false when skipped.
+///
+/// Under `POLYESTER_TEST_STRICT_LIVE=1`, a missing mutation gate fails closed.
 pub fn require_mutation() -> bool {
     load_dotenv();
     if env_truthy("POLYESTER_TEST_MUTATION") {
         true
+    } else if strict_live_enabled() {
+        panic!("STRICT_LIVE: Set POLYESTER_TEST_MUTATION=1 to run mutation tests");
     } else {
         eprintln!("skip: Set POLYESTER_TEST_MUTATION=1 to run mutation tests");
         false
@@ -41,10 +48,14 @@ pub fn require_mutation() -> bool {
 }
 
 /// Soft-skip unless `POLYESTER_TEST_FUNDED` is truthy.
+///
+/// Under `POLYESTER_TEST_STRICT_LIVE=1`, a missing funded gate fails closed.
 pub fn require_funded() -> bool {
     load_dotenv();
     if env_truthy("POLYESTER_TEST_FUNDED") {
         true
+    } else if strict_live_enabled() {
+        panic!("STRICT_LIVE: Set POLYESTER_TEST_FUNDED=1 to run funded tests");
     } else {
         eprintln!("skip: Set POLYESTER_TEST_FUNDED=1 to run funded tests");
         false

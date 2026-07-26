@@ -6,9 +6,24 @@ use std::str::FromStr;
 
 pub const PRICE_TICK_SCALE: u32 = 6;
 pub const LEDGER_SCALE: u32 = 18;
+/// Maximum accepted quantity/ledger scale for public formatters and catalog hydration.
+///
+/// Values above this are rejected with [`Error::Validation`] instead of allocating
+/// pathological padding or panicking in `format!` width formatting (scale ≥ 65535).
+pub const MAX_PROTOCOL_SCALE: u32 = 36;
 pub const INT64_MAX: i128 = i64::MAX as i128;
 pub const INT64_MIN: i128 = i64::MIN as i128;
 pub const UINT64_MAX: u128 = u64::MAX as u128;
+
+/// Validate a caller/catalog scale before padding or allocation.
+pub fn validate_protocol_scale(scale: u32) -> Result<()> {
+    if scale > MAX_PROTOCOL_SCALE {
+        return Err(Error::validation(format!(
+            "scale {scale} exceeds maximum protocol scale {MAX_PROTOCOL_SCALE}"
+        )));
+    }
+    Ok(())
+}
 
 /// Strict non-negative decimal: digits with optional fractional part.
 fn decimal_string_from_input(raw: &str, field_name: &str) -> Result<String> {
@@ -68,6 +83,9 @@ fn is_strict_decimal(text: &str) -> bool {
 
 /// Strict decimal→scaled. Never rounds; excess fractional digits fail.
 pub fn try_decimal_to_scaled(decimal: &str, scale: u32) -> std::result::Result<i128, &'static str> {
+    if scale > MAX_PROTOCOL_SCALE {
+        return Err("scale");
+    }
     let raw = decimal.trim();
     if !is_strict_decimal(raw) {
         return Err("invalid");
@@ -91,11 +109,15 @@ pub fn try_decimal_to_scaled(decimal: &str, scale: u32) -> std::result::Result<i
 }
 
 pub fn decimal_to_scaled_str(raw: &str, scale: u32, field_name: &str) -> Result<i128> {
+    validate_protocol_scale(scale)?;
     let text = decimal_string_from_input(raw, field_name)?;
     match try_decimal_to_scaled(&text, scale) {
         Ok(v) => Ok(v),
         Err("precision") => Err(Error::validation(format!(
             "{field_name} supports at most {scale} decimal places: {text}"
+        ))),
+        Err("scale") => Err(Error::validation(format!(
+            "{field_name} scale {scale} exceeds maximum protocol scale {MAX_PROTOCOL_SCALE}"
         ))),
         Err(_) => Err(Error::validation(format!(
             "{field_name} must be a valid decimal string"
@@ -135,6 +157,7 @@ pub fn parse_price_ticks(raw: Decimal, field_name: &str) -> Result<i64> {
 
 pub fn format_price_ticks(ticks: i64) -> String {
     format_scaled(ticks as i128, PRICE_TICK_SCALE)
+        .expect("PRICE_TICK_SCALE is within MAX_PROTOCOL_SCALE")
 }
 
 pub fn parse_qty_scaled_str(raw: &str, scale: u32, field_name: &str) -> Result<i64> {
@@ -160,12 +183,12 @@ pub fn parse_qty_scaled(raw: Decimal, scale: u32, field_name: &str) -> Result<i6
     parse_qty_scaled_str(&text, scale, field_name)
 }
 
-pub fn format_qty_scaled(qty_scaled: i64, scale: u32) -> String {
+pub fn format_qty_scaled(qty_scaled: i64, scale: u32) -> Result<String> {
     format_scaled(qty_scaled as i128, scale)
 }
 
 /// Format a smaller ledger quantity integer by `10^scale`.
-pub fn format_ledger_u64(value: u64, scale: u32) -> String {
+pub fn format_ledger_u64(value: u64, scale: u32) -> Result<String> {
     let scale = if scale == 0 { LEDGER_SCALE } else { scale };
     format_scaled(value as i128, scale)
 }
@@ -191,10 +214,13 @@ pub fn format_ledger_u128(value: &str, scale: u32) -> Result<String> {
         return Err(Error::validation("ledger value exceeds u128 range"));
     }
     let scale = if scale == 0 { LEDGER_SCALE } else { scale };
+    validate_protocol_scale(scale)?;
     if scale == 0 {
         return Ok(digits.to_owned());
     }
-    let width = scale as usize + 1;
+    let width = (scale as usize)
+        .checked_add(1)
+        .ok_or_else(|| Error::validation("scale width overflow"))?;
     let padded = format!("{digits:0>width$}");
     let (head, tail) = padded.split_at(padded.len() - scale as usize);
     let head = head.trim_start_matches('0');
@@ -207,13 +233,16 @@ pub fn format_ledger_u128(value: &str, scale: u32) -> Result<String> {
     })
 }
 
-fn format_scaled(value: i128, scale: u32) -> String {
+fn format_scaled(value: i128, scale: u32) -> Result<String> {
+    validate_protocol_scale(scale)?;
     if scale == 0 {
-        return value.to_string();
+        return Ok(value.to_string());
     }
     let neg = value < 0;
     let digits = value.abs().to_string();
-    let width = scale as usize + 1;
+    let width = (scale as usize)
+        .checked_add(1)
+        .ok_or_else(|| Error::validation("scale width overflow"))?;
     let padded = format!("{digits:0>width$}");
     let (head, tail) = padded.split_at(padded.len() - scale as usize);
     let head = head.trim_start_matches('0');
@@ -224,7 +253,7 @@ fn format_scaled(value: i128, scale: u32) -> String {
     } else {
         format!("{head}.{tail}")
     };
-    if neg { format!("-{raw}") } else { raw }
+    Ok(if neg { format!("-{raw}") } else { raw })
 }
 
 fn base58_to_u64(value: &str, label: &str) -> Result<u64> {
@@ -351,7 +380,16 @@ mod tests {
 
     #[test]
     fn format_qty_scaled_round_trip() {
-        assert_eq!(format_qty_scaled(1_000_000, 8), "0.01");
+        assert_eq!(format_qty_scaled(1_000_000, 8).unwrap(), "0.01");
+    }
+
+    #[test]
+    fn format_rejects_scale_above_max_protocol_scale() {
+        assert!(format_qty_scaled(1, MAX_PROTOCOL_SCALE).is_ok());
+        assert!(format_qty_scaled(1, MAX_PROTOCOL_SCALE + 1).is_err());
+        assert!(format_qty_scaled(1, 65535).is_err());
+        assert!(format_ledger_u64(1, 65535).is_err());
+        assert!(format_ledger_u128("1", 65535).is_err());
     }
 
     #[test]
