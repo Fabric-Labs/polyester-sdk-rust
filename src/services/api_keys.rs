@@ -20,10 +20,10 @@ impl ApiKeysService {
         Self { ctx }
     }
 
-    pub fn connect_client(&self) -> ApiKeyServiceClient<crate::transport::SharedTransport> {
+    pub(crate) fn connect_client(&self) -> ApiKeyServiceClient<crate::transport::SharedTransport> {
         ApiKeyServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         )
     }
 

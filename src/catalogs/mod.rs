@@ -12,26 +12,28 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::RwLock;
 
-const DEFAULT_BASE_QTY_SCALE: u32 = 8;
-const DEFAULT_ZIPPED_ASSET_SCALE: u32 = 18;
-
-fn parse_u32_id(value: &Value, field: &str) -> Result<Option<u32>> {
+fn parse_u32_id(value: Option<&Value>, field: &str) -> Result<u32> {
+    let Some(value) = value else {
+        return Err(Error::validation(format!("catalog {field} is required")));
+    };
     let Some(raw) = value.as_u64() else {
-        if value.is_null() {
-            return Ok(None);
-        }
         return Err(Error::validation(format!(
-            "catalog {field} must be a non-negative integer"
+            "catalog {field} must be a positive integer"
         )));
     };
-    u32::try_from(raw)
-        .map(Some)
-        .map_err(|_| Error::validation(format!("catalog {field} {raw} exceeds u32 range")))
+    let id = u32::try_from(raw)
+        .map_err(|_| Error::validation(format!("catalog {field} {raw} exceeds u32 range")))?;
+    if id == 0 {
+        return Err(Error::validation(format!(
+            "catalog {field} must be non-zero"
+        )));
+    }
+    Ok(id)
 }
 
-fn parse_scale(value: Option<&Value>, field: &str, default: u32) -> Result<u32> {
+fn parse_scale(value: Option<&Value>, field: &str) -> Result<u32> {
     let Some(value) = value else {
-        return Ok(default);
+        return Err(Error::validation(format!("catalog {field} is required")));
     };
     let Some(raw) = value.as_u64() else {
         return Err(Error::validation(format!(
@@ -94,28 +96,41 @@ fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
         .or_else(|| value.get("markets"))
         .and_then(|m| m.as_array());
     let Some(markets) = markets else {
-        return Ok(snap);
+        return Err(Error::validation(
+            "catalog spot config must contain a pairs or markets array",
+        ));
     };
+    let mut id_to_symbol = HashMap::<u32, String>::new();
     for m in markets {
-        let symbol = m.get("symbol").and_then(|s| s.as_str()).unwrap_or("");
+        let symbol = m
+            .get("symbol")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|symbol| !symbol.is_empty())
+            .ok_or_else(|| Error::validation("catalog symbol must be non-empty"))?;
         let symbol_id = parse_u32_id(
-            m.get("symbol_id")
-                .or_else(|| m.get("symbolId"))
-                .unwrap_or(&Value::Null),
+            m.get("symbol_id").or_else(|| m.get("symbolId")),
             "symbol_id",
-        )?
-        .unwrap_or(0);
+        )?;
         let scale = parse_scale(
             m.get("base_quantity_scale")
                 .or_else(|| m.get("baseQuantityScale")),
             "base_quantity_scale",
-            DEFAULT_BASE_QTY_SCALE,
         )?;
-        if !symbol.is_empty() && symbol_id != 0 {
-            snap.symbol_to_id.insert(symbol.to_owned(), symbol_id);
-            snap.symbol_to_base_scale.insert(symbol.to_owned(), scale);
-            snap.id_to_base_scale.insert(symbol_id, scale);
+        if snap.symbol_to_id.contains_key(symbol) {
+            return Err(Error::validation(format!(
+                "catalog contains duplicate symbol {symbol}"
+            )));
         }
+        if let Some(existing) = id_to_symbol.get(&symbol_id) {
+            return Err(Error::validation(format!(
+                "catalog symbol_id {symbol_id} is shared by {existing} and {symbol}"
+            )));
+        }
+        snap.symbol_to_id.insert(symbol.to_owned(), symbol_id);
+        snap.symbol_to_base_scale.insert(symbol.to_owned(), scale);
+        snap.id_to_base_scale.insert(symbol_id, scale);
+        id_to_symbol.insert(symbol_id, symbol.to_owned());
         let buckets = m
             .get("orderbook_price_buckets")
             .or_else(|| m.get("orderbookPriceBuckets"))
@@ -151,31 +166,61 @@ fn build_zipper_snapshot(value: Value) -> Result<ZipperSnapshot> {
         zipper_config: value.clone(),
         ..Default::default()
     };
-    if let Some(assets) = value.get("assets").and_then(|a| a.as_array()) {
-        for a in assets {
-            let sym = a
-                .get("asset")
-                .or_else(|| a.get("symbol"))
-                .and_then(|s| s.as_str())
-                .unwrap_or("");
-            let ledger_id = parse_u32_id(
-                a.get("ledger_id")
-                    .or_else(|| a.get("ledgerId"))
-                    .unwrap_or(&Value::Null),
-                "ledger_id",
-            )?
-            .unwrap_or(0);
-            let scale = parse_scale(
-                a.get("quantity_scale").or_else(|| a.get("quantityScale")),
-                "quantity_scale",
-                DEFAULT_ZIPPED_ASSET_SCALE,
-            )?;
-            if !sym.is_empty() {
-                if ledger_id != 0 {
-                    snap.asset_to_ledger_id.insert(sym.to_owned(), ledger_id);
-                    snap.zipped_id_to_scale.insert(ledger_id, scale);
+    let assets = value
+        .get("assets")
+        .and_then(Value::as_array)
+        .ok_or_else(|| Error::validation("catalog zipper config must contain an assets array"))?;
+    let mut ledger_id_to_asset = HashMap::<u32, String>::new();
+    let mut zipped_id_to_asset = HashMap::<u32, String>::new();
+    for a in assets {
+        let sym = a
+            .get("asset")
+            .or_else(|| a.get("symbol"))
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|asset| !asset.is_empty())
+            .ok_or_else(|| Error::validation("catalog asset must be non-empty"))?;
+        let ledger_id = parse_u32_id(
+            a.get("ledger_id").or_else(|| a.get("ledgerId")),
+            "ledger_id",
+        )?;
+        let scale = parse_scale(
+            a.get("quantity_scale").or_else(|| a.get("quantityScale")),
+            "quantity_scale",
+        )?;
+        if snap.asset_to_ledger_id.contains_key(sym) {
+            return Err(Error::validation(format!(
+                "catalog contains duplicate asset {sym}"
+            )));
+        }
+        if let Some(existing) = ledger_id_to_asset.get(&ledger_id) {
+            return Err(Error::validation(format!(
+                "catalog ledger_id {ledger_id} is shared by {existing} and {sym}"
+            )));
+        }
+        snap.asset_to_ledger_id.insert(sym.to_owned(), ledger_id);
+        snap.asset_to_qty_scale.insert(sym.to_owned(), scale);
+        ledger_id_to_asset.insert(ledger_id, sym.to_owned());
+
+        if let Some(variants) = a.get("variants").and_then(Value::as_array) {
+            for variant in variants {
+                let zipped_id = parse_u32_id(
+                    variant
+                        .get("zipped_asset_id")
+                        .or_else(|| variant.get("zippedAssetId")),
+                    "zipped_asset_id",
+                )?;
+                if let Some(existing) = zipped_id_to_asset.get(&zipped_id) {
+                    return Err(Error::validation(format!(
+                        "catalog zipped_asset_id {zipped_id} is shared by {existing} and {sym}"
+                    )));
                 }
-                snap.asset_to_qty_scale.insert(sym.to_owned(), scale);
+                if snap.zipped_id_to_scale.insert(zipped_id, scale).is_some() {
+                    return Err(Error::validation(format!(
+                        "catalog contains duplicate zipped_asset_id {zipped_id}"
+                    )));
+                }
+                zipped_id_to_asset.insert(zipped_id, sym.to_owned());
             }
         }
     }
@@ -258,12 +303,11 @@ impl Manager {
             .and_then(|i| i.id_to_base_scale.get(&id).copied())
     }
 
-    pub fn quantity_scale_for_zipped_asset_id(&self, id: u32) -> u32 {
+    pub fn quantity_scale_for_zipped_asset_id(&self, id: u32) -> Option<u32> {
         self.inner
             .read()
             .ok()
             .and_then(|i| i.zipped_id_to_scale.get(&id).copied())
-            .unwrap_or(DEFAULT_ZIPPED_ASSET_SCALE)
     }
 
     pub fn orderbook_price_buckets_for_symbol(&self, symbol: &str) -> Vec<String> {
@@ -527,12 +571,16 @@ mod tests {
             "assets": [{
                 "asset": "USDT",
                 "ledger_id": 99,
-                "quantity_scale": 6
+                "quantity_scale": 6,
+                "variants": [{
+                    "zipped_asset_id": 42
+                }]
             }]
         }))
         .expect("hydrate");
         assert_eq!(mgr.ledger_id_for_asset("USDT"), Some(99));
-        assert_eq!(mgr.quantity_scale_for_zipped_asset_id(99), 6);
+        assert_eq!(mgr.quantity_scale_for_zipped_asset_id(42), Some(6));
+        assert_eq!(mgr.quantity_scale_for_zipped_asset_id(99), None);
     }
 
     #[test]
@@ -573,5 +621,81 @@ mod tests {
             supply: "200".to_owned(),
         }]));
         assert_eq!(mgr.supply_for_zipped_asset_id(42).as_deref(), Some("200"));
+    }
+
+    #[test]
+    fn contradictory_spot_identities_fail_without_replacing_previous_catalog() {
+        let mgr = Manager::new();
+        mgr.hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+
+        for malformed in [
+            json!({"pairs": [
+                {"symbol": "ETH-USDT", "symbol_id": 2, "base_quantity_scale": 6},
+                {"symbol": "SOL-USDT", "symbol_id": 2, "base_quantity_scale": 8}
+            ]}),
+            json!({"pairs": [
+                {"symbol": "ETH-USDT", "symbol_id": 2, "base_quantity_scale": 6},
+                {"symbol": "ETH-USDT", "symbol_id": 3, "base_quantity_scale": 8}
+            ]}),
+            json!({"pairs": [
+                {"symbol": "", "symbol_id": 2, "base_quantity_scale": 6}
+            ]}),
+            json!({"pairs": [
+                {"symbol": "ETH-USDT", "symbol_id": 2}
+            ]}),
+        ] {
+            assert!(mgr.hydrate_spot_config_json(malformed).is_err());
+            assert_eq!(mgr.symbol_id_for_symbol("BTC-USDT"), Some(1));
+            assert_eq!(mgr.symbol_id_for_symbol("ETH-USDT"), None);
+        }
+    }
+
+    #[test]
+    fn contradictory_zipper_identities_fail_without_replacing_previous_catalog() {
+        let mgr = Manager::new();
+        mgr.hydrate_zipper_config_json(json!({
+            "assets": [{
+                "asset": "USDT",
+                "ledger_id": 99,
+                "quantity_scale": 6,
+                "variants": [{"zipped_asset_id": 42}]
+            }]
+        }))
+        .unwrap();
+
+        for malformed in [
+            json!({"assets": [
+                {"asset": "BTC", "ledger_id": 1, "quantity_scale": 8},
+                {"asset": "ETH", "ledger_id": 1, "quantity_scale": 6}
+            ]}),
+            json!({"assets": [
+                {"asset": "BTC", "ledger_id": 1, "quantity_scale": 8},
+                {"asset": "BTC", "ledger_id": 2, "quantity_scale": 6}
+            ]}),
+            json!({"assets": [
+                {"asset": "", "ledger_id": 1, "quantity_scale": 8}
+            ]}),
+            json!({"assets": [
+                {"asset": "BTC", "ledger_id": 1}
+            ]}),
+            json!({"assets": [
+                {"asset": "BTC", "ledger_id": 1, "quantity_scale": 8,
+                 "variants": [{"zipped_asset_id": 7}]},
+                {"asset": "ETH", "ledger_id": 2, "quantity_scale": 6,
+                 "variants": [{"zipped_asset_id": 7}]}
+            ]}),
+        ] {
+            assert!(mgr.hydrate_zipper_config_json(malformed).is_err());
+            assert_eq!(mgr.ledger_id_for_asset("USDT"), Some(99));
+            assert_eq!(mgr.ledger_id_for_asset("BTC"), None);
+            assert_eq!(mgr.quantity_scale_for_zipped_asset_id(42), Some(6));
+        }
     }
 }

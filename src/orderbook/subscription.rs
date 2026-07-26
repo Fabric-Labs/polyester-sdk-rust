@@ -2,7 +2,7 @@
 
 use crate::errors::{Error, Result};
 use crate::models::{OrderBookDeltaUpdate, OrderbookData};
-use crate::realtime::SnapshotThenStream;
+use crate::realtime::{SnapshotThenStream, lock_unpoisoned};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -49,17 +49,24 @@ impl Subscription {
 
     /// Terminal subscription error, if the stream failed (e.g. queue overflow).
     pub fn err(&self) -> Option<Error> {
-        self.last_error
-            .lock()
-            .expect("error lock")
+        lock_unpoisoned(&self.last_error)
             .clone()
             .or_else(|| self.stream.err())
+    }
+
+    /// Register a callback for background transport, decode, snapshot, or
+    /// terminal buffering errors.
+    pub fn set_on_error<F>(&self, callback: F)
+    where
+        F: Fn(Error) + Send + Sync + 'static,
+    {
+        self.stream.set_on_error(callback);
     }
 
     /// Change the active price bucket and re-emit the current book.
     pub fn set_bucket(&self, bucket: &str) {
         let ticks = crate::orderbook::parse_bucket_ticks(bucket);
-        *self.bucket_ticks.lock().expect("bucket lock") = ticks;
+        *lock_unpoisoned(&self.bucket_ticks) = ticks;
         if self.stream.is_ready() && !self.closed.load(Ordering::SeqCst) {
             (self.emit)();
         }
@@ -76,7 +83,7 @@ impl Subscription {
             return;
         }
         // Drop the sender so `updates().recv()` unblocks with None.
-        let _ = self.tx_slot.lock().expect("tx slot").take();
+        let _ = lock_unpoisoned(&self.tx_slot).take();
         self.stream.close();
     }
 }

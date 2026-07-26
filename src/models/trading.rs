@@ -216,11 +216,14 @@ pub struct CreateTradingWithdrawParams {
     pub amount: AssetAmount,
     pub payload_signature: Vec<u8>,
     pub destination_address: String,
-    pub idempotency_key: Option<String>,
+    /// Stable key for this logical withdrawal. Persist it and reuse it for
+    /// every retry; generating a new key per attempt defeats deduplication.
+    pub idempotency_key: String,
     /// Override ledger scale (default 18).
     pub amount_scale: Option<u32>,
     pub deadline_ts_sec: Option<u64>,
-    pub nonce: Option<u128>,
+    /// Non-zero nonce included in the signed withdrawal payload.
+    pub nonce: u128,
 }
 
 /// Typed wallet trading-withdraw create params.
@@ -237,7 +240,8 @@ pub struct CreateWalletTradingWithdrawParams {
     pub subaccount_id: Option<u64>,
     pub amount_scale: Option<u32>,
     pub deadline_ts_sec: Option<u64>,
-    pub nonce: Option<u128>,
+    /// Non-zero nonce included in the signed withdrawal payload.
+    pub nonce: u128,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

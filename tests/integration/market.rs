@@ -56,10 +56,9 @@ async fn orderbook_get_for_smoke_symbol() {
     let Some(client) = require_live_client() else {
         return;
     };
-    let cfg = call_required("market_data.get_spot_config", || {
-        client.market_data.get_spot_config()
-    })
-    .await;
+    let cfg = hydrate_spot_and_zipper(&client)
+        .await
+        .expect("hydrate catalogs for orderbook");
     let symbol = smoke_symbol(&cfg);
     let Some(book) = call_optional("orderbook.get", || client.orderbook.get(&symbol, None)).await
     else {

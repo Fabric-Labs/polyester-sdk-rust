@@ -5,6 +5,7 @@ use super::enums::{
 };
 use super::money::{decode_price_ticks, decode_qty_scaled, decode_qty_scaled_allow_zero};
 use crate::codecs::scalars::format_uint64_id;
+use crate::errors::{Error, Result};
 use crate::models::{
     AttachedRisk, BatchCancelOrdersResult, BatchCancelResultItem, BatchCreateOrdersResult,
     BatchCreateResultItem, BatchModifyOrdersResult, BatchModifyResultItem, CancelAllAfterResult,
@@ -247,7 +248,8 @@ fn modify_action_name(
     match action.as_known() {
         Some(ModifyActionTaken::Amended) => "amended".to_owned(),
         Some(ModifyActionTaken::Replaced) => "replaced".to_owned(),
-        _ => String::new(),
+        Some(_) => String::new(),
+        None => format!("UNKNOWN({})", action.to_i32()),
     }
 }
 
@@ -262,41 +264,65 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> CancelAllOrdersRe
 
 /// Per-item results now carry an `Accepted`/`Rejected` outcome oneof instead of
 /// flat status/order_id/code fields.
-pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> BatchCreateOrdersResult {
-    BatchCreateOrdersResult {
-        results: msg
-            .results
-            .iter()
-            .map(|item| {
-                let mut out = BatchCreateResultItem {
-                    status: String::new(),
-                    order_id: String::new(),
-                    client_order_id: item.client_order_id.clone(),
-                    code: String::new(),
-                };
-                match item.outcome.as_ref() {
-                    Some(batch_create_result_item::Outcome::Accepted(accepted)) => {
-                        out.status = "accepted".to_owned();
-                        out.order_id = format_uint64_id(accepted.order_id);
-                    }
-                    Some(batch_create_result_item::Outcome::Rejected(rejected)) => {
-                        out.status = "rejected".to_owned();
-                        if let Some(err) = rejected.error.as_option() {
-                            out.code = err
-                                .code
-                                .as_known()
-                                .map(|c| c.proto_name().to_owned())
-                                .unwrap_or_default();
-                        }
-                    }
-                    None => {}
+pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchCreateOrdersResult> {
+    let mut accepted = 0usize;
+    let mut rejected = 0usize;
+    let results = msg
+        .results
+        .iter()
+        .map(|item| {
+            let mut out = BatchCreateResultItem {
+                status: String::new(),
+                order_id: String::new(),
+                client_order_id: item.client_order_id.clone(),
+                code: String::new(),
+            };
+            match item.outcome.as_ref() {
+                Some(batch_create_result_item::Outcome::Accepted(value)) => {
+                    accepted += 1;
+                    out.status = "accepted".to_owned();
+                    out.order_id = format_uint64_id(value.order_id);
                 }
-                out
-            })
-            .collect(),
+                Some(batch_create_result_item::Outcome::Rejected(value)) => {
+                    rejected += 1;
+                    out.status = "rejected".to_owned();
+                    out.code = value
+                        .error
+                        .as_option()
+                        .map(|err| match err.code.as_known() {
+                            Some(code) => code.proto_name().to_owned(),
+                            None => format!("UNKNOWN_ERROR_CODE({})", err.code.to_i32()),
+                        })
+                        .unwrap_or_else(|| "ERROR_CODE_UNSPECIFIED".to_owned());
+                }
+                None => {
+                    return Err(Error::transport(format!(
+                        "invalid BatchCreateOrders response: item {:?} has neither accepted nor rejected outcome",
+                        item.client_order_id
+                    )));
+                }
+            }
+            Ok(out)
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    if accepted != msg.accepted_count as usize
+        || rejected != msg.rejected_count as usize
+        || accepted + rejected != results.len()
+    {
+        return Err(Error::transport(format!(
+            "invalid BatchCreateOrders response counts: decoded {accepted} accepted/{rejected} rejected for {} results, server reported {}/{}",
+            results.len(),
+            msg.accepted_count,
+            msg.rejected_count
+        )));
+    }
+
+    Ok(BatchCreateOrdersResult {
+        results,
         accepted_count: msg.accepted_count as i32,
         rejected_count: msg.rejected_count as i32,
-    }
+    })
 }
 
 pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> BatchCancelOrdersResult {
@@ -606,10 +632,83 @@ mod tests {
             rejected_count: 0,
             ..Default::default()
         };
-        let result = batch_create_from_proto(&msg);
+        let result = batch_create_from_proto(&msg).expect("valid batch response");
         assert_eq!(result.accepted_count, 1);
         assert_eq!(result.results[0].status, "accepted");
         assert_eq!(result.results[0].order_id, format_uint64_id(9));
         assert_eq!(result.results[0].client_order_id, "c1");
+    }
+
+    #[test]
+    fn batch_create_rejects_missing_outcome() {
+        use crate::proto::orders::v1::BatchCreateResultItem as ProtoItem;
+
+        let msg = BatchCreateOrdersResponse {
+            results: vec![ProtoItem {
+                client_order_id: "ambiguous".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        let err = batch_create_from_proto(&msg).expect_err("missing outcome must fail closed");
+        assert!(err.to_string().contains("neither accepted nor rejected"));
+    }
+
+    #[test]
+    fn batch_create_preserves_unknown_rejection_code() {
+        use crate::proto::orders::v1::{
+            BatchCreateRejected, BatchCreateResultItem as ProtoItem, ErrorDetail,
+            batch_create_result_item,
+        };
+
+        let msg = BatchCreateOrdersResponse {
+            results: vec![ProtoItem {
+                client_order_id: "unknown-code".into(),
+                outcome: Some(batch_create_result_item::Outcome::Rejected(Box::new(
+                    BatchCreateRejected {
+                        error: ErrorDetail {
+                            code: buffa::EnumValue::from(999),
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    },
+                ))),
+                ..Default::default()
+            }],
+            accepted_count: 0,
+            rejected_count: 1,
+            ..Default::default()
+        };
+
+        let result = batch_create_from_proto(&msg).expect("unknown code stays observable");
+        assert_eq!(result.results[0].code, "UNKNOWN_ERROR_CODE(999)");
+    }
+
+    #[test]
+    fn batch_create_rejects_count_mismatch() {
+        use crate::proto::orders::v1::{
+            BatchCreateAccepted, BatchCreateResultItem as ProtoItem, batch_create_result_item,
+        };
+
+        let msg = BatchCreateOrdersResponse {
+            results: vec![ProtoItem {
+                client_order_id: "accepted".into(),
+                outcome: Some(batch_create_result_item::Outcome::Accepted(Box::new(
+                    BatchCreateAccepted {
+                        order_id: 9,
+                        ..Default::default()
+                    },
+                ))),
+                ..Default::default()
+            }],
+            accepted_count: 0,
+            rejected_count: 1,
+            ..Default::default()
+        };
+
+        let err = batch_create_from_proto(&msg).expect_err("count mismatch must fail closed");
+        assert!(err.to_string().contains("response counts"));
     }
 }

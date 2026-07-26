@@ -133,8 +133,7 @@ pub async fn wait_until_no_open_client_ids(
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
     Err(Error::validation(format!(
-        "client orders {:?} still open after {timeout:?}",
-        client_order_ids
+        "client orders {client_order_ids:?} still open after {timeout:?}"
     )))
 }
 

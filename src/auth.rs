@@ -4,10 +4,6 @@ use crate::errors::{Error, Result};
 use ed25519_dalek::{Signer, SigningKey};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
-};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const API_KEY_ID_ENV: &str = "POLYESTER_API_KEY_ID";
@@ -23,7 +19,6 @@ pub const HEADER_SIGNATURE: &str = "X-API-SIGNATURE";
 pub struct Credentials {
     pub key_id: String,
     signing_key: SigningKey,
-    last_timestamp_ms: Arc<AtomicU64>,
 }
 
 impl std::fmt::Debug for Credentials {
@@ -31,7 +26,6 @@ impl std::fmt::Debug for Credentials {
         f.debug_struct("Credentials")
             .field("key_id", &self.key_id)
             .field("signing_key", &"<redacted>")
-            .field("last_timestamp_ms", &"<internal>")
             .finish()
     }
 }
@@ -47,7 +41,6 @@ impl Credentials {
         Ok(Self {
             key_id,
             signing_key,
-            last_timestamp_ms: Arc::new(AtomicU64::new(0)),
         })
     }
 
@@ -93,41 +86,27 @@ impl Credentials {
         raw_url: &str,
         body: &[u8],
         timestamp_ms: Option<&str>,
-    ) -> BTreeMap<String, String> {
-        let ts = timestamp_ms
-            .map(str::to_owned)
-            .unwrap_or_else(|| self.next_timestamp_ms().to_string());
-        let canonical = canonical_signing_string(&ts, method, raw_url, body);
+    ) -> Result<BTreeMap<String, String>> {
+        let ts = match timestamp_ms {
+            Some(value) => value.to_owned(),
+            None => timestamp_ms_from(SystemTime::now())?.to_string(),
+        };
+        let canonical = canonical_signing_string(&ts, method, raw_url, body)?;
         let sig = self.signing_key.sign(canonical.as_bytes());
         let mut headers = BTreeMap::new();
         headers.insert(HEADER_KEY_ID.to_owned(), self.key_id.clone());
         headers.insert(HEADER_TIMESTAMP.to_owned(), ts);
         headers.insert(HEADER_SIGNATURE.to_owned(), hex::encode(sig.to_bytes()));
-        headers
+        Ok(headers)
     }
+}
 
-    fn next_timestamp_ms(&self) -> u64 {
-        let now = u64::try_from(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("clock")
-                .as_millis(),
-        )
-        .expect("Unix timestamp milliseconds fit in u64");
-        let mut observed = self.last_timestamp_ms.load(Ordering::Relaxed);
-        loop {
-            let next = now.max(observed.saturating_add(1));
-            match self.last_timestamp_ms.compare_exchange_weak(
-                observed,
-                next,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => return next,
-                Err(actual) => observed = actual,
-            }
-        }
-    }
+fn timestamp_ms_from(now: SystemTime) -> Result<u64> {
+    let elapsed = now
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| Error::transport("system clock is before UNIX_EPOCH"))?;
+    u64::try_from(elapsed.as_millis())
+        .map_err(|_| Error::transport("Unix timestamp milliseconds exceed u64 range"))
 }
 
 /// Accept a 64-char hex Ed25519 seed (32 bytes).
@@ -167,10 +146,7 @@ pub fn encode_query_component(s: &str) -> String {
 }
 
 /// Sort and percent-encode query parameters (Python `quote(safe="")` parity).
-pub fn canonical_query(raw_url: &str) -> String {
-    let Ok(parsed) = url::Url::parse(raw_url) else {
-        return String::new();
-    };
+fn canonical_query_from_url(parsed: &url::Url) -> String {
     let mut pairs: Vec<(String, String)> = parsed
         .query_pairs()
         .map(|(k, v)| (k.into_owned(), v.into_owned()))
@@ -189,32 +165,37 @@ pub fn canonical_query(raw_url: &str) -> String {
         .join("&")
 }
 
+pub fn canonical_query(raw_url: &str) -> Result<String> {
+    let parsed = url::Url::parse(raw_url)
+        .map_err(|err| Error::validation(format!("invalid signing URL: {err}")))?;
+    Ok(canonical_query_from_url(&parsed))
+}
+
 pub fn canonical_signing_string(
     timestamp_ms: &str,
     method: &str,
     raw_url: &str,
     body: &[u8],
-) -> String {
-    let pathname = match url::Url::parse(raw_url) {
-        Ok(u) => {
-            let path = u.path();
-            if path.is_empty() {
-                "/".to_owned()
-            } else {
-                path.to_owned()
-            }
+) -> Result<String> {
+    let parsed = url::Url::parse(raw_url)
+        .map_err(|err| Error::validation(format!("invalid signing URL: {err}")))?;
+    let pathname = {
+        let path = parsed.path();
+        if path.is_empty() {
+            "/".to_owned()
+        } else {
+            path.to_owned()
         }
-        Err(_) => "/".to_owned(),
     };
     let sum = Sha256::digest(body);
-    [
+    Ok([
         timestamp_ms,
         &method.to_uppercase(),
         &pathname,
-        &canonical_query(raw_url),
+        &canonical_query_from_url(&parsed),
         &hex::encode(sum),
     ]
-    .join("\n")
+    .join("\n"))
 }
 
 pub fn request_url(api_base: &str, procedure: &str) -> String {
@@ -243,7 +224,7 @@ mod tests {
 
     #[test]
     fn canonical_query_sorts_and_encodes_values() {
-        let got = canonical_query("https://api.example.test/path?b=2&a=hello world");
+        let got = canonical_query("https://api.example.test/path?b=2&a=hello world").unwrap();
         assert_eq!(got, "a=hello%20world&b=2");
     }
 
@@ -264,7 +245,7 @@ mod tests {
         let url =
             "https://api.example.test/v1/rt/subscribe?channel=private:auth:api-keys:account:proto";
         assert_eq!(
-            canonical_query(url),
+            canonical_query(url).unwrap(),
             "channel=private%3Aauth%3Aapi-keys%3Aaccount%3Aproto"
         );
     }
@@ -294,7 +275,7 @@ mod tests {
             ),
         ];
         for (url, want) in cases {
-            assert_eq!(canonical_query(url), want, "url={url}");
+            assert_eq!(canonical_query(url).unwrap(), want, "url={url}");
         }
     }
 
@@ -305,7 +286,8 @@ mod tests {
             "post",
             "https://api.example.test/foo/bar?b=2&a=1",
             b"{}",
-        );
+        )
+        .unwrap();
         let want = "123\nPOST\n/foo/bar\na=1&b=2\n44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a";
         assert_eq!(got, want);
     }
@@ -317,7 +299,8 @@ mod tests {
             "POST",
             "https://api-devnet.polyester.ai/orders.v1.OrdersService/CreateOrder",
             b"",
-        );
+        )
+        .unwrap();
         let expected_hash = hex::encode(Sha256::digest(b""));
         assert!(s.contains(&expected_hash));
         assert!(s.starts_with("1700000000000\nPOST\n/orders.v1.OrdersService/CreateOrder\n\n"));
@@ -327,20 +310,21 @@ mod tests {
     fn sign_request_returns_polyester_headers() {
         let (seed, _) = generate_ed25519_keypair();
         let creds = Credentials::new("key_123", &seed).unwrap();
-        let headers =
-            creds.sign_request("POST", "https://api.example.test/foo", b"{}", Some("123"));
+        let headers = creds
+            .sign_request("POST", "https://api.example.test/foo", b"{}", Some("123"))
+            .unwrap();
         assert_eq!(headers.get(HEADER_KEY_ID).unwrap(), "key_123");
         assert_eq!(headers.get(HEADER_TIMESTAMP).unwrap(), "123");
         assert_eq!(headers.get(HEADER_SIGNATURE).unwrap().len(), 128);
     }
 
     #[test]
-    fn automatic_timestamps_are_unique_across_concurrent_clones() {
-        use std::collections::HashSet;
+    fn concurrent_signing_timestamps_track_wall_clock_without_future_drift() {
         use std::sync::{Arc, Barrier};
 
         let (seed, _) = generate_ed25519_keypair();
         let creds = Credentials::new("key_123", &seed).unwrap();
+        let before = timestamp_ms_from(SystemTime::now()).unwrap();
         let barrier = Arc::new(Barrier::new(32));
         let handles = (0..32)
             .map(|_| {
@@ -348,7 +332,9 @@ mod tests {
                 let barrier = Arc::clone(&barrier);
                 std::thread::spawn(move || {
                     barrier.wait();
-                    creds.sign_request("POST", "https://api.example.test/foo", b"{}", None)
+                    creds
+                        .sign_request("POST", "https://api.example.test/foo", b"{}", None)
+                        .unwrap()
                 })
             })
             .collect::<Vec<_>>();
@@ -356,34 +342,26 @@ mod tests {
             .into_iter()
             .map(|handle| handle.join().unwrap())
             .collect::<Vec<_>>();
-        assert_eq!(
-            headers
-                .iter()
-                .map(|headers| headers[HEADER_TIMESTAMP].clone())
-                .collect::<HashSet<_>>()
-                .len(),
-            32
-        );
-        assert_eq!(
-            headers
-                .iter()
-                .map(|headers| headers[HEADER_SIGNATURE].clone())
-                .collect::<HashSet<_>>()
-                .len(),
-            32
-        );
+        let after = timestamp_ms_from(SystemTime::now()).unwrap();
+        for headers in headers {
+            let timestamp = headers[HEADER_TIMESTAMP].parse::<u64>().unwrap();
+            assert!(timestamp >= before);
+            assert!(timestamp <= after);
+        }
     }
 
     #[test]
     fn round_trip_credentials() {
         let (seed, _) = generate_ed25519_keypair();
         let creds = Credentials::new("ak_test", &seed).unwrap();
-        let headers = creds.sign_request(
-            "POST",
-            "https://api-devnet.polyester.ai/orders.v1.OrdersService/CreateOrder",
-            b"{}",
-            Some("1"),
-        );
+        let headers = creds
+            .sign_request(
+                "POST",
+                "https://api-devnet.polyester.ai/orders.v1.OrdersService/CreateOrder",
+                b"{}",
+                Some("1"),
+            )
+            .unwrap();
         assert_eq!(headers.get(HEADER_KEY_ID).unwrap(), "ak_test");
         assert_eq!(headers.get(HEADER_TIMESTAMP).unwrap(), "1");
         assert_eq!(headers.get(HEADER_SIGNATURE).unwrap().len(), 128);
@@ -420,5 +398,28 @@ mod tests {
             request_url("https://api.example.test", "/auth.v1.AuthService/Me"),
             "https://api.example.test/auth.v1.AuthService/Me"
         );
+    }
+
+    #[test]
+    fn signing_rejects_unparseable_urls() {
+        let (seed, _) = generate_ed25519_keypair();
+        let creds = Credentials::new("ak_test", &seed).unwrap();
+        let err = creds
+            .sign_request("POST", "not a url", b"{}", Some("1"))
+            .unwrap_err();
+        assert!(matches!(err, Error::Validation(_)));
+        assert!(canonical_query("not a url").is_err());
+        assert!(canonical_signing_string("1", "POST", "not a url", b"").is_err());
+    }
+
+    #[test]
+    fn pre_epoch_clock_is_an_error_not_a_panic() {
+        let before_epoch = UNIX_EPOCH
+            .checked_sub(std::time::Duration::from_secs(1))
+            .unwrap();
+        assert!(matches!(
+            timestamp_ms_from(before_epoch),
+            Err(Error::Transport(_))
+        ));
     }
 }

@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.14`, git tag `v0.1.0a14`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.15`, git tag `v0.1.0a15`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ The crate is not on crates.io yet. Pin the published git tag:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a14" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a15" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -346,9 +346,11 @@ let result = account.send_calls(&[call], true, Duration::from_secs(60)).await?;
 Realtime queues fail with `Error::QueueOverflow` instead of silently dropping;
 managed streams rebuild snapshots after reconnect and expose
 `on_reconnect` / `on_snapshot_refresh` hooks. Subscribe methods return only
-after the initial websocket handshake succeeds. After connection, use
-`is_alive()`, `err()`, and `take_err()` to monitor terminal delivery errors and
-reconnects. Snapshot-recovery buffers also fail closed on overflow.
+after the initial websocket handshake succeeds; managed create methods also
+wait for the initial snapshot. After connection, use
+`recv_result().await` or `set_on_error(...)` so delivery failures cannot look
+like a clean end of stream. Reconnects use capped exponential backoff with
+per-subscription jitter. Snapshot-recovery buffers also fail closed on overflow.
 
 Pass `default_account_id` (your Profile **Account ID**) on the client for bucket
 transfers and other account-scoped ledger operations.
@@ -385,7 +387,8 @@ let _ = (candles, current, trades);
 
 client.wait_for_catalogs().await?;
 let mut sub = client.market_data.subscribe_trades("BNB-USDT").await?;
-if let Some(trade) = sub.recv().await {
+sub.set_on_error(|error| eprintln!("realtime interruption: {error}"));
+if let Some(trade) = sub.recv_result().await? {
     println!(
         "{:?} {:?}",
         trade.price.as_ref().map(|p| p.as_ticks()),
@@ -406,6 +409,7 @@ let mut sub = client
         ..Default::default()
     })
     .await?;
+sub.set_on_error(|error| eprintln!("managed overview failed: {error}"));
 if let Some(markets) = sub.updates().recv().await {
     println!("{} rows", markets.len());
 }
@@ -445,6 +449,7 @@ let mut book = client
         ..Default::default()
     })
     .await?;
+book.set_on_error(|error| eprintln!("managed order book failed: {error}"));
 if let Some(snapshot) = book.updates().recv().await {
     println!("{} {}", snapshot.book_seq, snapshot.bids.len());
 }
@@ -528,6 +533,10 @@ hex(sha256(body))
 ```
 
 Headers: `X-API-KEY-ID`, `X-API-TIMESTAMP`, `X-API-SIGNATURE`.
+
+Use the high-level `Client` service methods for authenticated calls. Generated
+clients under `polyester::connect` are low-level protocol bindings and do not
+apply Polyester API-key signatures by themselves.
 
 ## Examples
 

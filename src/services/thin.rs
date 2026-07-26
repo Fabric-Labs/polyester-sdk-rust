@@ -3,7 +3,7 @@
 use super::ServiceContext;
 
 macro_rules! thin_service {
-    ($name:ident, $client:ty, $auth:expr) => {
+    ($name:ident, $client:ty) => {
         #[derive(Clone)]
         pub struct $name {
             pub(crate) ctx: ServiceContext,
@@ -12,11 +12,25 @@ macro_rules! thin_service {
             pub fn new(ctx: ServiceContext) -> Self {
                 Self { ctx }
             }
-            pub fn connect_client(&self) -> $client {
+            pub(crate) fn connect_client(&self) -> $client {
                 <$client>::new(
-                    self.ctx.factory.transport($auth),
-                    self.ctx.factory.connect_config($auth),
+                    self.ctx.factory.transport(),
+                    self.ctx.factory.connect_config(),
                 )
+            }
+        }
+    };
+}
+
+macro_rules! realtime_only_service {
+    ($name:ident) => {
+        #[derive(Clone)]
+        pub struct $name {
+            pub(crate) ctx: ServiceContext,
+        }
+        impl $name {
+            pub fn new(ctx: ServiceContext) -> Self {
+                Self { ctx }
             }
         }
     };
@@ -26,70 +40,54 @@ thin_service!(
     ChainAnalyticsService,
     crate::connect::chain::analytics::v1::ChainAnalyticsServiceClient<
         crate::transport::SharedTransport,
-    >,
-    false
+    >
 );
 thin_service!(
     LifecycleService,
     crate::connect::chain::lifecycle::v1::LifecycleReadServiceClient<
         crate::transport::SharedTransport,
-    >,
-    true
+    >
 );
 thin_service!(
     HeatmapService,
-    crate::connect::marketdata::v1::HeatmapServiceClient<crate::transport::SharedTransport>,
-    false
+    crate::connect::marketdata::v1::HeatmapServiceClient<crate::transport::SharedTransport>
 );
-thin_service!(
-    PoliciesService,
-    crate::connect::auth::v1::PolicyServiceClient<crate::transport::SharedTransport>,
-    true
-);
+realtime_only_service!(PoliciesService);
 thin_service!(
     SubAccountsService,
-    crate::connect::auth::v1::SubaccountServiceClient<crate::transport::SharedTransport>,
-    true
+    crate::connect::auth::v1::SubaccountServiceClient<crate::transport::SharedTransport>
 );
 thin_service!(
     AddressBookService,
-    crate::connect::auth::v1::AddressBookServiceClient<crate::transport::SharedTransport>,
-    true
+    crate::connect::auth::v1::AddressBookServiceClient<crate::transport::SharedTransport>
 );
 thin_service!(
     SocialVerificationService,
-    crate::connect::auth::v1::SocialVerificationServiceClient<crate::transport::SharedTransport>,
-    true
+    crate::connect::auth::v1::SocialVerificationServiceClient<crate::transport::SharedTransport>
 );
 thin_service!(
     WhiteboardService,
-    crate::connect::collab::v1::WhiteboardServiceClient<crate::transport::SharedTransport>,
-    true
+    crate::connect::collab::v1::WhiteboardServiceClient<crate::transport::SharedTransport>
 );
 thin_service!(
     PolychartService,
-    crate::connect::polychart::v1::PolychartServiceClient<crate::transport::SharedTransport>,
-    true
+    crate::connect::polychart::v1::PolychartServiceClient<crate::transport::SharedTransport>
 );
 thin_service!(
     LayoutService,
-    crate::connect::layout::v1::LayoutServiceClient<crate::transport::SharedTransport>,
-    true
+    crate::connect::layout::v1::LayoutServiceClient<crate::transport::SharedTransport>
 );
 thin_service!(
     GuardSignerService,
-    crate::connect::chain::guard::v1::GuardSignerServiceClient<crate::transport::SharedTransport>,
-    true
+    crate::connect::chain::guard::v1::GuardSignerServiceClient<crate::transport::SharedTransport>
 );
 thin_service!(
     InternalTransfersService,
-    crate::connect::transfer::v1::InternalTransferServiceClient<crate::transport::SharedTransport>,
-    true
+    crate::connect::transfer::v1::InternalTransferServiceClient<crate::transport::SharedTransport>
 );
 thin_service!(
     TransfersService,
-    crate::connect::ledger::read::v1::LedgerReadServiceClient<crate::transport::SharedTransport>,
-    true
+    crate::connect::ledger::read::v1::LedgerReadServiceClient<crate::transport::SharedTransport>
 );
 
 impl HeatmapService {
@@ -382,8 +380,8 @@ impl SubAccountsService {
             ..Default::default()
         };
         let client = crate::connect::auth::v1::SubaccountViewServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         );
         let resp = {
             use super::unary;
@@ -445,8 +443,8 @@ impl SubAccountsService {
     ) -> crate::errors::Result<crate::models::SubAccountActivityList> {
         use crate::codecs::decode::subaccount_activity_list_from_proto;
         let client = crate::connect::auth::v1::SubaccountViewServiceClient::new(
-            self.ctx.factory.transport(true),
-            self.ctx.factory.connect_config(true),
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
         );
         let resp = {
             use super::unary;

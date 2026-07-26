@@ -67,7 +67,6 @@ pub struct Factory {
     pub credentials: Option<Credentials>,
     transport: SharedTransport,
     connect_config: ClientConfig,
-    connect_config_auth: ClientConfig,
 }
 
 impl Factory {
@@ -79,16 +78,12 @@ impl Factory {
 
         let transport = build_http_client(&config.api_url)?;
 
-        let mut connect_config = ClientConfig::new(uri.clone())
-            .with_default_timeout(config.timeout)
-            .with_default_max_message_size(MAX_CONNECT_RESPONSE_BYTES);
-        let mut connect_config_auth = ClientConfig::new(uri)
+        let mut connect_config = ClientConfig::new(uri)
             .with_default_timeout(config.timeout)
             .with_default_max_message_size(MAX_CONNECT_RESPONSE_BYTES);
 
         if config.wire_format == WireFormat::Json {
             connect_config = connect_config.json();
-            connect_config_auth = connect_config_auth.json();
         }
 
         Ok(Self {
@@ -96,20 +91,15 @@ impl Factory {
             credentials,
             transport,
             connect_config,
-            connect_config_auth,
         })
     }
 
-    pub fn transport(&self, _authenticated: bool) -> SharedTransport {
+    pub(crate) fn transport(&self) -> SharedTransport {
         self.transport.clone()
     }
 
-    pub fn connect_config(&self, authenticated: bool) -> ClientConfig {
-        if authenticated {
-            self.connect_config_auth.clone()
-        } else {
-            self.connect_config.clone()
-        }
+    pub(crate) fn connect_config(&self) -> ClientConfig {
+        self.connect_config.clone()
     }
 
     pub fn require_credentials(&self) -> Result<&Credentials> {
@@ -135,7 +125,7 @@ impl Factory {
             WireFormat::Json => connectrpc::JsonCodec::encode(request).map_err(Self::map_error)?,
         };
         let sign_url = auth::request_url(&self.config.api_url, procedure);
-        let headers = creds.sign_request("POST", &sign_url, &body, None);
+        let headers = creds.sign_request("POST", &sign_url, &body, None)?;
         let mut opts = CallOptions::default();
         for (k, v) in headers {
             opts = opts.with_header(k, v);

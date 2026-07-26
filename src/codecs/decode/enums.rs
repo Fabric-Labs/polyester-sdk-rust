@@ -1,6 +1,14 @@
 //! Proto enum → SDK label helpers (Go `codecs/proto_helpers` parity).
 
 use crate::proto::orders::v1::{OrderStatus, OrderType, Side, TimeInForce};
+use buffa::Enumeration;
+
+pub fn enum_proto_name<T: Enumeration>(value: &buffa::EnumValue<T>) -> String {
+    value
+        .as_known()
+        .map(|known| known.proto_name().to_owned())
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
+}
 
 pub fn order_side_name(side: Side) -> &'static str {
     match side {
@@ -39,18 +47,30 @@ pub fn order_status_name(status: OrderStatus) -> &'static str {
     }
 }
 
-pub fn enum_value_side(value: buffa::EnumValue<Side>) -> &'static str {
-    value.as_known().map(order_side_name).unwrap_or("")
+pub fn enum_value_side(value: buffa::EnumValue<Side>) -> String {
+    value
+        .as_known()
+        .map(|known| order_side_name(known).to_owned())
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
-pub fn enum_value_order_type(value: buffa::EnumValue<OrderType>) -> &'static str {
-    value.as_known().map(order_type_name).unwrap_or("")
+pub fn enum_value_order_type(value: buffa::EnumValue<OrderType>) -> String {
+    value
+        .as_known()
+        .map(|known| order_type_name(known).to_owned())
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
-pub fn enum_value_time_in_force(value: buffa::EnumValue<TimeInForce>) -> &'static str {
-    value.as_known().map(time_in_force_name).unwrap_or("")
+pub fn enum_value_time_in_force(value: buffa::EnumValue<TimeInForce>) -> String {
+    value
+        .as_known()
+        .map(|known| time_in_force_name(known).to_owned())
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
-pub fn enum_value_order_status(value: buffa::EnumValue<OrderStatus>) -> &'static str {
-    value.as_known().map(order_status_name).unwrap_or("")
+pub fn enum_value_order_status(value: buffa::EnumValue<OrderStatus>) -> String {
+    value
+        .as_known()
+        .map(|known| order_status_name(known).to_owned())
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
