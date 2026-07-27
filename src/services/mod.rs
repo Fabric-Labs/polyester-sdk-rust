@@ -3,6 +3,7 @@
 mod api_keys;
 mod auth;
 mod balances;
+mod correlation_id;
 mod deposit_withdraw;
 mod market_data;
 mod orders;
