@@ -31,11 +31,28 @@ async fn balances_get_balance_history_optional() {
     .await;
 }
 
+/// Live confirmation that concurrent identical authenticated reads do not collide
+/// under server replay protection (monotonic signing timestamps).
+///
+/// CI regression lives in `auth` / `hardening` unit tests (10k identical signs).
+/// This test only proves the server accepts the distinct tuples. Probe with
+/// `call_optional` first so a missing Balances scope soft-skips like
+/// `balances_list_returns_or_skips` instead of panicking the suite red for a
+/// fixture gap (STRICT_LIVE still fails closed on that skip).
 #[tokio::test]
 async fn concurrent_identical_authenticated_reads_do_not_replay_collide() {
     let Some(client) = require_live_client() else {
         return;
     };
+    if call_optional("balances.list", || {
+        client.balances.list(GetBalancesRequest::default())
+    })
+    .await
+    .is_none()
+    {
+        return;
+    }
+
     let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(16));
     let mut tasks = tokio::task::JoinSet::new();
     for _ in 0..16 {
