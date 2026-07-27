@@ -185,6 +185,24 @@ impl HeatmapService {
     }
 }
 
+fn internal_transfer_amount_e18(
+    quantity: &crate::types::AssetAmount,
+    quantity_scale: Option<u32>,
+    asset_id: u32,
+) -> crate::errors::Result<crate::proto::polyester::r#type::v1::U128> {
+    use crate::codecs::scalars::{LEDGER_SCALE, i128_to_u128};
+    use crate::types::{QuantityDomain, resolve_asset_amount_scaled_with_input_scale};
+
+    let scaled = resolve_asset_amount_scaled_with_input_scale(
+        quantity,
+        quantity_scale,
+        LEDGER_SCALE,
+        QuantityDomain::LedgerE18,
+        Some(asset_id),
+    )?;
+    i128_to_u128(scaled)
+}
+
 impl InternalTransfersService {
     /// Create an internal transfer. Quantity must be an [`crate::types::AssetAmount`].
     pub async fn create(
@@ -194,12 +212,11 @@ impl InternalTransfersService {
         use super::scope;
         use super::unary;
         use crate::codecs::decode::internal_transfer_from_proto;
-        use crate::codecs::scalars::{LEDGER_SCALE, i128_to_u128, id_to_u64};
+        use crate::codecs::scalars::id_to_u64;
         use crate::errors::Error;
         use crate::proto::transfer::v1::{
             CreateInternalTransferRequest, create_internal_transfer_request::Destination,
         };
-        use crate::types::{QuantityDomain, resolve_asset_amount_scaled};
 
         let has_account = params
             .destination_account_id
@@ -224,13 +241,8 @@ impl InternalTransfersService {
             ));
         }
 
-        let scale = params.quantity_scale.unwrap_or(LEDGER_SCALE);
-        let scaled = resolve_asset_amount_scaled(
-            &params.quantity,
-            scale,
-            QuantityDomain::LedgerE18,
-            Some(params.asset_id),
-        )?;
+        let amount_e18 =
+            internal_transfer_amount_e18(&params.quantity, params.quantity_scale, params.asset_id)?;
         let mut req = CreateInternalTransferRequest {
             asset_id: params.asset_id,
             idempotency_key: params.idempotency_key,
@@ -238,7 +250,7 @@ impl InternalTransfersService {
                 .unwrap_or(0),
             ..Default::default()
         };
-        *req.amount_e18.get_or_insert_default() = i128_to_u128(scaled)?;
+        *req.amount_e18.get_or_insert_default() = amount_e18;
         if has_account {
             req.destination = Some(Destination::DestinationAccountId(id_to_u64(
                 params.destination_account_id.as_deref().unwrap(),
@@ -1855,8 +1867,24 @@ impl WhiteboardService {
 
 #[cfg(test)]
 mod tests {
+    use super::internal_transfer_amount_e18;
     use crate::models::CreateInternalTransferParams;
     use crate::types::{AssetAmount, QuantityDomain};
+
+    #[test]
+    fn internal_transfer_amount_is_always_exact_e18() {
+        let amount =
+            AssetAmount::from_scaled(125, Some(2), QuantityDomain::LedgerE18, Some(7)).unwrap();
+        let wire = internal_transfer_amount_e18(&amount, Some(2), 7).unwrap();
+        assert_eq!(
+            (u128::from(wire.hi) << 64) | u128::from(wire.lo),
+            1_250_000_000_000_000_000
+        );
+
+        let inexact =
+            AssetAmount::from_scaled(126, Some(19), QuantityDomain::LedgerE18, Some(7)).unwrap();
+        assert!(internal_transfer_amount_e18(&inexact, Some(19), 7).is_err());
+    }
 
     #[tokio::test]
     async fn internal_transfer_requires_destination_before_transport() {

@@ -151,7 +151,11 @@ pub struct ModifyOrderParams {
     pub new_client_order_id: Option<String>,
 }
 
-/// Price source for attached TP/SL/trailing trigger evaluation.
+/// Price source requested for trigger evaluation.
+///
+/// Attached order risk currently evaluates against last trade and cannot
+/// encode a caller-selected source. Standalone triggers expose their own
+/// supported semantics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TriggerPriceSourceKind {
     LastPrice,
@@ -163,6 +167,11 @@ pub enum TriggerPriceSourceKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RiskLeg {
     pub trigger_price: Price,
+    /// Deprecated for attached risk: any supplied value is rejected because
+    /// the wire contract always evaluates against last trade.
+    #[deprecated(
+        note = "attached risk always uses last trade; supplying trigger_price_source is rejected"
+    )]
     pub trigger_price_source: Option<TriggerPriceSourceKind>,
     pub order_type: Option<CreateOrderType>,
     pub limit_price: Option<Price>,
@@ -215,7 +224,8 @@ pub struct CreateInternalTransferParams {
     pub destination_account_id: Option<String>,
     pub destination_subaccount_id: Option<String>,
     pub destination_smart_account_address: Option<String>,
-    /// Override ledger scale (default 18).
+    /// Input quantity scale when `quantity` does not carry one. Wire
+    /// `amount_e18` is always rescaled exactly to 18 decimals.
     pub quantity_scale: Option<u32>,
 }
 
@@ -229,11 +239,31 @@ pub struct CreateTradingWithdrawParams {
     /// Stable key for this logical withdrawal. Persist it and reuse it for
     /// every retry; generating a new key per attempt defeats deduplication.
     pub idempotency_key: String,
-    /// Override ledger scale (default 18).
+    /// Input amount scale when `amount` does not carry one. Wire `amount_e18`
+    /// is always rescaled exactly to 18 decimals.
     pub amount_scale: Option<u32>,
+    /// Exact deadline covered by `payload_signature`. Required for this
+    /// precomputed-signature path.
     pub deadline_ts_sec: Option<u64>,
     /// Non-zero nonce included in the signed withdrawal payload.
     pub nonce: u128,
+}
+
+/// API-key trading-withdraw params for SDK-owned payload construction/signing.
+#[derive(Debug, Clone)]
+pub struct CreateApiKeyTradingWithdrawParams {
+    pub asset_id: u32,
+    pub amount: AssetAmount,
+    pub destination_address: String,
+    /// Stable key for this logical withdrawal.
+    pub idempotency_key: String,
+    /// Input amount scale when `amount` does not carry one. Wire `amount_e18`
+    /// is always rescaled exactly to 18 decimals.
+    pub amount_scale: Option<u32>,
+    /// Optional explicit deadline. The SDK uses now + five minutes when absent.
+    pub deadline_ts_sec: Option<u64>,
+    /// Optional explicit nonce. The SDK generates a secure non-zero nonce when absent.
+    pub nonce: Option<u128>,
 }
 
 /// Typed wallet trading-withdraw create params.
@@ -248,7 +278,11 @@ pub struct CreateWalletTradingWithdrawParams {
     pub destination_chain_id: u64,
     pub destination_address: String,
     pub subaccount_id: Option<u64>,
+    /// Input amount scale when `amount` does not carry one. Wire `amount_e18`
+    /// is always rescaled exactly to 18 decimals.
     pub amount_scale: Option<u32>,
+    /// Exact deadline covered by `payload_signature`. Required for this
+    /// precomputed-signature path.
     pub deadline_ts_sec: Option<u64>,
     /// Non-zero nonce included in the signed withdrawal payload.
     pub nonce: u128,

@@ -1,0 +1,5 @@
+error[E0616]: field `symbol` of struct `Price` is private
+ --> tests/ui/no_price_metadata_assignment.rs:6:11
+  |
+6 |     price.symbol = Some("ETH-USDT".into());
+  |           ^^^^^^ private field
