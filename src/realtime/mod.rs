@@ -11,7 +11,7 @@ use crate::errors::{Error, Result};
 use futures_util::{SinkExt, StreamExt};
 use rand_core::{OsRng, RngCore};
 use std::sync::{
-    Arc, Mutex, MutexGuard,
+    Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
     atomic::{AtomicBool, Ordering},
 };
 use tokio::sync::{mpsc, oneshot, watch};
@@ -38,6 +38,16 @@ type ErrorCallback = Arc<dyn Fn(Error) + Send + Sync>;
 pub(crate) fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex
         .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+pub(crate) fn read_unpoisoned<T>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
+    lock.read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+pub(crate) fn write_unpoisoned<T>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
+    lock.write()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
@@ -756,6 +766,19 @@ mod tests {
     fn is_private_channel_detects_prefix() {
         assert!(is_private_channel("private:spot:orders:acct:proto"));
         assert!(!is_private_channel("public:spot:market:trades:1:proto"));
+    }
+
+    #[test]
+    fn rwlock_helpers_recover_from_poison() {
+        let lock = RwLock::new(7u32);
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = lock.write().unwrap();
+            panic!("poison rwlock");
+        }));
+        assert!(lock.read().is_err());
+        assert_eq!(*read_unpoisoned(&lock), 7);
+        *write_unpoisoned(&lock) = 9;
+        assert_eq!(*read_unpoisoned(&lock), 9);
     }
 
     #[test]
