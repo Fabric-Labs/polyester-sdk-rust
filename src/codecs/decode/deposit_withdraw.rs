@@ -2,6 +2,7 @@
 
 use super::money::decode_asset_amount_u128;
 use crate::codecs::scalars::LEDGER_SCALE;
+use crate::errors::{Error, Result};
 use crate::models::{
     DepositAddress, DepositAddressesList, InternalTransferResult, WithdrawIntentResult,
 };
@@ -34,14 +35,18 @@ pub fn deposit_addresses_list_from_proto(
     }
 }
 
-pub fn create_deposit_address_from_proto(msg: &CreateDepositAddressResponse) -> DepositAddress {
-    msg.deposit_address
-        .as_option()
-        .map(deposit_address_from_proto)
-        .unwrap_or(DepositAddress {
-            chain_id: 0,
-            deposit_address: String::new(),
-        })
+pub fn create_deposit_address_from_proto(
+    msg: &CreateDepositAddressResponse,
+) -> Result<DepositAddress> {
+    let address = msg.deposit_address.as_option().ok_or_else(|| {
+        Error::transport("invalid CreateDepositAddress response: missing deposit_address")
+    })?;
+    if address.deposit_address.trim().is_empty() {
+        return Err(Error::transport(
+            "invalid CreateDepositAddress response: empty deposit address",
+        ));
+    }
+    Ok(deposit_address_from_proto(address))
 }
 
 pub fn withdraw_intent_from_proto(msg: &CreateTradingWithdrawResponse) -> WithdrawIntentResult {
@@ -103,6 +108,13 @@ mod tests {
         assert_eq!(list.addresses.len(), 1);
         assert_eq!(list.addresses[0].chain_id, 1);
         assert_eq!(list.addresses[0].deposit_address, "0xabc");
+    }
+
+    #[test]
+    fn create_deposit_address_rejects_missing_required_entity() {
+        let err = create_deposit_address_from_proto(&CreateDepositAddressResponse::default())
+            .expect_err("missing deposit address must fail closed");
+        assert!(err.to_string().contains("missing deposit_address"));
     }
 
     #[test]

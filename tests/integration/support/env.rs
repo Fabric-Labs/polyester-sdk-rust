@@ -2,6 +2,8 @@
 
 use std::path::PathBuf;
 
+static MUTATION_TEST_GUARD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 /// Load dotenv files if present (repo `.env`, then sibling Python SDK `.env`).
 pub fn load_dotenv() {
     if env_truthy("POLYESTER_TEST_DISABLE_DOTENV") {
@@ -45,6 +47,15 @@ pub fn require_mutation() -> bool {
         eprintln!("skip: Set POLYESTER_TEST_MUTATION=1 to run mutation tests");
         false
     }
+}
+
+/// Serialize state-changing live tests that share the configured account.
+///
+/// Cargo runs integration test functions concurrently by default. Without a
+/// shared guard, one test can consume another test's balance or invalidate its
+/// before/after reconciliation snapshot.
+pub async fn mutation_test_guard() -> tokio::sync::MutexGuard<'static, ()> {
+    MUTATION_TEST_GUARD.lock().await
 }
 
 /// Soft-skip unless `POLYESTER_TEST_FUNDED` is truthy.

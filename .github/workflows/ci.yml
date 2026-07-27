@@ -21,8 +21,8 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.ref_name || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust 1.88 toolchain
+        uses: dtolnay/rust-toolchain@1.88.0
         with:
           components: rustfmt, clippy
 
@@ -76,7 +76,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       # Required PR gate: unit/UI plus deterministic local HTTP/WS L2 tests.
       # Credentialed staging tests remain a separate fail-closed release job.

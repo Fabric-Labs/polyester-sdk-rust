@@ -20,8 +20,12 @@ pub fn spot_config_from_proto(msg: &GetSpotConfigResponse) -> SpotConfig {
     if let Some(pairs) = raw.get_mut("pairs").and_then(Value::as_array_mut) {
         for (pair, typed) in pairs.iter_mut().zip(&msg.pairs) {
             if let Some(object) = pair.as_object_mut() {
+                // Proto-JSON uses camelCase. Writing the snake_case alias as a
+                // second key makes serde reject the object as a duplicate field
+                // when consumers re-deserialize into generated PairConfig types.
+                object.remove("base_quantity_scale");
                 object.insert(
-                    "base_quantity_scale".to_owned(),
+                    "baseQuantityScale".to_owned(),
                     Value::from(typed.base_quantity_scale),
                 );
             }
@@ -141,41 +145,37 @@ pub fn candles_columns_from_proto(
     msg: &GetCandlesColumnsResponse,
     volume_scale: u32,
 ) -> Result<CandlesResult> {
+    let rows = msg.ts_sec.len();
+    let lengths = [
+        ("open", msg.open.len()),
+        ("high", msg.high.len()),
+        ("low", msg.low.len()),
+        ("close", msg.close.len()),
+        ("volume", msg.volume.len()),
+    ];
+    if lengths.iter().any(|(_, len)| *len != rows) {
+        return Err(Error::transport(format!(
+            "invalid GetCandlesColumns response lengths: ts_sec={rows}, open={}, high={}, low={}, close={}, volume={}",
+            msg.open.len(),
+            msg.high.len(),
+            msg.low.len(),
+            msg.close.len(),
+            msg.volume.len()
+        )));
+    }
+
     let timeframe = enum_value_timeframe(msg.timeframe);
     let symbol_id = msg.symbol_id;
-    let mut candles = Vec::with_capacity(msg.ts_sec.len());
+    let mut candles = Vec::with_capacity(rows);
     for (i, &ts) in msg.ts_sec.iter().enumerate() {
-        let volume = match msg.volume.get(i).copied() {
-            Some(v) => format_qty_scaled(v, volume_scale)
-                .map_err(|e| Error::validation(format!("candle volume scale invalid: {e}")))?,
-            None => String::new(),
-        };
+        let volume = format_qty_scaled(msg.volume[i], volume_scale)
+            .map_err(|e| Error::validation(format!("candle volume scale invalid: {e}")))?;
         candles.push(Candle {
             ts_sec: ts as i64,
-            open: msg
-                .open
-                .get(i)
-                .copied()
-                .map(format_price_ticks)
-                .unwrap_or_default(),
-            high: msg
-                .high
-                .get(i)
-                .copied()
-                .map(format_price_ticks)
-                .unwrap_or_default(),
-            low: msg
-                .low
-                .get(i)
-                .copied()
-                .map(format_price_ticks)
-                .unwrap_or_default(),
-            close: msg
-                .close
-                .get(i)
-                .copied()
-                .map(format_price_ticks)
-                .unwrap_or_default(),
+            open: format_price_ticks(msg.open[i]),
+            high: format_price_ticks(msg.high[i]),
+            low: format_price_ticks(msg.low[i]),
+            close: format_price_ticks(msg.close[i]),
             volume,
             symbol_id,
             timeframe: timeframe.clone(),
@@ -233,7 +233,11 @@ mod tests {
             ..Default::default()
         };
         let spot = spot_config_from_proto(&msg);
-        assert_eq!(spot.raw["pairs"][0]["base_quantity_scale"], 0);
+        assert_eq!(spot.raw["pairs"][0]["baseQuantityScale"], 0);
+        assert!(spot.raw["pairs"][0].get("base_quantity_scale").is_none());
+        let round_trip: GetSpotConfigResponse =
+            serde_json::from_value(spot.raw.clone()).expect("spot config round-trip");
+        assert_eq!(round_trip.pairs[0].base_quantity_scale, 0);
     }
 
     #[test]
@@ -299,10 +303,33 @@ mod tests {
             symbol_id: 1,
             timeframe: Timeframe::Min1.into(),
             ts_sec: vec![10],
+            open: vec![1],
+            high: vec![1],
+            low: vec![1],
+            close: vec![1],
             volume: vec![1],
             ..Default::default()
         };
         let err = candles_columns_from_proto(&msg, 65535).expect_err("invalid scale");
         assert!(err.to_string().to_ascii_lowercase().contains("scale"));
+    }
+
+    #[test]
+    fn candles_columns_rejects_short_parallel_arrays() {
+        let msg = GetCandlesColumnsResponse {
+            symbol_id: 1,
+            timeframe: Timeframe::Min1.into(),
+            ts_sec: vec![10, 20],
+            open: vec![1, 2],
+            high: vec![1],
+            low: vec![1, 2],
+            close: vec![1, 2],
+            volume: vec![1, 2],
+            ..Default::default()
+        };
+        let err = candles_columns_from_proto(&msg, 8)
+            .expect_err("misaligned columnar response must fail closed");
+        assert!(err.to_string().contains("response lengths"));
+        assert!(err.to_string().contains("high=1"));
     }
 }

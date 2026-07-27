@@ -19,6 +19,7 @@ async fn spot_fill() {
     if !require_mutation() {
         return;
     }
+    let _mutation_guard = crate::support::mutation_test_guard().await;
     if !require_funded() {
         return;
     }
