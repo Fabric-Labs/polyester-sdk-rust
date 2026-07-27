@@ -15,20 +15,22 @@ use crate::models::{
     BatchModifyItem, BatchModifyOrdersResult, CancelAllAfterResult, CancelAllOpts,
     CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType, CreateSide,
     CreateTimeInForce, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts, ListOrderHistoryOpts,
-    MaxSlippage, ModifyOrderParams, ModifyOrderResult, Order, OrderMutationResult, OrdersList,
-    RiskLeg, TrailingDistance, TrailingStop, UserTrade, UserTradesList,
+    MaxSlippage, ModifyOrderParams, ModifyOrderResult, Order, OrderFeeSource, OrderMutationResult,
+    OrderSelfTradePrevention, OrdersList, RiskLeg, TrailingDistance, TrailingStop, UserTrade,
+    UserTradesList,
 };
 use crate::proto::orders::v1::{
     BatchCancelItem as ProtoBatchCancelItem, BatchCancelOrdersRequest, BatchCreateOrdersRequest,
     BatchModifyItem as ProtoBatchModifyItem, BatchModifyOrdersRequest, CancelAllAfterRequest,
-    CancelAllOrdersRequest, CancelOrderRequest, CreateOrderRequest, GetOpenOrdersRequest,
-    GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, LimitFok, LimitGtc, LimitIoc,
-    MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, RiskExecution, RiskLimitGtc,
-    RiskPolicy, Side, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy, batch_modify_item,
-    cancel_order_request, get_order_request, modify_order_request, order_intent, risk_execution,
-    risk_policy, trailing_stop_policy,
+    CancelAllOrdersRequest, CancelOrderRequest, CreateOrderRequest, FeeSource,
+    GetOpenOrdersRequest, GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, LimitFok,
+    LimitGtc, LimitIoc, MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, RiskExecution,
+    RiskLimitGtc, RiskPolicy, SelfTradePreventionMode, Side, StopLossPolicy, TakeProfitPolicy,
+    TrailingStopPolicy, batch_modify_item, cancel_order_request, get_order_request, market_ioc,
+    modify_order_request, order_intent, risk_execution, risk_policy, trailing_stop_policy,
 };
 use crate::types::{Price, Quantity, resolve_price_ticks, resolve_qty_scaled};
+use rand_core::{OsRng, RngCore};
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -253,9 +255,33 @@ impl OrdersService {
             },
             ..Default::default()
         };
-        if let Some(id) = params.client_order_id.as_ref() {
-            intent.client_order_id = id.clone();
+        if let Some(client_order_id) = params
+            .client_order_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            intent.client_order_id = client_order_id.to_owned();
         }
+        intent.fee_source = match params.fee_source.unwrap_or(OrderFeeSource::Quote) {
+            OrderFeeSource::Quote => FeeSource::Quote.into(),
+            OrderFeeSource::Received if matches!(params.side, CreateSide::Buy) => {
+                FeeSource::Received.into()
+            }
+            OrderFeeSource::Received => {
+                return Err(Error::validation(
+                    "fee_source=received is only valid for BUY orders",
+                ));
+            }
+        };
+        intent.self_trade_prevention_mode = match params
+            .self_trade_prevention
+            .unwrap_or(OrderSelfTradePrevention::ExpireMaker)
+        {
+            OrderSelfTradePrevention::ExpireTaker => SelfTradePreventionMode::ExpireTaker.into(),
+            OrderSelfTradePrevention::ExpireMaker => SelfTradePreventionMode::ExpireMaker.into(),
+            OrderSelfTradePrevention::ExpireBoth => SelfTradePreventionMode::ExpireBoth.into(),
+        };
         let post_only = params.post_only.unwrap_or(false);
         intent.execution = Some(match params.order_type {
             CreateOrderType::Market => {
@@ -269,6 +295,18 @@ impl OrdersService {
                     market.client_ref_price_ticks =
                         resolve_price_ticks(ref_price, Some(&params.symbol))?;
                 }
+                market.max_slippage = match params.market_max_slippage {
+                    Some(MaxSlippage::Ticks(value)) if value > 0 => {
+                        Some(market_ioc::MaxSlippage::MaxSlippageTicks(value))
+                    }
+                    Some(MaxSlippage::Bps(value)) if value > 0 => {
+                        Some(market_ioc::MaxSlippage::MaxSlippageBps(value))
+                    }
+                    Some(_) => {
+                        return Err(Error::validation("market_max_slippage must be positive"));
+                    }
+                    None => None,
+                };
                 order_intent::Execution::MarketIoc(Box::new(market))
             }
             CreateOrderType::Limit => {
@@ -432,14 +470,29 @@ impl OrdersService {
         Ok(proto)
     }
 
-    fn request_id(prefix: &str) -> String {
-        format!(
-            "{prefix}-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        )
+    /// Generate a cryptographically random mutation request id (`prefix-<12 hex chars>`).
+    ///
+    /// Matches Go/Python (`cancel-all-<hex>`, `mod-<hex>`, …) and TypeScript (UUID when omitted):
+    /// generate once per logical mutation. For retries after an ambiguous failure, provide and
+    /// reuse a caller-owned stable `request_id` instead of calling this again — a blind retry
+    /// that omits `request_id` mints a *new* id and is not an idempotent replay.
+    fn new_mutation_request_id(prefix: &str) -> Result<String> {
+        let mut random = [0_u8; 6];
+        OsRng
+            .try_fill_bytes(&mut random)
+            .map_err(|err| Error::transport(format!("secure randomness unavailable: {err}")))?;
+        Ok(format!("{prefix}-{}", hex::encode(random)))
+    }
+
+    /// Prefer a trimmed caller-provided request id; otherwise generate one (TS/Go/Python parity).
+    fn coalesce_request_id(value: Option<String>, prefix: &str) -> Result<String> {
+        if let Some(id) = value {
+            let trimmed = id.trim();
+            if !trimmed.is_empty() {
+                return Ok(trimmed.to_owned());
+            }
+        }
+        Self::new_mutation_request_id(prefix)
     }
 
     fn modify_behavior(label: &str) -> Result<ModifyBehavior> {
@@ -478,7 +531,7 @@ impl OrdersService {
         )?;
         let mut req = ModifyOrderRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
-            request_id: params.request_id.unwrap_or_else(|| Self::request_id("mod")),
+            request_id: Self::coalesce_request_id(params.request_id, "mod")?,
             ..Default::default()
         };
         if has_order {
@@ -528,9 +581,13 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(order_mutation_from_create(&resp))
+        order_mutation_from_create(&resp)
     }
 
+    /// Batch-create orders.
+    ///
+    /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
+    /// non-empty value when retrying the same logical batch — omitting it on retry mints a new id.
     pub async fn batch_create(
         &self,
         items: Vec<CreateOrderParams>,
@@ -547,7 +604,7 @@ impl OrdersService {
         }
         let req = BatchCreateOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
-            request_id: request_id.unwrap_or_else(|| Self::request_id("batch-create")),
+            request_id: Self::coalesce_request_id(request_id, "batch-create")?,
             items: encoded,
             ..Default::default()
         };
@@ -563,6 +620,10 @@ impl OrdersService {
         batch_create_from_proto(&resp)
     }
 
+    /// Batch-cancel orders.
+    ///
+    /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
+    /// non-empty value when retrying the same logical batch — omitting it on retry mints a new id.
     pub async fn batch_cancel(
         &self,
         items: Vec<BatchCancelItem>,
@@ -595,7 +656,7 @@ impl OrdersService {
         }
         let req = BatchCancelOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
-            request_id: request_id.unwrap_or_else(|| Self::request_id("batch-cancel")),
+            request_id: Self::coalesce_request_id(request_id, "batch-cancel")?,
             items: proto_items,
             ..Default::default()
         };
@@ -611,6 +672,10 @@ impl OrdersService {
         batch_cancel_from_proto(&resp)
     }
 
+    /// Batch-modify orders.
+    ///
+    /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
+    /// non-empty value when retrying the same logical batch — omitting it on retry mints a new id.
     pub async fn batch_modify(
         &self,
         items: Vec<BatchModifyItem>,
@@ -679,7 +744,7 @@ impl OrdersService {
         }
         let mut req = BatchModifyOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
-            request_id: request_id.unwrap_or_else(|| Self::request_id("batch-mod")),
+            request_id: Self::coalesce_request_id(request_id, "batch-mod")?,
             items: proto_items,
             allow_partial,
             ..Default::default()
@@ -699,6 +764,10 @@ impl OrdersService {
         batch_modify_from_proto(&resp)
     }
 
+    /// Schedules cancel-all-after for the account scope.
+    ///
+    /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
+    /// non-empty value when retrying the same logical cancel-all-after.
     pub async fn cancel_all_after(
         &self,
         timeout_sec: u32,
@@ -710,7 +779,7 @@ impl OrdersService {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
             timeout_sec,
             symbol: symbol.unwrap_or("").to_owned(),
-            request_id: request_id.unwrap_or_else(|| Self::request_id("cancel-after")),
+            request_id: Self::coalesce_request_id(request_id, "cancel-after")?,
             ..Default::default()
         };
         let client = self.write_client();
@@ -735,7 +804,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(order_mutation_from_cancel(&resp))
+        order_mutation_from_cancel(&resp)
     }
 
     pub async fn cancel_with(&self, params: CancelOrderParams) -> Result<OrderMutationResult> {
@@ -805,6 +874,10 @@ impl OrdersService {
         .await
     }
 
+    /// Cancels all matching open orders for the account scope (optional symbol / dry-run).
+    ///
+    /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
+    /// non-empty value via [`cancel_all_with`] when retrying the same logical bulk cancellation.
     pub async fn cancel_all(
         &self,
         symbol: Option<&str>,
@@ -820,14 +893,16 @@ impl OrdersService {
         .await
     }
 
+    /// Cancels all matching open orders with full options.
+    ///
+    /// A `request_id` is generated when omitted or blank. Provide a stable non-empty value when
+    /// retrying the same logical bulk cancellation.
     pub async fn cancel_all_with(&self, opts: CancelAllOpts) -> Result<CancelAllOrdersResult> {
         let mut req = CancelAllOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol: opts.symbol.unwrap_or_default(),
             dry_run: opts.dry_run,
-            request_id: opts
-                .request_id
-                .unwrap_or_else(|| Self::request_id("sdk-cancel-all")),
+            request_id: Self::coalesce_request_id(opts.request_id, "cancel-all")?,
             ..Default::default()
         };
         if let Some(side) = opts.side.as_deref() {
@@ -854,6 +929,10 @@ impl OrdersService {
     }
 
     /// Modify an order. `new_price` / `new_qty` must be `Price` / `Quantity` wrappers.
+    ///
+    /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
+    /// non-empty value when retrying the same logical modification — omitting it on retry mints a
+    /// new id and is not an idempotent replay.
     pub async fn modify(&self, params: ModifyOrderParams) -> Result<ModifyOrderResult> {
         self.ctx.wait_for_catalogs().await?;
         let req = self.encode_modify_params(params)?;
@@ -866,7 +945,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(modify_order_from_proto(&resp))
+        modify_order_from_proto(&resp)
     }
 
     pub fn create_params(
@@ -875,7 +954,12 @@ impl OrdersService {
         order_type: CreateOrderType,
         quantity: Quantity,
         price: Option<Price>,
+        client_order_id: Option<&str>,
     ) -> CreateOrderParams {
+        let client_order_id = client_order_id
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_owned());
         CreateOrderParams {
             symbol: symbol.into(),
             side,
@@ -883,10 +967,13 @@ impl OrdersService {
             quantity,
             price,
             time_in_force: None,
-            client_order_id: None,
+            client_order_id,
             subaccount_id: None,
             post_only: None,
             market_client_ref_price: None,
+            fee_source: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
             attached_risk: None,
         }
     }
@@ -1058,6 +1145,9 @@ mod tests {
             subaccount_id: None,
             post_only: Some(true),
             market_client_ref_price: None,
+            fee_source: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
             attached_risk: None,
         }
     }
@@ -1228,6 +1318,100 @@ mod tests {
         modify.new_attached_risk = Some(risk);
         let modify_wire = client.orders.encode_modify_params(modify).unwrap();
         assert!(modify_wire.new_attached_risk.is_set());
+    }
+
+    #[test]
+    fn create_allows_omitted_client_order_id_and_encodes_market_maker_controls() {
+        let client = client();
+        let mut params = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        params.client_order_id = None;
+        let omitted = client.orders.encode_create_params(&params).unwrap();
+        assert!(
+            omitted
+                .order
+                .as_option()
+                .unwrap()
+                .client_order_id
+                .is_empty()
+        );
+
+        params.client_order_id = Some(" ".into());
+        let whitespace = client.orders.encode_create_params(&params).unwrap();
+        assert!(
+            whitespace
+                .order
+                .as_option()
+                .unwrap()
+                .client_order_id
+                .is_empty()
+        );
+
+        params.client_order_id = Some("mm-create-1".into());
+        params.order_type = CreateOrderType::Market;
+        params.price = None;
+        params.post_only = None;
+        params.fee_source = Some(OrderFeeSource::Received);
+        params.self_trade_prevention = Some(OrderSelfTradePrevention::ExpireBoth);
+        params.market_max_slippage = Some(MaxSlippage::Bps(25));
+        let wire = client.orders.encode_create_params(&params).unwrap();
+        let intent = wire.order.as_option().unwrap();
+        assert_eq!(intent.fee_source.as_known(), Some(FeeSource::Received));
+        assert_eq!(
+            intent.self_trade_prevention_mode.as_known(),
+            Some(SelfTradePreventionMode::ExpireBoth)
+        );
+        let Some(order_intent::Execution::MarketIoc(market)) = intent.execution.as_ref() else {
+            panic!("expected market execution");
+        };
+        assert!(matches!(
+            market.max_slippage,
+            Some(market_ioc::MaxSlippage::MaxSlippageBps(25))
+        ));
+
+        params.market_max_slippage = Some(MaxSlippage::Ticks(0));
+        assert!(client.orders.encode_create_params(&params).is_err());
+    }
+
+    #[test]
+    fn mutation_request_ids_are_generated_when_omitted_like_go_python_typescript() {
+        for prefix in [
+            "cancel-all",
+            "cancel-after",
+            "mod",
+            "batch-create",
+            "batch-cancel",
+            "batch-mod",
+        ] {
+            let generated = OrdersService::coalesce_request_id(None, prefix).unwrap();
+            assert!(
+                generated.starts_with(&format!("{prefix}-")),
+                "unexpected generated id for {prefix}: {generated}"
+            );
+            assert_eq!(generated.len(), prefix.len() + 1 + 12);
+
+            let blank = OrdersService::coalesce_request_id(Some("  ".into()), prefix).unwrap();
+            assert!(blank.starts_with(&format!("{prefix}-")));
+            assert_ne!(generated, blank);
+        }
+
+        assert_eq!(
+            OrdersService::coalesce_request_id(Some(" retry-mod-1 ".into()), "mod").unwrap(),
+            "retry-mod-1"
+        );
+        assert_eq!(
+            OrdersService::coalesce_request_id(Some("same-retry".into()), "batch-create").unwrap(),
+            "same-retry"
+        );
     }
 
     #[test]

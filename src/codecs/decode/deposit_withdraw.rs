@@ -49,27 +49,44 @@ pub fn create_deposit_address_from_proto(
     Ok(deposit_address_from_proto(address))
 }
 
-pub fn withdraw_intent_from_proto(msg: &CreateTradingWithdrawResponse) -> WithdrawIntentResult {
-    WithdrawIntentResult {
+pub fn withdraw_intent_from_proto(
+    msg: &CreateTradingWithdrawResponse,
+) -> Result<WithdrawIntentResult> {
+    if msg.intent_id.trim().is_empty() {
+        return Err(Error::transport(
+            "invalid CreateTradingWithdraw response: missing intent_id",
+        ));
+    }
+    Ok(WithdrawIntentResult {
         intent_id: msg.intent_id.clone(),
         status: String::new(),
         flow_id: String::new(),
-    }
+    })
 }
 
 pub fn withdraw_intent_from_wallet_proto(
     msg: &CreateWalletTradingWithdrawResponse,
-) -> WithdrawIntentResult {
-    WithdrawIntentResult {
+) -> Result<WithdrawIntentResult> {
+    if msg.intent_id.trim().is_empty() {
+        return Err(Error::transport(
+            "invalid CreateWalletTradingWithdraw response: missing intent_id",
+        ));
+    }
+    Ok(WithdrawIntentResult {
         intent_id: msg.intent_id.clone(),
         status: String::new(),
         flow_id: String::new(),
-    }
+    })
 }
 
 pub fn internal_transfer_from_proto(
     msg: &CreateInternalTransferResponse,
-) -> InternalTransferResult {
+) -> Result<InternalTransferResult> {
+    if msg.request_id.trim().is_empty() || msg.transfer_id.trim().is_empty() {
+        return Err(Error::transport(
+            "invalid CreateInternalTransfer response: missing request_id or transfer_id",
+        ));
+    }
     let asset_id = msg.asset_id;
     let quantity = msg.amount_e18.as_option().and_then(|u| {
         decode_asset_amount_u128(
@@ -80,13 +97,13 @@ pub fn internal_transfer_from_proto(
             Some(asset_id),
         )
     });
-    InternalTransferResult {
+    Ok(InternalTransferResult {
         request_id: msg.request_id.clone(),
         transfer_id: msg.transfer_id.clone(),
         asset_id,
         asset_code: msg.asset_code.clone(),
         quantity,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -132,7 +149,7 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        let result = internal_transfer_from_proto(&msg);
+        let result = internal_transfer_from_proto(&msg).unwrap();
         assert_eq!(result.request_id, "req");
         assert_eq!(result.transfer_id, "xfer");
         assert_eq!(result.asset_id, 7);
@@ -148,6 +165,19 @@ mod tests {
             intent_id: "intent-1".into(),
             ..Default::default()
         };
-        assert_eq!(withdraw_intent_from_proto(&msg).intent_id, "intent-1");
+        assert_eq!(
+            withdraw_intent_from_proto(&msg).unwrap().intent_id,
+            "intent-1"
+        );
+    }
+
+    #[test]
+    fn singular_mutations_reject_empty_success_responses() {
+        assert!(withdraw_intent_from_proto(&CreateTradingWithdrawResponse::default()).is_err());
+        assert!(
+            withdraw_intent_from_wallet_proto(&CreateWalletTradingWithdrawResponse::default())
+                .is_err()
+        );
+        assert!(internal_transfer_from_proto(&CreateInternalTransferResponse::default()).is_err());
     }
 }

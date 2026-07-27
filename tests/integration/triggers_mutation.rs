@@ -80,7 +80,7 @@ async fn trigger_pause_resume_cancel() {
         trigger_price_source: None,
         time_in_force: None,
         subaccount_id: None,
-        client_trigger_id: Some(client_trigger_id.clone()),
+        client_trigger_id: client_trigger_id.clone(),
         post_only: false,
         activation_price: None,
         trailing_distance_ticks: None,

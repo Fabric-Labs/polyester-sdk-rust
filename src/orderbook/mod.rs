@@ -7,6 +7,7 @@ pub use subscription::Subscription;
 use std::collections::BTreeMap;
 
 use crate::codecs::decode::{decode_price_ticks, decode_qty_scaled};
+use crate::errors::{Error, Result};
 use crate::models::{OrderBookDeltaUpdate, OrderbookData, OrderbookLevel};
 
 pub type BookSide = BTreeMap<i64, i64>; // price_ticks -> qty_scaled
@@ -21,28 +22,44 @@ pub fn apply_side_delta(book: &mut BookSide, pairs: &[(i64, i64)]) {
     }
 }
 
-/// Parse a bucket string into tick size. Empty/invalid → `0` (no bucketing).
-pub fn parse_bucket_ticks(bucket: &str) -> i64 {
-    if bucket.is_empty() {
-        return 0;
+/// Parse a bucket string into a positive tick size. Empty means no bucketing.
+pub fn parse_bucket_ticks(bucket: &str) -> Result<i64> {
+    if bucket.trim().is_empty() {
+        return Ok(0);
     }
-    crate::codecs::scalars::parse_price_ticks_str(bucket, "bucket").unwrap_or(0)
+    let ticks = crate::codecs::scalars::parse_price_ticks_str(bucket, "bucket")?;
+    if ticks <= 0 {
+        return Err(Error::validation(
+            "bucket must be a positive price increment",
+        ));
+    }
+    Ok(ticks)
 }
 
-/// Aggregate levels into price buckets. `bucket_ticks <= 0` returns `book` unchanged.
-pub fn bucket_side(book: &BookSide, bucket_ticks: i64) -> BookSide {
+/// Aggregate levels into executable-side-safe price buckets.
+///
+/// Bids round down; asks round up so displayed asks never appear below their
+/// executable price.
+pub fn bucket_side(book: &BookSide, bucket_ticks: i64, asks: bool) -> Result<BookSide> {
     if bucket_ticks <= 0 {
-        return book.clone();
+        return Ok(book.clone());
     }
     let mut out = BookSide::new();
     for (&price, &qty) in book {
         if qty <= 0 {
             continue;
         }
-        let bucket = (price / bucket_ticks) * bucket_ticks;
+        let floor = price.div_euclid(bucket_ticks) * bucket_ticks;
+        let bucket = if asks && price.rem_euclid(bucket_ticks) != 0 {
+            floor
+                .checked_add(bucket_ticks)
+                .ok_or_else(|| Error::validation("ask bucket price overflow"))?
+        } else {
+            floor
+        };
         *out.entry(bucket).or_insert(0) += qty;
     }
-    out
+    Ok(out)
 }
 
 /// Build a book side from `(price_ticks, qty_scaled)` pairs (zero qty skipped).
@@ -116,8 +133,8 @@ fn side_to_levels(
     bucket_ticks: i64,
     symbol: &str,
     quantity_scale: u32,
-) -> Vec<OrderbookLevel> {
-    let view = bucket_side(book, bucket_ticks);
+) -> Result<Vec<OrderbookLevel>> {
+    let view = bucket_side(book, bucket_ticks, side == "asks")?;
     let mut entries: Vec<(i64, i64)> = view.into_iter().collect();
     if side == "bids" {
         entries.sort_by_key(|b| std::cmp::Reverse(b.0));
@@ -126,14 +143,14 @@ fn side_to_levels(
     }
     let limit = limit.min(entries.len());
     let symbol = Some(symbol.to_owned());
-    entries
+    Ok(entries
         .into_iter()
         .take(limit)
         .map(|(price, qty)| OrderbookLevel {
             price: decode_price_ticks(price, symbol.clone()),
             qty: decode_qty_scaled(qty, Some(quantity_scale), symbol.clone(), None),
         })
-        .collect()
+        .collect())
 }
 
 /// Render the current in-memory book as [`OrderbookData`].
@@ -145,15 +162,15 @@ pub fn build_orderbook_data(
     asks: &BookSide,
     bucket_ticks: i64,
     quantity_scale: u32,
-) -> OrderbookData {
+) -> Result<OrderbookData> {
     let limit = depth as usize;
-    OrderbookData {
+    Ok(OrderbookData {
         symbol: symbol.to_owned(),
         depth,
         book_seq: book_seq.to_string(),
-        bids: side_to_levels(bids, "bids", limit, bucket_ticks, symbol, quantity_scale),
-        asks: side_to_levels(asks, "asks", limit, bucket_ticks, symbol, quantity_scale),
-    }
+        bids: side_to_levels(bids, "bids", limit, bucket_ticks, symbol, quantity_scale)?,
+        asks: side_to_levels(asks, "asks", limit, bucket_ticks, symbol, quantity_scale)?,
+    })
 }
 
 #[cfg(test)]
@@ -280,20 +297,25 @@ mod tests {
     #[test]
     fn bucket_side_aggregates() {
         let book = BookSide::from([(101, 2), (105, 3)]);
-        let bucketed = bucket_side(&book, 10);
+        let bucketed = bucket_side(&book, 10, false).unwrap();
         assert_eq!(bucketed.get(&100), Some(&5));
+        let asks = bucket_side(&book, 10, true).unwrap();
+        assert_eq!(asks.get(&110), Some(&5));
+        assert!(bucket_side(&BookSide::from([(i64::MAX, 1)]), 10, true).is_err());
     }
 
     #[test]
     fn parse_bucket_ticks_empty_is_zero() {
-        assert_eq!(parse_bucket_ticks(""), 0);
+        assert_eq!(parse_bucket_ticks("").unwrap(), 0);
+        assert!(parse_bucket_ticks("nope").is_err());
+        assert!(parse_bucket_ticks("-1").is_err());
     }
 
     #[test]
     fn build_orderbook_data_sorts_and_limits() {
         let bids = BookSide::from([(100, 1), (110, 2), (120, 3)]);
         let asks = BookSide::from([(200, 4), (210, 5)]);
-        let data = build_orderbook_data("BTC-USDT", 2, 7, &bids, &asks, 0, 8);
+        let data = build_orderbook_data("BTC-USDT", 2, 7, &bids, &asks, 0, 8).unwrap();
         assert_eq!(data.book_seq, "7");
         assert_eq!(data.bids.len(), 2);
         assert_eq!(data.bids[0].price.as_ref().unwrap().as_ticks(), 120);

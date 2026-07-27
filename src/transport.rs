@@ -132,6 +132,29 @@ impl Factory {
         }
         Ok(opts)
     }
+
+    /// Async variant used by SDK network calls so timestamp-capacity
+    /// backpressure never blocks a Tokio worker thread.
+    pub async fn sign_options_async<M: Message + Serialize>(
+        &self,
+        procedure: &str,
+        request: &M,
+    ) -> Result<CallOptions> {
+        let creds = self.require_credentials()?;
+        let body = match self.config.wire_format {
+            WireFormat::Binary => request.encode_to_bytes(),
+            WireFormat::Json => connectrpc::JsonCodec::encode(request).map_err(Self::map_error)?,
+        };
+        let sign_url = auth::request_url(&self.config.api_url, procedure);
+        let headers = creds
+            .sign_request_async("POST", &sign_url, &body, None)
+            .await?;
+        let mut opts = CallOptions::default();
+        for (k, v) in headers {
+            opts = opts.with_header(k, v);
+        }
+        Ok(opts)
+    }
 }
 
 fn build_http_client(api_url: &str) -> Result<HttpClient> {

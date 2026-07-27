@@ -26,6 +26,6 @@ where
     M: Message + Serialize,
     Fut: Future<Output = std::result::Result<UnaryResponse<R>, ConnectError>>,
 {
-    let opts = factory.sign_options(procedure, &request)?;
+    let opts = factory.sign_options_async(procedure, &request).await?;
     call(request, opts).await.map_err(Factory::map_error)
 }

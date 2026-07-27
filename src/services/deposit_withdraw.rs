@@ -259,7 +259,7 @@ impl WithdrawService {
         )
         .await?
         .into_owned();
-        Ok(withdraw_intent_from_proto(&resp))
+        withdraw_intent_from_proto(&resp)
     }
 
     /// Wallet-signed trading withdraw. Amount must be an [`AssetAmount`].
@@ -310,7 +310,7 @@ impl WithdrawService {
         )
         .await?
         .into_owned();
-        Ok(withdraw_intent_from_wallet_proto(&resp))
+        withdraw_intent_from_wallet_proto(&resp)
     }
 }
 

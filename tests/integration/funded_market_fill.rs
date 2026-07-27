@@ -133,6 +133,9 @@ async fn market_order_fill() {
         subaccount_id: None,
         post_only: Some(true),
         market_client_ref_price: None,
+        fee_source: None,
+        self_trade_prevention: None,
+        market_max_slippage: None,
         attached_risk: None,
     };
     match maker.orders.create(maker_params).await {
@@ -160,6 +163,9 @@ async fn market_order_fill() {
         market_client_ref_price: Some(
             Price::from_decimal_str(&ref_price, Some(symbol.clone())).expect("ref"),
         ),
+        fee_source: None,
+        self_trade_prevention: None,
+        market_max_slippage: None,
         attached_risk: None,
     };
     match client.orders.create(taker_params).await {
