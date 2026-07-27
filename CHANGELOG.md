@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.1.0a18
+
+Package version: `0.1.0-alpha.18`. Git tag: `v0.1.0a18`.
+
+### Breaking
+- Public `cancel_all_from_proto` and `cancel_all_after_from_proto` codecs now return `Result` so callers must handle malformed success responses.
+
+### Fixed
+- Catalog `RwLock` reads and writes recover from poisoning instead of panicking on write or treating a poisoned lock as a missing symbol/scale on read.
+- `client_order_id`, `new_client_order_id`, `client_trigger_id`, and caller-supplied `request_id` values are validated locally (ASCII charset; 1-36 / 1-64 length) and rejected with `Error::Validation` before the request is sent.
+- Local orderbook bucketing uses checked multiply/add and rejects negative prices/quantities instead of overflowing or emitting levels with missing fields.
+- `CancelAll` / `CancelAllAfter` response decoding rejects empty or unknown statuses (`submitted`/`dry_run`, `armed`/`disabled`) instead of returning `Ok` for ambiguous success payloads.
+
+### Testing
+- Catalog unit coverage poisons the manager lock and asserts hydrated scale/identity lookups and subsequent hydrates still succeed.
+- Hardening coverage asserts invalid correlation ids fail closed as `Error::Validation` without contacting Connect.
+- Signing capacity unit coverage no longer races the wall clock between seed and allocation.
+- Hardening coverage asserts empty/unknown cancel-all and cancel-all-after statuses fail closed through the public service.
+
 ## 0.1.0a17
 
 Package version: `0.1.0-alpha.17`. Git tag: `v0.1.0a17`.

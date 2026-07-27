@@ -538,10 +538,11 @@ mod tests {
     #[test]
     fn synchronous_signing_capacity_returns_retryable_error_without_sleeping() {
         let allocator = SigningTimestampAllocator::default();
-        let now = timestamp_ms_from(SystemTime::now()).unwrap();
+        // Seed far beyond the skew ceiling so wall-clock advance between store
+        // and next() cannot reopen capacity under parallel CI load.
         allocator
             .last_timestamp_ms
-            .store(now + MAX_SIGNING_FUTURE_SKEW_MS, Ordering::Release);
+            .store(u64::MAX - 2, Ordering::Release);
         let started = Instant::now();
         let error = allocator.next().unwrap_err();
         assert!(matches!(error, Error::RateLimit { .. }));

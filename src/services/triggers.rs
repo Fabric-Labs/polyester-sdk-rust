@@ -1,4 +1,5 @@
 use super::ServiceContext;
+use super::correlation_id::require_client_style_id;
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
@@ -125,12 +126,8 @@ impl TriggersService {
             qty_scaled: qty,
             ..Default::default()
         };
-        if params.client_trigger_id.trim().is_empty() {
-            return Err(Error::validation(
-                "client_trigger_id is required and must remain stable across retries",
-            ));
-        }
-        intent.client_trigger_id = params.client_trigger_id.clone();
+        intent.client_trigger_id =
+            require_client_style_id(&params.client_trigger_id, "client_trigger_id")?;
         if let Some(src) = params.fee_source.as_deref() {
             intent.fee_source = Self::fee_source(src)?.into();
         }
