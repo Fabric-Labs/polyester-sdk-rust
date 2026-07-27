@@ -53,6 +53,10 @@ pub struct UserTrade {
     pub price: Option<Price>,
     pub qty: Option<Quantity>,
     pub fee_scaled: String,
+    /// Asset used to pay the fee: `quote`, `received`, or an
+    /// `UNKNOWN(<number>)` forward-compatible enum value.
+    pub fee_source: String,
+    pub referral_share_scaled: String,
     pub ts_ns: String,
 }
 
@@ -73,9 +77,9 @@ pub struct ModifyOrderResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CancelAllOrdersResult {
     pub status: String,
-    pub matched_orders: i32,
-    pub submitted_cancels: i32,
-    pub failed_cancels: i32,
+    pub matched_orders: u32,
+    pub submitted_cancels: u32,
+    pub failed_cancels: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -89,8 +93,8 @@ pub struct BatchCreateResultItem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchCreateOrdersResult {
     pub results: Vec<BatchCreateResultItem>,
-    pub accepted_count: i32,
-    pub rejected_count: i32,
+    pub accepted_count: u32,
+    pub rejected_count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,8 +115,8 @@ pub struct BatchCancelResultItem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchCancelOrdersResult {
     pub results: Vec<BatchCancelResultItem>,
-    pub accepted_count: i32,
-    pub rejected_count: i32,
+    pub accepted_count: u32,
+    pub rejected_count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -255,9 +259,9 @@ pub struct BatchModifyResultItem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchModifyOrdersResult {
     pub results: Vec<BatchModifyResultItem>,
-    pub amended_count: i32,
-    pub replaced_count: i32,
-    pub rejected_count: i32,
+    pub amended_count: u32,
+    pub replaced_count: u32,
+    pub rejected_count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

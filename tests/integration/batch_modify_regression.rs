@@ -54,7 +54,7 @@ fn assert_complete_batch_result(
     );
     assert_eq!(
         result.amended_count + result.replaced_count,
-        BATCH_SIZE as i32,
+        BATCH_SIZE as u32,
         "round {round}: amended+replaced={} != {BATCH_SIZE}",
         result.amended_count + result.replaced_count
     );
@@ -102,6 +102,7 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
     if !require_mutation() {
         return;
     }
+    let _mutation_guard = crate::support::mutation_test_guard().await;
     if !require_funded() {
         return;
     }
@@ -322,7 +323,7 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
             "round {round}: retry must return one result per input"
         );
         let replayed_cached_result = result_fingerprint(&retry) == fingerprint;
-        let safely_rejected_without_reapply = retry.rejected_count == BATCH_SIZE as i32
+        let safely_rejected_without_reapply = retry.rejected_count == BATCH_SIZE as u32
             && retry.amended_count == 0
             && retry.replaced_count == 0
             && retry

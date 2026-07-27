@@ -798,7 +798,7 @@ impl LifecycleService {
             .await?
             .into_owned()
         };
-        Ok(flow_from_get_response(&resp))
+        flow_from_get_response(&resp)
     }
 
     pub async fn list_flows_by_tx(
@@ -838,7 +838,7 @@ impl LifecycleService {
             .await?
             .into_owned()
         };
-        Ok(flow_from_get_by_tx_response(&resp))
+        flow_from_get_by_tx_response(&resp)
     }
 
     /// Subscribe to open lifecycle flow summaries.

@@ -1,7 +1,8 @@
 //! Orders read/mutation decoders.
 
 use super::enums::{
-    enum_value_order_status, enum_value_order_type, enum_value_side, enum_value_time_in_force,
+    enum_value_fee_source, enum_value_order_status, enum_value_order_type, enum_value_side,
+    enum_value_time_in_force,
 };
 use super::money::{decode_price_ticks, decode_qty_scaled, decode_qty_scaled_allow_zero};
 use crate::codecs::scalars::format_uint64_id;
@@ -17,8 +18,8 @@ use crate::proto::orders::v1::{
     AttachedRisk as ProtoAttachedRisk, BatchCancelOrdersResponse, BatchCreateOrdersResponse,
     BatchModifyOrdersResponse, CancelAllAfterResponse, CancelAllOrdersResponse,
     CancelOrderResponse, CreateOrderResponse, GetOpenOrdersResponse, GetOrderHistoryResponse,
-    GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse, Order as ProtoOrder,
-    RiskExecution, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy,
+    GetOrderResponse, GetUserTradesResponse, ModifyActionTaken, ModifyOrderResponse,
+    Order as ProtoOrder, RiskExecution, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy,
     UserTrade as ProtoUserTrade, batch_create_result_item, risk_execution, trailing_stop_policy,
 };
 use buffa::Enumeration;
@@ -193,6 +194,12 @@ pub fn user_trade_from_proto(msg: &ProtoUserTrade) -> UserTrade {
         } else {
             msg.fee_scaled.to_string()
         },
+        fee_source: enum_value_fee_source(msg.fee_source),
+        referral_share_scaled: if msg.referral_share_scaled == 0 {
+            String::new()
+        } else {
+            msg.referral_share_scaled.to_string()
+        },
         ts_ns: if msg.ts_ns == 0 {
             String::new()
         } else {
@@ -256,9 +263,9 @@ fn modify_action_name(
 pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> CancelAllOrdersResult {
     CancelAllOrdersResult {
         status: msg.status.clone(),
-        matched_orders: msg.matched_orders as i32,
-        submitted_cancels: msg.submitted_cancels as i32,
-        failed_cancels: msg.failed_cancels as i32,
+        matched_orders: msg.matched_orders,
+        submitted_cancels: msg.submitted_cancels,
+        failed_cancels: msg.failed_cancels,
     }
 }
 
@@ -320,44 +327,110 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
 
     Ok(BatchCreateOrdersResult {
         results,
-        accepted_count: msg.accepted_count as i32,
-        rejected_count: msg.rejected_count as i32,
+        accepted_count: msg.accepted_count,
+        rejected_count: msg.rejected_count,
     })
 }
 
-pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> BatchCancelOrdersResult {
-    BatchCancelOrdersResult {
-        results: msg
-            .results
-            .iter()
-            .map(|item| BatchCancelResultItem {
-                status: item.status.clone(),
-                order_id: format_uint64_id(item.order_id),
-                client_order_id: item.client_order_id.clone(),
-                code: item.code.clone(),
-            })
-            .collect(),
-        accepted_count: msg.accepted_count as i32,
-        rejected_count: msg.rejected_count as i32,
+pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> Result<BatchCancelOrdersResult> {
+    let mut accepted = 0u32;
+    let mut rejected = 0u32;
+    let mut results = Vec::with_capacity(msg.results.len());
+    for item in &msg.results {
+        if item.status.eq_ignore_ascii_case("accepted") {
+            accepted += 1;
+        } else if item.status.eq_ignore_ascii_case("rejected") {
+            rejected += 1;
+        } else {
+            return Err(Error::transport(format!(
+                "invalid BatchCancelOrders response: unknown item status {:?}",
+                item.status
+            )));
+        }
+        results.push(BatchCancelResultItem {
+            status: item.status.clone(),
+            order_id: format_uint64_id(item.order_id),
+            client_order_id: item.client_order_id.clone(),
+            code: item.code.clone(),
+        });
     }
+    if accepted != msg.accepted_count
+        || rejected != msg.rejected_count
+        || usize::try_from(accepted + rejected).ok() != Some(results.len())
+    {
+        return Err(Error::transport(format!(
+            "invalid BatchCancelOrders response counts: decoded {accepted} accepted/{rejected} rejected for {} results, server reported {}/{}",
+            results.len(),
+            msg.accepted_count,
+            msg.rejected_count
+        )));
+    }
+    Ok(BatchCancelOrdersResult {
+        results,
+        accepted_count: msg.accepted_count,
+        rejected_count: msg.rejected_count,
+    })
 }
 
-pub fn batch_modify_from_proto(msg: &BatchModifyOrdersResponse) -> BatchModifyOrdersResult {
-    BatchModifyOrdersResult {
-        results: msg
-            .results
-            .iter()
-            .map(|item| BatchModifyResultItem {
-                status: item.status.clone(),
-                client_order_id: item.client_order_id.clone(),
-                final_order_id: format_uint64_id(item.final_order_id),
-                code: item.code.clone(),
-            })
-            .collect(),
-        amended_count: msg.amended_count as i32,
-        replaced_count: msg.replaced_count as i32,
-        rejected_count: msg.rejected_count as i32,
+pub fn batch_modify_from_proto(msg: &BatchModifyOrdersResponse) -> Result<BatchModifyOrdersResult> {
+    let mut amended = 0u32;
+    let mut replaced = 0u32;
+    let mut rejected = 0u32;
+    let mut results = Vec::with_capacity(msg.results.len());
+    for item in &msg.results {
+        if item.status.eq_ignore_ascii_case("rejected") {
+            if item.action_taken.to_i32() != 0 {
+                return Err(Error::transport(
+                    "invalid BatchModifyOrders response: rejected item has an action_taken",
+                ));
+            }
+            rejected += 1;
+        } else if item.status.eq_ignore_ascii_case("modified") {
+            match item.action_taken.as_known() {
+                Some(ModifyActionTaken::Amended) => amended += 1,
+                Some(ModifyActionTaken::Replaced) => replaced += 1,
+                _ => {
+                    return Err(Error::transport(format!(
+                        "invalid BatchModifyOrders response: modified item has invalid action_taken {}",
+                        item.action_taken.to_i32()
+                    )));
+                }
+            }
+        } else {
+            return Err(Error::transport(format!(
+                "invalid BatchModifyOrders response: unknown item status {:?}",
+                item.status
+            )));
+        }
+        results.push(BatchModifyResultItem {
+            status: item.status.clone(),
+            client_order_id: item.client_order_id.clone(),
+            final_order_id: format_uint64_id(item.final_order_id),
+            code: item.code.clone(),
+        });
     }
+    let decoded_total = amended
+        .checked_add(replaced)
+        .and_then(|value| value.checked_add(rejected));
+    if amended != msg.amended_count
+        || replaced != msg.replaced_count
+        || rejected != msg.rejected_count
+        || decoded_total.and_then(|value| usize::try_from(value).ok()) != Some(results.len())
+    {
+        return Err(Error::transport(format!(
+            "invalid BatchModifyOrders response counts: decoded {amended} amended/{replaced} replaced/{rejected} rejected for {} results, server reported {}/{}/{}",
+            results.len(),
+            msg.amended_count,
+            msg.replaced_count,
+            msg.rejected_count
+        )));
+    }
+    Ok(BatchModifyOrdersResult {
+        results,
+        amended_count: msg.amended_count,
+        replaced_count: msg.replaced_count,
+        rejected_count: msg.rejected_count,
+    })
 }
 
 pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> CancelAllAfterResult {
@@ -567,6 +640,9 @@ mod tests {
                 match_id: 99,
                 order_id: 7,
                 side: Side::Buy.into(),
+                fee_scaled: 5,
+                fee_source: crate::proto::orders::v1::FeeSource::Received.into(),
+                referral_share_scaled: 2,
                 ..Default::default()
             }],
             ..Default::default()
@@ -575,6 +651,9 @@ mod tests {
         assert_eq!(result.order.as_ref().unwrap().order_id, format_uint64_id(7));
         assert_eq!(result.trades.len(), 1);
         assert_eq!(result.trades[0].match_id, "99");
+        assert_eq!(result.trades[0].fee_scaled, "5");
+        assert_eq!(result.trades[0].fee_source, "received");
+        assert_eq!(result.trades[0].referral_share_scaled, "2");
     }
 
     #[test]
@@ -709,6 +788,74 @@ mod tests {
         };
 
         let err = batch_create_from_proto(&msg).expect_err("count mismatch must fail closed");
+        assert!(err.to_string().contains("response counts"));
+    }
+
+    #[test]
+    fn batch_cancel_rejects_count_mismatch_and_unknown_status() {
+        use crate::proto::orders::v1::BatchCancelResultItem as ProtoItem;
+
+        let mismatch = BatchCancelOrdersResponse {
+            results: vec![ProtoItem {
+                status: "accepted".into(),
+                order_id: 9,
+                ..Default::default()
+            }],
+            accepted_count: 0,
+            rejected_count: 1,
+            ..Default::default()
+        };
+        let err = batch_cancel_from_proto(&mismatch).expect_err("count mismatch must fail closed");
+        assert!(err.to_string().contains("response counts"));
+
+        let unknown = BatchCancelOrdersResponse {
+            results: vec![ProtoItem {
+                status: "maybe".into(),
+                ..Default::default()
+            }],
+            accepted_count: 1,
+            ..Default::default()
+        };
+        let err = batch_cancel_from_proto(&unknown).expect_err("unknown status must fail closed");
+        assert!(err.to_string().contains("unknown item status"));
+    }
+
+    #[test]
+    fn batch_modify_reconciles_actions_and_counts() {
+        use crate::proto::orders::v1::{BatchModifyResultItem as ProtoItem, ModifyActionTaken};
+
+        let valid = BatchModifyOrdersResponse {
+            results: vec![
+                ProtoItem {
+                    status: "modified".into(),
+                    action_taken: ModifyActionTaken::Amended.into(),
+                    ..Default::default()
+                },
+                ProtoItem {
+                    status: "modified".into(),
+                    action_taken: ModifyActionTaken::Replaced.into(),
+                    ..Default::default()
+                },
+                ProtoItem {
+                    status: "rejected".into(),
+                    ..Default::default()
+                },
+            ],
+            amended_count: 1,
+            replaced_count: 1,
+            rejected_count: 1,
+            ..Default::default()
+        };
+        let decoded = batch_modify_from_proto(&valid).expect("consistent response");
+        assert_eq!(decoded.amended_count, 1);
+        assert_eq!(decoded.replaced_count, 1);
+        assert_eq!(decoded.rejected_count, 1);
+
+        let mismatch = BatchModifyOrdersResponse {
+            amended_count: 2,
+            ..valid.clone()
+        };
+        let err = batch_modify_from_proto(&mismatch).expect_err("count mismatch must fail closed");
         assert!(err.to_string().contains("response counts"));
     }
 }

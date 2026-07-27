@@ -72,6 +72,7 @@ async fn funding_to_trading_userop() {
     if !require_mutation() {
         return;
     }
+    let _mutation_guard = crate::support::mutation_test_guard().await;
     if !require_funded() {
         return;
     }
@@ -149,6 +150,7 @@ async fn funding_withdraw_to_chain_userop() {
     if !require_mutation() {
         return;
     }
+    let _mutation_guard = crate::support::mutation_test_guard().await;
     if !require_funded() {
         return;
     }
