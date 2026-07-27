@@ -1,10 +1,13 @@
 error[E0624]: method `connect_client` is private
   --> tests/ui/no_unsigned_thin_connect_client.rs:12:33
    |
-12 |     let _ = client.guard_signer.connect_client();
-   |                                 ^^^^^^^^^^^^^^ private method
+12 |       let _ = client.guard_signer.connect_client();
+   |                                   ^^^^^^^^^^^^^^ private method
    |
   ::: src/services/thin.rs
    |
-   |             pub(crate) fn connect_client(&self) -> $client {
-   |             ---------------------------------------------- private method defined here
+   | / thin_service!(
+   | |     GuardSignerService,
+   | |     crate::connect::chain::guard::v1::GuardSignerServiceClient<crate::transport::SharedTransport>
+   | | );
+   | |_- private method defined here
