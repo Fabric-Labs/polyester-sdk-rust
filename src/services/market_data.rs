@@ -125,7 +125,10 @@ impl MarketDataService {
         Ok(market_trades_from_proto(&resp, quantity_scale))
     }
 
-    /// Candle series for a symbol. `interval` accepts values like `"1m"`, `"MIN_1"`, `"5m"`.
+    /// Candle series for a symbol, ordered newest-first by `ts_sec`.
+    ///
+    /// `interval` accepts values like `"1m"`, `"MIN_1"`, `"5m"`. When
+    /// incomplete candles are requested, the current open candle is prepended.
     pub async fn get_candles(
         &self,
         symbol: &str,
@@ -164,7 +167,7 @@ impl MarketDataService {
                 ..Default::default()
             })
             .await?;
-        Ok(result.candles.into_iter().next_back())
+        Ok(newest_candle(result))
     }
 
     /// Columnar OHLCV candles decoded into row-oriented [`CandlesResult`].
@@ -303,6 +306,10 @@ fn parse_timeframe(interval: &str) -> Result<Timeframe> {
         }
     };
     Ok(tf)
+}
+
+fn newest_candle(result: CandlesResult) -> Option<Candle> {
+    result.candles.into_iter().next()
 }
 
 /// Options for [`MarketOverviewService::list`].
@@ -563,12 +570,7 @@ impl OrderbookService {
         let resp = unary::await_public(client.get_order_book(req))
             .await?
             .into_owned();
-        Ok(orderbook_from_proto(
-            &resp,
-            symbol,
-            reported_depth,
-            quantity_scale,
-        ))
+        orderbook_from_proto(&resp, symbol, reported_depth, quantity_scale)
     }
 
     /// Subscribe to public orderbook delta updates (requires `realtime` feature).
@@ -722,10 +724,11 @@ impl OrderbookService {
                     if let Some(stream) = crate::realtime::lock_unpoisoned(&stream_slot).as_ref() {
                         stream.request_refresh();
                     }
-                    return;
+                    return false;
                 }
                 emit();
-            }) as Arc<dyn Fn(OrderBookDeltaUpdate) + Send + Sync>
+                true
+            }) as Arc<dyn Fn(OrderBookDeltaUpdate) -> bool + Send + Sync>
         };
 
         let svc = self.clone();
@@ -770,10 +773,16 @@ impl OrderbookService {
                             s.asks = levels_from_orderbook_side(&snapshot.asks);
                             s.book_seq = parsed_seq;
                         }
+                        let mut applied_all = true;
                         for delta in buffered {
-                            handle_delta(delta);
+                            if !handle_delta(delta) {
+                                applied_all = false;
+                                break;
+                            }
                         }
-                        emit();
+                        if applied_all {
+                            emit();
+                        }
                     },
                 )
             },
@@ -781,7 +790,9 @@ impl OrderbookService {
                 let handle_delta = handle_delta.clone();
                 Arc::new(move |deltas: Vec<OrderBookDeltaUpdate>| {
                     for delta in deltas {
-                        handle_delta(delta);
+                        if !handle_delta(delta) {
+                            break;
+                        }
                     }
                 })
             },
@@ -835,6 +846,28 @@ mod tests {
             MarketDataService::candle_channel_timeframe("1h").unwrap(),
             "1h"
         );
+    }
+
+    #[test]
+    fn current_candle_selects_first_newest_row() {
+        let candle = |ts_sec| Candle {
+            ts_sec,
+            open: "1".into(),
+            high: "1".into(),
+            low: "1".into(),
+            close: "1".into(),
+            volume: "1".into(),
+            symbol_id: 1,
+            timeframe: "1m".into(),
+        };
+        let newest = newest_candle(CandlesResult {
+            symbol_id: 1,
+            timeframe: "1m".into(),
+            candles: vec![candle(20), candle(10)],
+            next_page_token: String::new(),
+        })
+        .expect("current candle");
+        assert_eq!(newest.ts_sec, 20);
     }
 
     #[tokio::test]

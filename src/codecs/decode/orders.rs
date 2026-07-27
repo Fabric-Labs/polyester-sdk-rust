@@ -61,6 +61,7 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Order {
 /// Project an attached take-profit/stop-loss policy onto the flat public
 /// [`RiskLeg`]. The child execution determines `order_type`/`limit_price`.
 /// `trigger_price_source` is no longer part of the policy wire and is left empty.
+#[allow(deprecated)]
 fn decode_risk_leg(trigger_price_ticks: i64, child: Option<&RiskExecution>) -> Option<RiskLeg> {
     if trigger_price_ticks == 0 {
         return None;
@@ -226,9 +227,7 @@ pub fn get_order_from_proto(msg: &GetOrderResponse) -> GetOrderResult {
 pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> Result<OrderMutationResult> {
     // client_order_id is API-optional on create; an omitted request id may echo empty.
     if msg.order_id == 0 {
-        return Err(Error::transport(
-            "invalid CreateOrder response: missing order_id",
-        ));
+        return Err(Error::response_contract("CreateOrder", "missing order_id"));
     }
     Ok(order_mutation(
         "accepted",
@@ -239,8 +238,9 @@ pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> Result<OrderMuta
 
 pub fn order_mutation_from_cancel(msg: &CancelOrderResponse) -> Result<OrderMutationResult> {
     if msg.order_id == 0 || msg.status.trim().is_empty() {
-        return Err(Error::transport(
-            "invalid CancelOrder response: missing order_id or status",
+        return Err(Error::response_contract(
+            "CancelOrder",
+            "missing order_id or status",
         ));
     }
     Ok(order_mutation(&msg.status, msg.order_id, ""))
@@ -257,8 +257,9 @@ fn order_mutation(status: &str, order_id: u64, client_order_id: &str) -> OrderMu
 pub fn modify_order_from_proto(msg: &ModifyOrderResponse) -> Result<ModifyOrderResult> {
     let action_taken = modify_action_name(msg.action_taken);
     if action_taken.is_empty() || msg.old_order_id == 0 || msg.final_order_id == 0 {
-        return Err(Error::transport(
-            "invalid ModifyOrder response: missing action_taken, old_order_id, or final_order_id",
+        return Err(Error::response_contract(
+            "ModifyOrder",
+            "missing action_taken, old_order_id, or final_order_id",
         ));
     }
     Ok(ModifyOrderResult {
@@ -286,10 +287,36 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllO
     if status.is_empty()
         || !(status.eq_ignore_ascii_case("submitted") || status.eq_ignore_ascii_case("dry_run"))
     {
-        return Err(Error::transport(format!(
-            "invalid CancelAllOrders response: unknown status {:?}",
-            msg.status
-        )));
+        return Err(Error::response_contract(
+            "CancelAllOrders",
+            format!("unknown status {:?}", msg.status),
+        ));
+    }
+    if status.eq_ignore_ascii_case("submitted")
+        && msg
+            .submitted_cancels
+            .checked_add(msg.failed_cancels)
+            .filter(|total| *total == msg.matched_orders)
+            .is_none()
+    {
+        return Err(Error::response_contract(
+            "CancelAllOrders",
+            format!(
+                "response counts mismatch: matched {}, submitted {}, failed {}",
+                msg.matched_orders, msg.submitted_cancels, msg.failed_cancels
+            ),
+        ));
+    }
+    if status.eq_ignore_ascii_case("dry_run")
+        && (msg.submitted_cancels != 0 || msg.failed_cancels != 0)
+    {
+        return Err(Error::response_contract(
+            "CancelAllOrders",
+            format!(
+                "dry_run reported submitted or failed cancels: submitted {}, failed {}",
+                msg.submitted_cancels, msg.failed_cancels
+            ),
+        ));
     }
     Ok(CancelAllOrdersResult {
         status: msg.status.clone(),
@@ -333,10 +360,13 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                         .unwrap_or_else(|| "ERROR_CODE_UNSPECIFIED".to_owned());
                 }
                 None => {
-                    return Err(Error::transport(format!(
-                        "invalid BatchCreateOrders response: item {:?} has neither accepted nor rejected outcome",
-                        item.client_order_id
-                    )));
+                    return Err(Error::response_contract(
+                        "BatchCreateOrders",
+                        format!(
+                            "item {:?} has neither accepted nor rejected outcome",
+                            item.client_order_id
+                        ),
+                    ));
                 }
             }
             Ok(out)
@@ -347,12 +377,15 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
         || rejected != msg.rejected_count as usize
         || accepted + rejected != results.len()
     {
-        return Err(Error::transport(format!(
-            "invalid BatchCreateOrders response counts: decoded {accepted} accepted/{rejected} rejected for {} results, server reported {}/{}",
-            results.len(),
-            msg.accepted_count,
-            msg.rejected_count
-        )));
+        return Err(Error::response_contract(
+            "BatchCreateOrders",
+            format!(
+                "response counts mismatch: decoded {accepted} accepted/{rejected} rejected for {} results, server reported {}/{}",
+                results.len(),
+                msg.accepted_count,
+                msg.rejected_count
+            ),
+        ));
     }
 
     Ok(BatchCreateOrdersResult {
@@ -372,10 +405,10 @@ pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> Result<BatchC
         } else if item.status.eq_ignore_ascii_case("rejected") {
             rejected += 1;
         } else {
-            return Err(Error::transport(format!(
-                "invalid BatchCancelOrders response: unknown item status {:?}",
-                item.status
-            )));
+            return Err(Error::response_contract(
+                "BatchCancelOrders",
+                format!("unknown item status {:?}", item.status),
+            ));
         }
         results.push(BatchCancelResultItem {
             status: item.status.clone(),
@@ -388,12 +421,15 @@ pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> Result<BatchC
         || rejected != msg.rejected_count
         || usize::try_from(accepted + rejected).ok() != Some(results.len())
     {
-        return Err(Error::transport(format!(
-            "invalid BatchCancelOrders response counts: decoded {accepted} accepted/{rejected} rejected for {} results, server reported {}/{}",
-            results.len(),
-            msg.accepted_count,
-            msg.rejected_count
-        )));
+        return Err(Error::response_contract(
+            "BatchCancelOrders",
+            format!(
+                "response counts mismatch: decoded {accepted} accepted/{rejected} rejected for {} results, server reported {}/{}",
+                results.len(),
+                msg.accepted_count,
+                msg.rejected_count
+            ),
+        ));
     }
     Ok(BatchCancelOrdersResult {
         results,
@@ -410,8 +446,9 @@ pub fn batch_modify_from_proto(msg: &BatchModifyOrdersResponse) -> Result<BatchM
     for item in &msg.results {
         if item.status.eq_ignore_ascii_case("rejected") {
             if item.action_taken.to_i32() != 0 {
-                return Err(Error::transport(
-                    "invalid BatchModifyOrders response: rejected item has an action_taken",
+                return Err(Error::response_contract(
+                    "BatchModifyOrders",
+                    "rejected item has an action_taken",
                 ));
             }
             rejected += 1;
@@ -420,17 +457,20 @@ pub fn batch_modify_from_proto(msg: &BatchModifyOrdersResponse) -> Result<BatchM
                 Some(ModifyActionTaken::Amended) => amended += 1,
                 Some(ModifyActionTaken::Replaced) => replaced += 1,
                 _ => {
-                    return Err(Error::transport(format!(
-                        "invalid BatchModifyOrders response: modified item has invalid action_taken {}",
-                        item.action_taken.to_i32()
-                    )));
+                    return Err(Error::response_contract(
+                        "BatchModifyOrders",
+                        format!(
+                            "modified item has invalid action_taken {}",
+                            item.action_taken.to_i32()
+                        ),
+                    ));
                 }
             }
         } else {
-            return Err(Error::transport(format!(
-                "invalid BatchModifyOrders response: unknown item status {:?}",
-                item.status
-            )));
+            return Err(Error::response_contract(
+                "BatchModifyOrders",
+                format!("unknown item status {:?}", item.status),
+            ));
         }
         results.push(BatchModifyResultItem {
             status: item.status.clone(),
@@ -447,13 +487,16 @@ pub fn batch_modify_from_proto(msg: &BatchModifyOrdersResponse) -> Result<BatchM
         || rejected != msg.rejected_count
         || decoded_total.and_then(|value| usize::try_from(value).ok()) != Some(results.len())
     {
-        return Err(Error::transport(format!(
-            "invalid BatchModifyOrders response counts: decoded {amended} amended/{replaced} replaced/{rejected} rejected for {} results, server reported {}/{}/{}",
-            results.len(),
-            msg.amended_count,
-            msg.replaced_count,
-            msg.rejected_count
-        )));
+        return Err(Error::response_contract(
+            "BatchModifyOrders",
+            format!(
+                "response counts mismatch: decoded {amended} amended/{replaced} replaced/{rejected} rejected for {} results, server reported {}/{}/{}",
+                results.len(),
+                msg.amended_count,
+                msg.replaced_count,
+                msg.rejected_count
+            ),
+        ));
     }
     Ok(BatchModifyOrdersResult {
         results,
@@ -468,10 +511,10 @@ pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> Result<Cance
     if status.is_empty()
         || !(status.eq_ignore_ascii_case("armed") || status.eq_ignore_ascii_case("disabled"))
     {
-        return Err(Error::transport(format!(
-            "invalid CancelAllAfter response: unknown status {:?}",
-            msg.status
-        )));
+        return Err(Error::response_contract(
+            "CancelAllAfter",
+            format!("unknown status {:?}", msg.status),
+        ));
     }
     Ok(CancelAllAfterResult {
         status: msg.status.clone(),
@@ -527,6 +570,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn order_from_proto_maps_attached_risk_policy() {
         use crate::models::{CreateOrderType, TrailingDistance};
         use crate::proto::orders::v1::{
@@ -792,6 +836,9 @@ mod tests {
         };
 
         let err = batch_create_from_proto(&msg).expect_err("missing outcome must fail closed");
+        assert!(matches!(&err, Error::ResponseContract { .. }));
+        assert!(!err.is_retryable());
+        assert!(err.mutation_outcome_unknown());
         assert!(err.to_string().contains("neither accepted nor rejected"));
     }
 
@@ -849,6 +896,9 @@ mod tests {
         };
 
         let err = batch_create_from_proto(&msg).expect_err("count mismatch must fail closed");
+        assert!(matches!(&err, Error::ResponseContract { .. }));
+        assert!(!err.is_retryable());
+        assert!(err.mutation_outcome_unknown());
         assert!(err.to_string().contains("response counts"));
     }
 
@@ -867,6 +917,9 @@ mod tests {
             ..Default::default()
         };
         let err = batch_cancel_from_proto(&mismatch).expect_err("count mismatch must fail closed");
+        assert!(matches!(&err, Error::ResponseContract { .. }));
+        assert!(!err.is_retryable());
+        assert!(err.mutation_outcome_unknown());
         assert!(err.to_string().contains("response counts"));
 
         let unknown = BatchCancelOrdersResponse {
@@ -917,6 +970,9 @@ mod tests {
             ..valid.clone()
         };
         let err = batch_modify_from_proto(&mismatch).expect_err("count mismatch must fail closed");
+        assert!(matches!(&err, Error::ResponseContract { .. }));
+        assert!(!err.is_retryable());
+        assert!(err.mutation_outcome_unknown());
         assert!(err.to_string().contains("response counts"));
     }
 
@@ -935,9 +991,23 @@ mod tests {
 
         let dry_run = CancelAllOrdersResponse {
             status: "dry_run".into(),
+            matched_orders: 3,
             ..Default::default()
         };
         assert!(cancel_all_from_proto(&dry_run).is_ok());
+
+        let mismatched = CancelAllOrdersResponse {
+            status: "submitted".into(),
+            matched_orders: 3,
+            submitted_cancels: 1,
+            failed_cancels: 1,
+            ..Default::default()
+        };
+        let err = cancel_all_from_proto(&mismatched).expect_err("cancel-all counts must reconcile");
+        assert!(matches!(&err, Error::ResponseContract { .. }));
+        assert!(!err.is_retryable());
+        assert!(err.mutation_outcome_unknown());
+        assert!(err.to_string().contains("response counts"));
 
         for status in ["", "ok", "maybe", "accepted"] {
             let bad = CancelAllOrdersResponse {
@@ -946,6 +1016,9 @@ mod tests {
                 ..Default::default()
             };
             let err = cancel_all_from_proto(&bad).expect_err("unknown cancel-all status");
+            assert!(matches!(&err, Error::ResponseContract { .. }));
+            assert!(!err.is_retryable());
+            assert!(err.mutation_outcome_unknown());
             assert!(err.to_string().contains("unknown status"));
         }
     }

@@ -108,7 +108,7 @@ impl TriggersService {
             .ctx
             .catalogs
             .base_quantity_scale_for_symbol(&params.symbol)
-            .or(params.qty.scale)
+            .or(params.qty.scale())
             .ok_or_else(|| {
                 Error::validation(format!(
                     "quantity scale for {:?} is unavailable; await client.wait_for_catalogs() before creating triggers, or pass a scaled Quantity",

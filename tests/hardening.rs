@@ -497,7 +497,7 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
         })
         .await
         .unwrap_err();
-    assert!(matches!(order_error, Error::Transport(_)));
+    assert!(matches!(order_error, Error::ResponseContract { .. }));
 
     let trigger_error = client
         .triggers
@@ -542,7 +542,7 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
             destination_address: String::new(),
             idempotency_key: "fault-withdraw".into(),
             amount_scale: Some(18),
-            deadline_ts_sec: None,
+            deadline_ts_sec: Some(1_800_000_000),
             nonce: 1,
         })
         .await
@@ -3059,6 +3059,104 @@ async fn l2_snapshot_then_stream_recovery_success_clears_err() {
     assert!(sts.err().is_none());
     assert!(attempts.load(Ordering::SeqCst) >= 2);
     sts.close();
+}
+
+#[test]
+fn withdrawal_payload_signing_and_e18_conversion_are_exact() {
+    use buffa::Message;
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+    use polyester::models::CreateApiKeyTradingWithdrawParams;
+    use polyester::{AssetAmount, Client, Config, QuantityDomain};
+
+    let client = Client::new(Config {
+        api_key_id: Some("withdraw-hardening".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    let prepared = client
+        .withdraw
+        .prepare_api_key_to_funding(CreateApiKeyTradingWithdrawParams {
+            asset_id: 7,
+            amount: AssetAmount::from_scaled(125, Some(2), QuantityDomain::LedgerE18, Some(7))
+                .unwrap(),
+            destination_address: String::new(),
+            idempotency_key: "withdraw-hardening".into(),
+            amount_scale: Some(2),
+            deadline_ts_sec: Some(1_800_000_000),
+            nonce: Some(42),
+        })
+        .unwrap();
+
+    assert_eq!(prepared.payload().deadline_ts_sec, 1_800_000_000);
+    assert_eq!(
+        prepared.deterministic_payload_bytes(),
+        prepared.payload().encode_to_vec()
+    );
+    let amount = prepared.payload().amount_e18.as_option().unwrap();
+    assert_eq!(
+        (u128::from(amount.hi) << 64) | u128::from(amount.lo),
+        1_250_000_000_000_000_000
+    );
+
+    let seed: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
+    let verifier = VerifyingKey::from(&ed25519_dalek::SigningKey::from_bytes(&seed));
+    verifier
+        .verify(
+            &prepared.deterministic_payload_bytes(),
+            &Signature::from_slice(prepared.payload_signature()).unwrap(),
+        )
+        .unwrap();
+}
+
+#[tokio::test]
+async fn precomputed_withdraw_fields_and_unknown_wallet_actions_fail_closed() {
+    use polyester::models::{CreateTradingWithdrawParams, CreateWalletTradingWithdrawParams};
+    use polyester::{AssetAmount, Client, Config, Error, QuantityDomain};
+
+    let client = Client::new(Config {
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    let amount =
+        || AssetAmount::from_scaled(1, Some(18), QuantityDomain::LedgerE18, Some(7)).unwrap();
+    let missing_deadline = client
+        .withdraw
+        .create_to_funding(CreateTradingWithdrawParams {
+            asset_id: 7,
+            amount: amount(),
+            payload_signature: vec![1],
+            destination_address: String::new(),
+            idempotency_key: "missing-deadline".into(),
+            amount_scale: Some(18),
+            deadline_ts_sec: None,
+            nonce: 42,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(missing_deadline, Error::Validation(_)));
+
+    let unknown_action = client
+        .withdraw
+        .create_wallet_trading_withdraw(CreateWalletTradingWithdrawParams {
+            action: "unknown".into(),
+            asset_id: 7,
+            amount: amount(),
+            idempotency_key: "unknown-action".into(),
+            payload_signature: vec![1],
+            signer_wallet: "0x1".into(),
+            destination_chain_id: 0,
+            destination_address: String::new(),
+            subaccount_id: None,
+            amount_scale: Some(18),
+            deadline_ts_sec: Some(1_800_000_000),
+            nonce: 42,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(unknown_action, Error::Validation(_)));
 }
 
 // Silence unused import warnings when Credentials helpers evolve.

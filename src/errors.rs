@@ -7,6 +7,7 @@ use connectrpc::{ConnectError, ErrorCode, ErrorDetail};
 use thiserror::Error;
 
 use crate::proto::auth::v1::AuthErrorDetail;
+use crate::user_agent::{cloudflare_1010_message, is_cloudflare_browser_ban};
 
 /// Root result alias for the SDK.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -28,6 +29,14 @@ pub enum Error {
     Validation(String),
     #[error("{0}")]
     Transport(String),
+    /// A successful RPC returned a payload that violates the documented
+    /// response contract.
+    ///
+    /// This is not retryable: repeating a mutation blindly can duplicate work.
+    /// Because the server may already have accepted the mutation, callers must
+    /// reconcile when [`Self::mutation_outcome_unknown`] returns true.
+    #[error("{context}: response contract violation: {message}")]
+    ResponseContract { context: String, message: String },
     #[error("{message}")]
     RateLimit {
         message: String,
@@ -76,6 +85,13 @@ impl Error {
         Self::Transport(msg.into())
     }
 
+    pub fn response_contract(context: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::ResponseContract {
+            context: context.into(),
+            message: message.into(),
+        }
+    }
+
     pub fn realtime(msg: impl Into<String>) -> Self {
         Self::Realtime(msg.into())
     }
@@ -102,7 +118,10 @@ impl Error {
     /// Callers must treat these failures as ambiguous: reconcile first and
     /// reuse the original idempotency key if a retry is necessary.
     pub fn mutation_outcome_unknown(&self) -> bool {
-        matches!(self, Self::Transport(_) | Self::Server(_))
+        matches!(
+            self,
+            Self::Transport(_) | Self::ResponseContract { .. } | Self::Server(_)
+        )
     }
 
     /// Server-requested retry delay in seconds, when supplied.
@@ -205,6 +224,9 @@ pub fn map_connect_error(err: ConnectError) -> Error {
     let code = err.code;
     let retry_after = retry_after_seconds(&err);
     let message = fallback_message;
+    if is_cloudflare_browser_ban(&message) {
+        return Error::Transport(cloudflare_1010_message());
+    }
     match code {
         ErrorCode::Unauthenticated | ErrorCode::PermissionDenied => Error::Auth(message),
         ErrorCode::ResourceExhausted => Error::RateLimit {
@@ -319,6 +341,11 @@ mod tests {
         };
         assert!(limited.is_retryable());
         assert!(!limited.mutation_outcome_unknown());
+
+        let contract =
+            Error::response_contract("BatchCreateOrders", "reported counts do not match items");
+        assert!(!contract.is_retryable());
+        assert!(contract.mutation_outcome_unknown());
 
         assert!(!Error::validation("bad price").is_retryable());
     }

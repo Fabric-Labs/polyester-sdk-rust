@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.18`, git tag `v0.1.0a18`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.19`, git tag `v0.1.0a19`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ The crate is not on crates.io yet. Pin the published git tag:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a18" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a19" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -95,6 +95,12 @@ Create an API key in the Polyester app (**API** in the sidebar). Copy the key id
 and private key when shown. The private key is only displayed once.
 Open the key's **Permissions**, enable **Spot trading**, select the markets it
 may trade, and set a maximum order size appropriate for the strategy.
+
+For a subaccount-scoped key, attach an **API key policy** that grants ledger
+reads for balance requests and private balance streams. Add the appropriate
+trading permissions for create, cancel, modify, and other order mutations.
+This API key policy is separate from the **subaccount policy**: the subaccount
+policy constrains the subaccount, but does not grant permissions to the key.
 
 ```rust,no_run
 use polyester::{Client, Config, Result};
@@ -471,6 +477,9 @@ if let Some(trade) = sub.recv_result().await? {
 }
 ```
 
+`get_candles` and `get_candles_with` return rows newest-first by `ts_sec`.
+When incomplete rows are included, the current open candle is prepended.
+
 Merged market overview stream (snapshot + live updates):
 
 ```rust,no_run
@@ -528,6 +537,12 @@ if let Some(snapshot) = book.updates().recv().await {
     println!("{} {}", snapshot.book_seq, snapshot.bids.len());
 }
 ```
+
+Private order protobufs carry scaled quantity integers but may not carry the
+base quantity scale, so `Quantity::scale()` can return `None`. A bot must
+resolve the scale from the hydrated catalog using `Quantity::symbol_id()` (or
+`Quantity::symbol()`), then pass that catalog scale to `Quantity::format`.
+Never trust, guess, or invent a stream quantity scale.
 
 ## Development
 

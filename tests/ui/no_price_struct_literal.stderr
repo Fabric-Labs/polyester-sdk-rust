@@ -1,0 +1,9 @@
+error[E0451]: fields `ticks` and `symbol` of struct `Price` are private
+ --> tests/ui/no_price_struct_literal.rs:6:9
+  |
+5 |     let _ = Price {
+  |             ----- in this type
+6 |         ticks: loop {},
+  |         ^^^^^ private field
+7 |         symbol: Some("BTC-USDT".into()),
+  |         ^^^^^^ private field

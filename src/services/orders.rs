@@ -105,6 +105,11 @@ impl OrdersService {
     pub async fn list_history_with(&self, opts: ListOrderHistoryOpts) -> Result<OrdersList> {
         let mut symbol_ids = Vec::new();
         if let Some(sid) = opts.symbol_id {
+            if sid == 0 {
+                return Err(Error::validation(
+                    "symbol_id must be non-zero when explicitly supplied",
+                ));
+            }
             symbol_ids.push(sid);
         } else if let Some(ref symbol) = opts.symbol {
             let resolved = self
@@ -156,7 +161,9 @@ impl OrdersService {
 
     pub async fn get_with(&self, opts: GetOrderOpts) -> Result<GetOrderResult> {
         let key = if let Some(cid) = opts.client_order_id.as_deref().filter(|s| !s.is_empty()) {
-            Some(get_order_request::Key::ClientOrderId(cid.to_owned()))
+            Some(get_order_request::Key::ClientOrderId(
+                require_client_style_id(cid, "client_order_id")?,
+            ))
         } else if let Some(oid) = opts.order_id.as_deref().filter(|s| !s.is_empty()) {
             Some(get_order_request::Key::OrderId(id_to_u64(oid, "order_id")?))
         } else {
@@ -242,7 +249,7 @@ impl OrdersService {
     }
 
     fn order_intent_from_params(&self, params: &CreateOrderParams) -> Result<OrderIntent> {
-        let scale = self.require_quantity_scale(&params.symbol, params.quantity.scale)?;
+        let scale = self.require_quantity_scale(&params.symbol, params.quantity.scale())?;
         let qty = resolve_qty_scaled(
             &params.quantity,
             scale,
@@ -365,9 +372,14 @@ impl OrdersService {
     }
 
     /// Map the flat public [`RiskLeg`] (`order_type`/`limit_price`) onto a child
-    /// [`RiskExecution`] variant. `trigger_price_source` is no longer part of the
-    /// policy wire and is ignored.
+    /// [`RiskExecution`] variant.
+    #[allow(deprecated)]
     fn encode_risk_child(leg: &RiskLeg, symbol: Option<&str>) -> Result<RiskExecution> {
+        if leg.trigger_price_source.is_some() {
+            return Err(Error::validation(
+                "attached risk always uses last trade; trigger_price_source cannot be supplied",
+            ));
+        }
         let child_ty = leg.order_type.unwrap_or(CreateOrderType::Market);
         let execution = match (child_ty, leg.limit_price.as_ref()) {
             (CreateOrderType::Market, None) => risk_execution::Execution::MarketIoc(Box::default()),
@@ -523,7 +535,7 @@ impl OrdersService {
         }
         let scale = self.require_quantity_scale(
             &params.symbol,
-            params.new_qty.as_ref().and_then(|q| q.scale),
+            params.new_qty.as_ref().and_then(Quantity::scale),
         )?;
         let mut req = ModifyOrderRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
@@ -823,15 +835,16 @@ impl OrdersService {
                 "cancel requires exactly one of order_id or client_order_id",
             ));
         }
-        let symbol_id = if let Some(sid) = params.symbol_id {
-            sid
-        } else {
-            params
-                .symbol
-                .as_deref()
-                .and_then(|s| self.ctx.catalogs.symbol_id_for_symbol(s))
-                .unwrap_or(0)
-        };
+        // A targeted cancel without symbol metadata can route through the
+        // order directory, so avoid waiting for catalogs in that case.
+        if params.symbol_id.is_none() && params.symbol.is_some() {
+            self.ctx.wait_for_catalogs().await?;
+        }
+        let symbol_id = Self::resolve_cancel_symbol_id(
+            &self.ctx.catalogs,
+            params.symbol.as_deref(),
+            params.symbol_id,
+        )?;
         let key = if has_order {
             Some(cancel_order_request::Key::OrderId(id_to_u64(
                 params.order_id.as_deref().unwrap(),
@@ -839,7 +852,10 @@ impl OrdersService {
             )?))
         } else {
             Some(cancel_order_request::Key::ClientOrderId(
-                params.client_order_id.unwrap_or_default(),
+                require_client_style_id(
+                    params.client_order_id.as_deref().unwrap_or_default(),
+                    "client_order_id",
+                )?,
             ))
         };
         let req = CancelOrderRequest {
@@ -849,6 +865,28 @@ impl OrdersService {
             ..Default::default()
         };
         self.cancel(req).await
+    }
+
+    fn resolve_cancel_symbol_id(
+        catalogs: &crate::catalogs::Manager,
+        symbol: Option<&str>,
+        symbol_id: Option<u32>,
+    ) -> Result<u32> {
+        match (symbol, symbol_id) {
+            (None, None) => Ok(0),
+            (_, Some(0)) => Err(Error::validation(
+                "symbol_id must be non-zero when explicitly supplied",
+            )),
+            (Some(_), Some(_)) => Err(Error::validation(
+                "cancel accepts symbol or symbol_id, not both",
+            )),
+            (None, Some(symbol_id)) => Ok(symbol_id),
+            (Some(symbol), None) => catalogs.symbol_id_for_symbol(symbol).ok_or_else(|| {
+                Error::validation(format!(
+                    "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
+                ))
+            }),
+        }
     }
 
     pub async fn cancel_by_client_order_id(
@@ -1004,7 +1042,7 @@ impl OrdersService {
             let Some(qty) = item.new_qty.as_ref() else {
                 continue;
             };
-            let Some(scale) = qty.scale else {
+            let Some(scale) = qty.scale() else {
                 return Err(Error::validation(
                     "batch_modify requires symbol when new_qty has no known scale",
                 ));
@@ -1279,6 +1317,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn attached_risk_encodes_on_create_and_modify() {
         use crate::models::{AttachedRisk, RiskLeg, TriggerPriceSourceKind};
 
@@ -1286,13 +1325,13 @@ mod tests {
         let risk = AttachedRisk {
             take_profit: Some(RiskLeg {
                 trigger_price: Price::from_ticks(51_000_000_000, Some("BTC-USDT".into())).unwrap(),
-                trigger_price_source: Some(TriggerPriceSourceKind::LastPrice),
+                trigger_price_source: None,
                 order_type: Some(CreateOrderType::Market),
                 limit_price: None,
             }),
             stop_loss: Some(RiskLeg {
                 trigger_price: Price::from_ticks(49_000_000_000, Some("BTC-USDT".into())).unwrap(),
-                trigger_price_source: Some(TriggerPriceSourceKind::LastPrice),
+                trigger_price_source: None,
                 order_type: Some(CreateOrderType::Limit),
                 limit_price: Some(
                     Price::from_ticks(48_900_000_000, Some("BTC-USDT".into())).unwrap(),
@@ -1323,6 +1362,22 @@ mod tests {
         modify.new_attached_risk = Some(risk);
         let modify_wire = client.orders.encode_modify_params(modify).unwrap();
         assert!(modify_wire.new_attached_risk.is_set());
+
+        let mut unsupported = create;
+        unsupported
+            .attached_risk
+            .as_mut()
+            .unwrap()
+            .take_profit
+            .as_mut()
+            .unwrap()
+            .trigger_price_source = Some(TriggerPriceSourceKind::IndexPrice);
+        let err = client
+            .orders
+            .encode_create_params(&unsupported)
+            .unwrap_err();
+        assert!(matches!(&err, Error::Validation(_)));
+        assert!(err.to_string().contains("always uses last trade"));
     }
 
     #[test]
@@ -1417,6 +1472,66 @@ mod tests {
         assert!(err.to_string().contains("invalid characters"));
         let err = OrdersService::coalesce_request_id(Some("r".repeat(65)), "mod").unwrap_err();
         assert!(err.to_string().contains("1 to 64"));
+    }
+
+    #[tokio::test]
+    async fn singular_order_methods_reject_invalid_client_order_id_before_transport() {
+        let client = client();
+        let err = client
+            .orders
+            .cancel_by_client_order_id("bad id!", None, None)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::Validation(_)));
+        assert!(err.to_string().contains("invalid characters"));
+
+        let err = client
+            .orders
+            .get(Some("bad id!"), None, None)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::Validation(_)));
+        assert!(err.to_string().contains("invalid characters"));
+    }
+
+    #[test]
+    fn cancel_symbol_routing_distinguishes_omitted_and_invalid_inputs() {
+        let client = client();
+        assert_eq!(
+            OrdersService::resolve_cancel_symbol_id(&client.catalogs, None, None).unwrap(),
+            0
+        );
+        assert_eq!(
+            OrdersService::resolve_cancel_symbol_id(&client.catalogs, Some("BTC-USDT"), None)
+                .unwrap(),
+            7
+        );
+
+        for err in [
+            OrdersService::resolve_cancel_symbol_id(&client.catalogs, Some("UNKNOWN-USDT"), None)
+                .unwrap_err(),
+            OrdersService::resolve_cancel_symbol_id(&client.catalogs, None, Some(0)).unwrap_err(),
+            OrdersService::resolve_cancel_symbol_id(&client.catalogs, Some("BTC-USDT"), Some(7))
+                .unwrap_err(),
+        ] {
+            assert!(matches!(err, Error::Validation(_)));
+        }
+    }
+
+    #[tokio::test]
+    async fn cancel_rejects_unknown_supplied_symbol_before_transport() {
+        let client = client();
+        let err = client
+            .orders
+            .cancel_with(CancelOrderParams {
+                order_id: Some(format_id(9)),
+                symbol: Some("UNKNOWN-USDT".into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap_err();
+        assert!(matches!(&err, Error::Validation(_)));
+        assert!(err.to_string().contains("unknown symbol"));
     }
 
     #[test]

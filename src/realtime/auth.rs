@@ -2,8 +2,9 @@
 
 use crate::auth::{Credentials, encode_query_component};
 use crate::errors::{Error, Result};
+use crate::user_agent::{cloudflare_1010_message, is_cloudflare_browser_ban, user_agent};
 use http_body_util::{BodyExt, Empty, Limited};
-use hyper::header::{CONTENT_LENGTH, HeaderName, HeaderValue};
+use hyper::header::{CONTENT_LENGTH, HeaderName, HeaderValue, USER_AGENT};
 use hyper::{Method, Request};
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
@@ -85,6 +86,9 @@ async fn fetch_rt_token(
         .uri(uri)
         .body(Empty::<bytes::Bytes>::new())
         .map_err(|e| Error::realtime(format!("{label}: request build: {e}")))?;
+    let ua = HeaderValue::from_str(&user_agent())
+        .map_err(|e| Error::realtime(format!("{label}: User-Agent: {e}")))?;
+    req.headers_mut().insert(USER_AGENT, ua);
     for (name, value) in headers {
         let name = HeaderName::from_bytes(name.as_bytes())
             .map_err(|e| Error::realtime(format!("{label}: header name: {e}")))?;
@@ -123,6 +127,10 @@ async fn fetch_rt_token(
         )));
     }
     if status_code == 403 {
+        let text = String::from_utf8_lossy(&body);
+        if is_cloudflare_browser_ban(&text) {
+            return Err(Error::Transport(cloudflare_1010_message()));
+        }
         return Err(map_permission_denied(label, url, status_code, &body));
     }
     if !status.is_success() {
