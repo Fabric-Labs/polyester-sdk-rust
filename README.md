@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.15`, git tag `v0.1.0a15`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.16`, git tag `v0.1.0a16`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ The crate is not on crates.io yet. Pin the published git tag:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a15" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a16" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -149,6 +149,11 @@ value exactly as shown in the app. Do not use an internal numeric id.
 `default_account_id` is optional for public market-data calls. It is required for
 account-scoped operations such as private realtime channels, bucket transfers, and
 some ledger writes.
+
+Automatic request signing gives concurrent identical calls distinct authentication tuples. Cloned
+credentials share this allocator. Timestamps can lead the local clock by at most five seconds;
+larger bursts are backpressured instead of reusing a signature or drifting outside the API's
+10-second freshness window.
 
 ## Authentication patterns
 

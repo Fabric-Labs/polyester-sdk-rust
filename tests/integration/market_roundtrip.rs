@@ -1,6 +1,7 @@
-//! F-22 self-contained market BUY → SELL roundtrip (carry filled qty).
+//! Self-contained market BUY → SELL roundtrip.
 //!
-//! Live acceptance may still be blocked by backend reserve corruption (POLY-3028).
+//! The cleanup SELL carries the BUY's net received base quantity: cumulative
+//! fills minus fees whose source is the received asset.
 
 use crate::support::{
     base_asset_id, call_optional, far_above_buy_stop_price, hydrate_spot_and_zipper,
@@ -36,6 +37,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
     if !require_mutation() {
         return;
     }
+    let _mutation_guard = crate::support::mutation_test_guard().await;
     if !require_funded() {
         return;
     }
@@ -194,6 +196,27 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         eprintln!("skip: buy produced no fill (possible POLY-3028)");
         return;
     }
+    let buy_projection = client
+        .orders
+        .wait_for_order_trades_complete(Some(&buy_cid), None, Duration::from_secs(20))
+        .await
+        .expect("BUY trade projection must reconcile with cum_qty");
+    let received_fee = buy_projection
+        .trades
+        .iter()
+        .filter(|trade| trade.fee_source == "received")
+        .map(|trade| {
+            trade
+                .fee_scaled
+                .parse::<i64>()
+                .expect("received-asset fee must be an i64")
+        })
+        .try_fold(0_i64, i64::checked_add)
+        .expect("received-asset fee sum overflow");
+    let net_received = filled
+        .checked_sub(received_fee)
+        .filter(|qty| *qty > 0)
+        .expect("BUY net received quantity must be positive");
 
     let mut maker_buy_client_order_id = None;
     if let Some(maker) = maker.as_ref() {
@@ -204,7 +227,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
             side: CreateSide::Buy,
             order_type: CreateOrderType::Limit,
             quantity: Quantity::from_scaled(
-                filled,
+                net_received,
                 Some(scale),
                 QuantityDomain::OrderBase,
                 Some(symbol.clone()),
@@ -233,14 +256,15 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         maker_buy_client_order_id = Some(maker_buy_cid);
     }
 
-    // Carry exact filled base qty into cleanup SELL (no larger independent size).
+    // Carry the exact net base received into cleanup SELL. A BUY configured to
+    // pay fees from the received asset cannot safely sell its gross cum_qty.
     let sell_ref_price = market_ref_price(&client, &symbol, "sell", Some(&pair)).await;
     let sell_params = CreateOrderParams {
         symbol: symbol.clone(),
         side: CreateSide::Sell,
         order_type: CreateOrderType::Market,
         quantity: Quantity::from_scaled(
-            filled,
+            net_received,
             Some(scale),
             QuantityDomain::OrderBase,
             Some(symbol.clone()),
@@ -299,8 +323,8 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         .map(|q| q.as_scaled())
         .unwrap_or(0);
     assert_eq!(
-        sell_filled, filled,
-        "cleanup SELL must use BUY filled qty (F-22)"
+        sell_filled, net_received,
+        "cleanup SELL must use BUY net received qty"
     );
 
     let open = client

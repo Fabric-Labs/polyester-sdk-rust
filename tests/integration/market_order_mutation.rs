@@ -17,10 +17,12 @@ fn trade_symbol_or_btc() -> String {
 }
 
 #[tokio::test]
+#[ignore = "one-way funded mutation; use the self-contained market_roundtrip acceptance test"]
 async fn market_buy_mutation() {
     if !require_mutation() {
         return;
     }
+    let _mutation_guard = crate::support::mutation_test_guard().await;
     let Some(client) = require_live_client() else {
         return;
     };
@@ -118,10 +120,12 @@ async fn market_buy_mutation() {
 }
 
 #[tokio::test]
+#[ignore = "one-way funded mutation; use the self-contained market_roundtrip acceptance test"]
 async fn market_sell_mutation() {
     if !require_mutation() {
         return;
     }
+    let _mutation_guard = crate::support::mutation_test_guard().await;
     let Some(client) = require_live_client() else {
         return;
     };

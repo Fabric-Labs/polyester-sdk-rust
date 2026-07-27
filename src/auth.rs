@@ -4,7 +4,9 @@ use crate::errors::{Error, Result};
 use ed25519_dalek::{Signer, SigningKey};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub const API_KEY_ID_ENV: &str = "POLYESTER_API_KEY_ID";
 pub const API_PRIVATE_KEY_ENV: &str = "POLYESTER_API_PRIVATE_KEY";
@@ -14,11 +16,63 @@ pub const HEADER_KEY_ID: &str = "X-API-KEY-ID";
 pub const HEADER_TIMESTAMP: &str = "X-API-TIMESTAMP";
 pub const HEADER_SIGNATURE: &str = "X-API-SIGNATURE";
 
+/// Maximum amount an automatically allocated signing timestamp may lead the
+/// local wall clock. The API accepts a 10-second freshness window; keeping the
+/// client ceiling at 5 seconds leaves room for clock and network skew.
+pub const MAX_SIGNING_FUTURE_SKEW_MS: u64 = 5_000;
+const MAX_SIGNING_BACKPRESSURE: Duration = Duration::from_secs(10);
+
+#[derive(Debug, Default)]
+struct SigningTimestampAllocator {
+    last_timestamp_ms: AtomicU64,
+}
+
+impl SigningTimestampAllocator {
+    fn next(&self) -> Result<u64> {
+        let started = Instant::now();
+        loop {
+            let now = timestamp_ms_from(SystemTime::now())?;
+            let ceiling = now
+                .checked_add(MAX_SIGNING_FUTURE_SKEW_MS)
+                .ok_or_else(|| Error::transport("signing timestamp ceiling overflow"))?;
+            let observed = self.last_timestamp_ms.load(Ordering::Acquire);
+            let candidate = if observed < now {
+                now
+            } else {
+                observed
+                    .checked_add(1)
+                    .ok_or_else(|| Error::transport("signing timestamp sequence exhausted"))?
+            };
+
+            if candidate <= ceiling {
+                if self
+                    .last_timestamp_ms
+                    .compare_exchange_weak(observed, candidate, Ordering::AcqRel, Ordering::Acquire)
+                    .is_ok()
+                {
+                    return Ok(candidate);
+                }
+                continue;
+            }
+
+            if started.elapsed() >= MAX_SIGNING_BACKPRESSURE {
+                return Err(Error::RateLimit {
+                    message: "signing timestamp capacity exhausted; retry after clock advances"
+                        .to_owned(),
+                    retry_after: Some(0.001),
+                });
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+}
+
 /// API-key authentication material.
 #[derive(Clone)]
 pub struct Credentials {
     pub key_id: String,
     signing_key: SigningKey,
+    timestamp_allocator: Arc<SigningTimestampAllocator>,
 }
 
 impl std::fmt::Debug for Credentials {
@@ -41,6 +95,7 @@ impl Credentials {
         Ok(Self {
             key_id,
             signing_key,
+            timestamp_allocator: Arc::new(SigningTimestampAllocator::default()),
         })
     }
 
@@ -89,7 +144,7 @@ impl Credentials {
     ) -> Result<BTreeMap<String, String>> {
         let ts = match timestamp_ms {
             Some(value) => value.to_owned(),
-            None => timestamp_ms_from(SystemTime::now())?.to_string(),
+            None => self.timestamp_allocator.next()?.to_string(),
         };
         let canonical = canonical_signing_string(&ts, method, raw_url, body)?;
         let sig = self.signing_key.sign(canonical.as_bytes());
@@ -319,7 +374,8 @@ mod tests {
     }
 
     #[test]
-    fn concurrent_signing_timestamps_track_wall_clock_without_future_drift() {
+    fn ten_thousand_identical_requests_get_unique_bounded_auth_tuples() {
+        use std::collections::HashSet;
         use std::sync::{Arc, Barrier};
 
         let (seed, _) = generate_ed25519_keypair();
@@ -327,27 +383,46 @@ mod tests {
         let before = timestamp_ms_from(SystemTime::now()).unwrap();
         let barrier = Arc::new(Barrier::new(32));
         let handles = (0..32)
-            .map(|_| {
+            .map(|worker| {
                 let creds = creds.clone();
                 let barrier = Arc::clone(&barrier);
                 std::thread::spawn(move || {
                     barrier.wait();
-                    creds
-                        .sign_request("POST", "https://api.example.test/foo", b"{}", None)
-                        .unwrap()
+                    let count = 10_000 / 32 + usize::from(worker < 10_000 % 32);
+                    (0..count)
+                        .map(|_| {
+                            let headers = creds
+                                .sign_request("POST", "https://api.example.test/foo", b"{}", None)
+                                .unwrap();
+                            let observed_at_ms = timestamp_ms_from(SystemTime::now()).unwrap();
+                            (headers, observed_at_ms)
+                        })
+                        .collect::<Vec<_>>()
                 })
             })
             .collect::<Vec<_>>();
         let headers = handles
             .into_iter()
-            .map(|handle| handle.join().unwrap())
+            .flat_map(|handle| handle.join().unwrap())
             .collect::<Vec<_>>();
-        let after = timestamp_ms_from(SystemTime::now()).unwrap();
-        for headers in headers {
-            let timestamp = headers[HEADER_TIMESTAMP].parse::<u64>().unwrap();
+        assert_eq!(headers.len(), 10_000);
+        let mut timestamps = HashSet::with_capacity(headers.len());
+        let mut signatures = HashSet::with_capacity(headers.len());
+        for (item, observed_at_ms) in headers {
+            let timestamp = item[HEADER_TIMESTAMP].parse::<u64>().unwrap();
             assert!(timestamp >= before);
-            assert!(timestamp <= after);
+            assert!(timestamp <= observed_at_ms + MAX_SIGNING_FUTURE_SKEW_MS);
+            assert!(
+                timestamps.insert(timestamp),
+                "duplicate timestamp {timestamp}"
+            );
+            assert!(
+                signatures.insert(item[HEADER_SIGNATURE].clone()),
+                "duplicate signature for timestamp {timestamp}"
+            );
         }
+        assert_eq!(timestamps.len(), 10_000);
+        assert_eq!(signatures.len(), 10_000);
     }
 
     #[test]

@@ -185,6 +185,7 @@ fn a7_permission_declarations_cover_private_realtime_groups() {
 fn a7_non_dry_run_cancel_all_tests_require_dedicated_account_gate() {
     let integration = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/integration");
     let mut unguarded = Vec::new();
+    let mut unserialized_mutations = Vec::new();
     for entry in std::fs::read_dir(integration).expect("read integration tests") {
         let path = entry.expect("integration entry").path();
         if path.extension().and_then(|value| value.to_str()) != Some("rs") {
@@ -195,12 +196,20 @@ fn a7_non_dry_run_cancel_all_tests_require_dedicated_account_gate() {
             && source.contains(", false,")
             && !source.contains("require_account_wide_cleanup")
         {
-            unguarded.push(path);
+            unguarded.push(path.clone());
+        }
+        if source.contains("require_mutation()") && !source.contains("mutation_test_guard().await")
+        {
+            unserialized_mutations.push(path);
         }
     }
     assert!(
         unguarded.is_empty(),
         "unguarded cancel_all tests: {unguarded:?}"
+    );
+    assert!(
+        unserialized_mutations.is_empty(),
+        "state-changing tests without the shared mutation guard: {unserialized_mutations:?}"
     );
 }
 

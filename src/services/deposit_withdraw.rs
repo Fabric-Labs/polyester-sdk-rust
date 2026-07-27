@@ -109,7 +109,7 @@ impl DepositService {
         )
         .await?
         .into_owned();
-        Ok(create_deposit_address_from_proto(&resp))
+        create_deposit_address_from_proto(&resp)
     }
 }
 
