@@ -14,6 +14,10 @@ pub type BookSide = BTreeMap<i64, i64>; // price_ticks -> qty_scaled
 
 pub fn apply_side_delta(book: &mut BookSide, pairs: &[(i64, i64)]) {
     for &(price, qty) in pairs {
+        // Negative price/qty is wire corruption; never materialize it into the book.
+        if price < 0 || qty < 0 {
+            continue;
+        }
         if qty == 0 {
             book.remove(&price);
         } else {
@@ -42,14 +46,32 @@ pub fn parse_bucket_ticks(bucket: &str) -> Result<i64> {
 /// executable price.
 pub fn bucket_side(book: &BookSide, bucket_ticks: i64, asks: bool) -> Result<BookSide> {
     if bucket_ticks <= 0 {
+        for (&price, &qty) in book {
+            if price < 0 {
+                return Err(Error::validation(
+                    "orderbook price ticks must be non-negative",
+                ));
+            }
+            if qty < 0 {
+                return Err(Error::validation("orderbook quantity must be non-negative"));
+            }
+        }
         return Ok(book.clone());
     }
     let mut out = BookSide::new();
     for (&price, &qty) in book {
+        if price < 0 {
+            return Err(Error::validation(
+                "orderbook price ticks must be non-negative",
+            ));
+        }
         if qty <= 0 {
             continue;
         }
-        let floor = price.div_euclid(bucket_ticks) * bucket_ticks;
+        let quotient = price.div_euclid(bucket_ticks);
+        let floor = quotient
+            .checked_mul(bucket_ticks)
+            .ok_or_else(|| Error::validation("orderbook bucket price overflow"))?;
         let bucket = if asks && price.rem_euclid(bucket_ticks) != 0 {
             floor
                 .checked_add(bucket_ticks)
@@ -57,7 +79,10 @@ pub fn bucket_side(book: &BookSide, bucket_ticks: i64, asks: bool) -> Result<Boo
         } else {
             floor
         };
-        *out.entry(bucket).or_insert(0) += qty;
+        let entry = out.entry(bucket).or_insert(0);
+        *entry = entry
+            .checked_add(qty)
+            .ok_or_else(|| Error::validation("orderbook bucket quantity overflow"))?;
     }
     Ok(out)
 }
@@ -66,7 +91,7 @@ pub fn bucket_side(book: &BookSide, bucket_ticks: i64, asks: bool) -> Result<Boo
 pub fn levels_from_pairs(levels: impl IntoIterator<Item = (i64, i64)>) -> BookSide {
     let mut book = BookSide::new();
     for (price, qty) in levels {
-        if qty == 0 {
+        if price < 0 || qty <= 0 {
             continue;
         }
         book.insert(price, qty);
@@ -143,14 +168,18 @@ fn side_to_levels(
     }
     let limit = limit.min(entries.len());
     let symbol = Some(symbol.to_owned());
-    Ok(entries
-        .into_iter()
-        .take(limit)
-        .map(|(price, qty)| OrderbookLevel {
-            price: decode_price_ticks(price, symbol.clone()),
-            qty: decode_qty_scaled(qty, Some(quantity_scale), symbol.clone(), None),
-        })
-        .collect())
+    let mut levels = Vec::with_capacity(limit);
+    for (price, qty) in entries.into_iter().take(limit) {
+        let price = decode_price_ticks(price, symbol.clone())
+            .ok_or_else(|| Error::validation("orderbook level has invalid or missing price"))?;
+        let qty = decode_qty_scaled(qty, Some(quantity_scale), symbol.clone(), None)
+            .ok_or_else(|| Error::validation("orderbook level has invalid or missing quantity"))?;
+        levels.push(OrderbookLevel {
+            price: Some(price),
+            qty: Some(qty),
+        });
+    }
+    Ok(levels)
 }
 
 /// Render the current in-memory book as [`OrderbookData`].
@@ -302,6 +331,30 @@ mod tests {
         let asks = bucket_side(&book, 10, true).unwrap();
         assert_eq!(asks.get(&110), Some(&5));
         assert!(bucket_side(&BookSide::from([(i64::MAX, 1)]), 10, true).is_err());
+    }
+
+    #[test]
+    fn bucket_side_rejects_negative_price_and_qty_overflow() {
+        assert!(bucket_side(&BookSide::from([(-1, 1)]), 10, false).is_err());
+        assert!(bucket_side(&BookSide::from([(100, i64::MAX), (101, 1)]), 10, false).is_err());
+        // Extreme floor multiply must fail closed instead of wrapping/panicking.
+        assert!(bucket_side(&BookSide::from([(i64::MIN + 1, 1)]), 10, false).is_err());
+    }
+
+    #[test]
+    fn apply_side_delta_ignores_negative_levels() {
+        let mut book = BookSide::from([(100, 5)]);
+        apply_side_delta(&mut book, &[(-1, 3), (100, -2), (101, 4)]);
+        assert_eq!(book.get(&100), Some(&5));
+        assert_eq!(book.get(&101), Some(&4));
+        assert!(!book.contains_key(&-1));
+    }
+
+    #[test]
+    fn build_orderbook_data_rejects_negative_levels() {
+        let bids = BookSide::from([(-5, 1)]);
+        let asks = BookSide::from([(200, 1)]);
+        assert!(build_orderbook_data("BTC-USDT", 2, 7, &bids, &asks, 0, 8).is_err());
     }
 
     #[test]

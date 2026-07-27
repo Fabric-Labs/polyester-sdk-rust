@@ -1,4 +1,7 @@
 use super::ServiceContext;
+use super::correlation_id::{
+    optional_client_order_id, optional_request_id, require_client_style_id,
+};
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
@@ -255,13 +258,9 @@ impl OrdersService {
             },
             ..Default::default()
         };
-        if let Some(client_order_id) = params
-            .client_order_id
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
+        if let Some(client_order_id) = optional_client_order_id(params.client_order_id.as_deref())?
         {
-            intent.client_order_id = client_order_id.to_owned();
+            intent.client_order_id = client_order_id;
         }
         intent.fee_source = match params.fee_source.unwrap_or(OrderFeeSource::Quote) {
             OrderFeeSource::Quote => FeeSource::Quote.into(),
@@ -486,11 +485,8 @@ impl OrdersService {
 
     /// Prefer a trimmed caller-provided request id; otherwise generate one (TS/Go/Python parity).
     fn coalesce_request_id(value: Option<String>, prefix: &str) -> Result<String> {
-        if let Some(id) = value {
-            let trimmed = id.trim();
-            if !trimmed.is_empty() {
-                return Ok(trimmed.to_owned());
-            }
+        if let Some(id) = optional_request_id(value.as_deref())? {
+            return Ok(id);
         }
         Self::new_mutation_request_id(prefix)
     }
@@ -541,7 +537,10 @@ impl OrdersService {
             )?));
         } else {
             req.key = Some(modify_order_request::Key::ClientOrderId(
-                params.client_order_id.unwrap_or_default(),
+                require_client_style_id(
+                    params.client_order_id.as_deref().unwrap_or_default(),
+                    "client_order_id",
+                )?,
             ));
         }
         if let Some(price) = params.new_price.as_ref() {
@@ -562,7 +561,7 @@ impl OrdersService {
         if let Some(behavior) = params.behavior.as_deref() {
             req.behavior = Self::modify_behavior(behavior)?.into();
         }
-        if let Some(ncid) = params.new_client_order_id {
+        if let Some(ncid) = optional_client_order_id(params.new_client_order_id.as_deref())? {
             req.new_client_order_id = ncid;
         }
         Ok(req)
@@ -647,7 +646,10 @@ impl OrdersService {
                 proto.order_id = id_to_u64(item.order_id.as_deref().unwrap(), "order_id")?;
             }
             if has_client {
-                proto.client_order_id = item.client_order_id.unwrap_or_default();
+                proto.client_order_id = require_client_style_id(
+                    item.client_order_id.as_deref().unwrap_or_default(),
+                    "client_order_id",
+                )?;
             }
             if let Some(sid) = item.symbol_id {
                 proto.symbol_id = sid;
@@ -716,7 +718,10 @@ impl OrdersService {
                 )?));
             } else {
                 proto.key = Some(batch_modify_item::Key::ClientOrderId(
-                    item.client_order_id.unwrap_or_default(),
+                    require_client_style_id(
+                        item.client_order_id.as_deref().unwrap_or_default(),
+                        "client_order_id",
+                    )?,
                 ));
             }
             if let Some(price) = item.new_price.as_ref() {
@@ -737,7 +742,7 @@ impl OrdersService {
             if let Some(behavior) = item.behavior.as_deref() {
                 proto.behavior = Self::modify_behavior(behavior)?.into();
             }
-            if let Some(ncid) = item.new_client_order_id {
+            if let Some(ncid) = optional_client_order_id(item.new_client_order_id.as_deref())? {
                 proto.new_client_order_id = ncid;
             }
             proto_items.push(proto);
@@ -791,7 +796,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(cancel_all_after_from_proto(&resp))
+        cancel_all_after_from_proto(&resp)
     }
 
     pub async fn cancel(&self, req: CancelOrderRequest) -> Result<OrderMutationResult> {
@@ -917,7 +922,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(cancel_all_from_proto(&resp))
+        cancel_all_from_proto(&resp)
     }
 
     fn parse_side(side: &str) -> Result<Side> {
@@ -1380,6 +1385,38 @@ mod tests {
 
         params.market_max_slippage = Some(MaxSlippage::Ticks(0));
         assert!(client.orders.encode_create_params(&params).is_err());
+    }
+
+    #[test]
+    fn create_rejects_invalid_client_order_id_before_wire() {
+        let client = client();
+        let mut params = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+
+        params.client_order_id = Some("bad id".into());
+        let err = client.orders.encode_create_params(&params).unwrap_err();
+        assert!(err.to_string().contains("invalid characters"));
+
+        params.client_order_id = Some("a".repeat(37));
+        let err = client.orders.encode_create_params(&params).unwrap_err();
+        assert!(err.to_string().contains("1 to 36"));
+
+        params.client_order_id = Some("ok-id_1.2:3/4".into());
+        assert!(client.orders.encode_create_params(&params).is_ok());
+
+        let err = OrdersService::coalesce_request_id(Some("bad id".into()), "mod").unwrap_err();
+        assert!(err.to_string().contains("invalid characters"));
+        let err = OrdersService::coalesce_request_id(Some("r".repeat(65)), "mod").unwrap_err();
+        assert!(err.to_string().contains("1 to 64"));
     }
 
     #[test]

@@ -281,13 +281,22 @@ fn modify_action_name(
     }
 }
 
-pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> CancelAllOrdersResult {
-    CancelAllOrdersResult {
+pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllOrdersResult> {
+    let status = msg.status.trim();
+    if status.is_empty()
+        || !(status.eq_ignore_ascii_case("submitted") || status.eq_ignore_ascii_case("dry_run"))
+    {
+        return Err(Error::transport(format!(
+            "invalid CancelAllOrders response: unknown status {:?}",
+            msg.status
+        )));
+    }
+    Ok(CancelAllOrdersResult {
         status: msg.status.clone(),
         matched_orders: msg.matched_orders,
         submitted_cancels: msg.submitted_cancels,
         failed_cancels: msg.failed_cancels,
-    }
+    })
 }
 
 /// Per-item results now carry an `Accepted`/`Rejected` outcome oneof instead of
@@ -454,8 +463,17 @@ pub fn batch_modify_from_proto(msg: &BatchModifyOrdersResponse) -> Result<BatchM
     })
 }
 
-pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> CancelAllAfterResult {
-    CancelAllAfterResult {
+pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> Result<CancelAllAfterResult> {
+    let status = msg.status.trim();
+    if status.is_empty()
+        || !(status.eq_ignore_ascii_case("armed") || status.eq_ignore_ascii_case("disabled"))
+    {
+        return Err(Error::transport(format!(
+            "invalid CancelAllAfter response: unknown status {:?}",
+            msg.status
+        )));
+    }
+    Ok(CancelAllAfterResult {
         status: msg.status.clone(),
         effective_timeout_sec: msg.effective_timeout_sec,
         expires_at_ts_ns: if msg.expires_at_ts_ns == 0 {
@@ -463,7 +481,7 @@ pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> CancelAllAft
         } else {
             msg.expires_at_ts_ns.to_string()
         },
-    }
+    })
 }
 
 #[cfg(test)]
@@ -900,5 +918,66 @@ mod tests {
         };
         let err = batch_modify_from_proto(&mismatch).expect_err("count mismatch must fail closed");
         assert!(err.to_string().contains("response counts"));
+    }
+
+    #[test]
+    fn cancel_all_requires_known_status() {
+        let valid = CancelAllOrdersResponse {
+            status: "submitted".into(),
+            matched_orders: 2,
+            submitted_cancels: 2,
+            failed_cancels: 0,
+            ..Default::default()
+        };
+        let decoded = cancel_all_from_proto(&valid).expect("submitted is valid");
+        assert_eq!(decoded.status, "submitted");
+        assert_eq!(decoded.matched_orders, 2);
+
+        let dry_run = CancelAllOrdersResponse {
+            status: "dry_run".into(),
+            ..Default::default()
+        };
+        assert!(cancel_all_from_proto(&dry_run).is_ok());
+
+        for status in ["", "ok", "maybe", "accepted"] {
+            let bad = CancelAllOrdersResponse {
+                status: status.into(),
+                matched_orders: 1,
+                ..Default::default()
+            };
+            let err = cancel_all_from_proto(&bad).expect_err("unknown cancel-all status");
+            assert!(err.to_string().contains("unknown status"));
+        }
+    }
+
+    #[test]
+    fn cancel_all_after_requires_known_status() {
+        let armed = CancelAllAfterResponse {
+            status: "armed".into(),
+            effective_timeout_sec: 30,
+            expires_at_ts_ns: 99,
+            ..Default::default()
+        };
+        let decoded = cancel_all_after_from_proto(&armed).expect("armed is valid");
+        assert_eq!(decoded.status, "armed");
+        assert_eq!(decoded.effective_timeout_sec, 30);
+        assert_eq!(decoded.expires_at_ts_ns, "99");
+
+        let disabled = CancelAllAfterResponse {
+            status: "disabled".into(),
+            ..Default::default()
+        };
+        assert!(cancel_all_after_from_proto(&disabled).is_ok());
+
+        for status in ["", "ok", "submitted", "maybe"] {
+            let bad = CancelAllAfterResponse {
+                status: status.into(),
+                effective_timeout_sec: 10,
+                ..Default::default()
+            };
+            let err =
+                cancel_all_after_from_proto(&bad).expect_err("unknown cancel-all-after status");
+            assert!(err.to_string().contains("unknown status"));
+        }
     }
 }

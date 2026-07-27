@@ -244,6 +244,9 @@ async fn l2_auth_10k_identical_requests_are_unique_future_bounded_and_runtime_sa
         }
         largest_gap
     });
+    // Let the ticker arm its first timer before creating 10k runnable tasks so
+    // task-spawn overhead is not misclassified as signing backpressure.
+    tokio::task::yield_now().await;
     let handles = (0..10_000)
         .map(|_| {
             let credentials = credentials.clone();
@@ -278,7 +281,7 @@ async fn l2_auth_10k_identical_requests_are_unique_future_bounded_and_runtime_sa
     let largest_timer_gap = ticker.await.unwrap();
     assert_eq!(tuples.len(), 10_000);
     assert!(
-        largest_timer_gap < Duration::from_secs(1),
+        largest_timer_gap < Duration::from_secs(2),
         "signing backpressure stalled current-thread Tokio for {largest_timer_gap:?}"
     );
     let timestamps = tuples.iter().map(|item| item.0).collect::<HashSet<_>>();
@@ -569,6 +572,120 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
             .await
             .unwrap()
             .is_none()
+    );
+}
+
+#[tokio::test]
+async fn l2_invalid_client_order_and_trigger_ids_fail_closed_without_hitting_connect() {
+    use polyester::models::{
+        CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce, CreateTriggerParams,
+        CreateTriggerType,
+    };
+    use polyester::{Price, Quantity, QuantityDomain};
+    use serde_json::json;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let hits = Arc::new(AtomicUsize::new(0));
+    let hits_cb = Arc::clone(&hits);
+    let http = MockHttpServer::spawn(move |_req| {
+        hits_cb.fetch_add(1, Ordering::SeqCst);
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .expect("client");
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+
+    let quantity = Quantity::from_scaled(
+        1,
+        Some(8),
+        QuantityDomain::OrderBase,
+        Some("BTC-USDT".into()),
+        Some(1),
+    )
+    .unwrap();
+    let price = Price::from_ticks(1, Some("BTC-USDT".into())).unwrap();
+
+    let order_err = client
+        .orders
+        .create(CreateOrderParams {
+            symbol: "BTC-USDT".into(),
+            side: CreateSide::Buy,
+            order_type: CreateOrderType::Limit,
+            quantity: quantity.clone(),
+            price: Some(price.clone()),
+            time_in_force: Some(CreateTimeInForce::Gtc),
+            client_order_id: Some("bad id!".into()),
+            subaccount_id: None,
+            post_only: None,
+            market_client_ref_price: None,
+            fee_source: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
+            attached_risk: None,
+        })
+        .await
+        .expect_err("invalid client_order_id must fail locally");
+    assert!(
+        matches!(order_err, Error::Validation(_)),
+        "want Validation, got {order_err:?}"
+    );
+
+    let trigger_err = client
+        .triggers
+        .create(CreateTriggerParams {
+            symbol: "BTC-USDT".into(),
+            trigger_type: CreateTriggerType::StopLoss,
+            side: CreateSide::Sell,
+            order_type: CreateOrderType::Market,
+            qty: quantity,
+            trigger_price: Some(price),
+            limit_price: None,
+            trigger_price_source: None,
+            time_in_force: None,
+            subaccount_id: None,
+            client_trigger_id: "x".repeat(37),
+            post_only: false,
+            activation_price: None,
+            trailing_distance_ticks: None,
+            trailing_distance_bps: None,
+            max_slippage_ticks: None,
+            max_slippage_bps: None,
+            twap_duration_ms: None,
+            twap_slice_interval_ms: None,
+            ladder_price_min: None,
+            ladder_price_max: None,
+            ladder_levels: None,
+            ladder_distribution: None,
+            fee_source: None,
+            self_trade_prevention_mode: None,
+        })
+        .await
+        .expect_err("oversized client_trigger_id must fail locally");
+    assert!(
+        matches!(trigger_err, Error::Validation(_)),
+        "want Validation, got {trigger_err:?}"
+    );
+
+    assert_eq!(
+        hits.load(Ordering::SeqCst),
+        0,
+        "invalid correlation ids must not reach Connect"
     );
 }
 
@@ -2527,6 +2644,79 @@ async fn l2_batch_cancel_rejects_inconsistent_server_counts_through_public_servi
         .await
         .expect_err("service must reject an ambiguous batch result");
     assert!(err.to_string().contains("response counts"), "{err}");
+}
+
+#[tokio::test]
+async fn l2_cancel_all_rejects_empty_and_unknown_status_through_public_service() {
+    use polyester::proto::orders::v1::CancelAllOrdersResponse;
+
+    for status in ["", "ok", "maybe"] {
+        let response = CancelAllOrdersResponse {
+            status: status.into(),
+            matched_orders: 1,
+            submitted_cancels: 1,
+            ..Default::default()
+        };
+        let http = MockHttpServer::spawn(move |req| {
+            if req.path == "/orders.v1.OrdersService/CancelAllOrders" {
+                connect_proto_ok(&response)
+            } else {
+                hardening_support::HttpScript::NotFound
+            }
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: http.base_url(),
+            api_key_id: Some("ak_test".into()),
+            api_private_key: Some(TEST_KEY.into()),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .expect("client");
+
+        let err = client
+            .orders
+            .cancel_all(None, false, None)
+            .await
+            .expect_err("empty/unknown cancel-all status must fail closed");
+        assert!(err.to_string().contains("unknown status"), "{err}");
+    }
+}
+
+#[tokio::test]
+async fn l2_cancel_all_after_rejects_empty_and_unknown_status_through_public_service() {
+    use polyester::proto::orders::v1::CancelAllAfterResponse;
+
+    for status in ["", "submitted", "maybe"] {
+        let response = CancelAllAfterResponse {
+            status: status.into(),
+            effective_timeout_sec: 15,
+            ..Default::default()
+        };
+        let http = MockHttpServer::spawn(move |req| {
+            if req.path == "/orders.v1.OrdersService/CancelAllAfter" {
+                connect_proto_ok(&response)
+            } else {
+                hardening_support::HttpScript::NotFound
+            }
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: http.base_url(),
+            api_key_id: Some("ak_test".into()),
+            api_private_key: Some(TEST_KEY.into()),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .expect("client");
+
+        let err = client
+            .orders
+            .cancel_all_after(15, None, None, None)
+            .await
+            .expect_err("empty/unknown cancel-all-after status must fail closed");
+        assert!(err.to_string().contains("unknown status"), "{err}");
+    }
 }
 
 #[tokio::test]

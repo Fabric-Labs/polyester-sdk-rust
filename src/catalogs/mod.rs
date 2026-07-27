@@ -8,6 +8,7 @@
 use crate::codecs::scalars::{MAX_PROTOCOL_SCALE, validate_protocol_scale};
 use crate::errors::{Error, Result};
 use crate::models::{DepositWithdrawConfig, ZippedAssetSupplyUpdate};
+use crate::realtime::{read_unpoisoned, write_unpoisoned};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -240,16 +241,14 @@ impl Manager {
     /// True only after both spot and zipper snapshots were validated and
     /// installed atomically.
     pub fn is_ready(&self) -> bool {
-        self.inner
-            .read()
-            .map(|inner| inner.spot_config.is_some() && inner.zipper_config.is_some())
-            .unwrap_or(false)
+        let inner = read_unpoisoned(&self.inner);
+        inner.spot_config.is_some() && inner.zipper_config.is_some()
     }
 
     /// Validate and install spot config atomically (no partial row mutation).
     pub fn hydrate_spot_config_json(&self, value: Value) -> Result<()> {
         let snap = build_spot_snapshot(value)?;
-        let mut inner = self.inner.write().expect("catalog lock");
+        let mut inner = write_unpoisoned(&self.inner);
         apply_spot(&mut inner, snap);
         Ok(())
     }
@@ -264,7 +263,7 @@ impl Manager {
     /// Validate and install zipper config atomically (no partial row mutation).
     pub fn hydrate_zipper_config_json(&self, value: Value) -> Result<()> {
         let snap = build_zipper_snapshot(value)?;
-        let mut inner = self.inner.write().expect("catalog lock");
+        let mut inner = write_unpoisoned(&self.inner);
         apply_zipper(&mut inner, snap);
         Ok(())
     }
@@ -275,14 +274,17 @@ impl Manager {
     pub fn hydrate_spot_and_zipper_json(&self, spot: Value, zipper: Value) -> Result<()> {
         let spot_snap = build_spot_snapshot(spot)?;
         let zipper_snap = build_zipper_snapshot(zipper)?;
-        let mut inner = self.inner.write().expect("catalog lock");
+        let mut inner = write_unpoisoned(&self.inner);
         apply_spot(&mut inner, spot_snap);
         apply_zipper(&mut inner, zipper_snap);
         Ok(())
     }
 
     pub fn symbol_id_for_symbol(&self, symbol: &str) -> Option<u32> {
-        self.inner.read().ok()?.symbol_to_id.get(symbol).copied()
+        read_unpoisoned(&self.inner)
+            .symbol_to_id
+            .get(symbol)
+            .copied()
     }
 
     /// Returns the pair base quantity scale, or `None` when unknown/unhydrated.
@@ -290,38 +292,36 @@ impl Manager {
     /// Never invents scale 8 for missing symbols — callers that need a decode
     /// fallback must choose it explicitly.
     pub fn base_quantity_scale_for_symbol(&self, symbol: &str) -> Option<u32> {
-        self.inner
-            .read()
-            .ok()
-            .and_then(|i| i.symbol_to_base_scale.get(symbol).copied())
+        read_unpoisoned(&self.inner)
+            .symbol_to_base_scale
+            .get(symbol)
+            .copied()
     }
 
     pub fn base_quantity_scale_for_symbol_id(&self, id: u32) -> Option<u32> {
-        self.inner
-            .read()
-            .ok()
-            .and_then(|i| i.id_to_base_scale.get(&id).copied())
+        read_unpoisoned(&self.inner)
+            .id_to_base_scale
+            .get(&id)
+            .copied()
     }
 
     pub fn quantity_scale_for_zipped_asset_id(&self, id: u32) -> Option<u32> {
-        self.inner
-            .read()
-            .ok()
-            .and_then(|i| i.zipped_id_to_scale.get(&id).copied())
+        read_unpoisoned(&self.inner)
+            .zipped_id_to_scale
+            .get(&id)
+            .copied()
     }
 
     pub fn orderbook_price_buckets_for_symbol(&self, symbol: &str) -> Vec<String> {
-        self.inner
-            .read()
-            .ok()
-            .and_then(|i| i.orderbook_buckets.get(symbol).cloned())
+        read_unpoisoned(&self.inner)
+            .orderbook_buckets
+            .get(symbol)
+            .cloned()
             .unwrap_or_default()
     }
 
     pub fn ledger_id_for_asset(&self, symbol: &str) -> Option<u32> {
-        self.inner
-            .read()
-            .ok()?
+        read_unpoisoned(&self.inner)
             .asset_to_ledger_id
             .get(symbol)
             .copied()
@@ -329,9 +329,7 @@ impl Manager {
 
     /// Latest supply string for a zipped asset id, if patched from realtime updates.
     pub fn supply_for_zipped_asset_id(&self, id: u32) -> Option<String> {
-        self.inner
-            .read()
-            .ok()?
+        read_unpoisoned(&self.inner)
             .zipped_id_to_supply
             .get(&id)
             .cloned()
@@ -346,7 +344,7 @@ impl Manager {
         if updates.is_empty() {
             return false;
         }
-        let mut inner = self.inner.write().expect("catalog lock");
+        let mut inner = write_unpoisoned(&self.inner);
         let mut changed = false;
         for update in updates {
             let prev = inner.zipped_id_to_supply.get(&update.zipped_asset_id);
@@ -358,6 +356,19 @@ impl Manager {
             }
         }
         changed
+    }
+
+    #[cfg(test)]
+    fn poison_for_test(&self) {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = self.inner.write().expect("catalog lock");
+            panic!("poison catalog");
+        }));
+        assert!(result.is_err(), "poison panic must unwind");
+        assert!(
+            self.inner.read().is_err(),
+            "catalog RwLock must be poisoned for this test"
+        );
     }
 }
 
@@ -697,5 +708,91 @@ mod tests {
             assert_eq!(mgr.ledger_id_for_asset("BTC"), None);
             assert_eq!(mgr.quantity_scale_for_zipped_asset_id(42), Some(6));
         }
+    }
+
+    fn seed_ready_catalog(mgr: &Manager) {
+        mgr.hydrate_spot_and_zipper_json(
+            json!({
+                "pairs": [{
+                    "symbol": "BTC-USDT",
+                    "symbol_id": 1,
+                    "base_quantity_scale": 8,
+                    "orderbook_price_buckets": [0.01, 0.1]
+                }]
+            }),
+            json!({
+                "assets": [{
+                    "asset": "USDT",
+                    "ledger_id": 99,
+                    "quantity_scale": 6,
+                    "variants": [{"zipped_asset_id": 42}]
+                }]
+            }),
+        )
+        .expect("hydrate");
+        assert!(mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
+            zipped_asset_id: 42,
+            supply: "100.5".to_owned(),
+        }]));
+    }
+
+    #[test]
+    fn poisoned_catalog_reads_still_return_hydrated_scale_data() {
+        let mgr = Manager::new();
+        seed_ready_catalog(&mgr);
+        mgr.poison_for_test();
+
+        // Poison must not masquerade as "symbol/asset not found" — that would
+        // route around fail-closed scale lookups by reporting absence.
+        assert!(mgr.is_ready());
+        assert_eq!(mgr.symbol_id_for_symbol("BTC-USDT"), Some(1));
+        assert_eq!(mgr.base_quantity_scale_for_symbol("BTC-USDT"), Some(8));
+        assert_eq!(mgr.base_quantity_scale_for_symbol_id(1), Some(8));
+        assert_eq!(mgr.quantity_scale_for_zipped_asset_id(42), Some(6));
+        assert_eq!(mgr.ledger_id_for_asset("USDT"), Some(99));
+        assert_eq!(
+            mgr.orderbook_price_buckets_for_symbol("BTC-USDT"),
+            vec!["0.01".to_owned(), "0.1".to_owned()]
+        );
+        assert_eq!(mgr.supply_for_zipped_asset_id(42).as_deref(), Some("100.5"));
+        assert_eq!(mgr.base_quantity_scale_for_symbol("NOPE"), None);
+    }
+
+    #[test]
+    fn poisoned_catalog_writes_still_hydrate_and_patch() {
+        let mgr = Manager::new();
+        seed_ready_catalog(&mgr);
+        mgr.poison_for_test();
+
+        mgr.hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "ETH-USDT",
+                "symbol_id": 2,
+                "base_quantity_scale": 6
+            }]
+        }))
+        .expect("spot write after poison");
+        assert_eq!(mgr.base_quantity_scale_for_symbol("ETH-USDT"), Some(6));
+        assert_eq!(mgr.base_quantity_scale_for_symbol("BTC-USDT"), None);
+
+        assert!(mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
+            zipped_asset_id: 42,
+            supply: "200".to_owned(),
+        }]));
+        assert_eq!(mgr.supply_for_zipped_asset_id(42).as_deref(), Some("200"));
+
+        mgr.hydrate_zipper_config_json(json!({
+            "assets": [{
+                "asset": "BTC",
+                "ledger_id": 1,
+                "quantity_scale": 8,
+                "variants": [{"zipped_asset_id": 7}]
+            }]
+        }))
+        .expect("zipper write after poison");
+        assert_eq!(mgr.ledger_id_for_asset("BTC"), Some(1));
+        assert_eq!(mgr.quantity_scale_for_zipped_asset_id(7), Some(8));
+        // Live supply map is preserved across zipper replacement.
+        assert_eq!(mgr.supply_for_zipped_asset_id(42).as_deref(), Some("200"));
     }
 }
