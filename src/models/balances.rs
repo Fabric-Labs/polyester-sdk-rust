@@ -33,7 +33,7 @@ pub struct BalanceHistory {
     pub bucket: String,
     pub start_ts_sec: i64,
     pub end_ts_sec: i64,
-    pub points: i32,
+    pub points: u32,
     pub series: Vec<BalanceHistorySeries>,
 }
 
@@ -53,7 +53,7 @@ pub struct EquityHistory {
     pub start_ts_sec: i64,
     pub end_ts_sec: i64,
     pub quote_asset: String,
-    pub points: i32,
+    pub points: u32,
     pub series: Vec<EquityHistorySeries>,
 }
 

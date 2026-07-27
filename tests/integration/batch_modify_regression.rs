@@ -156,6 +156,9 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
             subaccount_id: None,
             post_only: Some(true),
             market_client_ref_price: None,
+            fee_source: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
             attached_risk: None,
         };
         match client.orders.create(params).await {

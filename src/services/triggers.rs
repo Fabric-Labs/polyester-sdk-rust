@@ -125,20 +125,23 @@ impl TriggersService {
             qty_scaled: qty,
             ..Default::default()
         };
-        intent.client_trigger_id = params
-            .client_trigger_id
-            .clone()
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(Self::new_client_trigger_id);
+        if params.client_trigger_id.trim().is_empty() {
+            return Err(Error::validation(
+                "client_trigger_id is required and must remain stable across retries",
+            ));
+        }
+        intent.client_trigger_id = params.client_trigger_id.clone();
         if let Some(src) = params.fee_source.as_deref() {
             intent.fee_source = Self::fee_source(src)?.into();
         }
         if let Some(mode) = params.self_trade_prevention_mode.as_deref() {
             intent.self_trade_prevention_mode = Self::stp_mode(mode)?.into();
         }
-        // trigger_price_source is no longer part of the create wire contract; it is
-        // evaluated server-side. Accept and ignore for API compatibility.
-        let _ = params.trigger_price_source.as_ref();
+        if params.trigger_price_source.is_some() {
+            return Err(Error::validation(
+                "trigger_price_source is not supported by the current wire contract",
+            ));
+        }
 
         let side = match params.side {
             CreateSide::Buy => Side::Buy,
@@ -147,10 +150,14 @@ impl TriggersService {
 
         intent.strategy = Some(match params.trigger_type {
             CreateTriggerType::StopLoss | CreateTriggerType::TakeProfit => {
-                let trigger_price_ticks = match params.trigger_price.as_ref() {
-                    Some(price) => resolve_price_ticks(price, Some(&params.symbol))?,
-                    None => 0,
-                };
+                let trigger_price_ticks = params
+                    .trigger_price
+                    .as_ref()
+                    .ok_or_else(|| Error::validation("stop/take-profit requires trigger_price"))
+                    .and_then(|price| resolve_price_ticks(price, Some(&params.symbol)))?;
+                if trigger_price_ticks <= 0 {
+                    return Err(Error::validation("trigger_price must be positive"));
+                }
                 let mut cond = ConditionalTrigger {
                     trigger_price_ticks,
                     side: side.into(),
@@ -169,10 +176,30 @@ impl TriggersService {
                     return Err(Error::validation("trailing_stop only supports side=sell"));
                 }
                 let mut trailing = TrailingStopTrigger::default();
+                if params.trailing_distance_ticks.is_some()
+                    == params.trailing_distance_bps.is_some()
+                {
+                    return Err(Error::validation(
+                        "trailing_stop requires exactly one of trailing_distance_ticks or trailing_distance_bps",
+                    ));
+                }
+                if params.max_slippage_ticks.is_some() && params.max_slippage_bps.is_some() {
+                    return Err(Error::validation(
+                        "trailing_stop allows at most one of max_slippage_ticks or max_slippage_bps",
+                    ));
+                }
                 if let Some(ticks) = params.trailing_distance_ticks {
+                    if ticks <= 0 {
+                        return Err(Error::validation(
+                            "trailing_distance_ticks must be positive",
+                        ));
+                    }
                     trailing.trailing_distance =
                         Some(trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(ticks));
                 } else if let Some(bps) = params.trailing_distance_bps {
+                    if bps <= 0 {
+                        return Err(Error::validation("trailing_distance_bps must be positive"));
+                    }
                     trailing.trailing_distance =
                         Some(trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(bps));
                 } else {
@@ -185,25 +212,40 @@ impl TriggersService {
                         resolve_price_ticks(price, Some(&params.symbol))?;
                 }
                 if let Some(ticks) = params.max_slippage_ticks {
+                    if ticks <= 0 {
+                        return Err(Error::validation("max_slippage_ticks must be positive"));
+                    }
                     trailing.max_slippage =
                         Some(trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(ticks));
                 } else if let Some(bps) = params.max_slippage_bps {
+                    if bps <= 0 {
+                        return Err(Error::validation("max_slippage_bps must be positive"));
+                    }
                     trailing.max_slippage =
                         Some(trailing_stop_trigger::MaxSlippage::MaxSlippageBps(bps));
                 }
                 trigger_intent::Strategy::TrailingStop(Box::new(trailing))
             }
             CreateTriggerType::Twap => {
+                let duration_ms = params
+                    .twap_duration_ms
+                    .filter(|value| *value > 0)
+                    .ok_or_else(|| Error::validation("twap requires positive duration_ms"))?;
+                let slice_interval_ms = params
+                    .twap_slice_interval_ms
+                    .filter(|value| *value > 0)
+                    .ok_or_else(|| Error::validation("twap requires positive slice_interval_ms"))?;
+                if slice_interval_ms > duration_ms {
+                    return Err(Error::validation(
+                        "twap slice_interval_ms must not exceed duration_ms",
+                    ));
+                }
                 let mut twap = TwapTrigger {
                     side: side.into(),
+                    duration_ms,
+                    slice_interval_ms,
                     ..Default::default()
                 };
-                if let Some(ms) = params.twap_duration_ms {
-                    twap.duration_ms = ms;
-                }
-                if let Some(ms) = params.twap_slice_interval_ms {
-                    twap.slice_interval_ms = ms;
-                }
                 twap.execution = Some(match params.order_type {
                     CreateOrderType::Market => twap_trigger::Execution::MarketIoc(Box::default()),
                     CreateOrderType::Limit => {
@@ -227,20 +269,33 @@ impl TriggersService {
                         ));
                     }
                 }
-                let mut ladder = LadderTrigger {
+                let price_min_ticks = params
+                    .ladder_price_min
+                    .as_ref()
+                    .ok_or_else(|| Error::validation("ladder requires ladder_price_min"))
+                    .and_then(|price| resolve_price_ticks(price, Some(&params.symbol)))?;
+                let price_max_ticks = params
+                    .ladder_price_max
+                    .as_ref()
+                    .ok_or_else(|| Error::validation("ladder requires ladder_price_max"))
+                    .and_then(|price| resolve_price_ticks(price, Some(&params.symbol)))?;
+                let levels = params
+                    .ladder_levels
+                    .filter(|value| *value > 0)
+                    .ok_or_else(|| Error::validation("ladder requires positive ladder_levels"))?;
+                if price_min_ticks <= 0 || price_max_ticks <= price_min_ticks {
+                    return Err(Error::validation(
+                        "ladder prices must be positive and max must exceed min",
+                    ));
+                }
+                let ladder = LadderTrigger {
                     side: side.into(),
                     post_only: params.post_only,
+                    price_min_ticks,
+                    price_max_ticks,
+                    levels,
                     ..Default::default()
                 };
-                if let Some(price) = params.ladder_price_min.as_ref() {
-                    ladder.price_min_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
-                }
-                if let Some(price) = params.ladder_price_max.as_ref() {
-                    ladder.price_max_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
-                }
-                if let Some(levels) = params.ladder_levels {
-                    ladder.levels = levels;
-                }
                 trigger_intent::Strategy::Ladder(Box::new(ladder))
             }
         });
@@ -342,29 +397,43 @@ impl TriggersService {
         if let Some(price) = params.activation_price.as_ref() {
             req.activation_price_ticks = Some(resolve_price_ticks(price, None)?);
         }
+        if params.trailing_distance_ticks.is_some() && params.trailing_distance_bps.is_some() {
+            return Err(Error::validation(
+                "modify allows at most one trailing distance representation",
+            ));
+        }
+        if params.max_slippage_ticks.is_some() && params.max_slippage_bps.is_some() {
+            return Err(Error::validation(
+                "modify allows at most one max slippage representation",
+            ));
+        }
         if let Some(ticks) = params.trailing_distance_ticks {
+            if ticks <= 0 {
+                return Err(Error::validation(
+                    "trailing_distance_ticks must be positive",
+                ));
+            }
             req.trailing_distance =
                 Some(modify_trigger_request::TrailingDistance::TrailingDistanceTicks(ticks));
         } else if let Some(bps) = params.trailing_distance_bps {
+            if bps <= 0 {
+                return Err(Error::validation("trailing_distance_bps must be positive"));
+            }
             req.trailing_distance =
                 Some(modify_trigger_request::TrailingDistance::TrailingDistanceBps(bps));
         }
         if let Some(ticks) = params.max_slippage_ticks {
+            if ticks <= 0 {
+                return Err(Error::validation("max_slippage_ticks must be positive"));
+            }
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageTicks(ticks));
         } else if let Some(bps) = params.max_slippage_bps {
+            if bps <= 0 {
+                return Err(Error::validation("max_slippage_bps must be positive"));
+            }
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageBps(bps));
         }
         Ok(req)
-    }
-
-    fn new_client_trigger_id() -> String {
-        format!(
-            "trg-{:x}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        )
     }
 
     fn fee_source(label: &str) -> Result<FeeSource> {
@@ -399,7 +468,7 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(trigger_mutation_from_create(&resp))
+        trigger_mutation_from_create(&resp)
     }
 
     pub async fn cancel(&self, req: CancelTriggerRequest) -> Result<TriggerMutationResult> {
@@ -412,7 +481,7 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(trigger_mutation_from_cancel(&resp))
+        trigger_mutation_from_cancel(&resp)
     }
 
     /// Cancel a trigger using the public string ID returned by create and list calls.
@@ -439,7 +508,7 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(trigger_mutation_from_pause(&resp))
+        trigger_mutation_from_pause(&resp)
     }
 
     /// Pause a trigger using the public string ID returned by create and list calls.
@@ -466,7 +535,7 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(trigger_mutation_from_resume(&resp))
+        trigger_mutation_from_resume(&resp)
     }
 
     /// Resume a trigger using the public string ID returned by create and list calls.
@@ -495,7 +564,7 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(trigger_mutation_from_modify(&resp))
+        trigger_mutation_from_modify(&resp)
     }
 
     pub async fn list_events(&self, req: ListTriggerEventsRequest) -> Result<TriggerEventsList> {
@@ -576,10 +645,10 @@ mod tests {
             qty,
             trigger_price: Some(trigger_price),
             limit_price: Some(limit_price),
-            trigger_price_source: Some("last".into()),
+            trigger_price_source: None,
             time_in_force: Some(CreateTimeInForce::Gtc),
             subaccount_id: None,
-            client_trigger_id: Some("trigger-equivalence".into()),
+            client_trigger_id: "trigger-equivalence".into(),
             post_only: false,
             activation_price: None,
             trailing_distance_ticks: None,
@@ -698,6 +767,54 @@ mod tests {
     }
 
     #[test]
+    fn trigger_create_rejects_missing_ids_fields_and_ambiguous_oneofs() {
+        let client = client();
+        let base = create_params(
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+
+        let mut missing_id = base.clone();
+        missing_id.client_trigger_id = " ".into();
+        assert!(client.triggers.encode_create_params(&missing_id).is_err());
+
+        let mut missing_trigger_price = base.clone();
+        missing_trigger_price.trigger_price = None;
+        assert!(
+            client
+                .triggers
+                .encode_create_params(&missing_trigger_price)
+                .is_err()
+        );
+
+        let mut unsupported_source = base.clone();
+        unsupported_source.trigger_price_source = Some("mark".into());
+        assert!(
+            client
+                .triggers
+                .encode_create_params(&unsupported_source)
+                .is_err()
+        );
+
+        let mut trailing = base.clone();
+        trailing.trigger_type = CreateTriggerType::TrailingStop;
+        trailing.trigger_price = None;
+        trailing.limit_price = None;
+        trailing.trailing_distance_ticks = Some(10);
+        trailing.trailing_distance_bps = Some(10);
+        assert!(client.triggers.encode_create_params(&trailing).is_err());
+
+        let mut twap = base.clone();
+        twap.trigger_type = CreateTriggerType::Twap;
+        assert!(client.triggers.encode_create_params(&twap).is_err());
+
+        let mut ladder = base;
+        ladder.trigger_type = CreateTriggerType::Ladder;
+        assert!(client.triggers.encode_create_params(&ladder).is_err());
+    }
+
+    #[test]
     fn lifecycle_helpers_accept_base58_trigger_ids() {
         let client = client();
         let encoded = bs58::encode(42_u64.to_be_bytes()).into_string();
@@ -725,6 +842,12 @@ mod tests {
             max_slippage_bps: None,
         };
         assert!(client.triggers.encode_modify_params(&params).is_err());
+
+        let nonpositive = ModifyTriggerParams {
+            trailing_distance_bps: Some(0),
+            ..params
+        };
+        assert!(client.triggers.encode_modify_params(&nonpositive).is_err());
     }
 
     #[test]

@@ -288,7 +288,7 @@ impl Client {
                 "catalog hydration was not started because Client was constructed outside a \
                  Tokio runtime; await client.wait_for_catalogs() before placing orders",
             );
-            *self.catalog_last_error.lock().expect("catalog error lock") = Some(error.clone());
+            *crate::realtime::lock_unpoisoned(&self.catalog_last_error) = Some(error.clone());
             let _ = self.catalog_ready.set(Err(error));
             return;
         }
@@ -304,7 +304,7 @@ impl Client {
                 .get_or_init(|| async move {
                     let _guard = hydrate_lock.lock().await;
                     let result = Self::hydrate_catalogs_with(market_data, zipper, catalogs).await;
-                    *last_error.lock().expect("catalog error lock") = result.clone().err();
+                    *crate::realtime::lock_unpoisoned(&last_error) = result.clone().err();
                     result
                 })
                 .await;
@@ -341,7 +341,7 @@ impl Client {
             self.catalogs.clone(),
         )
         .await;
-        *self.catalog_last_error.lock().expect("catalog error lock") = result.clone().err();
+        *crate::realtime::lock_unpoisoned(&self.catalog_last_error) = result.clone().err();
         let _ = self.catalog_ready.set(result.clone());
         result
     }
@@ -370,7 +370,7 @@ impl Client {
                 self.catalogs.clone(),
             )
             .await;
-            *self.catalog_last_error.lock().expect("catalog error lock") = result.clone().err();
+            *crate::realtime::lock_unpoisoned(&self.catalog_last_error) = result.clone().err();
             return result;
         }
         let last_error = self.catalog_last_error.clone();
@@ -382,7 +382,7 @@ impl Client {
             .get_or_init(|| async move {
                 let _guard = hydrate_lock.lock().await;
                 let result = Self::hydrate_catalogs_with(market_data, zipper, catalogs).await;
-                *last_error.lock().expect("catalog error lock") = result.clone().err();
+                *crate::realtime::lock_unpoisoned(&last_error) = result.clone().err();
                 result
             })
             .await
@@ -391,10 +391,7 @@ impl Client {
 
     /// Most recent catalog hydration error, if any.
     pub fn catalogs_last_error(&self) -> Option<Error> {
-        self.catalog_last_error
-            .lock()
-            .expect("catalog error lock")
-            .clone()
+        crate::realtime::lock_unpoisoned(&self.catalog_last_error).clone()
     }
 }
 
@@ -422,6 +419,29 @@ mod tests {
         assert!(rendered.contains("ak_test"));
         assert!(rendered.contains("[REDACTED]"));
         assert!(!rendered.contains("super-secret-private-key"));
+    }
+
+    #[test]
+    fn catalog_error_state_recovers_from_a_poisoned_mutex() {
+        let client = Client::new(Config {
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .unwrap();
+        let state = Arc::clone(&client.catalog_last_error);
+        let _ = std::thread::spawn(move || {
+            let _guard = state.lock().unwrap();
+            panic!("poison catalog error state");
+        })
+        .join();
+
+        assert!(client.catalogs_last_error().is_none());
+        *crate::realtime::lock_unpoisoned(&client.catalog_last_error) =
+            Some(Error::transport("recovered"));
+        assert_eq!(
+            client.catalogs_last_error().map(|error| error.to_string()),
+            Some("recovered".to_owned())
+        );
     }
 
     #[test]

@@ -3,9 +3,9 @@
 use crate::errors::{Error, Result};
 use ed25519_dalek::{Signer, SigningKey};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub const API_KEY_ID_ENV: &str = "POLYESTER_API_KEY_ID";
@@ -25,11 +25,11 @@ const MAX_SIGNING_BACKPRESSURE: Duration = Duration::from_secs(10);
 #[derive(Debug, Default)]
 struct SigningTimestampAllocator {
     last_timestamp_ms: AtomicU64,
+    async_gate: tokio::sync::Mutex<()>,
 }
 
 impl SigningTimestampAllocator {
     fn next(&self) -> Result<u64> {
-        let started = Instant::now();
         loop {
             let now = timestamp_ms_from(SystemTime::now())?;
             let ceiling = now
@@ -55,19 +55,60 @@ impl SigningTimestampAllocator {
                 continue;
             }
 
-            if started.elapsed() >= MAX_SIGNING_BACKPRESSURE {
-                return Err(Error::RateLimit {
-                    message: "signing timestamp capacity exhausted; retry after clock advances"
-                        .to_owned(),
-                    retry_after: Some(0.001),
-                });
+            return Err(signing_capacity_error(candidate - ceiling));
+        }
+    }
+
+    async fn next_async(&self) -> Result<u64> {
+        // Serialize only timestamp allocation, not hashing, signing, or I/O.
+        // Tokio's mutex queues waiters without blocking an executor thread.
+        let started = Instant::now();
+        let _gate = tokio::time::timeout(MAX_SIGNING_BACKPRESSURE, self.async_gate.lock())
+            .await
+            .map_err(|_| signing_capacity_error(1))?;
+        loop {
+            match self.next() {
+                Ok(timestamp) => return Ok(timestamp),
+                Err(Error::RateLimit { retry_after, .. })
+                    if started.elapsed() < MAX_SIGNING_BACKPRESSURE =>
+                {
+                    let wait = Duration::from_secs_f64(retry_after.unwrap_or(0.001).max(0.001));
+                    let remaining = MAX_SIGNING_BACKPRESSURE.saturating_sub(started.elapsed());
+                    tokio::time::sleep(wait.min(remaining)).await;
+                }
+                Err(error) => return Err(error),
             }
-            std::thread::sleep(Duration::from_millis(1));
         }
     }
 }
 
+fn signing_capacity_error(wait_ms: u64) -> Error {
+    Error::RateLimit {
+        message: "signing timestamp capacity exhausted; retry after clock advances".to_owned(),
+        retry_after: Some(wait_ms.max(1) as f64 / 1_000.0),
+    }
+}
+
+fn allocator_for_key(key_id: &str) -> Arc<SigningTimestampAllocator> {
+    static ALLOCATORS: OnceLock<Mutex<HashMap<String, Arc<SigningTimestampAllocator>>>> =
+        OnceLock::new();
+    let mut allocators = ALLOCATORS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(existing) = allocators.get(key_id) {
+        return existing.clone();
+    }
+    let allocator = Arc::new(SigningTimestampAllocator::default());
+    allocators.insert(key_id.to_owned(), allocator.clone());
+    allocator
+}
+
 /// API-key authentication material.
+///
+/// Credentials with the same key id share timestamp allocation within this
+/// process. The signing protocol has no cross-process nonce, so use one API key
+/// per process to avoid duplicate tuples across independent processes.
 #[derive(Clone)]
 pub struct Credentials {
     pub key_id: String,
@@ -92,10 +133,11 @@ impl Credentials {
         }
         let seed = normalize_private_key(private_key_hex)?;
         let signing_key = SigningKey::from_bytes(&seed);
+        let timestamp_allocator = allocator_for_key(&key_id);
         Ok(Self {
             key_id,
             signing_key,
-            timestamp_allocator: Arc::new(SigningTimestampAllocator::default()),
+            timestamp_allocator,
         })
     }
 
@@ -145,6 +187,31 @@ impl Credentials {
         let ts = match timestamp_ms {
             Some(value) => value.to_owned(),
             None => self.timestamp_allocator.next()?.to_string(),
+        };
+        let canonical = canonical_signing_string(&ts, method, raw_url, body)?;
+        let sig = self.signing_key.sign(canonical.as_bytes());
+        let mut headers = BTreeMap::new();
+        headers.insert(HEADER_KEY_ID.to_owned(), self.key_id.clone());
+        headers.insert(HEADER_TIMESTAMP.to_owned(), ts);
+        headers.insert(HEADER_SIGNATURE.to_owned(), hex::encode(sig.to_bytes()));
+        Ok(headers)
+    }
+
+    /// Sign a request without blocking an async executor when the timestamp
+    /// uniqueness window is temporarily full.
+    ///
+    /// All SDK network paths use this method. Callers using [`Self::sign_request`]
+    /// directly receive a retryable capacity error instead of a blocking sleep.
+    pub async fn sign_request_async(
+        &self,
+        method: &str,
+        raw_url: &str,
+        body: &[u8],
+        timestamp_ms: Option<&str>,
+    ) -> Result<BTreeMap<String, String>> {
+        let ts = match timestamp_ms {
+            Some(value) => value.to_owned(),
+            None => self.timestamp_allocator.next_async().await?.to_string(),
         };
         let canonical = canonical_signing_string(&ts, method, raw_url, body)?;
         let sig = self.signing_key.sign(canonical.as_bytes());
@@ -373,39 +440,48 @@ mod tests {
         assert_eq!(headers.get(HEADER_SIGNATURE).unwrap().len(), 128);
     }
 
-    #[test]
-    fn ten_thousand_identical_requests_get_unique_bounded_auth_tuples() {
+    #[tokio::test(flavor = "current_thread")]
+    async fn ten_thousand_identical_requests_get_unique_bounded_auth_tuples_without_blocking_runtime()
+     {
         use std::collections::HashSet;
-        use std::sync::{Arc, Barrier};
 
         let (seed, _) = generate_ed25519_keypair();
         let creds = Credentials::new("key_123", &seed).unwrap();
         let before = timestamp_ms_from(SystemTime::now()).unwrap();
-        let barrier = Arc::new(Barrier::new(32));
-        let handles = (0..32)
-            .map(|worker| {
+        let ticker = tokio::spawn(async {
+            let mut previous = tokio::time::Instant::now();
+            let mut largest_gap = Duration::ZERO;
+            for _ in 0..100 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                let now = tokio::time::Instant::now();
+                largest_gap = largest_gap.max(now.duration_since(previous));
+                previous = now;
+            }
+            largest_gap
+        });
+        let handles = (0..10_000)
+            .map(|_| {
                 let creds = creds.clone();
-                let barrier = Arc::clone(&barrier);
-                std::thread::spawn(move || {
-                    barrier.wait();
-                    let count = 10_000 / 32 + usize::from(worker < 10_000 % 32);
-                    (0..count)
-                        .map(|_| {
-                            let headers = creds
-                                .sign_request("POST", "https://api.example.test/foo", b"{}", None)
-                                .unwrap();
-                            let observed_at_ms = timestamp_ms_from(SystemTime::now()).unwrap();
-                            (headers, observed_at_ms)
-                        })
-                        .collect::<Vec<_>>()
+                tokio::spawn(async move {
+                    let headers = creds
+                        .sign_request_async("POST", "https://api.example.test/foo", b"{}", None)
+                        .await
+                        .unwrap();
+                    let observed_at_ms = timestamp_ms_from(SystemTime::now()).unwrap();
+                    (headers, observed_at_ms)
                 })
             })
             .collect::<Vec<_>>();
-        let headers = handles
-            .into_iter()
-            .flat_map(|handle| handle.join().unwrap())
-            .collect::<Vec<_>>();
+        let mut headers = Vec::with_capacity(handles.len());
+        for handle in handles {
+            headers.push(handle.await.unwrap());
+        }
+        let largest_timer_gap = ticker.await.unwrap();
         assert_eq!(headers.len(), 10_000);
+        assert!(
+            largest_timer_gap < Duration::from_secs(1),
+            "signing backpressure stalled the current-thread runtime for {largest_timer_gap:?}"
+        );
         let mut timestamps = HashSet::with_capacity(headers.len());
         let mut signatures = HashSet::with_capacity(headers.len());
         for (item, observed_at_ms) in headers {
@@ -423,6 +499,59 @@ mod tests {
         }
         assert_eq!(timestamps.len(), 10_000);
         assert_eq!(signatures.len(), 10_000);
+    }
+
+    #[tokio::test]
+    async fn independently_constructed_credentials_share_process_timestamp_allocator() {
+        let (seed, _) = generate_ed25519_keypair();
+        let first = Credentials::new("shared-key", &seed).unwrap();
+        let second = Credentials::new("shared-key", &seed).unwrap();
+        assert!(Arc::ptr_eq(
+            &first.timestamp_allocator,
+            &second.timestamp_allocator
+        ));
+        let (first, second) = tokio::join!(
+            first.sign_request_async("POST", "https://api.test/order", b"{}", None),
+            second.sign_request_async("POST", "https://api.test/order", b"{}", None)
+        );
+        assert_ne!(
+            first.unwrap()[HEADER_TIMESTAMP],
+            second.unwrap()[HEADER_TIMESTAMP]
+        );
+
+        let transient = Credentials::new("process-lifetime-key", &seed).unwrap();
+        let before_drop = transient
+            .sign_request("POST", "https://api.test/order", b"{}", None)
+            .unwrap()[HEADER_TIMESTAMP]
+            .parse::<u64>()
+            .unwrap();
+        drop(transient);
+        let reconstructed = Credentials::new("process-lifetime-key", &seed).unwrap();
+        let after_drop = reconstructed
+            .sign_request("POST", "https://api.test/order", b"{}", None)
+            .unwrap()[HEADER_TIMESTAMP]
+            .parse::<u64>()
+            .unwrap();
+        assert!(after_drop > before_drop);
+    }
+
+    #[test]
+    fn synchronous_signing_capacity_returns_retryable_error_without_sleeping() {
+        let allocator = SigningTimestampAllocator::default();
+        let now = timestamp_ms_from(SystemTime::now()).unwrap();
+        allocator
+            .last_timestamp_ms
+            .store(now + MAX_SIGNING_FUTURE_SKEW_MS, Ordering::Release);
+        let started = Instant::now();
+        let error = allocator.next().unwrap_err();
+        assert!(matches!(error, Error::RateLimit { .. }));
+        assert!(error.is_retryable());
+        assert!(error.retry_after().is_some_and(|value| value > 0.0));
+        assert!(
+            started.elapsed() < Duration::from_millis(50),
+            "synchronous capacity handling blocked for {:?}",
+            started.elapsed()
+        );
     }
 
     #[test]

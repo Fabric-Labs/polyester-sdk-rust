@@ -12,7 +12,7 @@ permissions:
 jobs:
   rust:
     name: Rust checks
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -35,6 +35,9 @@ jobs:
             echo "private ledger.write.v1 must not appear in public SDK gen/" >&2
             exit 1
           fi
+
+      - name: Public disclosure (README / CHANGELOG)
+        run: python3 scripts/check_public_disclosure.py
 
       # Capability artifacts: refresh + optional bot commit only on main (never on PRs).
       - name: Refresh SDK capability artifacts

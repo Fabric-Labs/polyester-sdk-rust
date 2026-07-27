@@ -75,6 +75,9 @@ async fn market_buy_mutation() {
                 }
             },
         ),
+        fee_source: None,
+        self_trade_prevention: None,
+        market_max_slippage: None,
         attached_risk: None,
     };
 
@@ -178,6 +181,9 @@ async fn market_sell_mutation() {
                 }
             },
         ),
+        fee_source: None,
+        self_trade_prevention: None,
+        market_max_slippage: None,
         attached_risk: None,
     };
 

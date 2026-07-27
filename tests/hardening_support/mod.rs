@@ -16,6 +16,7 @@ pub struct ParsedRequest {
     #[allow(dead_code)]
     pub method: String,
     pub path: String,
+    pub body: Vec<u8>,
 }
 
 pub enum HttpScript {
@@ -101,7 +102,12 @@ impl MockHttpServer {
                     let method = parts.next().unwrap_or("").to_owned();
                     let path = parts.next().unwrap_or("/").to_owned();
                     let path = path.split('?').next().unwrap_or(&path).to_owned();
-                    match handler(ParsedRequest { method, path }) {
+                    let body = buf[..n]
+                        .windows(4)
+                        .position(|window| window == b"\r\n\r\n")
+                        .map(|index| buf[index + 4..n].to_vec())
+                        .unwrap_or_default();
+                    match handler(ParsedRequest { method, path, body }) {
                         HttpScript::NotFound => {
                             let _ = stream
                                 .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
@@ -362,6 +368,75 @@ impl MockWsServer {
                                 let _ = ws
                                     .send(Message::Binary(centrifugo_publication(&payload).into()))
                                     .await;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+        Self {
+            addr,
+            connects,
+            active,
+            _join: join,
+        }
+    }
+
+    /// Accept connect+subscribe, then flood identical publications.
+    pub async fn spawn_centrifugo_publication_flood_after_handshake(
+        active: Arc<AtomicUsize>,
+        payload: Vec<u8>,
+        count: usize,
+    ) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind ws");
+        let addr = listener.local_addr().expect("addr").to_string();
+        let connects = Arc::new(AtomicUsize::new(0));
+        let connects_task = connects.clone();
+        let active_task = active.clone();
+        let join = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let active = active_task.clone();
+                let connects = connects_task.clone();
+                let payload = payload.clone();
+                tokio::spawn(async move {
+                    let Ok(mut ws) = accept_protobuf_ws(stream).await else {
+                        return;
+                    };
+                    connects.fetch_add(1, Ordering::SeqCst);
+                    active.fetch_add(1, Ordering::SeqCst);
+                    let _guard = ConnGuard(active);
+                    let mut replies = 0u8;
+                    while let Some(msg) = ws.next().await {
+                        let Ok(msg) = msg else { break };
+                        if let Message::Binary(_) = msg
+                            && replies < 2
+                        {
+                            replies += 1;
+                            let _ = ws
+                                .send(Message::Binary(
+                                    centrifugo_ok_reply(u32::from(replies)).into(),
+                                ))
+                                .await;
+                            if replies == 2 {
+                                // Let snapshot-then-stream finish its initial
+                                // snapshot so publications exercise the live
+                                // managed output queue rather than coalescing
+                                // into the startup buffer.
+                                tokio::time::sleep(Duration::from_millis(500)).await;
+                                for _ in 0..count {
+                                    if ws
+                                        .send(Message::Binary(
+                                            centrifugo_publication(&payload).into(),
+                                        ))
+                                        .await
+                                        .is_err()
+                                    {
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }

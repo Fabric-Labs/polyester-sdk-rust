@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.16`, git tag `v0.1.0a16`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.17`, git tag `v0.1.0a17`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ The crate is not on crates.io yet. Pin the published git tag:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a16" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a17" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -151,9 +151,13 @@ account-scoped operations such as private realtime channels, bucket transfers, a
 some ledger writes.
 
 Automatic request signing gives concurrent identical calls distinct authentication tuples. Cloned
-credentials share this allocator. Timestamps can lead the local clock by at most five seconds;
-larger bursts are backpressured instead of reusing a signature or drifting outside the API's
-10-second freshness window.
+and independently constructed credentials with the same key id share a process-wide allocator.
+The signing protocol has no cross-process nonce, so assign one API key per process; sharing a key
+between processes can produce identical authentication tuples. Timestamps can lead the local clock by at most five seconds;
+larger async bursts wait through Tokio-aware backpressure instead of blocking executor threads,
+reusing a signature, or drifting outside the API's 10-second freshness window. If the bounded
+capacity wait is exhausted, the call returns retryable `Error::RateLimit`. Direct low-level
+`Credentials::sign_request` calls never sleep; use `sign_request_async` in async applications.
 
 ## Authentication patterns
 
@@ -227,10 +231,10 @@ let mut params = OrdersService::create_params(
     CreateOrderType::Limit,
     Quantity::from_decimal_str("0.01", 8, None, None)?,
     Some(Price::from_decimal_str("100", None)?),
+    Some("my-bot-001"), // recommended whenever you may retry
 );
 params.time_in_force = Some(CreateTimeInForce::Gtc);
 params.post_only = Some(true);
-params.client_order_id = Some("my-bot-001".into());
 
 let result = client.orders.create(params).await?;
 println!("{} {}", result.status, result.order_id);
@@ -241,6 +245,10 @@ client
     .await?;
 ```
 
+`client_order_id` is **optional** (matches the API). Pass `None` for one-shot
+creates. **Set a stable non-empty value when you may retry** after an ambiguous
+transport/server failure, and reuse that same id on retry / reconciliation -
+without it you cannot safely tell whether the first attempt admitted the order.
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
 `-`. Batch create accepts at most 20 orders. Treat a cancel response as an
 admission acknowledgement and reconcile with `list_open` before releasing local
@@ -265,6 +273,7 @@ let params = OrdersService::create_params(
     CreateOrderType::Limit,
     Quantity::from_scaled(1_000_000, Some(8), Default::default(), None, None)?,
     Some(Price::from_ticks(100_000_000, None)?), // 100.000000 at 1e6
+    Some("my-scaled-bot-001"),
 );
 let _ = client.orders.create(params).await?;
 // Reads expose the same types: order.price.as_ticks(), order.orig_qty.as_scaled()
@@ -373,6 +382,66 @@ for bal in balances.balances {
 }
 ```
 
+## Errors, retries, and withdrawal identity
+
+Classify failures with `Error::is_retryable()` and respect `Error::retry_after()`. For mutations,
+`Error::mutation_outcome_unknown()` means the first request may have committed: reconcile state
+before retrying and reuse the same logical request identity.
+
+Order mutations that take a `request_id` (`modify`, `batch_create`, `batch_cancel`,
+`batch_modify`, `cancel_all` / `cancel_all_with`, `cancel_all_after`) **generate one when
+omitted**, matching TypeScript/Go/Python. That is fine for one-shot calls. **Do not blind-retry
+after an ambiguous failure while omitting `request_id`**: each omitted call mints a *new* id, so
+the retry is a second logical mutation rather than an idempotent replay. Generate or choose a
+stable `request_id` once, persist it with the attempt, and pass the same value on retry (same
+rule as `client_order_id` on create). Convenience helpers that do not accept `request_id`
+(for example `cancel_all`) are one-shot oriented - use the `*_with` / explicit-argument form when
+you need retry-safe identity.
+
+```rust,no_run
+use polyester::models::{CreateOrderParams, ModifyOrderParams};
+use polyester::{Client, Result};
+
+async fn create_with_reconciliation(client: &Client, params: CreateOrderParams) -> Result<()> {
+    match client.orders.create(params.clone()).await {
+        Ok(order) => println!("{}", order.order_id),
+        Err(error) if error.is_retryable() => {
+            if error.mutation_outcome_unknown() {
+                // Reconcile by client_order_id before deciding whether to retry.
+                // This only works if params.client_order_id was set on the first attempt.
+            }
+            if let Some(seconds) = error.retry_after() {
+                tokio::time::sleep(std::time::Duration::from_secs_f64(seconds)).await;
+            }
+            // If reconciliation permits a retry, reuse the same params.client_order_id.
+        }
+        Err(error) => return Err(error),
+    }
+    Ok(())
+}
+
+async fn modify_with_stable_request_id(client: &Client, mut params: ModifyOrderParams) -> Result<()> {
+    // Choose once per logical modify; reuse on every retry of that attempt.
+    params.request_id = Some("mod-bot-attempt-42".into());
+    let _ = client.orders.modify(params).await?;
+    Ok(())
+}
+```
+
+Trading withdrawals require a caller-owned non-empty idempotency key and non-zero nonce. Generate
+each once per logical withdrawal, persist both with the signed payload, and reuse the entire
+request after an ambiguous timeout:
+
+```rust,no_run
+use polyester::{new_trading_withdraw_idempotency_key, new_trading_withdraw_nonce};
+
+let idempotency_key = new_trading_withdraw_idempotency_key()?;
+let nonce = new_trading_withdraw_nonce()?;
+// Persist both before signing CreateTradingWithdrawParams.
+```
+
+Never generate either value inside a retry loop.
+
 ## Public market data
 
 Public endpoints do not require an API key. Authenticated endpoints use the
@@ -383,7 +452,7 @@ let candles = client
     .market_data
     .get_candles("BTC-USDT", "1m", Some(50))
     .await?;
-let current = client
+let current: Option<_> = client
     .market_data
     .get_current_candle("BTC-USDT", "1m")
     .await?;
@@ -436,12 +505,12 @@ the cleanup safety net.
 use polyester::services::CreateSubscriptionOptions;
 
 let mut orders = client.orders.subscribe(None).await?;
-if let Some(order) = orders.recv().await {
+if let Some(order) = orders.recv_result().await? {
     println!("{} {}", order.order_id, order.status);
 }
 
 let mut api_policies = client.policies.subscribe_api_policies(None).await?;
-if let Some(policy) = api_policies.recv().await {
+if let Some(policy) = api_policies.recv_result().await? {
     println!("{} {}", policy.policy_id, policy.revision);
 }
 
