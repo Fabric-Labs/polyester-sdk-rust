@@ -1,7 +1,9 @@
-//! Order / trigger polling helpers.
+//! Order / trigger / balance polling helpers.
 
 use super::call::is_not_found;
+use super::trade::reserved_balance_raw;
 use polyester::models::{Order, Trigger, TriggerEventsList};
+use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::proto::triggers::v1::{GetTriggerRequest, ListTriggerEventsRequest};
 use polyester::{Client, Error, Result};
 use std::time::{Duration, Instant};
@@ -177,6 +179,52 @@ pub async fn wait_for_terminal_order(
     }
     Err(Error::validation(format!(
         "order {client_order_id} did not reach terminal status within {timeout:?}"
+    )))
+}
+
+/// Poll `balances.list` until each `(asset_id, expected_reserved)` pair matches.
+///
+/// Ledger reserved balances can lag terminal order status; roundtrip tests should wait
+/// briefly rather than asserting on the first post-fill snapshot.
+pub async fn wait_until_reserved_reconciles(
+    client: &Client,
+    expectations: &[(u32, u128)],
+    timeout: Duration,
+) -> Result<()> {
+    let timeout = if timeout.is_zero() {
+        Duration::from_secs(20)
+    } else {
+        timeout
+    };
+    if expectations.is_empty() {
+        return Ok(());
+    }
+    let deadline = Instant::now() + timeout;
+    let mut last: Vec<(u32, u128, u128)> = Vec::new();
+    while Instant::now() < deadline {
+        let listed = client.balances.list(GetBalancesRequest::default()).await?;
+        last = expectations
+            .iter()
+            .map(|&(asset_id, expected)| {
+                (
+                    asset_id,
+                    reserved_balance_raw(&listed.balances, asset_id),
+                    expected,
+                )
+            })
+            .collect();
+        if last.iter().all(|&(_, actual, expected)| actual == expected) {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    Err(Error::validation(format!(
+        "reserved balances not reconciled after {timeout:?}: {:?}",
+        last.iter()
+            .map(|&(asset_id, actual, expected)| {
+                format!("asset={asset_id} actual={actual} expected={expected}")
+            })
+            .collect::<Vec<_>>()
     )))
 }
 

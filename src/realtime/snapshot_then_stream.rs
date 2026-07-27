@@ -274,6 +274,11 @@ where
         self.inner.connection_tx.send_replace(Some(Ok(())));
         let _ = self.inner.stop_tx.send(true);
     }
+
+    /// Terminate the managed stream with an observable error.
+    pub(crate) fn fail(&self, err: Error) {
+        self.inner.fail_closed(err);
+    }
 }
 
 impl<TSnapshot, TPublication> Drop for SnapshotThenStream<TSnapshot, TPublication> {

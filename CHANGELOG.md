@@ -2,24 +2,59 @@
 
 ## Unreleased
 
+## 0.1.0a17
+
+Package version: `0.1.0-alpha.17`. Git tag: `v0.1.0a17`.
+
+### Breaking
+- `CreateOrderParams.client_order_id` is now `Option<String>` (API-optional). Pass `None` for one-shot creates; set a stable value when you may retry after an ambiguous failure. `OrdersService::create_params` takes `Option<&str>`. Create-order response decoding no longer requires a non-empty echoed client id.
+- Trigger creation still requires a stable client trigger id. Order mutation `request_id` values (`modify`, batch create/cancel/modify, `cancel_all`, `cancel_all_after`) are generated when omitted (TypeScript/Go/Python parity) instead of being regenerated from wall-clock time or rejected; provide a stable value when retrying - a blind retry that omits `request_id` mints a new id.
+- `CreateOrderParams` exposes fee source, self-trade prevention, and market slippage controls.
+- `get_current_candle` returns `Option<Candle>` when no row exists; orderbook bucket parsing and updates return validation errors for invalid increments.
+- `CancelAllAfterResult.effective_timeout_sec` is `u32`, preserving the full wire range.
+
+### Fixed
+- Order mutation `request_id` handling matches TypeScript/Go/Python: generate when omitted for `modify`, batch create/cancel/modify, `cancel_all`, and `cancel_all_after` (fixes the broken convenience `cancel_all` path that always failed validation).
+- `format_id(0)` now returns the canonical base58 zero (`"1"`) instead of aliasing id `1` as `"2"`; Rust now preserves distinct zero/one round-trips and matches Python/TypeScript encoding.
+- Digit-only canonical base58 default subaccount IDs no longer resolve as decimal IDs.
+- Managed overview/orderbook overflow closes the consumer channel and underlying stream, delivers the error callback, and remains explicitly closeable.
+- Singular order, trigger, withdrawal, and internal-transfer responses reject empty/default success payloads.
+- Internal transfers require exactly one destination and a non-empty idempotency key; trigger strategies validate required and mutually exclusive fields.
+- Ask buckets round up while bid buckets round down, preserving executable spread semantics.
+- Independently constructed credentials for one key share a process allocator; one API key per process is documented because the protocol has no cross-process nonce.
+
+### Testing
+- Market roundtrip waits for reserved-balance reconciliation (ledger lag) before asserting no residual holds.
+- Added public Connect wire coverage for digit-only subaccount scope and malformed singular mutation responses.
+- Added socket-backed managed-overflow coverage for receiver termination, callback delivery, task cancellation, and connection cleanup.
+
 ## 0.1.0a16
 
 Package version: `0.1.0-alpha.16`. Git tag: `v0.1.0a16`.
 
+### Breaking
+- `UserTrade` adds `fee_source` and `referral_share_scaled`. Consumers using exhaustive struct literals must initialize the new fields (or use `..` where appropriate). Use `fee_source == "received"` to subtract base-denominated BUY fees when calculating net sellable quantity.
+- Batch create/cancel counters and cancel-all counters change from `i32` to `u32`; batch-modify counters are also `u32`. Remove signed casts and update explicitly typed variables.
+- `BalanceHistory.points` and `EquityHistory.points` change from `i32` to `u32`, matching the protobuf fields and preserving their complete range.
+- Response-integrity decoders for batch cancel/modify, address-book mutations, deposit-address creation, and singular lifecycle lookups now return `Result` and reject malformed responses. Direct codec consumers must propagate or handle the error; high-level service methods already do this.
+
 ### Fixed
 - Spot-config JSON restores `baseQuantityScale` under the canonical proto-JSON key so consumers can re-deserialize `GetSpotConfigResponse` without a duplicate-field error (regression from a15).
-- Concurrent identical requests receive unique authentication timestamps across cloned credentials. The allocator caps future skew at five seconds and applies bounded backpressure instead of emitting duplicate authentication tuples.
+- Concurrent identical requests receive unique authentication timestamps across cloned credentials. Async SDK calls queue timestamp allocation without blocking Tokio threads, cap future skew at five seconds, and return a retryable capacity error if the bounded wait is exhausted. Direct synchronous signing returns the same error immediately instead of sleeping.
 - Batch create, modify, and cancel responses reconcile aggregate counts against per-item outcomes and reject unknown/ambiguous result states.
 - Columnar candles reject misaligned OHLCV arrays instead of emitting empty fields.
 - Address-book mutations, deposit-address creation, and singular lifecycle lookups reject missing required entities instead of returning placeholder models.
 - Public batch and cancel-all counters preserve their unsigned protobuf range.
 - User trades expose fee source and referral share, so received-asset fees can be distinguished from quote fees and BUY net quantity can be calculated correctly.
+- Catalog error state recovers from a poisoned mutex instead of panicking.
+- Balance and equity history point counts preserve the protobuf `u32` range.
 
 ### Testing
 - Public-service Connect fault injection covers inconsistent batch counts, misaligned candle columns, and missing required entities in addition to decoder-level boundary tests.
 - The funded BUY-to-SELL acceptance test waits for complete fill projection and sells net received base quantity after received-asset fees.
 - State-changing live integration tests share a process-wide guard, preventing concurrent tests on one QA account from consuming each other's balances or corrupting reconciliation snapshots.
 - Legacy one-way market BUY and SELL probes are ignored in the release suite; the self-contained net-quantity BUY-to-SELL roundtrip provides the same live mutation coverage without leaving a position behind.
+- A 10,000-identical-request current-thread Tokio regression asserts unique bounded signatures while independent timers continue to tick.
 
 ## 0.1.0a15
 

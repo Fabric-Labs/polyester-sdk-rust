@@ -226,55 +226,61 @@ async fn l2_all_publication_decode_errors_surface_through_the_public_websocket_a
     .await;
 }
 
-#[test]
-fn l2_auth_10k_identical_requests_are_unique_and_future_bounded() {
+#[tokio::test(flavor = "current_thread")]
+async fn l2_auth_10k_identical_requests_are_unique_future_bounded_and_runtime_safe() {
     use polyester::auth::{HEADER_SIGNATURE, HEADER_TIMESTAMP, MAX_SIGNING_FUTURE_SKEW_MS};
     use std::collections::HashSet;
-    use std::sync::Barrier;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    const THREADS: usize = 16;
-    const PER_THREAD: usize = 625;
-
     let credentials = test_credentials("ak_test", TEST_KEY);
-    let barrier = Arc::new(Barrier::new(THREADS));
-    let handles = (0..THREADS)
+    let ticker = tokio::spawn(async {
+        let mut previous = tokio::time::Instant::now();
+        let mut largest_gap = Duration::ZERO;
+        for _ in 0..100 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            let now = tokio::time::Instant::now();
+            largest_gap = largest_gap.max(now.duration_since(previous));
+            previous = now;
+        }
+        largest_gap
+    });
+    let handles = (0..10_000)
         .map(|_| {
             let credentials = credentials.clone();
-            let barrier = Arc::clone(&barrier);
-            std::thread::spawn(move || {
-                barrier.wait();
-                (0..PER_THREAD)
-                    .map(|_| {
-                        let headers = credentials
-                            .sign_request(
-                                "POST",
-                                "https://api.example.test/orders.v1.OrdersService/CreateOrder",
-                                b"identical-order-body",
-                                None,
-                            )
-                            .unwrap();
-                        (
-                            headers[HEADER_TIMESTAMP].parse::<u64>().unwrap(),
-                            headers[HEADER_SIGNATURE].clone(),
-                            u64::try_from(
-                                SystemTime::now()
-                                    .duration_since(UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_millis(),
-                            )
-                            .unwrap(),
-                        )
-                    })
-                    .collect::<Vec<_>>()
+            tokio::spawn(async move {
+                let headers = credentials
+                    .sign_request_async(
+                        "POST",
+                        "https://api.example.test/orders.v1.OrdersService/CreateOrder",
+                        b"identical-order-body",
+                        None,
+                    )
+                    .await
+                    .unwrap();
+                (
+                    headers[HEADER_TIMESTAMP].parse::<u64>().unwrap(),
+                    headers[HEADER_SIGNATURE].clone(),
+                    u64::try_from(
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis(),
+                    )
+                    .unwrap(),
+                )
             })
         })
         .collect::<Vec<_>>();
-    let tuples = handles
-        .into_iter()
-        .flat_map(|handle| handle.join().unwrap())
-        .collect::<Vec<_>>();
+    let mut tuples = Vec::with_capacity(handles.len());
+    for handle in handles {
+        tuples.push(handle.await.unwrap());
+    }
+    let largest_timer_gap = ticker.await.unwrap();
     assert_eq!(tuples.len(), 10_000);
+    assert!(
+        largest_timer_gap < Duration::from_secs(1),
+        "signing backpressure stalled current-thread Tokio for {largest_timer_gap:?}"
+    );
     let timestamps = tuples.iter().map(|item| item.0).collect::<HashSet<_>>();
     let signatures = tuples.iter().map(|item| &item.1).collect::<HashSet<_>>();
     assert_eq!(timestamps.len(), 10_000, "duplicate signing timestamp");
@@ -288,12 +294,13 @@ fn l2_auth_10k_identical_requests_are_unique_and_future_bounded() {
     }
 
     let later = credentials
-        .sign_request(
+        .sign_request_async(
             "GET",
             "https://api.example.test/auth.v1.AuthService/Me",
             b"",
             None,
         )
+        .await
         .unwrap()[HEADER_TIMESTAMP]
         .parse::<u64>()
         .unwrap();
@@ -334,6 +341,415 @@ async fn l2_scale_dependent_public_paths_fail_closed_without_catalogs() {
         .expect_err("explicit symbol id must still require a known scale");
     assert!(matches!(trades_err, Error::Validation(_)));
     assert!(trades_err.to_string().contains("catalog quantity scale"));
+}
+
+#[tokio::test]
+async fn digit_only_public_subaccount_id_uses_canonical_base58_on_order_wire() {
+    use buffa::Message as _;
+    use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
+    use polyester::proto::orders::v1::{CreateOrderRequest, CreateOrderResponse};
+    use polyester::{Price, Quantity};
+    use std::sync::Mutex;
+
+    let observed = Arc::new(Mutex::new(None));
+    let observed_handler = observed.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path == "/orders.v1.OrdersService/CreateOrder" {
+            let decoded = CreateOrderRequest::decode_from_slice(&request.body).unwrap();
+            *observed_handler.lock().unwrap() = decoded.subaccount_id;
+            return connect_proto_ok(&CreateOrderResponse {
+                order_id: 9,
+                client_order_id: "scope-wire".into(),
+                ..Default::default()
+            });
+        }
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("scope-test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        default_sub_account_id: Some("5".into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+    client
+        .orders
+        .create(CreateOrderParams {
+            symbol: "BTC-USDT".into(),
+            side: CreateSide::Buy,
+            order_type: CreateOrderType::Limit,
+            quantity: Quantity::from_scaled(
+                1,
+                Some(8),
+                QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(1),
+            )
+            .unwrap(),
+            price: Some(Price::from_ticks(1, Some("BTC-USDT".into())).unwrap()),
+            time_in_force: Some(CreateTimeInForce::Gtc),
+            client_order_id: Some("scope-wire".into()),
+            subaccount_id: None,
+            post_only: None,
+            market_client_ref_price: None,
+            fee_source: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
+            attached_risk: None,
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(*observed.lock().unwrap(), Some(4));
+}
+
+#[tokio::test]
+async fn singular_mutation_default_connect_responses_fail_closed() {
+    use polyester::models::{
+        CreateInternalTransferParams, CreateOrderParams, CreateOrderType, CreateSide,
+        CreateTimeInForce, CreateTradingWithdrawParams, CreateTriggerParams, CreateTriggerType,
+    };
+    use polyester::proto::chain::withdraw::v1::CreateTradingWithdrawResponse;
+    use polyester::proto::marketdata::v1::GetCandlesResponse;
+    use polyester::proto::orders::v1::CreateOrderResponse;
+    use polyester::proto::transfer::v1::CreateInternalTransferResponse;
+    use polyester::proto::triggers::v1::CreateTriggerResponse;
+    use polyester::{AssetAmount, Price, Quantity};
+
+    let server = MockHttpServer::spawn(|request| match request.path.as_str() {
+        "/orders.v1.OrdersService/CreateOrder" => connect_proto_ok(&CreateOrderResponse::default()),
+        "/triggers.v1.TriggersService/CreateTrigger" => {
+            connect_proto_ok(&CreateTriggerResponse::default())
+        }
+        "/chain.withdraw.v1.WithdrawService/CreateTradingWithdraw" => {
+            connect_proto_ok(&CreateTradingWithdrawResponse::default())
+        }
+        "/transfer.v1.InternalTransferService/CreateInternalTransfer" => {
+            connect_proto_ok(&CreateInternalTransferResponse::default())
+        }
+        "/marketdata.v1.MarketDataService/GetCandles" => {
+            connect_proto_ok(&GetCandlesResponse::default())
+        }
+        _ => hardening_support::HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("fault-test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+
+    let quantity = Quantity::from_scaled(
+        1,
+        Some(8),
+        QuantityDomain::OrderBase,
+        Some("BTC-USDT".into()),
+        Some(1),
+    )
+    .unwrap();
+    let price = Price::from_ticks(1, Some("BTC-USDT".into())).unwrap();
+    let order_error = client
+        .orders
+        .create(CreateOrderParams {
+            symbol: "BTC-USDT".into(),
+            side: CreateSide::Buy,
+            order_type: CreateOrderType::Limit,
+            quantity: quantity.clone(),
+            price: Some(price.clone()),
+            time_in_force: Some(CreateTimeInForce::Gtc),
+            client_order_id: Some("fault-order".into()),
+            subaccount_id: Some(4),
+            post_only: None,
+            market_client_ref_price: None,
+            fee_source: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
+            attached_risk: None,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(order_error, Error::Transport(_)));
+
+    let trigger_error = client
+        .triggers
+        .create(CreateTriggerParams {
+            symbol: "BTC-USDT".into(),
+            trigger_type: CreateTriggerType::StopLoss,
+            side: CreateSide::Sell,
+            order_type: CreateOrderType::Market,
+            qty: quantity,
+            trigger_price: Some(price),
+            limit_price: None,
+            trigger_price_source: None,
+            time_in_force: None,
+            subaccount_id: Some(4),
+            client_trigger_id: "fault-trigger".into(),
+            post_only: false,
+            activation_price: None,
+            trailing_distance_ticks: None,
+            trailing_distance_bps: None,
+            max_slippage_ticks: None,
+            max_slippage_bps: None,
+            twap_duration_ms: None,
+            twap_slice_interval_ms: None,
+            ladder_price_min: None,
+            ladder_price_max: None,
+            ladder_levels: None,
+            ladder_distribution: None,
+            fee_source: None,
+            self_trade_prevention_mode: None,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(trigger_error, Error::Transport(_)));
+
+    let amount = AssetAmount::from_scaled(1, Some(18), QuantityDomain::LedgerE18, Some(7)).unwrap();
+    let withdraw_error = client
+        .withdraw
+        .create_to_funding(CreateTradingWithdrawParams {
+            asset_id: 7,
+            amount: amount.clone(),
+            payload_signature: vec![1],
+            destination_address: String::new(),
+            idempotency_key: "fault-withdraw".into(),
+            amount_scale: Some(18),
+            deadline_ts_sec: None,
+            nonce: 1,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(withdraw_error, Error::Transport(_)));
+
+    let transfer_error = client
+        .internal_transfers
+        .create(CreateInternalTransferParams {
+            asset_id: 7,
+            quantity: amount,
+            idempotency_key: "fault-transfer".into(),
+            subaccount_id: Some(4),
+            destination_account_id: Some("2".into()),
+            destination_subaccount_id: None,
+            destination_smart_account_address: None,
+            quantity_scale: Some(18),
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(transfer_error, Error::Transport(_)));
+
+    assert!(
+        client
+            .market_data
+            .get_current_candle("BTC-USDT", "1m")
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[tokio::test]
+async fn managed_overview_overflow_terminates_receiver_callback_task_and_socket() {
+    use polyester::proto::marketoverview::v1::{
+        ListMarketOverviewResponse, MarketOverview, MarketOverviewBatch,
+    };
+    use polyester::services::MarketOverviewCreateSubscriptionOptions;
+    use std::sync::atomic::AtomicBool;
+
+    let active = Arc::new(AtomicUsize::new(0));
+    let publication = MarketOverviewBatch {
+        markets: vec![MarketOverview {
+            symbol_id: 1,
+            symbol: "BTC-USDT".into(),
+            last_price_ticks: 1,
+            ..Default::default()
+        }],
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let ws = MockWsServer::spawn_centrifugo_publication_flood_after_handshake(
+        active.clone(),
+        publication,
+        500,
+    )
+    .await;
+    let http = MockHttpServer::spawn(|request| {
+        if request.path == "/marketoverview.v1.MarketOverviewService/ListMarketOverview" {
+            connect_proto_ok(&ListMarketOverviewResponse::default())
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: ws.ws_url(),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    let mut subscription = client
+        .market_overview
+        .create_subscription(MarketOverviewCreateSubscriptionOptions::default())
+        .await
+        .unwrap();
+    let callback_fired = Arc::new(AtomicBool::new(false));
+    let callback_flag = callback_fired.clone();
+    subscription.set_on_error(move |error| {
+        assert!(matches!(error, Error::QueueOverflow(_)));
+        callback_flag.store(true, Ordering::SeqCst);
+    });
+
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    while subscription.err().is_none() && tokio::time::Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        matches!(subscription.err(), Some(Error::QueueOverflow(_))),
+        "unexpected terminal state: err={:?}, active={}, connects={}",
+        subscription.err(),
+        active.load(Ordering::SeqCst),
+        ws.connects.load(Ordering::SeqCst)
+    );
+    loop {
+        let next = tokio::time::timeout(Duration::from_secs(2), subscription.updates().recv())
+            .await
+            .expect("overflow must terminate the managed receiver");
+        if next.is_none() {
+            break;
+        }
+    }
+    assert!(matches!(subscription.err(), Some(Error::QueueOverflow(_))));
+    assert!(callback_fired.load(Ordering::SeqCst));
+    wait_until(
+        || active.load(Ordering::SeqCst) == 0,
+        Duration::from_secs(2),
+    )
+    .await;
+
+    // Explicit close remains idempotent after overflow and cannot leave the
+    // already-terminated transport alive.
+    subscription.close();
+    assert_eq!(active.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn managed_orderbook_overflow_terminates_receiver_callback_task_and_socket() {
+    use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta};
+    use polyester::services::CreateSubscriptionOptions;
+    use std::sync::atomic::AtomicBool;
+
+    let active = Arc::new(AtomicUsize::new(0));
+    let publication = OrderBookDelta {
+        symbol_id: 1,
+        book_seq_start: 2,
+        book_seq_end: 2,
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let ws = MockWsServer::spawn_centrifugo_publication_flood_after_handshake(
+        active.clone(),
+        publication,
+        500,
+    )
+    .await;
+    let http = MockHttpServer::spawn(|request| {
+        if request.path == "/orderbook.v1.OrderbookService/GetOrderBook" {
+            connect_proto_ok(&GetOrderBookResponse {
+                symbol_id: 1,
+                book_seq: 1,
+                ..Default::default()
+            })
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: ws.ws_url(),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+    let mut subscription = client
+        .orderbook
+        .create_subscription(CreateSubscriptionOptions {
+            symbol: "BTC-USDT".into(),
+            symbol_id: Some(1),
+            depth: Some(50),
+            bucket: None,
+        })
+        .await
+        .unwrap();
+    let callback_fired = Arc::new(AtomicBool::new(false));
+    let callback_flag = callback_fired.clone();
+    subscription.set_on_error(move |error| {
+        assert!(matches!(error, Error::QueueOverflow(_)));
+        callback_flag.store(true, Ordering::SeqCst);
+    });
+
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    while subscription.err().is_none() && tokio::time::Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        matches!(subscription.err(), Some(Error::QueueOverflow(_))),
+        "unexpected terminal state: err={:?}, active={}, connects={}",
+        subscription.err(),
+        active.load(Ordering::SeqCst),
+        ws.connects.load(Ordering::SeqCst)
+    );
+    loop {
+        let next = tokio::time::timeout(Duration::from_secs(2), subscription.updates().recv())
+            .await
+            .expect("overflow must terminate the managed receiver");
+        if next.is_none() {
+            break;
+        }
+    }
+    assert!(callback_fired.load(Ordering::SeqCst));
+    wait_until(
+        || active.load(Ordering::SeqCst) == 0,
+        Duration::from_secs(2),
+    )
+    .await;
+    subscription.close();
+    assert_eq!(active.load(Ordering::SeqCst), 0);
 }
 
 #[test]

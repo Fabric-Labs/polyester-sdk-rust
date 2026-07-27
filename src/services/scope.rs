@@ -7,13 +7,12 @@ pub fn optional_subaccount(ctx: &ServiceContext, explicit: Option<u64>) -> Resul
         return Ok(Some(id));
     }
     if let Some(ref s) = ctx.default_sub_account_id {
-        if s.is_empty() {
+        if s.trim().is_empty() {
             return Ok(None);
         }
-        // Allow decimal or base58
-        if let Ok(n) = s.parse::<u64>() {
-            return Ok(Some(n));
-        }
+        // Configured defaults use the same canonical public base58
+        // representation returned by subaccount APIs. Digit-only base58 IDs
+        // are valid and must not be interpreted as decimal first.
         return Ok(Some(id_to_u64(s, "subaccount_id")?));
     }
     Ok(None)

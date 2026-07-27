@@ -204,18 +204,23 @@ impl InternalTransfersService {
         let has_account = params
             .destination_account_id
             .as_ref()
-            .is_some_and(|s| !s.is_empty());
+            .is_some_and(|s| !s.trim().is_empty());
         let has_sub = params
             .destination_subaccount_id
             .as_ref()
-            .is_some_and(|s| !s.is_empty());
+            .is_some_and(|s| !s.trim().is_empty());
         let has_smart = params
             .destination_smart_account_address
             .as_ref()
-            .is_some_and(|s| !s.is_empty());
-        if !has_account && !has_sub && !has_smart {
+            .is_some_and(|s| !s.trim().is_empty());
+        if usize::from(has_account) + usize::from(has_sub) + usize::from(has_smart) != 1 {
             return Err(Error::validation(
-                "create requires destination_account_id, destination_subaccount_id, or destination_smart_account_address",
+                "create requires exactly one of destination_account_id, destination_subaccount_id, or destination_smart_account_address",
+            ));
+        }
+        if params.idempotency_key.trim().is_empty() {
+            return Err(Error::validation(
+                "create requires a non-empty idempotency_key reused across retries",
             ));
         }
 
@@ -259,7 +264,7 @@ impl InternalTransfersService {
         )
         .await?
         .into_owned();
-        Ok(internal_transfer_from_proto(&resp))
+        internal_transfer_from_proto(&resp)
     }
 }
 
@@ -1872,7 +1877,47 @@ mod tests {
             quantity_scale: Some(18),
         };
 
-        let err = client.internal_transfers.create(params).await.unwrap_err();
-        assert!(err.to_string().contains("requires destination"));
+        let err = client
+            .internal_transfers
+            .create(params.clone())
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("requires exactly one"));
+
+        let multiple = CreateInternalTransferParams {
+            destination_account_id: Some("2".into()),
+            destination_subaccount_id: Some("3".into()),
+            idempotency_key: "multiple-destinations".into(),
+            ..params.clone()
+        };
+        let err = client
+            .internal_transfers
+            .create(multiple)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("requires exactly one"));
+
+        let empty_key = CreateInternalTransferParams {
+            destination_account_id: Some("2".into()),
+            idempotency_key: " ".into(),
+            ..params.clone()
+        };
+        let err = client
+            .internal_transfers
+            .create(empty_key)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("non-empty idempotency_key"));
+
+        let whitespace_destination = CreateInternalTransferParams {
+            destination_smart_account_address: Some("   ".into()),
+            ..params
+        };
+        let err = client
+            .internal_transfers
+            .create(whitespace_destination)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("requires exactly one"));
     }
 }

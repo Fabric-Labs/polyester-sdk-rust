@@ -223,12 +223,27 @@ pub fn get_order_from_proto(msg: &GetOrderResponse) -> GetOrderResult {
 
 /// `CreateOrderResponse` acknowledges admission only and no longer carries a
 /// status field; synthesize `"accepted"`.
-pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> OrderMutationResult {
-    order_mutation("accepted", msg.order_id, &msg.client_order_id)
+pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> Result<OrderMutationResult> {
+    // client_order_id is API-optional on create; an omitted request id may echo empty.
+    if msg.order_id == 0 {
+        return Err(Error::transport(
+            "invalid CreateOrder response: missing order_id",
+        ));
+    }
+    Ok(order_mutation(
+        "accepted",
+        msg.order_id,
+        &msg.client_order_id,
+    ))
 }
 
-pub fn order_mutation_from_cancel(msg: &CancelOrderResponse) -> OrderMutationResult {
-    order_mutation(&msg.status, msg.order_id, "")
+pub fn order_mutation_from_cancel(msg: &CancelOrderResponse) -> Result<OrderMutationResult> {
+    if msg.order_id == 0 || msg.status.trim().is_empty() {
+        return Err(Error::transport(
+            "invalid CancelOrder response: missing order_id or status",
+        ));
+    }
+    Ok(order_mutation(&msg.status, msg.order_id, ""))
 }
 
 fn order_mutation(status: &str, order_id: u64, client_order_id: &str) -> OrderMutationResult {
@@ -239,13 +254,19 @@ fn order_mutation(status: &str, order_id: u64, client_order_id: &str) -> OrderMu
     }
 }
 
-pub fn modify_order_from_proto(msg: &ModifyOrderResponse) -> ModifyOrderResult {
-    ModifyOrderResult {
-        action_taken: modify_action_name(msg.action_taken),
+pub fn modify_order_from_proto(msg: &ModifyOrderResponse) -> Result<ModifyOrderResult> {
+    let action_taken = modify_action_name(msg.action_taken);
+    if action_taken.is_empty() || msg.old_order_id == 0 || msg.final_order_id == 0 {
+        return Err(Error::transport(
+            "invalid ModifyOrder response: missing action_taken, old_order_id, or final_order_id",
+        ));
+    }
+    Ok(ModifyOrderResult {
+        action_taken,
         old_order_id: format_uint64_id(msg.old_order_id),
         final_order_id: format_uint64_id(msg.final_order_id),
         code: msg.code.clone(),
-    }
+    })
 }
 
 fn modify_action_name(
@@ -436,7 +457,7 @@ pub fn batch_modify_from_proto(msg: &BatchModifyOrdersResponse) -> Result<BatchM
 pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> CancelAllAfterResult {
     CancelAllAfterResult {
         status: msg.status.clone(),
-        effective_timeout_sec: msg.effective_timeout_sec as i32,
+        effective_timeout_sec: msg.effective_timeout_sec,
         expires_at_ts_ns: if msg.expires_at_ts_ns == 0 {
             String::new()
         } else {
@@ -667,7 +688,8 @@ mod tests {
             final_order_id: 11,
             code: "ok".into(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(modified.action_taken, "amended");
         assert_eq!(modified.old_order_id, format_uint64_id(10));
         assert_eq!(modified.final_order_id, format_uint64_id(11));
@@ -676,19 +698,40 @@ mod tests {
             order_id: 42,
             client_order_id: "coid-1".into(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(created.status, "accepted");
         assert_eq!(created.order_id, format_uint64_id(42));
         assert_eq!(created.client_order_id, "coid-1");
+
+        let created_without_client_id = order_mutation_from_create(&CreateOrderResponse {
+            order_id: 43,
+            client_order_id: String::new(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(created_without_client_id.order_id, format_uint64_id(43));
+        assert!(created_without_client_id.client_order_id.is_empty());
 
         let cancelled = order_mutation_from_cancel(&CancelOrderResponse {
             status: "cancelled".into(),
             order_id: 42,
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(cancelled.status, "cancelled");
         assert_eq!(cancelled.order_id, format_uint64_id(42));
         assert!(cancelled.client_order_id.is_empty());
+    }
+
+    #[test]
+    fn singular_order_mutations_reject_empty_success_responses() {
+        use crate::proto::orders::v1::{
+            CancelOrderResponse, CreateOrderResponse, ModifyOrderResponse,
+        };
+        assert!(order_mutation_from_create(&CreateOrderResponse::default()).is_err());
+        assert!(order_mutation_from_cancel(&CancelOrderResponse::default()).is_err());
+        assert!(modify_order_from_proto(&ModifyOrderResponse::default()).is_err());
     }
 
     #[test]

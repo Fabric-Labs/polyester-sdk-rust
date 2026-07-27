@@ -64,9 +64,7 @@ impl Subscription {
 
     /// Stop the subscription.
     pub fn close(&self) {
-        if self.closed.swap(true, Ordering::SeqCst) {
-            return;
-        }
+        self.closed.store(true, Ordering::SeqCst);
         let _ = lock_unpoisoned(&self.tx_slot).take();
         self.stream.close();
     }
