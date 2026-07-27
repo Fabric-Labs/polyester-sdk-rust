@@ -1,0 +1,23 @@
+error[E0616]: field `scale` of struct `Quantity` is private
+ --> tests/ui/no_quantity_metadata_assignment.rs:7:14
+  |
+7 |     quantity.scale = Some(6);
+  |              ^^^^^ private field
+
+error[E0616]: field `domain` of struct `Quantity` is private
+ --> tests/ui/no_quantity_metadata_assignment.rs:8:14
+  |
+8 |     quantity.domain = QuantityDomain::Asset;
+  |              ^^^^^^ private field
+
+error[E0616]: field `symbol` of struct `Quantity` is private
+ --> tests/ui/no_quantity_metadata_assignment.rs:9:14
+  |
+9 |     quantity.symbol = Some("ETH-USDT".into());
+  |              ^^^^^^ private field
+
+error[E0616]: field `symbol_id` of struct `Quantity` is private
+  --> tests/ui/no_quantity_metadata_assignment.rs:10:14
+   |
+10 |     quantity.symbol_id = Some(9);
+   |              ^^^^^^^^^ private field

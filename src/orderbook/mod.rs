@@ -115,10 +115,15 @@ pub fn apply_delta(
     mut current_seq: u64,
     delta: &OrderBookDeltaUpdate,
 ) -> (u64, bool) {
-    if delta.reset {
-        bids.clear();
-        asks.clear();
-        current_seq = 0;
+    // Reject the whole update atomically. Skipping only corrupt rows while
+    // advancing the sequence leaves a stale book that can no longer self-heal.
+    if delta
+        .bids
+        .iter()
+        .chain(&delta.asks)
+        .any(|pair| pair.price_ticks < 0 || pair.qty_scaled < 0)
+    {
+        return (current_seq, true);
     }
     // Keep seq as u64 end-to-end. Never coerce parse failures to 0 (that disables
     // gap detection). Invalid/overflowing sequences fail toward refresh.
@@ -127,11 +132,17 @@ pub fn apply_delta(
     if seq_end < seq_start {
         return (current_seq, true);
     }
-    if current_seq != 0 && seq_start > current_seq.saturating_add(1) {
+    let comparison_seq = if delta.reset { 0 } else { current_seq };
+    if comparison_seq != 0 && seq_start > comparison_seq.saturating_add(1) {
         return (current_seq, true);
     }
-    if seq_end <= current_seq {
+    if !delta.reset && seq_end <= current_seq {
         return (current_seq, false);
+    }
+    if delta.reset {
+        bids.clear();
+        asks.clear();
+        current_seq = 0;
     }
     let bid_pairs: Vec<(i64, i64)> = delta
         .bids
@@ -304,6 +315,22 @@ mod tests {
         assert!(needs_refresh);
         assert_eq!(seq, 3);
         assert_eq!(bids.get(&100), Some(&5));
+    }
+
+    #[test]
+    fn apply_delta_rejects_malformed_levels_without_advancing_or_mutating() {
+        let mut bids = BookSide::from([(100, 5)]);
+        let mut asks = BookSide::from([(200, 3)]);
+        let (seq, needs_refresh) = apply_delta(
+            &mut bids,
+            &mut asks,
+            1,
+            &delta(2, 2, &[(100, -1), (101, 4)], &[], false),
+        );
+        assert!(needs_refresh);
+        assert_eq!(seq, 1);
+        assert_eq!(bids, BookSide::from([(100, 5)]));
+        assert_eq!(asks, BookSide::from([(200, 3)]));
     }
 
     #[test]

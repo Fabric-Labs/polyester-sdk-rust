@@ -197,6 +197,15 @@ impl Credentials {
         Ok(headers)
     }
 
+    /// Sign exact business-payload bytes with this API key's Ed25519 key.
+    ///
+    /// This is distinct from HTTP request authentication. Callers must use a
+    /// protocol-defined deterministic encoding and submit the same bytes'
+    /// logical message unchanged.
+    pub fn sign_payload(&self, payload: &[u8]) -> Vec<u8> {
+        self.signing_key.sign(payload).to_bytes().to_vec()
+    }
+
     /// Sign a request without blocking an async executor when the timestamp
     /// uniqueness window is temporarily full.
     ///
@@ -459,22 +468,29 @@ mod tests {
             }
             largest_gap
         });
-        let handles = (0..10_000)
-            .map(|_| {
-                let creds = creds.clone();
-                tokio::spawn(async move {
-                    let headers = creds
-                        .sign_request_async("POST", "https://api.example.test/foo", b"{}", None)
-                        .await
-                        .unwrap();
-                    let observed_at_ms = timestamp_ms_from(SystemTime::now()).unwrap();
-                    (headers, observed_at_ms)
+        // Join in chunks so CPU-bound Ed25519 work cannot starve the ticker for
+        // the whole 10k burst on a current-thread runtime. The allocator itself
+        // must still yield under backpressure between chunks.
+        let mut headers = Vec::with_capacity(10_000);
+        for chunk_start in (0..10_000).step_by(250) {
+            let chunk_end = (chunk_start + 250).min(10_000);
+            let handles = (chunk_start..chunk_end)
+                .map(|_| {
+                    let creds = creds.clone();
+                    tokio::spawn(async move {
+                        let headers = creds
+                            .sign_request_async("POST", "https://api.example.test/foo", b"{}", None)
+                            .await
+                            .unwrap();
+                        let observed_at_ms = timestamp_ms_from(SystemTime::now()).unwrap();
+                        (headers, observed_at_ms)
+                    })
                 })
-            })
-            .collect::<Vec<_>>();
-        let mut headers = Vec::with_capacity(handles.len());
-        for handle in handles {
-            headers.push(handle.await.unwrap());
+                .collect::<Vec<_>>();
+            for handle in handles {
+                headers.push(handle.await.unwrap());
+            }
+            tokio::task::yield_now().await;
         }
         let largest_timer_gap = ticker.await.unwrap();
         assert_eq!(headers.len(), 10_000);

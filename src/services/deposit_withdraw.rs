@@ -13,8 +13,9 @@ use crate::connect::chain::zipper::v1::ZipperServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::ZippedAssetSupplyBatch;
 use crate::models::{
-    CreateTradingWithdrawParams, CreateWalletTradingWithdrawParams, DepositAddress,
-    DepositAddressesList, DepositWithdrawConfig, WithdrawIntentResult,
+    CreateApiKeyTradingWithdrawParams, CreateTradingWithdrawParams,
+    CreateWalletTradingWithdrawParams, DepositAddress, DepositAddressesList, DepositWithdrawConfig,
+    WithdrawIntentResult,
 };
 use crate::proto::chain::deposit::v1::{CreateDepositAddressRequest, ListDepositAddressesRequest};
 use crate::proto::chain::withdraw::v1::{
@@ -22,7 +23,8 @@ use crate::proto::chain::withdraw::v1::{
     TradingWithdrawIntentPayload,
 };
 use crate::proto::chain::zipper::v1::GetDepositWithdrawConfigRequest;
-use crate::types::{AssetAmount, QuantityDomain, resolve_asset_amount_scaled};
+use crate::types::{AssetAmount, QuantityDomain, resolve_asset_amount_scaled_with_input_scale};
+use buffa::Message;
 use rand_core::{OsRng, RngCore};
 
 /// Generate a cryptographically random withdrawal idempotency key.
@@ -65,8 +67,63 @@ struct EncodeWithdrawPayload<'a> {
     idempotency_key: String,
     destination_chain_id: u64,
     destination_address: String,
-    deadline_ts_sec: Option<u64>,
+    deadline_ts_sec: u64,
     nonce: u128,
+}
+
+/// Exact API-key signed withdraw request prepared for durable persistence and retry.
+#[derive(Clone)]
+pub struct PreparedTradingWithdraw {
+    request: CreateTradingWithdrawRequest,
+}
+
+impl std::fmt::Debug for PreparedTradingWithdraw {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PreparedTradingWithdraw")
+            .field("payload", &self.request.payload.as_option())
+            .field("payload_signature", &"<redacted>")
+            .finish()
+    }
+}
+
+impl PreparedTradingWithdraw {
+    /// Restore a prepared request previously persisted with [`Self::request_bytes`].
+    pub fn from_request_bytes(bytes: &[u8]) -> Result<Self> {
+        let request = CreateTradingWithdrawRequest::decode_from_slice(bytes)
+            .map_err(|err| Error::validation(format!("invalid prepared withdraw bytes: {err}")))?;
+        if request.payload.as_option().is_none() {
+            return Err(Error::validation(
+                "prepared withdraw request is missing payload",
+            ));
+        }
+        if request.payload_signature.is_empty() {
+            return Err(Error::validation(
+                "prepared withdraw request is missing payload_signature",
+            ));
+        }
+        Ok(Self { request })
+    }
+
+    pub fn payload(&self) -> &TradingWithdrawIntentPayload {
+        self.request
+            .payload
+            .as_option()
+            .expect("prepared withdraw always has a payload")
+    }
+
+    pub fn payload_signature(&self) -> &[u8] {
+        &self.request.payload_signature
+    }
+
+    /// Exact deterministic protobuf bytes covered by `payload_signature`.
+    pub fn deterministic_payload_bytes(&self) -> Vec<u8> {
+        self.payload().encode_to_vec()
+    }
+
+    /// Canonical bytes to persist before first submission and reuse on retries.
+    pub fn request_bytes(&self) -> Vec<u8> {
+        self.request.encode_to_vec()
+    }
 }
 
 #[derive(Clone)]
@@ -133,19 +190,19 @@ impl WithdrawService {
     }
 
     fn encode_payload(opts: EncodeWithdrawPayload<'_>) -> Result<TradingWithdrawIntentPayload> {
-        if opts.amount_scale.is_some_and(|s| s == 0) {
-            return Err(Error::validation("amount_scale must be positive"));
-        }
         if opts.idempotency_key.trim().is_empty() {
             return Err(Error::validation("idempotency_key is required"));
+        }
+        if opts.deadline_ts_sec == 0 {
+            return Err(Error::validation("deadline_ts_sec must be non-zero"));
         }
         if opts.nonce == 0 {
             return Err(Error::validation("nonce must be non-zero"));
         }
-        let scale = opts.amount_scale.unwrap_or(LEDGER_SCALE);
-        let scaled = resolve_asset_amount_scaled(
+        let scaled = resolve_asset_amount_scaled_with_input_scale(
             opts.amount,
-            scale,
+            opts.amount_scale,
+            LEDGER_SCALE,
             QuantityDomain::LedgerE18,
             Some(opts.asset_id),
         )?;
@@ -155,10 +212,7 @@ impl WithdrawService {
             destination_chain_id: opts.destination_chain_id,
             destination_address: opts.destination_address,
             idempotency_key: opts.idempotency_key,
-            deadline_ts_sec: match opts.deadline_ts_sec {
-                Some(deadline) => deadline,
-                None => Self::default_deadline_ts_sec()?,
-            },
+            deadline_ts_sec: opts.deadline_ts_sec,
             ..Default::default()
         };
         *payload.amount_e18.get_or_insert_default() = i128_to_u128(scaled)?;
@@ -182,6 +236,102 @@ impl WithdrawService {
             .ok_or_else(|| Error::validation("withdraw deadline overflow"))
     }
 
+    fn prepare_api_key(
+        &self,
+        action: TradingWithdrawAction,
+        params: CreateApiKeyTradingWithdrawParams,
+        destination_chain_id: u64,
+    ) -> Result<PreparedTradingWithdraw> {
+        if action == TradingWithdrawAction::ToExternalChain
+            && params.destination_address.trim().is_empty()
+        {
+            return Err(Error::validation(
+                "destination_address is required for external-chain withdraw",
+            ));
+        }
+        let deadline_ts_sec = match params.deadline_ts_sec {
+            Some(deadline) => deadline,
+            None => Self::default_deadline_ts_sec()?,
+        };
+        let nonce = match params.nonce {
+            Some(nonce) => nonce,
+            None => new_trading_withdraw_nonce()?,
+        };
+        let payload = Self::encode_payload(EncodeWithdrawPayload {
+            action,
+            asset_id: params.asset_id,
+            amount: &params.amount,
+            amount_scale: params.amount_scale,
+            idempotency_key: params.idempotency_key,
+            destination_chain_id,
+            destination_address: params.destination_address,
+            deadline_ts_sec,
+            nonce,
+        })?;
+        let payload_signature = self
+            .ctx
+            .factory
+            .require_credentials()?
+            .sign_payload(&payload.encode_to_vec());
+        let mut request = CreateTradingWithdrawRequest {
+            payload_signature,
+            ..Default::default()
+        };
+        *request.payload.get_or_insert_default() = payload;
+        Ok(PreparedTradingWithdraw { request })
+    }
+
+    /// Build and API-key sign a complete Trading-to-Funding payload.
+    ///
+    /// Persist the returned value before submission and reuse it unchanged
+    /// after an outcome-unknown transport error.
+    pub fn prepare_api_key_to_funding(
+        &self,
+        params: CreateApiKeyTradingWithdrawParams,
+    ) -> Result<PreparedTradingWithdraw> {
+        self.prepare_api_key(TradingWithdrawAction::ToFunding, params, 0)
+    }
+
+    /// Build and API-key sign a complete Trading-to-external-chain payload.
+    pub fn prepare_api_key_to_external_chain(
+        &self,
+        params: CreateApiKeyTradingWithdrawParams,
+        destination_chain_id: u64,
+    ) -> Result<PreparedTradingWithdraw> {
+        self.prepare_api_key(
+            TradingWithdrawAction::ToExternalChain,
+            params,
+            destination_chain_id,
+        )
+    }
+
+    /// Submit an already prepared request without rebuilding signed fields.
+    pub async fn submit_prepared(
+        &self,
+        prepared: &PreparedTradingWithdraw,
+    ) -> Result<WithdrawIntentResult> {
+        self.create_trading_withdraw(prepared.request.clone()).await
+    }
+
+    /// Build, API-key sign, and submit a Trading-to-Funding payload unchanged.
+    pub async fn create_api_key_to_funding(
+        &self,
+        params: CreateApiKeyTradingWithdrawParams,
+    ) -> Result<WithdrawIntentResult> {
+        let prepared = self.prepare_api_key_to_funding(params)?;
+        self.submit_prepared(&prepared).await
+    }
+
+    /// Build, API-key sign, and submit a Trading-to-external-chain payload unchanged.
+    pub async fn create_api_key_to_external_chain(
+        &self,
+        params: CreateApiKeyTradingWithdrawParams,
+        destination_chain_id: u64,
+    ) -> Result<WithdrawIntentResult> {
+        let prepared = self.prepare_api_key_to_external_chain(params, destination_chain_id)?;
+        self.submit_prepared(&prepared).await
+    }
+
     /// Withdraw from trading to funding. Amount must be an [`crate::types::AssetAmount`].
     pub async fn create_to_funding(
         &self,
@@ -192,6 +342,9 @@ impl WithdrawService {
                 "payload_signature is required for trading withdraw",
             ));
         }
+        let deadline_ts_sec = params.deadline_ts_sec.ok_or_else(|| {
+            Error::validation("deadline_ts_sec is required when payload_signature is precomputed")
+        })?;
         let payload = Self::encode_payload(EncodeWithdrawPayload {
             action: TradingWithdrawAction::ToFunding,
             asset_id: params.asset_id,
@@ -200,7 +353,7 @@ impl WithdrawService {
             idempotency_key: params.idempotency_key,
             destination_chain_id: 0,
             destination_address: params.destination_address,
-            deadline_ts_sec: params.deadline_ts_sec,
+            deadline_ts_sec,
             nonce: params.nonce,
         })?;
         let mut req = CreateTradingWithdrawRequest {
@@ -227,6 +380,9 @@ impl WithdrawService {
                 "destination_address is required for external-chain withdraw",
             ));
         }
+        let deadline_ts_sec = params.deadline_ts_sec.ok_or_else(|| {
+            Error::validation("deadline_ts_sec is required when payload_signature is precomputed")
+        })?;
         let payload = Self::encode_payload(EncodeWithdrawPayload {
             action: TradingWithdrawAction::ToExternalChain,
             asset_id: params.asset_id,
@@ -235,7 +391,7 @@ impl WithdrawService {
             idempotency_key: params.idempotency_key,
             destination_chain_id,
             destination_address: params.destination_address,
-            deadline_ts_sec: params.deadline_ts_sec,
+            deadline_ts_sec,
             nonce: params.nonce,
         })?;
         let mut req = CreateTradingWithdrawRequest {
@@ -280,8 +436,16 @@ impl WithdrawService {
         {
             "to_funding" => TradingWithdrawAction::ToFunding,
             "to_external_chain" => TradingWithdrawAction::ToExternalChain,
-            _ => TradingWithdrawAction::ActionUnspecified,
+            _ => {
+                return Err(Error::validation(format!(
+                    "unknown trading withdraw action: {}",
+                    params.action
+                )));
+            }
         };
+        let deadline_ts_sec = params.deadline_ts_sec.ok_or_else(|| {
+            Error::validation("deadline_ts_sec is required when payload_signature is precomputed")
+        })?;
         let payload = Self::encode_payload(EncodeWithdrawPayload {
             action,
             asset_id: params.asset_id,
@@ -290,7 +454,7 @@ impl WithdrawService {
             idempotency_key: params.idempotency_key,
             destination_chain_id: params.destination_chain_id,
             destination_address: params.destination_address,
-            deadline_ts_sec: params.deadline_ts_sec,
+            deadline_ts_sec,
             nonce: params.nonce,
         })?;
         let mut req = CreateWalletTradingWithdrawRequest {
@@ -376,7 +540,7 @@ mod tests {
             idempotency_key: "withdraw-equivalence".into(),
             destination_chain_id: 0,
             destination_address: String::new(),
-            deadline_ts_sec: Some(1_800_000_000),
+            deadline_ts_sec: 1_800_000_000,
             nonce: 42,
         })
     }
@@ -440,7 +604,7 @@ mod tests {
             idempotency_key: "  ".into(),
             destination_chain_id: 0,
             destination_address: String::new(),
-            deadline_ts_sec: Some(1_800_000_000),
+            deadline_ts_sec: 1_800_000_000,
             nonce: 42,
         })
         .unwrap_err();
@@ -459,7 +623,7 @@ mod tests {
             idempotency_key: "stable-withdraw".into(),
             destination_chain_id: 0,
             destination_address: String::new(),
-            deadline_ts_sec: Some(1_800_000_000),
+            deadline_ts_sec: 1_800_000_000,
             nonce: 0,
         })
         .unwrap_err();
@@ -474,5 +638,125 @@ mod tests {
         assert_eq!(first_key.len(), 35);
         assert_ne!(first_key, second_key);
         assert_ne!(new_trading_withdraw_nonce().unwrap(), 0);
+    }
+
+    fn signing_client(seed_hex: &str) -> crate::Client {
+        crate::Client::new(crate::Config {
+            api_key_id: Some("withdraw-test-key".into()),
+            api_private_key: Some(seed_hex.into()),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .unwrap()
+    }
+
+    fn api_key_params(amount: AssetAmount) -> CreateApiKeyTradingWithdrawParams {
+        CreateApiKeyTradingWithdrawParams {
+            asset_id: 7,
+            amount,
+            destination_address: String::new(),
+            idempotency_key: "prepared-withdraw".into(),
+            amount_scale: Some(2),
+            deadline_ts_sec: Some(1_800_000_000),
+            nonce: Some(42),
+        }
+    }
+
+    #[test]
+    fn prepared_api_key_withdraw_retains_deadline_rescales_e18_and_signs_exact_bytes() {
+        use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+        let seed = [7_u8; 32];
+        let client = signing_client(&hex::encode(seed));
+        let amount =
+            AssetAmount::from_scaled(125, Some(2), QuantityDomain::LedgerE18, Some(7)).unwrap();
+        let prepared = client
+            .withdraw
+            .prepare_api_key_to_funding(api_key_params(amount))
+            .unwrap();
+        let payload = prepared.payload();
+
+        assert_eq!(payload.deadline_ts_sec, 1_800_000_000);
+        let amount = payload.amount_e18.as_option().unwrap();
+        assert_eq!(
+            (u128::from(amount.hi) << 64) | u128::from(amount.lo),
+            1_250_000_000_000_000_000
+        );
+        let verifying_key = VerifyingKey::from(&ed25519_dalek::SigningKey::from_bytes(&seed));
+        let signature = Signature::from_slice(prepared.payload_signature()).unwrap();
+        verifying_key
+            .verify(&prepared.deterministic_payload_bytes(), &signature)
+            .unwrap();
+        let restored =
+            PreparedTradingWithdraw::from_request_bytes(&prepared.request_bytes()).unwrap();
+        assert_eq!(restored.request_bytes(), prepared.request_bytes());
+
+        let identical = client
+            .withdraw
+            .prepare_api_key_to_funding(api_key_params(
+                AssetAmount::from_scaled(125, Some(2), QuantityDomain::LedgerE18, Some(7)).unwrap(),
+            ))
+            .unwrap();
+        assert_eq!(
+            prepared.deterministic_payload_bytes(),
+            identical.deterministic_payload_bytes()
+        );
+        assert_eq!(prepared.payload_signature(), identical.payload_signature());
+    }
+
+    #[tokio::test]
+    async fn precomputed_signature_path_rejects_missing_deadline() {
+        let client = crate::Client::new(crate::Config {
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .unwrap();
+        let err = client
+            .withdraw
+            .create_to_funding(CreateTradingWithdrawParams {
+                asset_id: 7,
+                amount: AssetAmount::from_scaled(1, Some(18), QuantityDomain::LedgerE18, Some(7))
+                    .unwrap(),
+                payload_signature: vec![1],
+                destination_address: String::new(),
+                idempotency_key: "missing-deadline".into(),
+                amount_scale: Some(18),
+                deadline_ts_sec: None,
+                nonce: 42,
+            })
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::Validation(_)));
+        assert!(err.to_string().contains("deadline_ts_sec"));
+    }
+
+    #[tokio::test]
+    async fn wallet_withdraw_rejects_unknown_action_as_validation() {
+        let client = crate::Client::new(crate::Config {
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .unwrap();
+        let err = client
+            .withdraw
+            .create_wallet_trading_withdraw(CreateWalletTradingWithdrawParams {
+                action: "future_action".into(),
+                asset_id: 7,
+                amount: AssetAmount::from_scaled(1, Some(18), QuantityDomain::LedgerE18, Some(7))
+                    .unwrap(),
+                idempotency_key: "unknown-action".into(),
+                payload_signature: vec![1],
+                signer_wallet: "0x1".into(),
+                destination_chain_id: 0,
+                destination_address: String::new(),
+                subaccount_id: None,
+                amount_scale: Some(18),
+                deadline_ts_sec: Some(1_800_000_000),
+                nonce: 42,
+            })
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::Validation(_)));
+        assert!(err.to_string().contains("unknown trading withdraw action"));
     }
 }

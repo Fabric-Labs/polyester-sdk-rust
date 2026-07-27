@@ -2,11 +2,12 @@
 
 use crate::auth::{self, Credentials};
 use crate::errors::{Error, Result, map_connect_error};
+use crate::user_agent::user_agent;
 use buffa::Message;
 use connectrpc::ConnectError;
 use connectrpc::client::{CallOptions, ClientConfig, HttpClient};
 use connectrpc::rustls;
-use http::Uri;
+use http::{HeaderValue, Uri, header::USER_AGENT};
 use serde::Serialize;
 use std::sync::Arc;
 use std::time::Duration;
@@ -78,9 +79,12 @@ impl Factory {
 
         let transport = build_http_client(&config.api_url)?;
 
+        let ua = HeaderValue::from_str(&user_agent())
+            .map_err(|e| Error::validation(format!("invalid User-Agent header value: {e}")))?;
         let mut connect_config = ClientConfig::new(uri)
             .with_default_timeout(config.timeout)
-            .with_default_max_message_size(MAX_CONNECT_RESPONSE_BYTES);
+            .with_default_max_message_size(MAX_CONNECT_RESPONSE_BYTES)
+            .with_default_header(USER_AGENT, ua);
 
         if config.wire_format == WireFormat::Json {
             connect_config = connect_config.json();
@@ -126,7 +130,7 @@ impl Factory {
         };
         let sign_url = auth::request_url(&self.config.api_url, procedure);
         let headers = creds.sign_request("POST", &sign_url, &body, None)?;
-        let mut opts = CallOptions::default();
+        let mut opts = CallOptions::default().with_header(USER_AGENT, user_agent());
         for (k, v) in headers {
             opts = opts.with_header(k, v);
         }
@@ -149,7 +153,7 @@ impl Factory {
         let headers = creds
             .sign_request_async("POST", &sign_url, &body, None)
             .await?;
-        let mut opts = CallOptions::default();
+        let mut opts = CallOptions::default().with_header(USER_AGENT, user_agent());
         for (k, v) in headers {
             opts = opts.with_header(k, v);
         }
@@ -178,5 +182,31 @@ fn build_http_client(api_url: &str) -> Result<HttpClient> {
         Err(Error::validation(
             "api_url must start with http:// or https://",
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::user_agent::user_agent;
+
+    #[test]
+    fn connect_config_sets_polyester_user_agent() {
+        let factory = Factory::new(
+            Config {
+                api_url: "http://127.0.0.1:9".into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .expect("factory");
+        let config = factory.connect_config();
+        let ua = config
+            .default_headers()
+            .get(USER_AGENT)
+            .expect("User-Agent default header")
+            .to_str()
+            .expect("ascii");
+        assert_eq!(ua, user_agent());
     }
 }

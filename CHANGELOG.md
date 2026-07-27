@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.1.0a19
+
+Package version: `0.1.0-alpha.19`. Git tag: `v0.1.0a19`.
+
+### Fixed
+- Outbound Connect and realtime-token HTTP requests now send an explicit `User-Agent: polyester-sdk-rust/<version>` instead of relying on hyper's accidental omission of the header, so edge WAF rules that ban browser signatures (Cloudflare error 1010) cannot silently break every Rust client.
+- Cloudflare error 1010 responses are mapped to `Error::Transport` with an explicit WAF message instead of being misclassified as auth / permission failures.
+- Concurrent identical authenticated balance reads soft-skip like the sibling balances probe when the Balances scope is unavailable, instead of panicking the live suite for a fixture gap.
+
+### Breaking
+- Public orderbook snapshot decoders now return `Result` so malformed levels cannot be represented with missing price or quantity fields.
+- `Price` and `Quantity` metadata is now immutable after validated construction; replace public field reads with `symbol()`, `scale()`, `domain()`, and `symbol_id()` getters.
+
+### Fixed
+- Managed orderbooks reject malformed levels and invalid sequence ranges atomically, keep the prior sequence/book, and request a snapshot refresh.
+- Snapshot depth `1` and `1000` requests now use the matching protocol variants.
+- Singular cancel and lookup by client-order-id validate the documented identifier constraints before contacting the transport.
+
+### Testing
+- The 10k identical-sign runtime-safety probe joins in chunks so CPU-bound Ed25519 work cannot starve the current-thread ticker for the whole burst.
+
 ## 0.1.0a18
 
 Package version: `0.1.0-alpha.18`. Git tag: `v0.1.0a18`.

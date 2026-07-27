@@ -49,10 +49,13 @@ impl QtyScaled {
 }
 
 /// Resolved protocol price units (protobuf `price_ticks`, fixed 1e6).
+///
+/// Fields are private so metadata cannot be changed independently of the
+/// validated ticks. Use [`Price::symbol`] to inspect the immutable metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Price {
     ticks: PriceTicks,
-    pub symbol: Option<String>,
+    symbol: Option<String>,
 }
 
 impl Price {
@@ -80,6 +83,10 @@ impl Price {
         self.ticks.get()
     }
 
+    pub fn symbol(&self) -> Option<&str> {
+        self.symbol.as_deref()
+    }
+
     pub fn as_decimal(&self) -> Decimal {
         // Price ticks always use the protocol's fixed 1e6 scale, so this
         // conversion is exact and cannot silently substitute Decimal::ZERO.
@@ -91,7 +98,7 @@ impl Price {
     }
 
     pub fn compatible_with(&self, symbol: Option<&str>) -> Result<()> {
-        if let (Some(a), Some(b)) = (self.symbol.as_deref(), symbol)
+        if let (Some(a), Some(b)) = (self.symbol(), symbol)
             && a != b
         {
             return Err(Error::validation(format!(
@@ -103,13 +110,16 @@ impl Price {
 }
 
 /// Resolved order/trigger base quantity (protobuf `qty_scaled`).
+///
+/// Fields are private so metadata cannot be changed independently of the
+/// validated scaled value. Use the immutable metadata getters to inspect it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Quantity {
     scaled: QtyScaled,
-    pub scale: Option<u32>,
-    pub domain: QuantityDomain,
-    pub symbol: Option<String>,
-    pub symbol_id: Option<u32>,
+    scale: Option<u32>,
+    domain: QuantityDomain,
+    symbol: Option<String>,
+    symbol_id: Option<u32>,
 }
 
 impl Quantity {
@@ -171,8 +181,24 @@ impl Quantity {
         self.scaled.get()
     }
 
+    pub fn scale(&self) -> Option<u32> {
+        self.scale
+    }
+
+    pub fn domain(&self) -> QuantityDomain {
+        self.domain
+    }
+
+    pub fn symbol(&self) -> Option<&str> {
+        self.symbol.as_deref()
+    }
+
+    pub fn symbol_id(&self) -> Option<u32> {
+        self.symbol_id
+    }
+
     pub fn format(&self, scale: Option<u32>) -> Result<String> {
-        let resolved = scale.or(self.scale).ok_or_else(|| {
+        let resolved = scale.or(self.scale()).ok_or_else(|| {
             Error::validation("format requires a known scale; pass scale= or construct with scale=")
         })?;
         format_qty_scaled(self.scaled.get(), resolved)
@@ -185,27 +211,27 @@ impl Quantity {
         symbol: Option<&str>,
         symbol_id: Option<u32>,
     ) -> Result<()> {
-        if self.domain != domain {
+        if self.domain() != domain {
             return Err(Error::validation(format!(
                 "quantity domain mismatch: value is {:?}, destination is {domain:?}",
-                self.domain
+                self.domain()
             )));
         }
-        if let (Some(a), Some(b)) = (self.scale, scale)
+        if let (Some(a), Some(b)) = (self.scale(), scale)
             && a != b
         {
             return Err(Error::validation(format!(
                 "quantity scale mismatch: value scale is {a}, destination is {b}"
             )));
         }
-        if let (Some(a), Some(b)) = (self.symbol.as_deref(), symbol)
+        if let (Some(a), Some(b)) = (self.symbol(), symbol)
             && a != b
         {
             return Err(Error::validation(format!(
                 "quantity symbol mismatch: value is for {a}, destination is {b}"
             )));
         }
-        if let (Some(a), Some(b)) = (self.symbol_id, symbol_id)
+        if let (Some(a), Some(b)) = (self.symbol_id(), symbol_id)
             && a != b
         {
             return Err(Error::validation(format!(
@@ -361,14 +387,59 @@ pub fn resolve_asset_amount_scaled(
     domain: QuantityDomain,
     asset_id: Option<u32>,
 ) -> Result<i128> {
-    value.compatible_with(domain, Some(scale), asset_id)?;
+    resolve_asset_amount_scaled_with_input_scale(value, None, scale, domain, asset_id)
+}
+
+/// Resolve an asset amount to `target_scale`, using `input_scale` only when the
+/// value does not already carry a scale.
+pub(crate) fn resolve_asset_amount_scaled_with_input_scale(
+    value: &AssetAmount,
+    input_scale: Option<u32>,
+    target_scale: u32,
+    domain: QuantityDomain,
+    asset_id: Option<u32>,
+) -> Result<i128> {
+    crate::codecs::scalars::validate_protocol_scale(target_scale)?;
+    if let Some(scale) = input_scale {
+        crate::codecs::scalars::validate_protocol_scale(scale)?;
+    }
+    value.compatible_with(domain, None, asset_id)?;
+    if let (Some(value_scale), Some(input_scale)) = (value.scale, input_scale)
+        && value_scale != input_scale
+    {
+        return Err(Error::validation(format!(
+            "amount scale mismatch: value scale is {value_scale}, input scale is {input_scale}"
+        )));
+    }
     if value.scaled <= 0 {
         return Err(Error::validation("amount must be positive"));
     }
-    if domain != QuantityDomain::LedgerE18 && value.scaled > crate::codecs::scalars::INT64_MAX {
+    let source_scale = value.scale.or(input_scale).unwrap_or(target_scale);
+    let scaled = if source_scale < target_scale {
+        let factor = 10_i128
+            .checked_pow(target_scale - source_scale)
+            .ok_or_else(|| Error::validation("amount scale conversion overflow"))?;
+        value
+            .scaled
+            .checked_mul(factor)
+            .ok_or_else(|| Error::validation("amount scale conversion overflow"))?
+    } else if source_scale > target_scale {
+        let divisor = 10_i128
+            .checked_pow(source_scale - target_scale)
+            .ok_or_else(|| Error::validation("amount scale conversion overflow"))?;
+        if value.scaled % divisor != 0 {
+            return Err(Error::validation(format!(
+                "amount cannot be represented exactly at scale {target_scale}"
+            )));
+        }
+        value.scaled / divisor
+    } else {
+        value.scaled
+    };
+    if domain != QuantityDomain::LedgerE18 && scaled > crate::codecs::scalars::INT64_MAX {
         return Err(Error::validation("amount exceeds int64 range"));
     }
-    Ok(value.scaled)
+    Ok(scaled)
 }
 
 #[cfg(test)]
@@ -402,6 +473,42 @@ mod tests {
         assert_eq!(
             resolve_qty_scaled(&qty, 8, Some("BTC-USDT"), Some(1)).unwrap(),
             125_000_000
+        );
+    }
+
+    #[test]
+    fn price_and_quantity_metadata_getters_preserve_compatibility() {
+        let price = Price::from_ticks(42_500_000, Some("BTC-USDT".into())).unwrap();
+        assert_eq!(price.symbol(), Some("BTC-USDT"));
+        assert_eq!(price.as_ticks(), 42_500_000);
+        assert_eq!(price.format(), "42.5");
+        assert_eq!(price.clone(), price);
+        assert!(format!("{price:?}").contains("BTC-USDT"));
+
+        let qty = Quantity::from_scaled(
+            125_000_000,
+            Some(8),
+            QuantityDomain::OrderBase,
+            Some("BTC-USDT".into()),
+            Some(7),
+        )
+        .unwrap();
+        assert_eq!(qty.scale(), Some(8));
+        assert_eq!(qty.domain(), QuantityDomain::OrderBase);
+        assert_eq!(qty.symbol(), Some("BTC-USDT"));
+        assert_eq!(qty.symbol_id(), Some(7));
+        assert_eq!(qty.as_scaled(), 125_000_000);
+        assert_eq!(qty.format(None).unwrap(), "1.25");
+        assert_eq!(qty.clone(), qty);
+        assert!(format!("{qty:?}").contains("BTC-USDT"));
+        assert!(
+            qty.compatible_with(
+                QuantityDomain::OrderBase,
+                Some(8),
+                Some("BTC-USDT"),
+                Some(7)
+            )
+            .is_ok()
         );
     }
 
@@ -440,6 +547,44 @@ mod tests {
         assert!(
             resolve_asset_amount_scaled(&amount, 18, QuantityDomain::LedgerE18, Some(8)).is_err()
         );
+    }
+
+    #[test]
+    fn asset_amount_rescales_exactly_without_rounding() {
+        let asset_precision =
+            AssetAmount::from_scaled(125, Some(2), QuantityDomain::LedgerE18, Some(7)).unwrap();
+        assert_eq!(
+            resolve_asset_amount_scaled(&asset_precision, 18, QuantityDomain::LedgerE18, Some(7))
+                .unwrap(),
+            1_250_000_000_000_000_000
+        );
+
+        let exact_downscale = AssetAmount::from_scaled(
+            1_250_000_000_000_000_000,
+            Some(18),
+            QuantityDomain::LedgerE18,
+            Some(7),
+        )
+        .unwrap();
+        assert_eq!(
+            resolve_asset_amount_scaled(&exact_downscale, 2, QuantityDomain::LedgerE18, Some(7))
+                .unwrap(),
+            125
+        );
+
+        let inexact_downscale =
+            AssetAmount::from_scaled(126, Some(3), QuantityDomain::LedgerE18, Some(7)).unwrap();
+        assert!(
+            resolve_asset_amount_scaled(&inexact_downscale, 2, QuantityDomain::LedgerE18, Some(7))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn asset_amount_rescale_rejects_overflow() {
+        let amount =
+            AssetAmount::from_scaled(i128::MAX, Some(17), QuantityDomain::LedgerE18, None).unwrap();
+        assert!(resolve_asset_amount_scaled(&amount, 18, QuantityDomain::LedgerE18, None).is_err());
     }
 
     #[test]
