@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.1.0a16
+
+Package version: `0.1.0-alpha.16`. Git tag: `v0.1.0a16`.
+
+### Fixed
+- Spot-config JSON restores `baseQuantityScale` under the canonical proto-JSON key so consumers can re-deserialize `GetSpotConfigResponse` without a duplicate-field error (regression from a15).
+- Concurrent identical requests receive unique authentication timestamps across cloned credentials. The allocator caps future skew at five seconds and applies bounded backpressure instead of emitting duplicate authentication tuples.
+- Batch create, modify, and cancel responses reconcile aggregate counts against per-item outcomes and reject unknown/ambiguous result states.
+- Columnar candles reject misaligned OHLCV arrays instead of emitting empty fields.
+- Address-book mutations, deposit-address creation, and singular lifecycle lookups reject missing required entities instead of returning placeholder models.
+- Public batch and cancel-all counters preserve their unsigned protobuf range.
+- User trades expose fee source and referral share, so received-asset fees can be distinguished from quote fees and BUY net quantity can be calculated correctly.
+
+### Testing
+- Public-service Connect fault injection covers inconsistent batch counts, misaligned candle columns, and missing required entities in addition to decoder-level boundary tests.
+- The funded BUY-to-SELL acceptance test waits for complete fill projection and sells net received base quantity after received-asset fees.
+- State-changing live integration tests share a process-wide guard, preventing concurrent tests on one QA account from consuming each other's balances or corrupting reconciliation snapshots.
+- Legacy one-way market BUY and SELL probes are ignored in the release suite; the self-contained net-quantity BUY-to-SELL roundtrip provides the same live mutation coverage without leaving a position behind.
+
 ## 0.1.0a15
 
 Package version: `0.1.0-alpha.15`. Git tag: `v0.1.0a15`.
@@ -21,7 +40,7 @@ Package version: `0.1.0-alpha.15`. Git tag: `v0.1.0a15`.
 - Batch-create decoding rejects missing outcomes and inconsistent aggregate counts; unknown rejection enum values retain their numeric code.
 - Realtime reconnects use capped exponential backoff with per-subscription jitter.
 - `SnapshotThenStream::start` cannot miss transient initial readiness and now obeys the configured startup deadline.
-- Signing timestamps remain at wall clock under 100k-request bursts instead of drifting into the future.
+- Signing timestamps no longer drift without a future-skew bound under large bursts.
 - Catalog hydration rejects conflicting identities atomically; scale-dependent market data, orderbooks, and Zipper supply fail closed instead of guessing a scale. Valid proto3 scale `0` values survive protobuf-to-JSON conversion.
 - REST and realtime public market trades carry catalog quantity-scale metadata.
 - Unknown enum values are preserved as `UNKNOWN(n)` rather than collapsing to an empty string.

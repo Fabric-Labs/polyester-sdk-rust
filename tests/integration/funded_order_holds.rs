@@ -15,6 +15,7 @@ async fn order_hold_visible_while_open() {
     if !require_mutation() {
         return;
     }
+    let _mutation_guard = crate::support::mutation_test_guard().await;
     if !require_funded() {
         return;
     }

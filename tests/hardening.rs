@@ -227,55 +227,65 @@ async fn l2_all_publication_decode_errors_surface_through_the_public_websocket_a
 }
 
 #[test]
-fn l2_auth_100k_concurrent_signatures_do_not_drift_into_the_future() {
-    use polyester::auth::HEADER_TIMESTAMP;
+fn l2_auth_10k_identical_requests_are_unique_and_future_bounded() {
+    use polyester::auth::{HEADER_SIGNATURE, HEADER_TIMESTAMP, MAX_SIGNING_FUTURE_SKEW_MS};
+    use std::collections::HashSet;
     use std::sync::Barrier;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     const THREADS: usize = 16;
-    const PER_THREAD: usize = 6_250;
+    const PER_THREAD: usize = 625;
 
-    let credentials = Arc::new(test_credentials("ak_test", TEST_KEY));
+    let credentials = test_credentials("ak_test", TEST_KEY);
     let barrier = Arc::new(Barrier::new(THREADS));
     let handles = (0..THREADS)
         .map(|_| {
-            let credentials = Arc::clone(&credentials);
+            let credentials = credentials.clone();
             let barrier = Arc::clone(&barrier);
             std::thread::spawn(move || {
                 barrier.wait();
-                let mut maximum = 0_u64;
-                for sequence in 0..PER_THREAD {
-                    let body = sequence.to_le_bytes();
-                    let headers = credentials
-                        .sign_request(
-                            "POST",
-                            "https://api.example.test/orders.v1.OrdersService/CreateOrder",
-                            &body,
-                            None,
+                (0..PER_THREAD)
+                    .map(|_| {
+                        let headers = credentials
+                            .sign_request(
+                                "POST",
+                                "https://api.example.test/orders.v1.OrdersService/CreateOrder",
+                                b"identical-order-body",
+                                None,
+                            )
+                            .unwrap();
+                        (
+                            headers[HEADER_TIMESTAMP].parse::<u64>().unwrap(),
+                            headers[HEADER_SIGNATURE].clone(),
+                            u64::try_from(
+                                SystemTime::now()
+                                    .duration_since(UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_millis(),
+                            )
+                            .unwrap(),
                         )
-                        .unwrap();
-                    maximum = maximum.max(headers[HEADER_TIMESTAMP].parse().unwrap());
-                }
-                maximum
+                    })
+                    .collect::<Vec<_>>()
             })
         })
         .collect::<Vec<_>>();
-    let maximum = handles
+    let tuples = handles
         .into_iter()
-        .map(|handle| handle.join().unwrap())
-        .max()
-        .unwrap();
-    let wall_clock_after = u64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis(),
-    )
-    .unwrap();
-    assert!(
-        maximum <= wall_clock_after,
-        "maximum signed timestamp {maximum} exceeded wall clock {wall_clock_after}"
-    );
+        .flat_map(|handle| handle.join().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(tuples.len(), 10_000);
+    let timestamps = tuples.iter().map(|item| item.0).collect::<HashSet<_>>();
+    let signatures = tuples.iter().map(|item| &item.1).collect::<HashSet<_>>();
+    assert_eq!(timestamps.len(), 10_000, "duplicate signing timestamp");
+    assert_eq!(signatures.len(), 10_000, "duplicate authentication tuple");
+    for (timestamp, _, observed_at_ms) in &tuples {
+        assert!(
+            *timestamp <= *observed_at_ms + MAX_SIGNING_FUTURE_SKEW_MS,
+            "signed timestamp {timestamp} exceeded its per-request bounded ceiling {}",
+            *observed_at_ms + MAX_SIGNING_FUTURE_SKEW_MS
+        );
+    }
 
     let later = credentials
         .sign_request(
@@ -294,7 +304,7 @@ fn l2_auth_100k_concurrent_signatures_do_not_drift_into_the_future() {
             .as_millis(),
     )
     .unwrap();
-    assert!(later <= wall_clock_later);
+    assert!(later <= wall_clock_later + MAX_SIGNING_FUTURE_SKEW_MS);
 }
 
 #[tokio::test]
@@ -1829,6 +1839,9 @@ async fn l2_wait_for_order_trades_complete_polls_get_order_until_trade_sum_match
                     UserTrade {
                         symbol_id: 1,
                         qty_scaled: 40,
+                        fee_scaled: 1,
+                        fee_source: polyester::proto::orders::v1::FeeSource::Received.into(),
+                        referral_share_scaled: 1,
                         ..Default::default()
                     },
                     UserTrade {
@@ -1871,6 +1884,9 @@ async fn l2_wait_for_order_trades_complete_polls_get_order_until_trade_sum_match
         .sum();
     assert_eq!(cum, 100);
     assert_eq!(sum, 100);
+    assert_eq!(result.trades[0].fee_source, "received");
+    assert_eq!(result.trades[0].fee_scaled, "1");
+    assert_eq!(result.trades[0].referral_share_scaled, "1");
 }
 
 #[tokio::test]
@@ -2045,6 +2061,237 @@ async fn l2_wait_for_catalogs_headers_then_body_stall_times_out() {
         .expect_err("body stall must fail");
     assert!(started.elapsed() < timeout + Duration::from_millis(1200));
     assert!(err.to_string().contains("catalog"), "{err}");
+}
+
+#[tokio::test]
+async fn l2_batch_cancel_rejects_inconsistent_server_counts_through_public_service() {
+    use polyester::models::BatchCancelItem;
+    use polyester::proto::orders::v1::{
+        BatchCancelOrdersResponse, BatchCancelResultItem as ProtoItem,
+    };
+
+    let response = BatchCancelOrdersResponse {
+        results: vec![ProtoItem {
+            status: "accepted".into(),
+            order_id: 9,
+            ..Default::default()
+        }],
+        accepted_count: 0,
+        rejected_count: 1,
+        ..Default::default()
+    };
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path == "/orders.v1.OrdersService/BatchCancelOrders" {
+            connect_proto_ok(&response)
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .expect("client");
+
+    let err = client
+        .orders
+        .batch_cancel(
+            vec![BatchCancelItem {
+                order_id: Some("9".into()),
+                client_order_id: None,
+                symbol_id: None,
+            }],
+            None,
+            Some("count-mismatch".into()),
+        )
+        .await
+        .expect_err("service must reject an ambiguous batch result");
+    assert!(err.to_string().contains("response counts"), "{err}");
+}
+
+#[tokio::test]
+async fn l2_batch_modify_rejects_inconsistent_server_counts_through_public_service() {
+    use polyester::Price;
+    use polyester::models::BatchModifyItem;
+    use polyester::proto::orders::v1::{
+        BatchModifyOrdersResponse, BatchModifyResultItem as ProtoItem, ModifyActionTaken,
+    };
+
+    let spot = spot_config_fixture();
+    let zipper = zipper_config_fixture();
+    let response = BatchModifyOrdersResponse {
+        results: vec![ProtoItem {
+            status: "modified".into(),
+            action_taken: ModifyActionTaken::Amended.into(),
+            final_order_id: 9,
+            ..Default::default()
+        }],
+        amended_count: 0,
+        rejected_count: 1,
+        ..Default::default()
+    };
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path == SPOT_CONFIG_PATH {
+            connect_proto_ok(&spot)
+        } else if req.path == ZIPPER_CONFIG_PATH {
+            connect_proto_ok(&zipper)
+        } else if req.path == "/orders.v1.OrdersService/BatchModifyOrders" {
+            connect_proto_ok(&response)
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: true,
+        ..Default::default()
+    })
+    .expect("client");
+    client.wait_for_catalogs().await.expect("catalogs");
+
+    let err = client
+        .orders
+        .batch_modify(
+            vec![BatchModifyItem {
+                order_id: Some("9".into()),
+                client_order_id: None,
+                new_price: Some(Price::from_ticks(1, Some("BTC-USDT".into())).expect("price")),
+                new_qty: None,
+                new_attached_risk: None,
+                behavior: None,
+                new_client_order_id: None,
+            }],
+            Some("BTC-USDT"),
+            None,
+            Some("modify-count-mismatch".into()),
+            None,
+            false,
+        )
+        .await
+        .expect_err("service must reject an ambiguous batch result");
+    assert!(err.to_string().contains("response counts"), "{err}");
+}
+
+#[tokio::test]
+async fn l2_columnar_candles_reject_misaligned_columns_through_public_service() {
+    use polyester::models::GetCandlesOpts;
+    use polyester::proto::marketdata::v1::{GetCandlesColumnsResponse, Timeframe};
+
+    let spot = spot_config_fixture();
+    let zipper = zipper_config_fixture();
+    let response = GetCandlesColumnsResponse {
+        symbol_id: 1,
+        timeframe: Timeframe::Min1.into(),
+        ts_sec: vec![10, 20],
+        open: vec![1, 2],
+        high: vec![1],
+        low: vec![1, 2],
+        close: vec![1, 2],
+        volume: vec![1, 2],
+        ..Default::default()
+    };
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path == SPOT_CONFIG_PATH {
+            connect_proto_ok(&spot)
+        } else if req.path == ZIPPER_CONFIG_PATH {
+            connect_proto_ok(&zipper)
+        } else if req.path == "/marketdata.v1.MarketDataService/GetCandlesColumns" {
+            connect_proto_ok(&response)
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        hydrate_catalogs: true,
+        ..Default::default()
+    })
+    .expect("client");
+    client.wait_for_catalogs().await.expect("catalogs");
+
+    let err = client
+        .market_data
+        .get_candles_columns(GetCandlesOpts {
+            symbol: Some("BTC-USDT".into()),
+            timeframe: "1m".into(),
+            ..Default::default()
+        })
+        .await
+        .expect_err("service must reject misaligned OHLCV columns");
+    assert!(err.to_string().contains("response lengths"), "{err}");
+}
+
+#[tokio::test]
+async fn l2_lifecycle_get_rejects_missing_required_flow_through_public_service() {
+    use polyester::proto::chain::lifecycle::v1::GetFlowResponse;
+
+    let response = GetFlowResponse::default();
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path == "/chain.lifecycle.v1.LifecycleReadService/GetFlowById" {
+            connect_proto_ok(&response)
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .expect("client");
+
+    let err = client
+        .lifecycle
+        .get_flow("flow-1")
+        .await
+        .expect_err("service must reject a missing required flow");
+    assert!(err.to_string().contains("missing flow"), "{err}");
+}
+
+#[tokio::test]
+async fn l2_create_deposit_address_rejects_missing_entity_through_public_service() {
+    use polyester::proto::chain::deposit::v1::{
+        CreateDepositAddressRequest, CreateDepositAddressResponse,
+    };
+
+    let response = CreateDepositAddressResponse::default();
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path == "/chain.deposit.v1.DepositAddressService/CreateDepositAddress" {
+            connect_proto_ok(&response)
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .expect("client");
+
+    let err = client
+        .deposit
+        .create_address(CreateDepositAddressRequest {
+            chain_id: 1,
+            ..Default::default()
+        })
+        .await
+        .expect_err("service must reject a missing deposit address");
+    assert!(err.to_string().contains("missing deposit_address"), "{err}");
 }
 
 #[tokio::test]

@@ -18,6 +18,7 @@ async fn order_round_trip_mutation() {
     if !require_mutation() {
         return;
     }
+    let _mutation_guard = crate::support::mutation_test_guard().await;
     let Some(client) = require_live_client() else {
         return;
     };

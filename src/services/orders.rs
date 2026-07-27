@@ -608,7 +608,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(batch_cancel_from_proto(&resp))
+        batch_cancel_from_proto(&resp)
     }
 
     pub async fn batch_modify(
@@ -696,7 +696,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(batch_modify_from_proto(&resp))
+        batch_modify_from_proto(&resp)
     }
 
     pub async fn cancel_all_after(
@@ -1303,6 +1303,8 @@ mod tests {
                     .unwrap(),
                 ),
                 fee_scaled: "0".into(),
+                fee_source: "quote".into(),
+                referral_share_scaled: "0".into(),
                 ts_ns: String::new(),
             }],
         };

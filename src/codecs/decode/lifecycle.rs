@@ -2,6 +2,7 @@
 
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::format_uint64_id;
+use crate::errors::{Error, Result};
 use crate::models::{LifecycleFlowSummary, LifecycleFlowsList};
 use crate::proto::chain::lifecycle::v1::{
     FlowSummaryView, FlowTxMatchView, GetFlowResponse, ListFlowsByTxResponse, ListFlowsResponse,
@@ -49,22 +50,23 @@ pub fn flows_by_tx_list_from_proto(msg: &ListFlowsByTxResponse) -> LifecycleFlow
     }
 }
 
-pub fn flow_from_get_response(msg: &GetFlowResponse) -> LifecycleFlowSummary {
-    match msg.flow.as_option() {
-        Some(detail) => detail
-            .summary
-            .as_option()
-            .map(flow_summary_from_proto)
-            .unwrap_or_default(),
-        None => LifecycleFlowSummary::default(),
-    }
+pub fn flow_from_get_response(msg: &GetFlowResponse) -> Result<LifecycleFlowSummary> {
+    let detail = msg
+        .flow
+        .as_option()
+        .ok_or_else(|| Error::transport("invalid GetFlow response: missing flow"))?;
+    detail
+        .summary
+        .as_option()
+        .map(flow_summary_from_proto)
+        .ok_or_else(|| Error::transport("invalid GetFlow response: missing flow summary"))
 }
 
-pub fn flow_from_get_by_tx_response(msg: &ListFlowsByTxResponse) -> LifecycleFlowSummary {
+pub fn flow_from_get_by_tx_response(msg: &ListFlowsByTxResponse) -> Result<LifecycleFlowSummary> {
     msg.matches
         .first()
         .map(flow_tx_match_from_proto)
-        .unwrap_or_default()
+        .ok_or_else(|| Error::transport("invalid GetFlowByTx response: no matching flow"))
 }
 
 #[cfg(test)]
@@ -110,5 +112,11 @@ mod tests {
         let result = flows_list_from_proto(&msg);
         assert_eq!(result.flows.len(), 2);
         assert_eq!(result.next_page_token, "next");
+    }
+
+    #[test]
+    fn singular_flow_responses_reject_missing_required_entities() {
+        assert!(flow_from_get_response(&GetFlowResponse::default()).is_err());
+        assert!(flow_from_get_by_tx_response(&ListFlowsByTxResponse::default()).is_err());
     }
 }
