@@ -149,8 +149,12 @@ impl MarketDataService {
         candles_from_proto(&resp, volume_scale)
     }
 
-    /// Latest candle for a symbol/timeframe (limit=1, include_incomplete).
-    pub async fn get_current_candle(&self, symbol: &str, timeframe: &str) -> Result<Candle> {
+    /// Latest candle for a symbol/timeframe, or `None` when the market has no rows.
+    pub async fn get_current_candle(
+        &self,
+        symbol: &str,
+        timeframe: &str,
+    ) -> Result<Option<Candle>> {
         let result = self
             .get_candles_with(GetCandlesOpts {
                 symbol: Some(symbol.to_owned()),
@@ -160,16 +164,7 @@ impl MarketDataService {
                 ..Default::default()
             })
             .await?;
-        Ok(result.candles.into_iter().next_back().unwrap_or(Candle {
-            ts_sec: 0,
-            open: String::new(),
-            high: String::new(),
-            low: String::new(),
-            close: String::new(),
-            volume: String::new(),
-            symbol_id: 0,
-            timeframe: timeframe.to_owned(),
-        }))
+        Ok(result.candles.into_iter().next_back())
     }
 
     /// Columnar OHLCV candles decoded into row-oriented [`CandlesResult`].
@@ -402,12 +397,16 @@ impl MarketOverviewService {
         let (tx, rx) = mpsc::channel::<Vec<MarketOverviewEntry>>(50);
         let tx_slot: Arc<Mutex<Option<mpsc::Sender<Vec<MarketOverviewEntry>>>>> =
             Arc::new(Mutex::new(Some(tx)));
+        let stream_slot: Arc<
+            Mutex<Option<SnapshotThenStream<MarketOverviewList, MarketOverviewList>>>,
+        > = Arc::new(Mutex::new(None));
 
         let emit = {
             let by_symbol_id = by_symbol_id.clone();
             let closed = closed.clone();
             let last_error = last_error.clone();
             let tx_slot = tx_slot.clone();
+            let stream_slot = stream_slot.clone();
             Arc::new(move || {
                 if closed.load(std::sync::atomic::Ordering::SeqCst) {
                     return;
@@ -417,17 +416,23 @@ impl MarketOverviewService {
                         .values()
                         .cloned()
                         .collect();
-                let guard = crate::realtime::lock_unpoisoned(&tx_slot);
-                let Some(tx) = guard.as_ref() else {
+                let Some(tx) = crate::realtime::lock_unpoisoned(&tx_slot).as_ref().cloned() else {
                     return;
                 };
-                let _ = crate::realtime::try_enqueue(
-                    tx,
+                if !crate::realtime::try_enqueue(
+                    &tx,
                     rows,
                     &closed,
                     &last_error,
                     "market overview subscription queue full; consumer too slow",
-                );
+                ) && let Some(err @ Error::QueueOverflow(_)) =
+                    crate::realtime::lock_unpoisoned(&last_error).clone()
+                {
+                    let _ = crate::realtime::lock_unpoisoned(&tx_slot).take();
+                    if let Some(stream) = crate::realtime::lock_unpoisoned(&stream_slot).as_ref() {
+                        stream.fail(err);
+                    }
+                }
             }) as Arc<dyn Fn() + Send + Sync>
         };
 
@@ -490,6 +495,7 @@ impl MarketOverviewService {
             on_snapshot_refresh: None,
             on_error: None,
         });
+        *crate::realtime::lock_unpoisoned(&stream_slot) = Some(stream.clone());
 
         let subscription = crate::marketoverview::Subscription::new(
             rx,
@@ -617,7 +623,7 @@ impl OrderbookService {
             })?;
         let bucket_ticks = Arc::new(Mutex::new(parse_bucket_ticks(
             opts.bucket.as_deref().unwrap_or(""),
-        )));
+        )?));
 
         let state = Arc::new(Mutex::new(BookState {
             bids: BookSide::new(),
@@ -631,6 +637,11 @@ impl OrderbookService {
         // forever after close/error.
         let tx_slot: Arc<Mutex<Option<mpsc::Sender<OrderbookData>>>> =
             Arc::new(Mutex::new(Some(tx)));
+        // Filled after stream construction so synchronous emit callbacks can
+        // terminate the underlying socket on local queue overflow.
+        let stream_slot: Arc<
+            Mutex<Option<SnapshotThenStream<OrderbookData, OrderBookDeltaUpdate>>>,
+        > = Arc::new(Mutex::new(None));
 
         let emit = {
             let state = state.clone();
@@ -638,6 +649,7 @@ impl OrderbookService {
             let closed = closed.clone();
             let last_error = last_error.clone();
             let tx_slot = tx_slot.clone();
+            let stream_slot = stream_slot.clone();
             let symbol = symbol.clone();
             Arc::new(move || {
                 if closed.load(std::sync::atomic::Ordering::SeqCst) {
@@ -648,7 +660,7 @@ impl OrderbookService {
                     (s.bids.clone(), s.asks.clone(), s.book_seq)
                 };
                 let ticks = *crate::realtime::lock_unpoisoned(&bucket_ticks);
-                let data = build_orderbook_data(
+                let data = match build_orderbook_data(
                     &symbol,
                     ws_depth,
                     book_seq,
@@ -656,25 +668,39 @@ impl OrderbookService {
                     &asks,
                     ticks,
                     quantity_scale,
-                );
-                let guard = crate::realtime::lock_unpoisoned(&tx_slot);
-                let Some(tx) = guard.as_ref() else {
+                ) {
+                    Ok(data) => data,
+                    Err(err) => {
+                        closed.store(true, std::sync::atomic::Ordering::SeqCst);
+                        *crate::realtime::lock_unpoisoned(&last_error) = Some(err.clone());
+                        let _ = crate::realtime::lock_unpoisoned(&tx_slot).take();
+                        if let Some(stream) =
+                            crate::realtime::lock_unpoisoned(&stream_slot).as_ref()
+                        {
+                            stream.fail(err);
+                        }
+                        return;
+                    }
+                };
+                let Some(tx) = crate::realtime::lock_unpoisoned(&tx_slot).as_ref().cloned() else {
                     return;
                 };
-                let _ = crate::realtime::try_enqueue(
-                    tx,
+                if !crate::realtime::try_enqueue(
+                    &tx,
                     data,
                     &closed,
                     &last_error,
                     "orderbook subscription queue full; consumer too slow",
-                );
+                ) && let Some(err @ Error::QueueOverflow(_)) =
+                    crate::realtime::lock_unpoisoned(&last_error).clone()
+                {
+                    let _ = crate::realtime::lock_unpoisoned(&tx_slot).take();
+                    if let Some(stream) = crate::realtime::lock_unpoisoned(&stream_slot).as_ref() {
+                        stream.fail(err);
+                    }
+                }
             }) as Arc<dyn Fn() + Send + Sync>
         };
-
-        // Placeholder stream handle filled after construction for gap refresh.
-        let stream_slot: Arc<
-            Mutex<Option<SnapshotThenStream<OrderbookData, OrderBookDeltaUpdate>>>,
-        > = Arc::new(Mutex::new(None));
 
         let handle_delta = {
             let state = state.clone();

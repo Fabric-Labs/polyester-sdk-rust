@@ -137,6 +137,12 @@ pub struct ModifyOrderParams {
     pub order_id: Option<String>,
     pub client_order_id: Option<String>,
     pub subaccount_id: Option<u64>,
+    /// Optional mutation request id (API-required on the wire).
+    ///
+    /// When omitted or blank, the SDK generates a unique id (TypeScript/Go/Python parity).
+    /// Set a stable non-empty value when you may retry the same logical modification after an
+    /// ambiguous failure, and reuse that same value on retry. A blind retry that omits
+    /// `request_id` mints a *new* id and is not an idempotent replay.
     pub request_id: Option<String>,
     pub new_price: Option<Price>,
     pub new_qty: Option<Quantity>,
@@ -267,7 +273,7 @@ pub struct BatchModifyOrdersResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CancelAllAfterResult {
     pub status: String,
-    pub effective_timeout_sec: i32,
+    pub effective_timeout_sec: u32,
     pub expires_at_ts_ns: String,
 }
 
@@ -320,6 +326,12 @@ pub struct CancelAllOpts {
     pub dry_run: bool,
     pub subaccount_id: Option<u64>,
     pub side: Option<String>,
+    /// Optional mutation request id (API-required on the wire).
+    ///
+    /// When omitted or blank, the SDK generates a unique id (TypeScript/Go/Python parity).
+    /// Set a stable non-empty value when you may retry the same logical cancel-all after an
+    /// ambiguous failure, and reuse that same value on retry. A blind retry that omits
+    /// `request_id` mints a *new* id and is not an idempotent replay.
     pub request_id: Option<String>,
 }
 
@@ -331,13 +343,37 @@ pub struct CreateOrderParams {
     pub quantity: Quantity,
     pub price: Option<Price>,
     pub time_in_force: Option<CreateTimeInForce>,
+    /// Optional client order id (API-optional).
+    ///
+    /// Set a stable non-empty value when you may retry after an ambiguous failure
+    /// (`Error::mutation_outcome_unknown`), and reuse that same value on retry.
+    /// Omit (`None`) for one-shot creates where you will not reconcile by client id.
     pub client_order_id: Option<String>,
     pub subaccount_id: Option<u64>,
     pub post_only: Option<bool>,
     /// Client reference price for MARKET order reservation (price ticks domain).
     pub market_client_ref_price: Option<Price>,
+    /// BUY fee source (`Quote` is required for SELL orders).
+    pub fee_source: Option<OrderFeeSource>,
+    /// Self-trade prevention policy for this order.
+    pub self_trade_prevention: Option<OrderSelfTradePrevention>,
+    /// Optional market-order slippage guard.
+    pub market_max_slippage: Option<MaxSlippage>,
     /// Optional TP/SL/trailing controls that arm after the parent fills.
     pub attached_risk: Option<AttachedRisk>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OrderFeeSource {
+    Quote,
+    Received,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OrderSelfTradePrevention {
+    ExpireTaker,
+    ExpireMaker,
+    ExpireBoth,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

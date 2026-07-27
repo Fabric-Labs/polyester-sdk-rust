@@ -26,7 +26,8 @@ pub struct CreateTriggerParams {
     pub trigger_price_source: Option<String>,
     pub time_in_force: Option<CreateTimeInForce>,
     pub subaccount_id: Option<u64>,
-    pub client_trigger_id: Option<String>,
+    /// Stable identity for this logical trigger. Persist and reuse it on retries.
+    pub client_trigger_id: String,
     pub post_only: bool,
     pub activation_price: Option<Price>,
     pub trailing_distance_ticks: Option<i64>,
@@ -162,6 +163,7 @@ pub struct TriggersList {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TriggerMutationResult {
     pub trigger_id: String,
+    pub client_trigger_id: String,
     pub status: String,
 }
 

@@ -10,7 +10,7 @@ use crate::support::{
     require_mutation, require_trading_quote_balance, reserved_balance_raw,
     resolve_post_only_buy_limit_price, route_unavailable, strict_live_enabled, trade_e2e_enabled,
     trade_symbol, trading_balance_raw, unique_client_order_id, wait_for_terminal_order,
-    wait_until_no_open_client_ids,
+    wait_until_no_open_client_ids, wait_until_reserved_reconciles,
 };
 use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
 use polyester::proto::ledger::read::v1::{GetBalancesRequest, ListHoldsRequest};
@@ -120,6 +120,9 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
             subaccount_id: None,
             post_only: Some(true),
             market_client_ref_price: None,
+            fee_source: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
             attached_risk: None,
         };
         if let Err(err) = maker.orders.create(maker_params).await {
@@ -144,6 +147,9 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         market_client_ref_price: Some(
             Price::from_decimal_str(&buy_ref_price, Some(symbol.clone())).expect("buy ref price"),
         ),
+        fee_source: None,
+        self_trade_prevention: None,
+        market_max_slippage: None,
         attached_risk: None,
     };
     match client.orders.create(buy_params).await {
@@ -242,6 +248,9 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
             subaccount_id: None,
             post_only: Some(true),
             market_client_ref_price: None,
+            fee_source: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
             attached_risk: None,
         };
         if let Err(err) = maker.orders.create(maker_buy).await {
@@ -279,6 +288,9 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         market_client_ref_price: Some(
             Price::from_decimal_str(&sell_ref_price, Some(symbol.clone())).expect("sell ref price"),
         ),
+        fee_source: None,
+        self_trade_prevention: None,
+        market_max_slippage: None,
         attached_risk: None,
     };
     match client.orders.create(sell_params).await {
@@ -338,6 +350,18 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
             "test order still open: {:?}",
             order.client_order_id
         );
+    }
+
+    let mut reserved_expectations = vec![(base_id, base_reserved_before)];
+    if let (Some(qid), Some(q_before)) = (quote_id, quote_reserved_before) {
+        reserved_expectations.push((qid, q_before));
+    }
+    // Reserved can lag terminal order projection; poll before treating as a leak.
+    if let Err(err) =
+        wait_until_reserved_reconciles(&client, &reserved_expectations, Duration::from_secs(30))
+            .await
+    {
+        panic!("reserved balance must reconcile: {err}");
     }
 
     let balances_after = client

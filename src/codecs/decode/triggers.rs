@@ -390,35 +390,58 @@ pub fn get_trigger_from_proto(msg: &GetTriggerResponse) -> Option<Trigger> {
 fn trigger_mutation(
     trigger_id: u64,
     status: buffa::EnumValue<TriggerStatus>,
-) -> TriggerMutationResult {
-    TriggerMutationResult {
-        trigger_id: format_uint64_id(trigger_id),
-        status: enum_value_trigger_status(status),
+) -> crate::errors::Result<TriggerMutationResult> {
+    let status = enum_value_trigger_status(status);
+    if trigger_id == 0 || status.is_empty() {
+        return Err(crate::Error::transport(
+            "invalid trigger mutation response: missing trigger_id or status",
+        ));
     }
+    Ok(TriggerMutationResult {
+        trigger_id: format_uint64_id(trigger_id),
+        client_trigger_id: String::new(),
+        status,
+    })
 }
 
 /// `CreateTriggerResponse` acknowledges admission only and no longer carries a
 /// status field; synthesize `"accepted"`.
-pub fn trigger_mutation_from_create(msg: &CreateTriggerResponse) -> TriggerMutationResult {
-    TriggerMutationResult {
-        trigger_id: format_uint64_id(msg.trigger_id),
-        status: "accepted".to_owned(),
+pub fn trigger_mutation_from_create(
+    msg: &CreateTriggerResponse,
+) -> crate::errors::Result<TriggerMutationResult> {
+    if msg.trigger_id == 0 || msg.client_trigger_id.trim().is_empty() {
+        return Err(crate::Error::transport(
+            "invalid CreateTrigger response: missing trigger_id or client_trigger_id",
+        ));
     }
+    Ok(TriggerMutationResult {
+        trigger_id: format_uint64_id(msg.trigger_id),
+        client_trigger_id: msg.client_trigger_id.clone(),
+        status: "accepted".to_owned(),
+    })
 }
 
-pub fn trigger_mutation_from_cancel(msg: &CancelTriggerResponse) -> TriggerMutationResult {
+pub fn trigger_mutation_from_cancel(
+    msg: &CancelTriggerResponse,
+) -> crate::errors::Result<TriggerMutationResult> {
     trigger_mutation(msg.trigger_id, msg.status)
 }
 
-pub fn trigger_mutation_from_pause(msg: &PauseTriggerResponse) -> TriggerMutationResult {
+pub fn trigger_mutation_from_pause(
+    msg: &PauseTriggerResponse,
+) -> crate::errors::Result<TriggerMutationResult> {
     trigger_mutation(msg.trigger_id, msg.status)
 }
 
-pub fn trigger_mutation_from_resume(msg: &ResumeTriggerResponse) -> TriggerMutationResult {
+pub fn trigger_mutation_from_resume(
+    msg: &ResumeTriggerResponse,
+) -> crate::errors::Result<TriggerMutationResult> {
     trigger_mutation(msg.trigger_id, msg.status)
 }
 
-pub fn trigger_mutation_from_modify(msg: &ModifyTriggerResponse) -> TriggerMutationResult {
+pub fn trigger_mutation_from_modify(
+    msg: &ModifyTriggerResponse,
+) -> crate::errors::Result<TriggerMutationResult> {
     trigger_mutation(msg.trigger_id, msg.status)
 }
 
@@ -519,6 +542,23 @@ mod tests {
             TriggerStatus::StatusCanceled
         );
         assert!(trigger_status_from_label("nope").is_err());
+    }
+
+    #[test]
+    fn singular_trigger_mutations_reject_empty_success_responses() {
+        assert!(trigger_mutation_from_create(&CreateTriggerResponse::default()).is_err());
+        assert!(trigger_mutation_from_cancel(&CancelTriggerResponse::default()).is_err());
+        assert!(trigger_mutation_from_pause(&PauseTriggerResponse::default()).is_err());
+        assert!(trigger_mutation_from_resume(&ResumeTriggerResponse::default()).is_err());
+        assert!(trigger_mutation_from_modify(&ModifyTriggerResponse::default()).is_err());
+
+        let created = trigger_mutation_from_create(&CreateTriggerResponse {
+            trigger_id: 7,
+            client_trigger_id: "stable-trigger".into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(created.client_trigger_id, "stable-trigger");
     }
 
     #[test]

@@ -296,7 +296,7 @@ pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
 
 pub fn format_id(id: u64) -> String {
     if id == 0 {
-        return bs58::encode([1u8]).into_string(); // match Go: 0→1
+        return bs58::encode([0u8]).into_string();
     }
     let bytes = id.to_be_bytes();
     let start = bytes.iter().position(|&b| b != 0).unwrap_or(7);
@@ -409,9 +409,11 @@ mod tests {
         // format_id(4) == "5"; decimal parse would wrongly yield 5.
         assert_eq!(format_id(4), "5");
         assert_eq!(id_to_u64("5", "order_id").unwrap(), 4);
-        // format_id(0) intentionally aliases to the same encoding as 1 (Go parity).
-        assert_eq!(format_id(0), format_id(1));
-        for id in 1u64..200 {
+        // Zero has its own canonical base58 encoding and must not alias id 1.
+        assert_eq!(format_id(0), "1");
+        assert_eq!(format_id(1), "2");
+        assert_ne!(format_id(0), format_id(1));
+        for id in 0u64..200 {
             let encoded = format_id(id);
             assert_eq!(
                 id_to_u64(&encoded, "id").unwrap(),
@@ -419,6 +421,12 @@ mod tests {
                 "round-trip failed for id={id} encoded={encoded}"
             );
         }
+    }
+
+    #[test]
+    fn format_uint64_id_preserves_wire_zero_as_decimal_zero() {
+        assert_eq!(format_uint64_id(0), "0");
+        assert_eq!(format_uint64_id(1), "2");
     }
 
     #[test]

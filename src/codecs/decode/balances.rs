@@ -55,7 +55,7 @@ pub fn balance_history_from_proto(msg: &GetBalanceHistoryResponse) -> BalanceHis
         bucket: msg.bucket.clone(),
         start_ts_sec: msg.start_ts_sec as i64,
         end_ts_sec: msg.end_ts_sec as i64,
-        points: msg.points as i32,
+        points: msg.points,
         series: msg
             .series
             .iter()
@@ -79,7 +79,7 @@ pub fn equity_history_from_proto(
         start_ts_sec: msg.start_ts_sec as i64,
         end_ts_sec: msg.end_ts_sec as i64,
         quote_asset: msg.quote_asset.clone(),
-        points: msg.points as i32,
+        points: msg.points,
         series: msg
             .series
             .iter()
@@ -272,6 +272,20 @@ mod tests {
         assert_eq!(result.series[0].account_code, 5);
         assert_eq!(result.series[0].account_name, "Trading");
         assert_eq!(result.series[0].equity_q, vec![999]);
+    }
+
+    #[test]
+    fn history_point_counts_preserve_full_u32_range() {
+        let balance = balance_history_from_proto(&GetBalanceHistoryResponse {
+            points: u32::MAX,
+            ..Default::default()
+        });
+        let equity = equity_history_from_proto(&GetEquityHistorySeriesResponse {
+            points: u32::MAX,
+            ..Default::default()
+        });
+        assert_eq!(balance.points, u32::MAX);
+        assert_eq!(equity.points, u32::MAX);
     }
 
     #[test]

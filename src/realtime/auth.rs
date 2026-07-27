@@ -76,7 +76,7 @@ async fn fetch_rt_token(
         timeout
     };
     let client = build_http_client()?;
-    let headers = creds.sign_request("GET", url, b"", None)?;
+    let headers = creds.sign_request_async("GET", url, b"", None).await?;
     let uri: hyper::Uri = url
         .parse()
         .map_err(|e| Error::realtime(format!("{label}: invalid url: {e}")))?;

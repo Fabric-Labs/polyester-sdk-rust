@@ -64,12 +64,13 @@ impl Subscription {
     }
 
     /// Change the active price bucket and re-emit the current book.
-    pub fn set_bucket(&self, bucket: &str) {
-        let ticks = crate::orderbook::parse_bucket_ticks(bucket);
+    pub fn set_bucket(&self, bucket: &str) -> Result<()> {
+        let ticks = crate::orderbook::parse_bucket_ticks(bucket)?;
         *lock_unpoisoned(&self.bucket_ticks) = ticks;
         if self.stream.is_ready() && !self.closed.load(Ordering::SeqCst) {
             (self.emit)();
         }
+        Ok(())
     }
 
     /// Refetch the REST snapshot.
@@ -79,9 +80,7 @@ impl Subscription {
 
     /// Stop the subscription.
     pub fn close(&self) {
-        if self.closed.swap(true, Ordering::SeqCst) {
-            return;
-        }
+        self.closed.store(true, Ordering::SeqCst);
         // Drop the sender so `updates().recv()` unblocks with None.
         let _ = lock_unpoisoned(&self.tx_slot).take();
         self.stream.close();
