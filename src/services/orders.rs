@@ -296,6 +296,11 @@ impl OrdersService {
                         "post_only is not supported for market orders",
                     ));
                 }
+                if params.price.is_some() {
+                    return Err(Error::validation(
+                        "price is not valid for market orders; use market_client_ref_price for a reservation reference",
+                    ));
+                }
                 let mut market = MarketIoc::default();
                 if let Some(ref_price) = params.market_client_ref_price.as_ref() {
                     market.client_ref_price_ticks =
@@ -1438,6 +1443,14 @@ mod tests {
             Some(market_ioc::MaxSlippage::MaxSlippageBps(25))
         ));
 
+        params.price = Some(Price::from_ticks(1, None).unwrap());
+        let err = client.orders.encode_create_params(&params).unwrap_err();
+        assert!(
+            err.to_string().contains("price is not valid for market"),
+            "unexpected error: {err}"
+        );
+
+        params.price = None;
         params.market_max_slippage = Some(MaxSlippage::Ticks(0));
         assert!(client.orders.encode_create_params(&params).is_err());
     }
