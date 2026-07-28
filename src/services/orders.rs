@@ -144,11 +144,7 @@ impl OrdersService {
         Ok(orders_list_from_history(&resp))
     }
 
-    pub async fn get(
-        &self,
-        key: OrderKey,
-        subaccount_id: Option<u64>,
-    ) -> Result<GetOrderResult> {
+    pub async fn get(&self, key: OrderKey, subaccount_id: Option<u64>) -> Result<GetOrderResult> {
         self.get_with(GetOrderOpts {
             key,
             subaccount_id,
@@ -221,10 +217,9 @@ impl OrdersService {
 
     fn encode_get_order_key(key: &OrderKey) -> Result<get_order_request::Key> {
         match key {
-            OrderKey::OrderId(oid) => Ok(get_order_request::Key::OrderId(id_to_u64(
-                oid,
-                "order_id",
-            )?)),
+            OrderKey::OrderId(oid) => {
+                Ok(get_order_request::Key::OrderId(id_to_u64(oid, "order_id")?))
+            }
             OrderKey::ClientOrderId(cid) => Ok(get_order_request::Key::ClientOrderId(
                 require_client_style_id(cid, "client_order_id")?,
             )),
@@ -234,8 +229,7 @@ impl OrdersService {
     fn encode_cancel_order_key(key: &OrderKey) -> Result<cancel_order_request::Key> {
         match key {
             OrderKey::OrderId(oid) => Ok(cancel_order_request::Key::OrderId(id_to_u64(
-                oid,
-                "order_id",
+                oid, "order_id",
             )?)),
             OrderKey::ClientOrderId(cid) => Ok(cancel_order_request::Key::ClientOrderId(
                 require_client_style_id(cid, "client_order_id")?,
@@ -246,8 +240,7 @@ impl OrdersService {
     fn encode_modify_order_key(key: &OrderKey) -> Result<modify_order_request::Key> {
         match key {
             OrderKey::OrderId(oid) => Ok(modify_order_request::Key::OrderId(id_to_u64(
-                oid,
-                "order_id",
+                oid, "order_id",
             )?)),
             OrderKey::ClientOrderId(cid) => Ok(modify_order_request::Key::ClientOrderId(
                 require_client_style_id(cid, "client_order_id")?,
@@ -257,10 +250,9 @@ impl OrdersService {
 
     fn encode_batch_modify_key(key: &OrderKey) -> Result<batch_modify_item::Key> {
         match key {
-            OrderKey::OrderId(oid) => Ok(batch_modify_item::Key::OrderId(id_to_u64(
-                oid,
-                "order_id",
-            )?)),
+            OrderKey::OrderId(oid) => {
+                Ok(batch_modify_item::Key::OrderId(id_to_u64(oid, "order_id")?))
+            }
             OrderKey::ClientOrderId(cid) => Ok(batch_modify_item::Key::ClientOrderId(
                 require_client_style_id(cid, "client_order_id")?,
             )),

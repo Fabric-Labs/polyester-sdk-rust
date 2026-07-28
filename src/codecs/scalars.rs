@@ -393,9 +393,18 @@ mod tests {
         assert!(parse_price_ticks_str("65000.", "price").is_err());
         assert!(parse_price_ticks_str("65.", "price").is_err());
         // Leading/trailing whitespace is trimmed (TS `value.trim()` parity).
-        assert_eq!(parse_price_ticks_str(" 65000", "price").unwrap(), 65_000_000_000);
-        assert_eq!(parse_price_ticks_str("65000 ", "price").unwrap(), 65_000_000_000);
-        assert_eq!(parse_price_ticks_str("65000.0", "price").unwrap(), 65_000_000_000);
+        assert_eq!(
+            parse_price_ticks_str(" 65000", "price").unwrap(),
+            65_000_000_000
+        );
+        assert_eq!(
+            parse_price_ticks_str("65000 ", "price").unwrap(),
+            65_000_000_000
+        );
+        assert_eq!(
+            parse_price_ticks_str("65000.0", "price").unwrap(),
+            65_000_000_000
+        );
     }
 
     #[test]
