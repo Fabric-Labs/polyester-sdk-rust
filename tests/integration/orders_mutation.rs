@@ -111,7 +111,10 @@ async fn order_round_trip_mutation() {
     assert_eq!(open_order.client_order_id, client_order_id);
 
     let detail = call_required("orders.get", || {
-        client.orders.get(Some(&client_order_id), None, None)
+        client.orders.get(
+            polyester::models::OrderKey::ClientOrderId(client_order_id.clone()),
+            None,
+        )
     })
     .await;
     let order = detail.order.expect("detail.order");

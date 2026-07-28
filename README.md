@@ -302,8 +302,9 @@ status. Valid values:
 Unknown values return a validation error (they do not silently return an empty
 list). Response `status` uses the same labels (British spelling `cancelled`).
 
-`orders.get_with(GetOrderOpts { include_attached_risk: true, .. })` returns
-policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
+`orders.get_with(GetOrderOpts { key: OrderKey::OrderId(id), include_attached_risk: true, subaccount_id: None, include_attached_risk_state: false })`
+returns policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
+Identify orders with `OrderKey::OrderId` or `OrderKey::ClientOrderId` (exclusive oneOf).
 
 ## Qty / price rules
 

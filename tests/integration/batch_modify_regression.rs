@@ -210,8 +210,7 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
             .iter()
             .zip(new_cids.iter())
             .map(|(cid, new_cid)| BatchModifyItem {
-                order_id: None,
-                client_order_id: Some(cid.clone()),
+                key: polyester::models::OrderKey::ClientOrderId(cid.clone()),
                 new_price: Some(new_price.clone()),
                 new_qty: None,
                 new_attached_risk: None,

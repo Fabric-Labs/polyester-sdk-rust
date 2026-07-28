@@ -60,7 +60,14 @@ pub async fn wait_for_open_order(
     let deadline = Instant::now() + timeout;
     let mut last_status = String::new();
     while Instant::now() < deadline {
-        match client.orders.get(Some(client_order_id), None, None).await {
+        match client
+            .orders
+            .get(
+                polyester::models::OrderKey::ClientOrderId(client_order_id.to_owned()),
+                None,
+            )
+            .await
+        {
             Ok(detail) => {
                 if let Some(order) = detail.order
                     && order.client_order_id == client_order_id
@@ -152,7 +159,14 @@ pub async fn wait_for_terminal_order(
     let deadline = Instant::now() + timeout;
     let mut last: Option<polyester::models::GetOrderResult> = None;
     while Instant::now() < deadline {
-        match client.orders.get(Some(client_order_id), None, None).await {
+        match client
+            .orders
+            .get(
+                polyester::models::OrderKey::ClientOrderId(client_order_id.to_owned()),
+                None,
+            )
+            .await
+        {
             Ok(detail) => {
                 if let Some(order) = detail.order.as_ref()
                     && order.client_order_id == client_order_id

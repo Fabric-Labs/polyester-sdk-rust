@@ -97,10 +97,18 @@ pub struct BatchCreateOrdersResult {
     pub rejected_count: u32,
 }
 
+/// Identifies an order by exactly one of exchange order id or client order id.
+///
+/// Matches TypeScript/Go oneOf semantics for get/cancel/modify and batch items.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OrderKey {
+    OrderId(String),
+    ClientOrderId(String),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchCancelItem {
-    pub order_id: Option<String>,
-    pub client_order_id: Option<String>,
+    pub key: OrderKey,
     pub symbol_id: Option<u32>,
 }
 
@@ -121,8 +129,7 @@ pub struct BatchCancelOrdersResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchModifyItem {
-    pub order_id: Option<String>,
-    pub client_order_id: Option<String>,
+    pub key: OrderKey,
     pub new_price: Option<Price>,
     pub new_qty: Option<Quantity>,
     pub new_attached_risk: Option<AttachedRisk>,
@@ -134,8 +141,7 @@ pub struct BatchModifyItem {
 #[derive(Debug, Clone)]
 pub struct ModifyOrderParams {
     pub symbol: String,
-    pub order_id: Option<String>,
-    pub client_order_id: Option<String>,
+    pub key: OrderKey,
     pub subaccount_id: Option<u64>,
     /// Optional mutation request id (API-required on the wire).
     ///
@@ -334,20 +340,18 @@ pub struct ListOrderHistoryOpts {
 }
 
 /// Options for [`crate::services::OrdersService::get_with`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct GetOrderOpts {
-    pub client_order_id: Option<String>,
-    pub order_id: Option<String>,
+    pub key: OrderKey,
     pub subaccount_id: Option<u64>,
     pub include_attached_risk: bool,
     pub include_attached_risk_state: bool,
 }
 
 /// Params for [`crate::services::OrdersService::cancel_with`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct CancelOrderParams {
-    pub order_id: Option<String>,
-    pub client_order_id: Option<String>,
+    pub key: OrderKey,
     pub symbol: Option<String>,
     pub symbol_id: Option<u32>,
     pub subaccount_id: Option<u64>,
