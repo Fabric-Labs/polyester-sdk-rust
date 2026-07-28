@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn trigger_from_proto_projects_twap_child_orders_and_executed_qty() {
-        use crate::proto::triggers::v1::{TwapDetails, TwapMarketIoc, TwapTrigger};
+        use crate::proto::triggers::v1::{TwapDetails, TwapTrigger};
 
         let msg = ProtoTrigger {
             trigger_id: 11,
@@ -547,9 +547,7 @@ mod tests {
                 side: Side::Buy.into(),
                 duration_ms: 60_000,
                 slice_interval_ms: 5_000,
-                execution: Some(twap_trigger::Execution::MarketIoc(Box::new(
-                    TwapMarketIoc::default(),
-                ))),
+                execution: Some(twap_trigger::Execution::MarketIoc(Box::default())),
                 ..Default::default()
             }))),
             runtime_details: Some(trigger::RuntimeDetails::TwapState(Box::new(TwapDetails {
