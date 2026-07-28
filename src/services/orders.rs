@@ -716,8 +716,10 @@ impl OrdersService {
                     "each batch item requires new_price, new_qty, and/or new_attached_risk",
                 ));
             }
-            let mut proto = ProtoBatchModifyItem::default();
-            proto.key = Some(Self::encode_batch_modify_key(&item.key)?);
+            let mut proto = ProtoBatchModifyItem {
+                key: Some(Self::encode_batch_modify_key(&item.key)?),
+                ..Default::default()
+            };
             if let Some(price) = item.new_price.as_ref() {
                 proto.new_price_ticks = Some(resolve_price_ticks(price, symbol)?);
             }
