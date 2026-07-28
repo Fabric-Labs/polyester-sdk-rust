@@ -47,14 +47,20 @@ async fn orders_get_round_trip_when_open_exists() {
     }
     let sample = &listed.orders[0];
     let by_id = call_required("orders.get", || {
-        client.orders.get(None, Some(&sample.order_id), None)
+        client.orders.get(
+            polyester::models::OrderKey::OrderId(sample.order_id.clone()),
+            None,
+        )
     })
     .await;
     let order = by_id.order.expect("expected order from get by order_id");
     assert_eq!(order.order_id, sample.order_id);
     if !sample.client_order_id.is_empty() {
         let by_cid = call_required("orders.get", || {
-            client.orders.get(Some(&sample.client_order_id), None, None)
+            client.orders.get(
+                polyester::models::OrderKey::ClientOrderId(sample.client_order_id.clone()),
+                None,
+            )
         })
         .await;
         let order = by_cid
