@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Breaking
+- Order identity for `get` / `cancel_with` / `modify` / `wait_for_order_trades_complete` and batch cancel/modify items is now a typed `models::OrderKey` (`OrderId` / `ClientOrderId`) instead of dual optional `order_id` / `client_order_id` fields. Convenience helpers `cancel_by_order_id` and `cancel_by_client_order_id` remain as thin wrappers.
+
 ## 0.1.0a19
 
 Package version: `0.1.0-alpha.19`. Git tag: `v0.1.0a19`.

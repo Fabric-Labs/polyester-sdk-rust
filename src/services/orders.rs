@@ -18,9 +18,9 @@ use crate::models::{
     BatchModifyItem, BatchModifyOrdersResult, CancelAllAfterResult, CancelAllOpts,
     CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType, CreateSide,
     CreateTimeInForce, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts, ListOrderHistoryOpts,
-    MaxSlippage, ModifyOrderParams, ModifyOrderResult, Order, OrderFeeSource, OrderMutationResult,
-    OrderSelfTradePrevention, OrdersList, RiskLeg, TrailingDistance, TrailingStop, UserTrade,
-    UserTradesList,
+    MaxSlippage, ModifyOrderParams, ModifyOrderResult, Order, OrderFeeSource, OrderKey,
+    OrderMutationResult, OrderSelfTradePrevention, OrdersList, RiskLeg, TrailingDistance,
+    TrailingStop, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
     BatchCancelItem as ProtoBatchCancelItem, BatchCancelOrdersRequest, BatchCreateOrdersRequest,
@@ -146,31 +146,20 @@ impl OrdersService {
 
     pub async fn get(
         &self,
-        client_order_id: Option<&str>,
-        order_id: Option<&str>,
+        key: OrderKey,
         subaccount_id: Option<u64>,
     ) -> Result<GetOrderResult> {
         self.get_with(GetOrderOpts {
-            client_order_id: client_order_id.map(|s| s.to_owned()),
-            order_id: order_id.map(|s| s.to_owned()),
+            key,
             subaccount_id,
-            ..Default::default()
+            include_attached_risk: false,
+            include_attached_risk_state: false,
         })
         .await
     }
 
     pub async fn get_with(&self, opts: GetOrderOpts) -> Result<GetOrderResult> {
-        let key = if let Some(cid) = opts.client_order_id.as_deref().filter(|s| !s.is_empty()) {
-            Some(get_order_request::Key::ClientOrderId(
-                require_client_style_id(cid, "client_order_id")?,
-            ))
-        } else if let Some(oid) = opts.order_id.as_deref().filter(|s| !s.is_empty()) {
-            Some(get_order_request::Key::OrderId(id_to_u64(oid, "order_id")?))
-        } else {
-            return Err(Error::validation(
-                "orders.get requires client_order_id or order_id",
-            ));
-        };
+        let key = Some(Self::encode_get_order_key(&opts.key)?);
         let req = GetOrderRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
             key,
@@ -198,8 +187,7 @@ impl OrdersService {
     /// instead of treating a single get as final trade projection.
     pub async fn wait_for_order_trades_complete(
         &self,
-        client_order_id: Option<&str>,
-        order_id: Option<&str>,
+        key: OrderKey,
         timeout: Duration,
     ) -> Result<GetOrderResult> {
         let timeout = if timeout.is_zero() {
@@ -209,12 +197,11 @@ impl OrdersService {
         };
         let deadline = tokio::time::Instant::now() + timeout;
         loop {
-            let last = tokio::time::timeout_at(deadline, self.get(client_order_id, order_id, None))
+            let last = tokio::time::timeout_at(deadline, self.get(key.clone(), None))
                 .await
                 .map_err(|_| {
                     Error::transport(format!(
-                        "timed out waiting for order trades to match cum_qty \
-                     (order_id={order_id:?}, client_order_id={client_order_id:?})"
+                        "timed out waiting for order trades to match cum_qty (key={key:?})"
                     ))
                 })??;
             if order_trades_projection_complete(&last) {
@@ -222,14 +209,61 @@ impl OrdersService {
             }
             if tokio::time::Instant::now() >= deadline {
                 return Err(Error::transport(format!(
-                    "timed out waiting for order trades to match cum_qty \
-                     (order_id={order_id:?}, client_order_id={client_order_id:?})"
+                    "timed out waiting for order trades to match cum_qty (key={key:?})"
                 )));
             }
             tokio::time::sleep_until(
                 deadline.min(tokio::time::Instant::now() + Duration::from_millis(100)),
             )
             .await;
+        }
+    }
+
+    fn encode_get_order_key(key: &OrderKey) -> Result<get_order_request::Key> {
+        match key {
+            OrderKey::OrderId(oid) => Ok(get_order_request::Key::OrderId(id_to_u64(
+                oid,
+                "order_id",
+            )?)),
+            OrderKey::ClientOrderId(cid) => Ok(get_order_request::Key::ClientOrderId(
+                require_client_style_id(cid, "client_order_id")?,
+            )),
+        }
+    }
+
+    fn encode_cancel_order_key(key: &OrderKey) -> Result<cancel_order_request::Key> {
+        match key {
+            OrderKey::OrderId(oid) => Ok(cancel_order_request::Key::OrderId(id_to_u64(
+                oid,
+                "order_id",
+            )?)),
+            OrderKey::ClientOrderId(cid) => Ok(cancel_order_request::Key::ClientOrderId(
+                require_client_style_id(cid, "client_order_id")?,
+            )),
+        }
+    }
+
+    fn encode_modify_order_key(key: &OrderKey) -> Result<modify_order_request::Key> {
+        match key {
+            OrderKey::OrderId(oid) => Ok(modify_order_request::Key::OrderId(id_to_u64(
+                oid,
+                "order_id",
+            )?)),
+            OrderKey::ClientOrderId(cid) => Ok(modify_order_request::Key::ClientOrderId(
+                require_client_style_id(cid, "client_order_id")?,
+            )),
+        }
+    }
+
+    fn encode_batch_modify_key(key: &OrderKey) -> Result<batch_modify_item::Key> {
+        match key {
+            OrderKey::OrderId(oid) => Ok(batch_modify_item::Key::OrderId(id_to_u64(
+                oid,
+                "order_id",
+            )?)),
+            OrderKey::ClientOrderId(cid) => Ok(batch_modify_item::Key::ClientOrderId(
+                require_client_style_id(cid, "client_order_id")?,
+            )),
         }
     }
 
@@ -520,16 +554,6 @@ impl OrdersService {
     }
 
     fn encode_modify_params(&self, params: ModifyOrderParams) -> Result<ModifyOrderRequest> {
-        let has_order = params.order_id.as_ref().is_some_and(|s| !s.is_empty());
-        let has_client = params
-            .client_order_id
-            .as_ref()
-            .is_some_and(|s| !s.is_empty());
-        if has_order == has_client {
-            return Err(Error::validation(
-                "modify requires exactly one of order_id or client_order_id",
-            ));
-        }
         if params.new_price.is_none()
             && params.new_qty.is_none()
             && params.new_attached_risk.is_none()
@@ -545,21 +569,9 @@ impl OrdersService {
         let mut req = ModifyOrderRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
             request_id: Self::coalesce_request_id(params.request_id, "mod")?,
+            key: Some(Self::encode_modify_order_key(&params.key)?),
             ..Default::default()
         };
-        if has_order {
-            req.key = Some(modify_order_request::Key::OrderId(id_to_u64(
-                params.order_id.as_deref().unwrap(),
-                "order_id",
-            )?));
-        } else {
-            req.key = Some(modify_order_request::Key::ClientOrderId(
-                require_client_style_id(
-                    params.client_order_id.as_deref().unwrap_or_default(),
-                    "client_order_id",
-                )?,
-            ));
-        }
         if let Some(price) = params.new_price.as_ref() {
             req.new_price_ticks = Some(resolve_price_ticks(price, Some(&params.symbol))?);
         }
@@ -651,22 +663,14 @@ impl OrdersService {
         }
         let mut proto_items = Vec::with_capacity(items.len());
         for item in items {
-            let has_order = item.order_id.as_ref().is_some_and(|s| !s.is_empty());
-            let has_client = item.client_order_id.as_ref().is_some_and(|s| !s.is_empty());
-            if has_order == has_client {
-                return Err(Error::validation(
-                    "each batch cancel item requires exactly one of order_id or client_order_id",
-                ));
-            }
             let mut proto = ProtoBatchCancelItem::default();
-            if has_order {
-                proto.order_id = id_to_u64(item.order_id.as_deref().unwrap(), "order_id")?;
-            }
-            if has_client {
-                proto.client_order_id = require_client_style_id(
-                    item.client_order_id.as_deref().unwrap_or_default(),
-                    "client_order_id",
-                )?;
+            match &item.key {
+                OrderKey::OrderId(oid) => {
+                    proto.order_id = id_to_u64(oid, "order_id")?;
+                }
+                OrderKey::ClientOrderId(cid) => {
+                    proto.client_order_id = require_client_style_id(cid, "client_order_id")?;
+                }
             }
             if let Some(sid) = item.symbol_id {
                 proto.symbol_id = sid;
@@ -712,13 +716,6 @@ impl OrdersService {
         let scale = Self::resolve_batch_modify_scale(&self.ctx.catalogs, scale_symbol, &items)?;
         let mut proto_items = Vec::with_capacity(items.len());
         for item in items {
-            let has_order = item.order_id.as_ref().is_some_and(|s| !s.is_empty());
-            let has_client = item.client_order_id.as_ref().is_some_and(|s| !s.is_empty());
-            if has_order == has_client {
-                return Err(Error::validation(
-                    "each batch item requires exactly one of order_id or client_order_id",
-                ));
-            }
             if item.new_price.is_none()
                 && item.new_qty.is_none()
                 && item.new_attached_risk.is_none()
@@ -728,19 +725,7 @@ impl OrdersService {
                 ));
             }
             let mut proto = ProtoBatchModifyItem::default();
-            if has_order {
-                proto.key = Some(batch_modify_item::Key::OrderId(id_to_u64(
-                    item.order_id.as_deref().unwrap(),
-                    "order_id",
-                )?));
-            } else {
-                proto.key = Some(batch_modify_item::Key::ClientOrderId(
-                    require_client_style_id(
-                        item.client_order_id.as_deref().unwrap_or_default(),
-                        "client_order_id",
-                    )?,
-                ));
-            }
+            proto.key = Some(Self::encode_batch_modify_key(&item.key)?);
             if let Some(price) = item.new_price.as_ref() {
                 proto.new_price_ticks = Some(resolve_price_ticks(price, symbol)?);
             }
@@ -830,16 +815,6 @@ impl OrdersService {
     }
 
     pub async fn cancel_with(&self, params: CancelOrderParams) -> Result<OrderMutationResult> {
-        let has_order = params.order_id.as_ref().is_some_and(|s| !s.is_empty());
-        let has_client = params
-            .client_order_id
-            .as_ref()
-            .is_some_and(|s| !s.is_empty());
-        if has_order == has_client {
-            return Err(Error::validation(
-                "cancel requires exactly one of order_id or client_order_id",
-            ));
-        }
         // A targeted cancel without symbol metadata can route through the
         // order directory, so avoid waiting for catalogs in that case.
         if params.symbol_id.is_none() && params.symbol.is_some() {
@@ -850,23 +825,10 @@ impl OrdersService {
             params.symbol.as_deref(),
             params.symbol_id,
         )?;
-        let key = if has_order {
-            Some(cancel_order_request::Key::OrderId(id_to_u64(
-                params.order_id.as_deref().unwrap(),
-                "order_id",
-            )?))
-        } else {
-            Some(cancel_order_request::Key::ClientOrderId(
-                require_client_style_id(
-                    params.client_order_id.as_deref().unwrap_or_default(),
-                    "client_order_id",
-                )?,
-            ))
-        };
         let req = CancelOrderRequest {
             symbol_id,
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
-            key,
+            key: Some(Self::encode_cancel_order_key(&params.key)?),
             ..Default::default()
         };
         self.cancel(req).await
@@ -901,10 +863,10 @@ impl OrdersService {
         subaccount_id: Option<u64>,
     ) -> Result<OrderMutationResult> {
         self.cancel_with(CancelOrderParams {
-            client_order_id: Some(client_order_id.to_owned()),
+            key: OrderKey::ClientOrderId(client_order_id.to_owned()),
             symbol: symbol.map(|s| s.to_owned()),
+            symbol_id: None,
             subaccount_id,
-            ..Default::default()
         })
         .await
     }
@@ -915,9 +877,10 @@ impl OrdersService {
         subaccount_id: Option<u64>,
     ) -> Result<OrderMutationResult> {
         self.cancel_with(CancelOrderParams {
-            order_id: Some(order_id.to_owned()),
+            key: OrderKey::OrderId(order_id.to_owned()),
+            symbol: None,
+            symbol_id: None,
             subaccount_id,
-            ..Default::default()
         })
         .await
     }
@@ -1227,8 +1190,7 @@ mod tests {
     fn modify_params(new_price: Option<Price>, new_qty: Option<Quantity>) -> ModifyOrderParams {
         ModifyOrderParams {
             symbol: "BTC-USDT".into(),
-            order_id: Some("1".into()),
-            client_order_id: None,
+            key: OrderKey::OrderId("1".into()),
             subaccount_id: None,
             request_id: Some("modify-equivalence".into()),
             new_price,
@@ -1269,8 +1231,7 @@ mod tests {
     fn batch_modify_rejects_missing_symbol_without_qty_scale() {
         let catalogs = crate::catalogs::Manager::new();
         let items = vec![BatchModifyItem {
-            order_id: Some(format_id(4)),
-            client_order_id: None,
+            key: OrderKey::OrderId(format_id(4)),
             new_price: None,
             new_qty: Some(
                 Quantity::from_scaled(1, None, crate::QuantityDomain::OrderBase, None, None)
@@ -1291,8 +1252,7 @@ mod tests {
     fn batch_modify_allows_missing_symbol_when_qty_scale_known() {
         let catalogs = crate::catalogs::Manager::new();
         let items = vec![BatchModifyItem {
-            order_id: Some(format_id(4)),
-            client_order_id: None,
+            key: OrderKey::OrderId(format_id(4)),
             new_price: None,
             new_qty: Some(
                 Quantity::from_scaled(1, Some(8), crate::QuantityDomain::OrderBase, None, None)
@@ -1311,11 +1271,11 @@ mod tests {
     #[test]
     fn modify_validates_key_and_patch() {
         let client = client();
-        let no_key = ModifyOrderParams {
-            order_id: None,
+        let empty_key = ModifyOrderParams {
+            key: OrderKey::ClientOrderId(String::new()),
             ..modify_params(Some(Price::from_ticks(1, None).unwrap()), None)
         };
-        assert!(client.orders.encode_modify_params(no_key).is_err());
+        assert!(client.orders.encode_modify_params(empty_key).is_err());
 
         let no_patch = modify_params(None, None);
         assert!(client.orders.encode_modify_params(no_patch).is_err());
@@ -1500,7 +1460,7 @@ mod tests {
 
         let err = client
             .orders
-            .get(Some("bad id!"), None, None)
+            .get(OrderKey::ClientOrderId("bad id!".into()), None)
             .await
             .unwrap_err();
         assert!(matches!(err, Error::Validation(_)));
@@ -1537,9 +1497,10 @@ mod tests {
         let err = client
             .orders
             .cancel_with(CancelOrderParams {
-                order_id: Some(format_id(9)),
+                key: OrderKey::OrderId(format_id(9)),
                 symbol: Some("UNKNOWN-USDT".into()),
-                ..Default::default()
+                symbol_id: None,
+                subaccount_id: None,
             })
             .await
             .unwrap_err();
