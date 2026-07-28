@@ -532,6 +532,51 @@ mod tests {
     }
 
     #[test]
+    fn trigger_from_proto_projects_twap_child_orders_and_executed_qty() {
+        use crate::proto::triggers::v1::{TwapDetails, TwapTrigger};
+
+        let msg = ProtoTrigger {
+            trigger_id: 11,
+            symbol_id: 1,
+            symbol: "BTC-USDT".into(),
+            status: TriggerStatus::StatusRunning.into(),
+            qty_scaled: 100_000_000,
+            client_trigger_id: "twap-1".into(),
+            child_order_ids: vec![101, 202],
+            configuration: Some(trigger::Configuration::Twap(Box::new(TwapTrigger {
+                side: Side::Buy.into(),
+                duration_ms: 60_000,
+                slice_interval_ms: 5_000,
+                execution: Some(twap_trigger::Execution::MarketIoc(Box::default())),
+                ..Default::default()
+            }))),
+            runtime_details: Some(trigger::RuntimeDetails::TwapState(Box::new(TwapDetails {
+                twap_duration_ms: 60_000,
+                twap_slice_interval_ms: 5_000,
+                slice_idx: 2,
+                slice_count: 12,
+                executed_qty_scaled: 25_000_000,
+                ..Default::default()
+            }))),
+            ..Default::default()
+        };
+        let t = trigger_from_proto(&msg);
+        assert_eq!(t.trigger_type, "twap");
+        assert_eq!(t.side, "buy");
+        assert_eq!(t.order_type, "market");
+        assert_eq!(
+            t.child_order_ids,
+            vec![format_uint64_id(101), format_uint64_id(202)]
+        );
+        let Some(TriggerDetails::Twap(twap)) = t.details.as_ref() else {
+            panic!("expected twap details");
+        };
+        assert_eq!(twap.slice_idx, 2);
+        assert_eq!(twap.slice_count, 12);
+        assert_eq!(twap.executed_qty.as_ref().unwrap().as_scaled(), 25_000_000);
+    }
+
+    #[test]
     fn trigger_status_from_label_validates() {
         assert_eq!(
             trigger_status_from_label("armed").unwrap(),

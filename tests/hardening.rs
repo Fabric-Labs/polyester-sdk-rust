@@ -2400,7 +2400,10 @@ async fn l2_wait_for_order_trades_complete_polls_get_order_until_trade_sum_match
     .expect("client");
     let result = client
         .orders
-        .wait_for_order_trades_complete(None, Some("1"), Duration::from_secs(2))
+        .wait_for_order_trades_complete(
+            polyester::models::OrderKey::OrderId("1".into()),
+            Duration::from_secs(2),
+        )
         .await
         .expect("wait complete");
     assert!(calls.load(Ordering::SeqCst) >= 2);
@@ -2452,7 +2455,10 @@ async fn l2_wait_for_order_trades_complete_enforces_overall_deadline() {
     let started = Instant::now();
     let err = client
         .orders
-        .wait_for_order_trades_complete(None, Some("1"), helper_timeout)
+        .wait_for_order_trades_complete(
+            polyester::models::OrderKey::OrderId("1".into()),
+            helper_timeout,
+        )
         .await
         .expect_err("helper deadline must cover the in-flight GetOrder call");
     assert!(
@@ -2634,8 +2640,7 @@ async fn l2_batch_cancel_rejects_inconsistent_server_counts_through_public_servi
         .orders
         .batch_cancel(
             vec![BatchCancelItem {
-                order_id: Some("9".into()),
-                client_order_id: None,
+                key: polyester::models::OrderKey::OrderId("9".into()),
                 symbol_id: None,
             }],
             None,
@@ -2766,8 +2771,7 @@ async fn l2_batch_modify_rejects_inconsistent_server_counts_through_public_servi
         .orders
         .batch_modify(
             vec![BatchModifyItem {
-                order_id: Some("9".into()),
-                client_order_id: None,
+                key: polyester::models::OrderKey::OrderId("9".into()),
                 new_price: Some(Price::from_ticks(1, Some("BTC-USDT".into())).expect("price")),
                 new_qty: None,
                 new_attached_risk: None,

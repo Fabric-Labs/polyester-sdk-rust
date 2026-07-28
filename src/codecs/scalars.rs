@@ -57,6 +57,11 @@ fn decimal_string_from_decimal(raw: Decimal, field_name: &str) -> Result<String>
     decimal_string_from_input(&text, field_name)
 }
 
+/// Strict non-negative decimal form: `digits` or `digits.digits`.
+///
+/// Matches TypeScript/Go/Python (`^\d+(?:\.\d+)?$`): a trailing bare `.`
+/// (e.g. `"65000."`) is rejected. Callers may trim surrounding whitespace
+/// before invoking this (same as TS `value.trim()`).
 fn is_strict_decimal(text: &str) -> bool {
     let mut chars = text.chars();
     let Some(first) = chars.next() else {
@@ -66,6 +71,7 @@ fn is_strict_decimal(text: &str) -> bool {
         return false;
     }
     let mut saw_dot = false;
+    let mut frac_digits = 0usize;
     for c in chars {
         if c == '.' {
             if saw_dot {
@@ -77,8 +83,11 @@ fn is_strict_decimal(text: &str) -> bool {
         if !c.is_ascii_digit() {
             return false;
         }
+        if saw_dot {
+            frac_digits += 1;
+        }
     }
-    true
+    !saw_dot || frac_digits > 0
 }
 
 /// Strict decimal→scaled. Never rounds; excess fractional digits fail.
@@ -376,6 +385,26 @@ mod tests {
     #[test]
     fn price_rejects_negative_string() {
         assert!(parse_price_ticks_str("-1", "price").is_err());
+    }
+
+    #[test]
+    fn price_rejects_trailing_dot_and_accepts_trimmed_whitespace() {
+        // TS/Go/Python reject bare trailing dots via `^\d+(?:\.\d+)?$`.
+        assert!(parse_price_ticks_str("65000.", "price").is_err());
+        assert!(parse_price_ticks_str("65.", "price").is_err());
+        // Leading/trailing whitespace is trimmed (TS `value.trim()` parity).
+        assert_eq!(
+            parse_price_ticks_str(" 65000", "price").unwrap(),
+            65_000_000_000
+        );
+        assert_eq!(
+            parse_price_ticks_str("65000 ", "price").unwrap(),
+            65_000_000_000
+        );
+        assert_eq!(
+            parse_price_ticks_str("65000.0", "price").unwrap(),
+            65_000_000_000
+        );
     }
 
     #[test]

@@ -204,7 +204,10 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
     }
     let buy_projection = client
         .orders
-        .wait_for_order_trades_complete(Some(&buy_cid), None, Duration::from_secs(20))
+        .wait_for_order_trades_complete(
+            polyester::models::OrderKey::ClientOrderId(buy_cid.clone()),
+            Duration::from_secs(20),
+        )
         .await
         .expect("BUY trade projection must reconcile with cum_qty");
     let received_fee = buy_projection

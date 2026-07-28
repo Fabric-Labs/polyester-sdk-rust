@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.19`, git tag `v0.1.0a19`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.20`, git tag `v0.1.0a20`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ The crate is not on crates.io yet. Pin the published git tag:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a19" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a20" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -302,8 +302,9 @@ status. Valid values:
 Unknown values return a validation error (they do not silently return an empty
 list). Response `status` uses the same labels (British spelling `cancelled`).
 
-`orders.get_with(GetOrderOpts { include_attached_risk: true, .. })` returns
-policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
+`orders.get_with(GetOrderOpts { key: OrderKey::OrderId(id), include_attached_risk: true, subaccount_id: None, include_attached_risk_state: false })`
+returns policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
+Identify orders with `OrderKey::OrderId` or `OrderKey::ClientOrderId` (exclusive oneOf).
 
 ## Qty / price rules
 
