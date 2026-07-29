@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Breaking
+- `OrdersService::batch_modify` and `BatchModify*` models are replaced by admission-oriented
+  `OrdersService::batch_replace` and `BatchReplace*`. Batch replacement is now a same-symbol
+  quote-refresh operation returning an admission receipt; poll `get_batch_replace_status` with
+  its `batch_request_id` for execution finality. Item `behavior` and request
+  `behavior_default` / `allow_partial` controls are removed.
+
 ## 0.1.0a20
 
 Package version: `0.1.0-alpha.20`. Git tag: `v0.1.0a20`.

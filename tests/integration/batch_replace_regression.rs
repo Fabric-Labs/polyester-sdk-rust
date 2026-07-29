@@ -1,6 +1,6 @@
-//! F-01 / M1: blocking BatchModify regression (live-gated).
+//! F-01 / M1: blocking BatchReplace regression (live-gated).
 //!
-//! Runs 5× complete 40-item BatchModify rounds with safe same-ID retry + cleanup.
+//! Runs 5× complete 40-item BatchReplace rounds with safe same-ID retry + cleanup.
 //! Staging-only; soft-skips without mutation/funded gates (fails closed under STRICT_LIVE).
 
 use crate::support::{
@@ -10,7 +10,7 @@ use crate::support::{
     trade_symbol, unique_client_order_id, wait_for_open_order, wait_until_no_open_client_ids,
 };
 use polyester::models::{
-    BatchModifyItem, BatchModifyOrdersResult, CreateOrderParams, CreateOrderType, CreateSide,
+    BatchReplaceItem, BatchReplaceOrdersResult, CreateOrderParams, CreateOrderType, CreateSide,
     CreateTimeInForce,
 };
 use polyester::types::{Price, Quantity};
@@ -20,7 +20,7 @@ use std::time::Duration;
 const BATCH_SIZE: usize = 40;
 const ROUNDS: usize = 5;
 
-fn all_results_internal_error(result: &BatchModifyOrdersResult) -> bool {
+fn all_results_internal_error(result: &BatchReplaceOrdersResult) -> bool {
     !result.results.is_empty()
         && result.results.iter().all(|r| {
             r.code.eq_ignore_ascii_case("INTERNAL_ERROR")
@@ -33,11 +33,7 @@ fn all_results_internal_error(result: &BatchModifyOrdersResult) -> bool {
             .all(|r| r.code.eq_ignore_ascii_case("INTERNAL_ERROR"))
 }
 
-fn assert_complete_batch_result(
-    result: &BatchModifyOrdersResult,
-    expected_cids: &HashSet<String>,
-    round: usize,
-) -> bool {
+fn assert_complete_batch_result(result: &BatchReplaceOrdersResult, round: usize) -> bool {
     assert_eq!(
         result.results.len(),
         BATCH_SIZE,
@@ -53,32 +49,19 @@ fn assert_complete_batch_result(
         result.rejected_count
     );
     assert_eq!(
-        result.amended_count + result.replaced_count,
-        BATCH_SIZE as u32,
-        "round {round}: amended+replaced={} != {BATCH_SIZE}",
-        result.amended_count + result.replaced_count
+        result.accepted_count, BATCH_SIZE as u32,
+        "round {round}: accepted={} != {BATCH_SIZE}",
+        result.accepted_count
     );
-    let seen: HashSet<String> = result
-        .results
-        .iter()
-        .map(|r| r.client_order_id.clone())
-        .filter(|s| !s.is_empty())
-        .collect();
-    let missing: Vec<_> = expected_cids.difference(&seen).cloned().collect();
-    assert!(
-        missing.is_empty(),
-        "round {round}: missing client_order_ids in results: {missing:?}"
-    );
-    for item in &result.results {
-        assert!(
-            !item.status.eq_ignore_ascii_case("rejected"),
-            "round {round}: rejected item {item:?}"
-        );
-    }
+    assert!(matches!(
+        result.status.as_str(),
+        "admitted" | "partially_admitted"
+    ));
+    assert!(result.results.iter().all(|item| item.status == "admitted"));
     true
 }
 
-fn result_fingerprint(result: &BatchModifyOrdersResult) -> Vec<(String, String, String)> {
+fn result_fingerprint(result: &BatchReplaceOrdersResult) -> Vec<(String, String, String)> {
     let mut rows: Vec<_> = result
         .results
         .iter()
@@ -86,7 +69,7 @@ fn result_fingerprint(result: &BatchModifyOrdersResult) -> Vec<(String, String, 
             (
                 r.client_order_id.clone(),
                 r.status.clone(),
-                r.final_order_id.clone(),
+                r.replacement_order_id.clone(),
             )
         })
         .collect();
@@ -95,7 +78,7 @@ fn result_fingerprint(result: &BatchModifyOrdersResult) -> Vec<(String, String, 
 }
 
 #[tokio::test]
-async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
+async fn batch_replace_five_rounds_of_forty_with_safe_same_id_retry() {
     if !require_account_wide_cleanup() {
         return;
     }
@@ -137,7 +120,7 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
 
     let mut client_order_ids = Vec::with_capacity(BATCH_SIZE);
     for i in 0..BATCH_SIZE {
-        let cid = unique_client_order_id(&format!("bm-{i}"));
+        let cid = unique_client_order_id(&format!("br-{i}"));
         let params = CreateOrderParams {
             symbol: symbol.clone(),
             side: CreateSide::Buy,
@@ -203,22 +186,21 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
             return;
         };
         let new_cids: Vec<String> = (0..BATCH_SIZE)
-            .map(|i| unique_client_order_id(&format!("bm-r{round}-{i}")))
+            .map(|i| unique_client_order_id(&format!("br-r{round}-{i}")))
             .collect();
         let requested: HashSet<String> = client_order_ids.iter().cloned().collect();
-        let items: Vec<BatchModifyItem> = client_order_ids
+        let items: Vec<BatchReplaceItem> = client_order_ids
             .iter()
             .zip(new_cids.iter())
-            .map(|(cid, new_cid)| BatchModifyItem {
+            .map(|(cid, new_cid)| BatchReplaceItem {
                 key: polyester::models::OrderKey::ClientOrderId(cid.clone()),
                 new_price: Some(new_price.clone()),
                 new_qty: None,
                 new_attached_risk: None,
-                behavior: None,
                 new_client_order_id: Some(new_cid.clone()),
             })
             .collect();
-        let request_id = unique_client_order_id(&format!("bm-req-{round}"));
+        let request_id = unique_client_order_id(&format!("br-req-{round}"));
         all_cids.extend(new_cids.iter().cloned());
 
         let mut before_count = 0usize;
@@ -227,7 +209,7 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
                 .orders
                 .list_open(None)
                 .await
-                .expect("list_open before batch_modify");
+                .expect("list_open before batch_replace");
             before_count = before_open
                 .orders
                 .iter()
@@ -249,25 +231,18 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
 
         let result = match client
             .orders
-            .batch_modify(
-                items.clone(),
-                Some(&symbol),
-                None,
-                Some(request_id.clone()),
-                None,
-                true,
-            )
+            .batch_replace(items.clone(), &symbol, None, Some(request_id.clone()))
             .await
         {
             Ok(r) => r,
             Err(err) if crate::support::devnet_unavailable(&err) => {
-                eprintln!("skip: batch_modify unavailable: {err}");
+                eprintln!("skip: batch_replace unavailable: {err}");
                 let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
                 return;
             }
             Err(err) => {
                 // Timeout / ambiguous commit: reconcile then same request_id retry.
-                eprintln!("batch_modify round {round} err (retrying once): {err}");
+                eprintln!("batch_replace round {round} err (retrying once): {err}");
                 let after_open = client
                     .orders
                     .list_open(None)
@@ -285,29 +260,58 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
                 tokio::time::sleep(Duration::from_millis(200)).await;
                 match client
                     .orders
-                    .batch_modify(
-                        items.clone(),
-                        Some(&symbol),
-                        None,
-                        Some(request_id.clone()),
-                        None,
-                        true,
-                    )
+                    .batch_replace(items.clone(), &symbol, None, Some(request_id.clone()))
                     .await
                 {
                     Ok(r) => r,
                     Err(retry_err) => {
                         let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
-                        panic!("batch_modify round {round}: {retry_err}");
+                        panic!("batch_replace round {round}: {retry_err}");
                     }
                 }
             }
         };
 
-        if !assert_complete_batch_result(&result, &requested, round) {
-            eprintln!("skip: batch_modify returned all INTERNAL_ERROR (OMS)");
+        if !assert_complete_batch_result(&result, round) {
+            eprintln!("skip: batch_replace returned all INTERNAL_ERROR (OMS)");
             let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
             return;
+        }
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            match client
+                .orders
+                .get_batch_replace_status(&result.batch_request_id, None)
+                .await
+            {
+                Ok(status) => {
+                    if status.items.len() == BATCH_SIZE
+                        && status.items.iter().all(|item| {
+                            matches!(item.phase.as_str(), "working" | "rejected" | "terminal")
+                        })
+                    {
+                        assert_eq!(
+                            status.rejected_count, 0,
+                            "round {round}: status rejected_count={}",
+                            status.rejected_count
+                        );
+                        break;
+                    }
+                    assert!(
+                        tokio::time::Instant::now() < deadline,
+                        "round {round}: batch replace did not settle: {status:?}"
+                    );
+                }
+                Err(err) => {
+                    let msg = err.to_string().to_lowercase();
+                    // Status projection can lag the admission receipt briefly.
+                    assert!(
+                        msg.contains("not found") && tokio::time::Instant::now() < deadline,
+                        "batch_replace status round {round}: {err}"
+                    );
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
         }
         let fingerprint = result_fingerprint(&result);
 
@@ -316,7 +320,7 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
         // contract is safe only if no second mutation is applied.
         let retry = client
             .orders
-            .batch_modify(items, Some(&symbol), None, Some(request_id), None, true)
+            .batch_replace(items, &symbol, None, Some(request_id))
             .await
             .unwrap_or_else(|err| panic!("idempotent retry round {round}: {err}"));
         assert_eq!(
@@ -324,18 +328,10 @@ async fn batch_modify_five_rounds_of_forty_with_safe_same_id_retry() {
             BATCH_SIZE,
             "round {round}: retry must return one result per input"
         );
-        let replayed_cached_result = result_fingerprint(&retry) == fingerprint;
-        let safely_rejected_without_reapply = retry.rejected_count == BATCH_SIZE as u32
-            && retry.amended_count == 0
-            && retry.replaced_count == 0
-            && retry
-                .results
-                .iter()
-                .all(|item| item.status.eq_ignore_ascii_case("rejected"));
-        assert!(
-            replayed_cached_result || safely_rejected_without_reapply,
-            "round {round}: retry must replay the cached result or reject every stale item \
-             without another mutation: {retry:?}"
+        assert_eq!(
+            result_fingerprint(&retry),
+            fingerprint,
+            "round {round}: idempotent retry changed admission receipt"
         );
         // Resolve live key per item: prefer new_cid when open.
         let mut next_cids = Vec::with_capacity(BATCH_SIZE);

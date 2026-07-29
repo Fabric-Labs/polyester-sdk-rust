@@ -128,12 +128,11 @@ pub struct BatchCancelOrdersResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BatchModifyItem {
+pub struct BatchReplaceItem {
     pub key: OrderKey,
     pub new_price: Option<Price>,
     pub new_qty: Option<Quantity>,
     pub new_attached_risk: Option<AttachedRisk>,
-    pub behavior: Option<String>,
     pub new_client_order_id: Option<String>,
 }
 
@@ -295,19 +294,45 @@ pub struct CreateWalletTradingWithdrawParams {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BatchModifyResultItem {
+pub struct BatchReplaceAdmissionItem {
+    pub item_index: u32,
     pub status: String,
+    pub old_order_id: String,
     pub client_order_id: String,
-    pub final_order_id: String,
+    pub replacement_order_id: String,
     pub code: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BatchModifyOrdersResult {
-    pub results: Vec<BatchModifyResultItem>,
-    pub amended_count: u32,
-    pub replaced_count: u32,
+pub struct BatchReplaceOrdersResult {
+    pub batch_request_id: String,
+    pub status: String,
+    pub results: Vec<BatchReplaceAdmissionItem>,
+    pub accepted_count: u32,
     pub rejected_count: u32,
+    pub accepted_ts_ns: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchReplaceStatusItem {
+    pub item_index: u32,
+    pub phase: String,
+    pub old_order_id: String,
+    pub replacement_order_id: String,
+    pub order_status: String,
+    pub code: String,
+    pub updated_ts_ns: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchReplaceStatusResult {
+    pub batch_request_id: String,
+    pub admission_status: String,
+    pub items: Vec<BatchReplaceStatusItem>,
+    pub accepted_count: u32,
+    pub rejected_count: u32,
+    pub accepted_ts_ns: u64,
+    pub updated_ts_ns: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

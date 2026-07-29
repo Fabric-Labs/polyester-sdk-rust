@@ -396,7 +396,7 @@ Classify failures with `Error::is_retryable()` and respect `Error::retry_after()
 before retrying and reuse the same logical request identity.
 
 Order mutations that take a `request_id` (`modify`, `batch_create`, `batch_cancel`,
-`batch_modify`, `cancel_all` / `cancel_all_with`, `cancel_all_after`) **generate one when
+`batch_replace`, `cancel_all` / `cancel_all_with`, `cancel_all_after`) **generate one when
 omitted**, matching TypeScript/Go/Python. That is fine for one-shot calls. **Do not blind-retry
 after an ambiguous failure while omitting `request_id`**: each omitted call mints a *new* id, so
 the retry is a second logical mutation rather than an idempotent replay. Generate or choose a

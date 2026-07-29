@@ -29,7 +29,7 @@ mod account;
 mod account_admin;
 mod auth;
 mod balances;
-mod batch_modify_regression;
+mod batch_replace_regression;
 mod funded_chain_userop;
 mod funded_internal_transfer;
 mod funded_market_fill;
