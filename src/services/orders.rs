@@ -5,31 +5,33 @@ use super::correlation_id::{
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
-    batch_cancel_from_proto, batch_create_from_proto, batch_modify_from_proto,
-    cancel_all_after_from_proto, cancel_all_from_proto, get_order_from_proto,
-    modify_order_from_proto, order_mutation_from_cancel, order_mutation_from_create,
-    orders_list_from_history, orders_list_from_open, user_trades_list_from_proto,
+    batch_cancel_from_proto, batch_create_from_proto, batch_replace_from_proto,
+    batch_replace_status_from_proto, cancel_all_after_from_proto, cancel_all_from_proto,
+    get_order_from_proto, modify_order_from_proto, order_mutation_from_cancel,
+    order_mutation_from_create, orders_list_from_history, orders_list_from_open,
+    user_trades_list_from_proto,
 };
 use crate::codecs::scalars::id_to_u64;
 use crate::connect::orders::v1::{OrdersReadServiceClient, OrdersServiceClient};
 use crate::errors::{Error, Result};
 use crate::models::{
     AttachedRisk, BatchCancelItem, BatchCancelOrdersResult, BatchCreateOrdersResult,
-    BatchModifyItem, BatchModifyOrdersResult, CancelAllAfterResult, CancelAllOpts,
-    CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType, CreateSide,
-    CreateTimeInForce, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts, ListOrderHistoryOpts,
-    MaxSlippage, ModifyOrderParams, ModifyOrderResult, Order, OrderFeeSource, OrderKey,
-    OrderMutationResult, OrderSelfTradePrevention, OrdersList, RiskLeg, TrailingDistance,
+    BatchReplaceItem, BatchReplaceOrdersResult, BatchReplaceStatusResult, CancelAllAfterResult,
+    CancelAllOpts, CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType,
+    CreateSide, CreateTimeInForce, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts,
+    ListOrderHistoryOpts, MaxSlippage, ModifyOrderParams, ModifyOrderResult, Order, OrderFeeSource,
+    OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, RiskLeg, TrailingDistance,
     TrailingStop, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
     BatchCancelItem as ProtoBatchCancelItem, BatchCancelOrdersRequest, BatchCreateOrdersRequest,
-    BatchModifyItem as ProtoBatchModifyItem, BatchModifyOrdersRequest, CancelAllAfterRequest,
-    CancelAllOrdersRequest, CancelOrderRequest, CreateOrderRequest, FeeSource,
-    GetOpenOrdersRequest, GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, LimitFok,
-    LimitGtc, LimitIoc, MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, RiskExecution,
-    RiskLimitGtc, RiskPolicy, SelfTradePreventionMode, Side, StopLossPolicy, TakeProfitPolicy,
-    TrailingStopPolicy, batch_modify_item, cancel_order_request, get_order_request, market_ioc,
+    BatchReplaceOrderItem as ProtoBatchReplaceOrderItem, BatchReplaceOrdersRequest,
+    CancelAllAfterRequest, CancelAllOrdersRequest, CancelOrderRequest, CreateOrderRequest,
+    FeeSource, GetBatchReplaceStatusRequest, GetOpenOrdersRequest, GetOrderHistoryRequest,
+    GetOrderRequest, GetUserTradesRequest, LimitFok, LimitGtc, LimitIoc, MarketIoc, ModifyBehavior,
+    ModifyOrderRequest, OrderIntent, RiskExecution, RiskLimitGtc, RiskPolicy,
+    SelfTradePreventionMode, Side, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy,
+    batch_replace_order_item, cancel_order_request, get_order_request, market_ioc,
     modify_order_request, order_intent, risk_execution, risk_policy, trailing_stop_policy,
 };
 use crate::types::{Price, Quantity, resolve_price_ticks, resolve_qty_scaled};
@@ -248,12 +250,12 @@ impl OrdersService {
         }
     }
 
-    fn encode_batch_modify_key(key: &OrderKey) -> Result<batch_modify_item::Key> {
+    fn encode_batch_replace_key(key: &OrderKey) -> Result<batch_replace_order_item::Key> {
         match key {
-            OrderKey::OrderId(oid) => {
-                Ok(batch_modify_item::Key::OrderId(id_to_u64(oid, "order_id")?))
-            }
-            OrderKey::ClientOrderId(cid) => Ok(batch_modify_item::Key::ClientOrderId(
+            OrderKey::OrderId(oid) => Ok(batch_replace_order_item::Key::OrderId(id_to_u64(
+                oid, "order_id",
+            )?)),
+            OrderKey::ClientOrderId(cid) => Ok(batch_replace_order_item::Key::ClientOrderId(
                 require_client_style_id(cid, "client_order_id")?,
             )),
         }
@@ -687,25 +689,33 @@ impl OrdersService {
         batch_cancel_from_proto(&resp)
     }
 
-    /// Batch-modify orders.
+    /// Replace multiple same-symbol orders and return their admission receipt.
     ///
-    /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
-    /// non-empty value when retrying the same logical batch — omitting it on retry mints a new id.
-    pub async fn batch_modify(
+    /// Poll [`Self::get_batch_replace_status`] using the returned
+    /// `batch_request_id` for recoverable execution finality.
+    pub async fn batch_replace(
         &self,
-        items: Vec<BatchModifyItem>,
-        symbol: Option<&str>,
+        items: Vec<BatchReplaceItem>,
+        symbol: &str,
         subaccount_id: Option<u64>,
         request_id: Option<String>,
-        behavior_default: Option<&str>,
-        allow_partial: bool,
-    ) -> Result<BatchModifyOrdersResult> {
+    ) -> Result<BatchReplaceOrdersResult> {
         self.ctx.wait_for_catalogs().await?;
         if items.is_empty() {
-            return Err(Error::validation("batch_modify requires at least one item"));
+            return Err(Error::validation(
+                "batch_replace requires at least one item",
+            ));
         }
-        let scale_symbol = symbol.unwrap_or("");
-        let scale = Self::resolve_batch_modify_scale(&self.ctx.catalogs, scale_symbol, &items)?;
+        let symbol_id = self
+            .ctx
+            .catalogs
+            .symbol_id_for_symbol(symbol)
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
+                ))
+            })?;
+        let scale = Self::resolve_batch_replace_scale(&self.ctx.catalogs, symbol)?;
         let mut proto_items = Vec::with_capacity(items.len());
         for item in items {
             if item.new_price.is_none()
@@ -716,53 +726,70 @@ impl OrdersService {
                     "each batch item requires new_price, new_qty, and/or new_attached_risk",
                 ));
             }
-            let mut proto = ProtoBatchModifyItem {
-                key: Some(Self::encode_batch_modify_key(&item.key)?),
+            let mut proto = ProtoBatchReplaceOrderItem {
+                key: Some(Self::encode_batch_replace_key(&item.key)?),
                 ..Default::default()
             };
             if let Some(price) = item.new_price.as_ref() {
-                proto.new_price_ticks = Some(resolve_price_ticks(price, symbol)?);
+                proto.new_price_ticks = Some(resolve_price_ticks(price, Some(symbol))?);
             }
             if let Some(qty) = item.new_qty.as_ref() {
                 proto.new_qty_scaled = Some(resolve_qty_scaled(
                     qty,
                     scale,
-                    symbol,
-                    symbol.and_then(|s| self.ctx.catalogs.symbol_id_for_symbol(s)),
+                    Some(symbol),
+                    Some(symbol_id),
                 )?);
             }
             if let Some(risk) = item.new_attached_risk.as_ref() {
                 *proto.new_attached_risk.get_or_insert_default() =
-                    Self::encode_attached_risk(risk, symbol)?;
-            }
-            if let Some(behavior) = item.behavior.as_deref() {
-                proto.behavior = Self::modify_behavior(behavior)?.into();
+                    Self::encode_attached_risk(risk, Some(symbol))?;
             }
             if let Some(ncid) = optional_client_order_id(item.new_client_order_id.as_deref())? {
                 proto.new_client_order_id = ncid;
             }
             proto_items.push(proto);
         }
-        let mut req = BatchModifyOrdersRequest {
+        let req = BatchReplaceOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
-            request_id: Self::coalesce_request_id(request_id, "batch-mod")?,
+            symbol_id,
+            request_id: Self::coalesce_request_id(request_id, "batch-replace")?,
             items: proto_items,
-            allow_partial,
             ..Default::default()
         };
-        if let Some(behavior) = behavior_default {
-            req.behavior_default = Self::modify_behavior(behavior)?.into();
-        }
         let client = self.write_client();
         let resp = unary::await_auth(
             &self.ctx.factory,
-            "/orders.v1.OrdersService/BatchModifyOrders",
+            "/orders.v1.OrdersService/BatchReplaceOrders",
             req,
-            |req, opts| client.batch_modify_orders_with_options(req, opts),
+            |req, opts| client.batch_replace_orders_with_options(req, opts),
         )
         .await?
         .into_owned();
-        batch_modify_from_proto(&resp)
+        batch_replace_from_proto(&resp)
+    }
+
+    /// Get durable execution status for an admitted batch replacement.
+    pub async fn get_batch_replace_status(
+        &self,
+        batch_request_id: &str,
+        subaccount_id: Option<u64>,
+    ) -> Result<BatchReplaceStatusResult> {
+        let req = GetBatchReplaceStatusRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            batch_request_id: id_to_u64(batch_request_id, "batch_request_id")?,
+            ..Default::default()
+        };
+        let client = self.read_client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/orders.v1.OrdersReadService/GetBatchReplaceStatus",
+            req,
+            |req, opts| client.get_batch_replace_status_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        batch_replace_status_from_proto(&resp)
     }
 
     /// Schedules cancel-all-after for the account scope.
@@ -983,43 +1010,16 @@ impl OrdersService {
         }
     }
 
-    /// Resolve quantity scale for batch modify without inventing scale 8.
-    ///
-    /// When `symbol` is present, use the catalog. When absent, every `new_qty`
-    /// must already carry a known scale; otherwise fail loudly.
-    pub(crate) fn resolve_batch_modify_scale(
+    /// Resolve the catalog quantity scale for a same-symbol batch replace.
+    pub(crate) fn resolve_batch_replace_scale(
         catalogs: &crate::catalogs::Manager,
         symbol: &str,
-        items: &[BatchModifyItem],
     ) -> Result<u32> {
-        if !symbol.is_empty() {
-            return catalogs.base_quantity_scale_for_symbol(symbol).ok_or_else(|| {
-                Error::validation(format!(
-                    "quantity scale for {symbol:?} is unavailable; await client.wait_for_catalogs() before placing orders, or pass a scaled Quantity"
-                ))
-            });
-        }
-        let mut inferred: Option<u32> = None;
-        for item in items {
-            let Some(qty) = item.new_qty.as_ref() else {
-                continue;
-            };
-            let Some(scale) = qty.scale() else {
-                return Err(Error::validation(
-                    "batch_modify requires symbol when new_qty has no known scale",
-                ));
-            };
-            match inferred {
-                None => inferred = Some(scale),
-                Some(existing) if existing != scale => {
-                    return Err(Error::validation(
-                        "batch_modify without symbol requires consistent new_qty scales",
-                    ));
-                }
-                _ => {}
-            }
-        }
-        Ok(inferred.unwrap_or(0))
+        catalogs.base_quantity_scale_for_symbol(symbol).ok_or_else(|| {
+            Error::validation(format!(
+                "quantity scale for {symbol:?} is unavailable; await client.wait_for_catalogs() before placing orders"
+            ))
+        })
     }
 
     /// Subscribe to private order updates for an account.
@@ -1222,42 +1222,20 @@ mod tests {
     }
 
     #[test]
-    fn batch_modify_rejects_missing_symbol_without_qty_scale() {
+    fn batch_replace_requires_catalog_quantity_scale() {
         let catalogs = crate::catalogs::Manager::new();
-        let items = vec![BatchModifyItem {
-            key: OrderKey::OrderId(format_id(4)),
-            new_price: None,
-            new_qty: Some(
-                Quantity::from_scaled(1, None, crate::QuantityDomain::OrderBase, None, None)
-                    .unwrap(),
-            ),
-            new_attached_risk: None,
-            behavior: None,
-            new_client_order_id: None,
-        }];
-        let err = OrdersService::resolve_batch_modify_scale(&catalogs, "", &items).unwrap_err();
+        let err = OrdersService::resolve_batch_replace_scale(&catalogs, "BTC-USDT").unwrap_err();
         assert!(
-            err.to_string().contains("requires symbol"),
+            err.to_string().contains("quantity scale"),
             "unexpected error: {err}"
         );
     }
 
     #[test]
-    fn batch_modify_allows_missing_symbol_when_qty_scale_known() {
-        let catalogs = crate::catalogs::Manager::new();
-        let items = vec![BatchModifyItem {
-            key: OrderKey::OrderId(format_id(4)),
-            new_price: None,
-            new_qty: Some(
-                Quantity::from_scaled(1, Some(8), crate::QuantityDomain::OrderBase, None, None)
-                    .unwrap(),
-            ),
-            new_attached_risk: None,
-            behavior: None,
-            new_client_order_id: None,
-        }];
+    fn batch_replace_uses_symbol_catalog_quantity_scale() {
+        let client = client();
         assert_eq!(
-            OrdersService::resolve_batch_modify_scale(&catalogs, "", &items).unwrap(),
+            OrdersService::resolve_batch_replace_scale(&client.catalogs, "BTC-USDT").unwrap(),
             8
         );
     }
@@ -1510,7 +1488,7 @@ mod tests {
             "mod",
             "batch-create",
             "batch-cancel",
-            "batch-mod",
+            "batch-replace",
         ] {
             let generated = OrdersService::coalesce_request_id(None, prefix).unwrap();
             assert!(
