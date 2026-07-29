@@ -9,16 +9,17 @@ use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
 use crate::models::{
     AttachedRisk, BatchCancelOrdersResult, BatchCancelResultItem, BatchCreateOrdersResult,
-    BatchCreateResultItem, BatchModifyOrdersResult, BatchModifyResultItem, CancelAllAfterResult,
-    CancelAllOrdersResult, CreateOrderType, GetOrderResult, MaxSlippage, ModifyOrderResult, Order,
-    OrderMutationResult, OrdersList, RiskLeg, TrailingDistance, TrailingStop, UserTrade,
-    UserTradesList,
+    BatchCreateResultItem, BatchReplaceAdmissionItem, BatchReplaceOrdersResult,
+    BatchReplaceStatusItem, BatchReplaceStatusResult, CancelAllAfterResult, CancelAllOrdersResult,
+    CreateOrderType, GetOrderResult, MaxSlippage, ModifyOrderResult, Order, OrderMutationResult,
+    OrdersList, RiskLeg, TrailingDistance, TrailingStop, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
     AttachedRisk as ProtoAttachedRisk, BatchCancelOrdersResponse, BatchCreateOrdersResponse,
-    BatchModifyOrdersResponse, CancelAllAfterResponse, CancelAllOrdersResponse,
-    CancelOrderResponse, CreateOrderResponse, GetOpenOrdersResponse, GetOrderHistoryResponse,
-    GetOrderResponse, GetUserTradesResponse, ModifyActionTaken, ModifyOrderResponse,
+    BatchReplaceAdmissionStatus, BatchReplaceItemAdmissionStatus, BatchReplaceOrdersResponse,
+    BatchReplacePhase, CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse,
+    CreateOrderResponse, GetBatchReplaceStatusResponse, GetOpenOrdersResponse,
+    GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse,
     Order as ProtoOrder, RiskExecution, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy,
     UserTrade as ProtoUserTrade, batch_create_result_item, risk_execution, trailing_stop_policy,
 };
@@ -438,72 +439,147 @@ pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> Result<BatchC
     })
 }
 
-pub fn batch_modify_from_proto(msg: &BatchModifyOrdersResponse) -> Result<BatchModifyOrdersResult> {
-    let mut amended = 0u32;
-    let mut replaced = 0u32;
+pub fn batch_replace_from_proto(
+    msg: &BatchReplaceOrdersResponse,
+) -> Result<BatchReplaceOrdersResult> {
+    if msg.batch_request_id == 0 {
+        return Err(Error::response_contract(
+            "BatchReplaceOrders",
+            "missing batch_request_id",
+        ));
+    }
+    let status = batch_replace_admission_status_name(msg.status).ok_or_else(|| {
+        Error::response_contract(
+            "BatchReplaceOrders",
+            format!("unknown admission status {}", msg.status.to_i32()),
+        )
+    })?;
+    let mut accepted = 0u32;
     let mut rejected = 0u32;
     let mut results = Vec::with_capacity(msg.results.len());
     for item in &msg.results {
-        if item.status.eq_ignore_ascii_case("rejected") {
-            if item.action_taken.to_i32() != 0 {
-                return Err(Error::response_contract(
-                    "BatchModifyOrders",
-                    "rejected item has an action_taken",
-                ));
-            }
-            rejected += 1;
-        } else if item.status.eq_ignore_ascii_case("modified") {
-            match item.action_taken.as_known() {
-                Some(ModifyActionTaken::Amended) => amended += 1,
-                Some(ModifyActionTaken::Replaced) => replaced += 1,
-                _ => {
-                    return Err(Error::response_contract(
-                        "BatchModifyOrders",
-                        format!(
-                            "modified item has invalid action_taken {}",
-                            item.action_taken.to_i32()
-                        ),
-                    ));
-                }
-            }
-        } else {
-            return Err(Error::response_contract(
-                "BatchModifyOrders",
-                format!("unknown item status {:?}", item.status),
-            ));
+        let item_status =
+            batch_replace_item_admission_status_name(item.status).ok_or_else(|| {
+                Error::response_contract(
+                    "BatchReplaceOrders",
+                    format!("unknown item status {}", item.status.to_i32()),
+                )
+            })?;
+        match item_status {
+            "admitted" => accepted += 1,
+            "rejected" => rejected += 1,
+            _ => unreachable!("known item admission status"),
         }
-        results.push(BatchModifyResultItem {
-            status: item.status.clone(),
+        results.push(BatchReplaceAdmissionItem {
+            item_index: item.item_index,
+            status: item_status.to_owned(),
+            old_order_id: format_uint64_id(item.old_order_id),
+            replacement_order_id: format_uint64_id(item.replacement_order_id),
             client_order_id: item.client_order_id.clone(),
-            final_order_id: format_uint64_id(item.final_order_id),
             code: item.code.clone(),
         });
     }
-    let decoded_total = amended
-        .checked_add(replaced)
-        .and_then(|value| value.checked_add(rejected));
-    if amended != msg.amended_count
-        || replaced != msg.replaced_count
+    if accepted != msg.accepted_count
         || rejected != msg.rejected_count
-        || decoded_total.and_then(|value| usize::try_from(value).ok()) != Some(results.len())
+        || accepted
+            .checked_add(rejected)
+            .and_then(|count| usize::try_from(count).ok())
+            != Some(results.len())
     {
         return Err(Error::response_contract(
-            "BatchModifyOrders",
+            "BatchReplaceOrders",
             format!(
-                "response counts mismatch: decoded {amended} amended/{replaced} replaced/{rejected} rejected for {} results, server reported {}/{}/{}",
+                "response counts mismatch: decoded {accepted} accepted/{rejected} rejected for {} results, server reported {}/{}",
                 results.len(),
-                msg.amended_count,
-                msg.replaced_count,
+                msg.accepted_count,
                 msg.rejected_count
             ),
         ));
     }
-    Ok(BatchModifyOrdersResult {
+    Ok(BatchReplaceOrdersResult {
+        batch_request_id: format_uint64_id(msg.batch_request_id),
+        status: status.to_owned(),
         results,
-        amended_count: msg.amended_count,
-        replaced_count: msg.replaced_count,
+        accepted_count: msg.accepted_count,
         rejected_count: msg.rejected_count,
+        accepted_ts_ns: msg.accepted_ts_ns,
     })
+}
+
+pub fn batch_replace_status_from_proto(
+    msg: &GetBatchReplaceStatusResponse,
+) -> Result<BatchReplaceStatusResult> {
+    if msg.batch_request_id == 0 {
+        return Err(Error::response_contract(
+            "GetBatchReplaceStatus",
+            "missing batch_request_id",
+        ));
+    }
+    let admission_status =
+        batch_replace_admission_status_name(msg.admission_status).ok_or_else(|| {
+            Error::response_contract(
+                "GetBatchReplaceStatus",
+                format!("unknown admission status {}", msg.admission_status.to_i32()),
+            )
+        })?;
+    let mut items = Vec::with_capacity(msg.items.len());
+    for item in &msg.items {
+        let phase = batch_replace_phase_name(item.phase).ok_or_else(|| {
+            Error::response_contract(
+                "GetBatchReplaceStatus",
+                format!("unknown batch replace phase {}", item.phase.to_i32()),
+            )
+        })?;
+        items.push(BatchReplaceStatusItem {
+            item_index: item.item_index,
+            phase: phase.to_owned(),
+            old_order_id: format_uint64_id(item.old_order_id),
+            replacement_order_id: format_uint64_id(item.replacement_order_id),
+            order_status: enum_value_order_status(item.order_status).to_owned(),
+            code: item.code.clone(),
+            updated_ts_ns: item.updated_ts_ns,
+        });
+    }
+    Ok(BatchReplaceStatusResult {
+        batch_request_id: format_uint64_id(msg.batch_request_id),
+        admission_status: admission_status.to_owned(),
+        items,
+        accepted_count: msg.accepted_count,
+        rejected_count: msg.rejected_count,
+        accepted_ts_ns: msg.accepted_ts_ns,
+        updated_ts_ns: msg.updated_ts_ns,
+    })
+}
+
+fn batch_replace_admission_status_name(
+    status: buffa::EnumValue<BatchReplaceAdmissionStatus>,
+) -> Option<&'static str> {
+    match status.as_known() {
+        Some(BatchReplaceAdmissionStatus::Admitted) => Some("admitted"),
+        Some(BatchReplaceAdmissionStatus::PartiallyAdmitted) => Some("partially_admitted"),
+        Some(BatchReplaceAdmissionStatus::Rejected) => Some("rejected"),
+        _ => None,
+    }
+}
+
+fn batch_replace_item_admission_status_name(
+    status: buffa::EnumValue<BatchReplaceItemAdmissionStatus>,
+) -> Option<&'static str> {
+    match status.as_known() {
+        Some(BatchReplaceItemAdmissionStatus::Admitted) => Some("admitted"),
+        Some(BatchReplaceItemAdmissionStatus::Rejected) => Some("rejected"),
+        _ => None,
+    }
+}
+
+fn batch_replace_phase_name(phase: buffa::EnumValue<BatchReplacePhase>) -> Option<&'static str> {
+    match phase.as_known() {
+        Some(BatchReplacePhase::Admitted) => Some("admitted"),
+        Some(BatchReplacePhase::Working) => Some("working"),
+        Some(BatchReplacePhase::Rejected) => Some("rejected"),
+        Some(BatchReplacePhase::Terminal) => Some("terminal"),
+        _ => None,
+    }
 }
 
 pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> Result<CancelAllAfterResult> {
@@ -935,45 +1011,80 @@ mod tests {
     }
 
     #[test]
-    fn batch_modify_reconciles_actions_and_counts() {
-        use crate::proto::orders::v1::{BatchModifyResultItem as ProtoItem, ModifyActionTaken};
+    fn batch_replace_reconciles_admission_counts_and_decodes_status() {
+        use crate::proto::orders::v1::{
+            BatchReplaceAdmissionItem as ProtoAdmissionItem, BatchReplaceAdmissionStatus,
+            BatchReplaceItemAdmissionStatus, BatchReplaceOrdersResponse, BatchReplacePhase,
+            BatchReplaceStatusItem as ProtoStatusItem, GetBatchReplaceStatusResponse, OrderStatus,
+        };
 
-        let valid = BatchModifyOrdersResponse {
+        let valid = BatchReplaceOrdersResponse {
+            batch_request_id: 9,
+            status: BatchReplaceAdmissionStatus::PartiallyAdmitted.into(),
             results: vec![
-                ProtoItem {
-                    status: "modified".into(),
-                    action_taken: ModifyActionTaken::Amended.into(),
+                ProtoAdmissionItem {
+                    item_index: 0,
+                    status: BatchReplaceItemAdmissionStatus::Admitted.into(),
+                    old_order_id: 1,
+                    replacement_order_id: 2,
                     ..Default::default()
                 },
-                ProtoItem {
-                    status: "modified".into(),
-                    action_taken: ModifyActionTaken::Replaced.into(),
-                    ..Default::default()
-                },
-                ProtoItem {
-                    status: "rejected".into(),
+                ProtoAdmissionItem {
+                    item_index: 1,
+                    status: BatchReplaceItemAdmissionStatus::Rejected.into(),
+                    old_order_id: 3,
+                    code: "REJECTED".into(),
                     ..Default::default()
                 },
             ],
-            amended_count: 1,
-            replaced_count: 1,
+            accepted_count: 1,
             rejected_count: 1,
             ..Default::default()
         };
-        let decoded = batch_modify_from_proto(&valid).expect("consistent response");
-        assert_eq!(decoded.amended_count, 1);
-        assert_eq!(decoded.replaced_count, 1);
+        let decoded = batch_replace_from_proto(&valid).expect("consistent response");
+        assert_eq!(decoded.batch_request_id, format_uint64_id(9));
+        assert_eq!(decoded.status, "partially_admitted");
+        assert_eq!(decoded.accepted_count, 1);
         assert_eq!(decoded.rejected_count, 1);
+        assert_eq!(decoded.results[0].status, "admitted");
 
-        let mismatch = BatchModifyOrdersResponse {
-            amended_count: 2,
+        let mismatch = BatchReplaceOrdersResponse {
+            accepted_count: 2,
             ..valid.clone()
         };
-        let err = batch_modify_from_proto(&mismatch).expect_err("count mismatch must fail closed");
+        let err = batch_replace_from_proto(&mismatch).expect_err("count mismatch must fail closed");
         assert!(matches!(&err, Error::ResponseContract { .. }));
         assert!(!err.is_retryable());
         assert!(err.mutation_outcome_unknown());
         assert!(err.to_string().contains("response counts"));
+
+        let status = batch_replace_status_from_proto(&GetBatchReplaceStatusResponse {
+            batch_request_id: 9,
+            admission_status: BatchReplaceAdmissionStatus::Admitted.into(),
+            items: vec![
+                ProtoStatusItem {
+                    item_index: 0,
+                    phase: BatchReplacePhase::Working.into(),
+                    old_order_id: 1,
+                    replacement_order_id: 2,
+                    order_status: OrderStatus::Working.into(),
+                    ..Default::default()
+                },
+                ProtoStatusItem {
+                    item_index: 1,
+                    phase: BatchReplacePhase::Terminal.into(),
+                    old_order_id: 3,
+                    replacement_order_id: 4,
+                    order_status: OrderStatus::Filled.into(),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        })
+        .expect("known phases decode");
+        assert_eq!(status.admission_status, "admitted");
+        assert_eq!(status.items[0].phase, "working");
+        assert_eq!(status.items[1].phase, "terminal");
     }
 
     #[test]

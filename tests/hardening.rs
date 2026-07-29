@@ -2725,23 +2725,25 @@ async fn l2_cancel_all_after_rejects_empty_and_unknown_status_through_public_ser
 }
 
 #[tokio::test]
-async fn l2_batch_modify_rejects_inconsistent_server_counts_through_public_service() {
+async fn l2_batch_replace_rejects_inconsistent_server_counts_through_public_service() {
     use polyester::Price;
-    use polyester::models::BatchModifyItem;
+    use polyester::models::BatchReplaceItem;
     use polyester::proto::orders::v1::{
-        BatchModifyOrdersResponse, BatchModifyResultItem as ProtoItem, ModifyActionTaken,
+        BatchReplaceAdmissionItem as ProtoItem, BatchReplaceAdmissionStatus,
+        BatchReplaceItemAdmissionStatus, BatchReplaceOrdersResponse,
     };
 
     let spot = spot_config_fixture();
     let zipper = zipper_config_fixture();
-    let response = BatchModifyOrdersResponse {
+    let response = BatchReplaceOrdersResponse {
+        batch_request_id: 9,
+        status: BatchReplaceAdmissionStatus::Admitted.into(),
         results: vec![ProtoItem {
-            status: "modified".into(),
-            action_taken: ModifyActionTaken::Amended.into(),
-            final_order_id: 9,
+            status: BatchReplaceItemAdmissionStatus::Admitted.into(),
+            replacement_order_id: 9,
             ..Default::default()
         }],
-        amended_count: 0,
+        accepted_count: 0,
         rejected_count: 1,
         ..Default::default()
     };
@@ -2750,7 +2752,7 @@ async fn l2_batch_modify_rejects_inconsistent_server_counts_through_public_servi
             connect_proto_ok(&spot)
         } else if req.path == ZIPPER_CONFIG_PATH {
             connect_proto_ok(&zipper)
-        } else if req.path == "/orders.v1.OrdersService/BatchModifyOrders" {
+        } else if req.path == "/orders.v1.OrdersService/BatchReplaceOrders" {
             connect_proto_ok(&response)
         } else {
             hardening_support::HttpScript::NotFound
@@ -2769,20 +2771,17 @@ async fn l2_batch_modify_rejects_inconsistent_server_counts_through_public_servi
 
     let err = client
         .orders
-        .batch_modify(
-            vec![BatchModifyItem {
+        .batch_replace(
+            vec![BatchReplaceItem {
                 key: polyester::models::OrderKey::OrderId("9".into()),
                 new_price: Some(Price::from_ticks(1, Some("BTC-USDT".into())).expect("price")),
                 new_qty: None,
                 new_attached_risk: None,
-                behavior: None,
                 new_client_order_id: None,
             }],
-            Some("BTC-USDT"),
+            "BTC-USDT",
             None,
-            Some("modify-count-mismatch".into()),
-            None,
-            false,
+            Some("replace-count-mismatch".into()),
         )
         .await
         .expect_err("service must reject an ambiguous batch result");

@@ -893,6 +893,8 @@ pub enum ErrorCode {
     ERROR_CODE_STALE_QUOTE = 65i32,
     /// Request failed structural or cross-field validation.
     ERROR_CODE_VALIDATION_ERROR = 66i32,
+    /// This edge is at its bounded concurrent BatchReplace admission capacity.
+    ERROR_CODE_OVERLOADED = 67i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1084,6 +1086,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_VALIDATION_ERROR`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ValidationError: Self = Self::ERROR_CODE_VALIDATION_ERROR;
+    ///Idiomatic alias for [`Self::ERROR_CODE_OVERLOADED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Overloaded: Self = Self::ERROR_CODE_OVERLOADED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -1290,6 +1295,7 @@ impl ::buffa::Enumeration for ErrorCode {
             48i32 => ::core::option::Option::Some(Self::ERROR_CODE_MAX_SLIPPAGE_INVALID),
             65i32 => ::core::option::Option::Some(Self::ERROR_CODE_STALE_QUOTE),
             66i32 => ::core::option::Option::Some(Self::ERROR_CODE_VALIDATION_ERROR),
+            67i32 => ::core::option::Option::Some(Self::ERROR_CODE_OVERLOADED),
             _ => ::core::option::Option::None,
         }
     }
@@ -1397,6 +1403,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_MAX_SLIPPAGE_INVALID => "ERROR_CODE_MAX_SLIPPAGE_INVALID",
             Self::ERROR_CODE_STALE_QUOTE => "ERROR_CODE_STALE_QUOTE",
             Self::ERROR_CODE_VALIDATION_ERROR => "ERROR_CODE_VALIDATION_ERROR",
+            Self::ERROR_CODE_OVERLOADED => "ERROR_CODE_OVERLOADED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1602,6 +1609,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_VALIDATION_ERROR" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_VALIDATION_ERROR)
             }
+            "ERROR_CODE_OVERLOADED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_OVERLOADED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1670,6 +1680,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_MAX_SLIPPAGE_INVALID,
             Self::ERROR_CODE_STALE_QUOTE,
             Self::ERROR_CODE_VALIDATION_ERROR,
+            Self::ERROR_CODE_OVERLOADED,
         ]
     }
 }
@@ -2299,6 +2310,389 @@ impl ::buffa::Enumeration for ModifyActionTaken {
     }
     fn values() -> &'static [Self] {
         &[Self::MODIFY_ACTION_UNSPECIFIED, Self::AMENDED, Self::REPLACED]
+    }
+}
+/// BatchReplaceAdmissionStatus summarizes admission of one quote-refresh batch.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum BatchReplaceAdmissionStatus {
+    /// Admission status is unavailable.
+    BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED = 0i32,
+    /// Every requested replacement was admitted.
+    BATCH_REPLACE_ADMISSION_STATUS_ADMITTED = 1i32,
+    /// Some requested replacements were admitted and others were rejected.
+    BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED = 2i32,
+    /// No requested replacement was admitted.
+    BATCH_REPLACE_ADMISSION_STATUS_REJECTED = 3i32,
+}
+impl BatchReplaceAdmissionStatus {
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_ADMISSION_STATUS_ADMITTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Admitted: Self = Self::BATCH_REPLACE_ADMISSION_STATUS_ADMITTED;
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PartiallyAdmitted: Self = Self::BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED;
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_ADMISSION_STATUS_REJECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Rejected: Self = Self::BATCH_REPLACE_ADMISSION_STATUS_REJECTED;
+}
+impl ::core::default::Default for BatchReplaceAdmissionStatus {
+    fn default() -> Self {
+        Self::BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for BatchReplaceAdmissionStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for BatchReplaceAdmissionStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = BatchReplaceAdmissionStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(BatchReplaceAdmissionStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<BatchReplaceAdmissionStatus, E> {
+                <BatchReplaceAdmissionStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<BatchReplaceAdmissionStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BatchReplaceAdmissionStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<BatchReplaceAdmissionStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BatchReplaceAdmissionStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<BatchReplaceAdmissionStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchReplaceAdmissionStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for BatchReplaceAdmissionStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED,
+                )
+            }
+            1i32 => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ADMISSION_STATUS_ADMITTED,
+                )
+            }
+            2i32 => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED,
+                )
+            }
+            3i32 => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ADMISSION_STATUS_REJECTED,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED => {
+                "BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED"
+            }
+            Self::BATCH_REPLACE_ADMISSION_STATUS_ADMITTED => {
+                "BATCH_REPLACE_ADMISSION_STATUS_ADMITTED"
+            }
+            Self::BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED => {
+                "BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED"
+            }
+            Self::BATCH_REPLACE_ADMISSION_STATUS_REJECTED => {
+                "BATCH_REPLACE_ADMISSION_STATUS_REJECTED"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED,
+                )
+            }
+            "BATCH_REPLACE_ADMISSION_STATUS_ADMITTED" => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ADMISSION_STATUS_ADMITTED,
+                )
+            }
+            "BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED" => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED,
+                )
+            }
+            "BATCH_REPLACE_ADMISSION_STATUS_REJECTED" => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ADMISSION_STATUS_REJECTED,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED,
+            Self::BATCH_REPLACE_ADMISSION_STATUS_ADMITTED,
+            Self::BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED,
+            Self::BATCH_REPLACE_ADMISSION_STATUS_REJECTED,
+        ]
+    }
+}
+/// BatchReplaceItemAdmissionStatus describes admission of one replacement.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum BatchReplaceItemAdmissionStatus {
+    /// Item admission status is unavailable.
+    BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED = 0i32,
+    /// The replacement was admitted and handed to execution.
+    BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED = 1i32,
+    /// The replacement was rejected before execution handoff.
+    BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED = 2i32,
+}
+impl BatchReplaceItemAdmissionStatus {
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Admitted: Self = Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED;
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Rejected: Self = Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED;
+}
+impl ::core::default::Default for BatchReplaceItemAdmissionStatus {
+    fn default() -> Self {
+        Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for BatchReplaceItemAdmissionStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for BatchReplaceItemAdmissionStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = BatchReplaceItemAdmissionStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(BatchReplaceItemAdmissionStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<BatchReplaceItemAdmissionStatus, E> {
+                <BatchReplaceItemAdmissionStatus as ::buffa::Enumeration>::from_proto_name(
+                        v,
+                    )
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<BatchReplaceItemAdmissionStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BatchReplaceItemAdmissionStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<BatchReplaceItemAdmissionStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BatchReplaceItemAdmissionStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<BatchReplaceItemAdmissionStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchReplaceItemAdmissionStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for BatchReplaceItemAdmissionStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED,
+                )
+            }
+            1i32 => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED,
+                )
+            }
+            2i32 => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED => {
+                "BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED"
+            }
+            Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED => {
+                "BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED"
+            }
+            Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED => {
+                "BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED,
+                )
+            }
+            "BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED" => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED,
+                )
+            }
+            "BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED" => {
+                ::core::option::Option::Some(
+                    Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED,
+            Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED,
+            Self::BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED,
+        ]
     }
 }
 /// =============================================================================
@@ -9932,11 +10326,11 @@ pub const __MODIFY_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     from_json: ::buffa::type_registry::any_from_json::<ModifyOrderResponse>,
     is_wkt: false,
 };
-/// BatchModifyItem identifies one modify operation inside a batch request.
+/// BatchReplaceOrderItem identifies one replacement inside a quote-refresh batch.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
-pub struct BatchModifyItem {
+pub struct BatchReplaceOrderItem {
     /// New limit price in quote units scaled by 1e6.
     ///
     /// Field 3: `new_price_ticks`
@@ -9967,19 +10361,9 @@ pub struct BatchModifyItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub new_attached_risk: ::buffa::MessageField<RiskPolicy>,
-    /// Optional per-item behavior override.
-    /// MODIFY_BEHAVIOR_UNSPECIFIED means "use behavior_default".
-    ///
-    /// Field 6: `behavior`
-    #[serde(
-        rename = "behavior",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub behavior: ::buffa::EnumValue<ModifyBehavior>,
     /// Optional new client order id when replace path is taken.
     ///
-    /// Field 7: `new_client_order_id`
+    /// Field 6: `new_client_order_id`
     #[serde(
         rename = "newClientOrderId",
         alias = "new_client_order_id",
@@ -9988,31 +10372,30 @@ pub struct BatchModifyItem {
     )]
     pub new_client_order_id: ::buffa::alloc::string::String,
     #[serde(flatten)]
-    pub key: ::core::option::Option<__buffa::oneof::batch_modify_item::Key>,
+    pub key: ::core::option::Option<__buffa::oneof::batch_replace_order_item::Key>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for BatchModifyItem {
+impl ::core::fmt::Debug for BatchReplaceOrderItem {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("BatchModifyItem")
+        f.debug_struct("BatchReplaceOrderItem")
             .field("new_price_ticks", &self.new_price_ticks)
             .field("new_qty_scaled", &self.new_qty_scaled)
             .field("new_attached_risk", &self.new_attached_risk)
-            .field("behavior", &self.behavior)
             .field("new_client_order_id", &self.new_client_order_id)
             .field("key", &self.key)
             .finish()
     }
 }
-impl BatchModifyItem {
+impl BatchReplaceOrderItem {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyItem";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceOrderItem";
 }
-impl BatchModifyItem {
+impl BatchReplaceOrderItem {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::new_price_ticks`] to `Some(value)`, consuming and returning `self`.
@@ -10028,14 +10411,14 @@ impl BatchModifyItem {
         self
     }
 }
-::buffa::impl_default_instance!(BatchModifyItem);
-impl ::buffa::MessageName for BatchModifyItem {
+::buffa::impl_default_instance!(BatchReplaceOrderItem);
+impl ::buffa::MessageName for BatchReplaceOrderItem {
     const PACKAGE: &'static str = "orders.v1";
-    const NAME: &'static str = "BatchModifyItem";
-    const FULL_NAME: &'static str = "orders.v1.BatchModifyItem";
-    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyItem";
+    const NAME: &'static str = "BatchReplaceOrderItem";
+    const FULL_NAME: &'static str = "orders.v1.BatchReplaceOrderItem";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceOrderItem";
 }
-impl ::buffa::Message for BatchModifyItem {
+impl ::buffa::Message for BatchReplaceOrderItem {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -10048,10 +10431,10 @@ impl ::buffa::Message for BatchModifyItem {
         let mut size = 0u32;
         if let ::core::option::Option::Some(ref v) = self.key {
             match v {
-                __buffa::oneof::batch_modify_item::Key::OrderId(_x) => {
+                __buffa::oneof::batch_replace_order_item::Key::OrderId(_x) => {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                __buffa::oneof::batch_modify_item::Key::ClientOrderId(x) => {
+                __buffa::oneof::batch_replace_order_item::Key::ClientOrderId(x) => {
                     size += 1u32 + ::buffa::types::string_encoded_len(x) as u32;
                 }
             }
@@ -10069,12 +10452,6 @@ impl ::buffa::Message for BatchModifyItem {
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
-        }
-        {
-            let val = self.behavior.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
         }
         if !self.new_client_order_id.is_empty() {
             size
@@ -10094,10 +10471,10 @@ impl ::buffa::Message for BatchModifyItem {
         use ::buffa::Enumeration as _;
         if let ::core::option::Option::Some(ref v) = self.key {
             match v {
-                __buffa::oneof::batch_modify_item::Key::OrderId(x) => {
+                __buffa::oneof::batch_replace_order_item::Key::OrderId(x) => {
                     ::buffa::types::put_fixed64_field(1u32, *x, buf);
                 }
-                __buffa::oneof::batch_modify_item::Key::ClientOrderId(x) => {
+                __buffa::oneof::batch_replace_order_item::Key::ClientOrderId(x) => {
                     ::buffa::types::put_string_field(2u32, x, buf);
                 }
             }
@@ -10112,14 +10489,8 @@ impl ::buffa::Message for BatchModifyItem {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.new_attached_risk.write_to(__cache, buf);
         }
-        {
-            let val = self.behavior.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(6u32, val, buf);
-            }
-        }
         if !self.new_client_order_id.is_empty() {
-            ::buffa::types::put_string_field(7u32, &self.new_client_order_id, buf);
+            ::buffa::types::put_string_field(6u32, &self.new_client_order_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -10140,7 +10511,7 @@ impl ::buffa::Message for BatchModifyItem {
                     ::buffa::encoding::WireType::Fixed64,
                 )?;
                 self.key = ::core::option::Option::Some(
-                    __buffa::oneof::batch_modify_item::Key::OrderId(
+                    __buffa::oneof::batch_replace_order_item::Key::OrderId(
                         ::buffa::types::decode_fixed64(buf)?,
                     ),
                 );
@@ -10151,7 +10522,7 @@ impl ::buffa::Message for BatchModifyItem {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 self.key = ::core::option::Option::Some(
-                    __buffa::oneof::batch_modify_item::Key::ClientOrderId(
+                    __buffa::oneof::batch_replace_order_item::Key::ClientOrderId(
                         ::buffa::types::decode_string(buf)?,
                     ),
                 );
@@ -10188,15 +10559,6 @@ impl ::buffa::Message for BatchModifyItem {
             6u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.behavior = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.new_client_order_id, buf)?;
@@ -10213,13 +10575,12 @@ impl ::buffa::Message for BatchModifyItem {
         self.new_price_ticks = ::core::option::Option::None;
         self.new_qty_scaled = ::core::option::Option::None;
         self.new_attached_risk = ::buffa::MessageField::none();
-        self.behavior = ::buffa::EnumValue::from(0);
         self.new_client_order_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for BatchModifyItem {
-    const PROTO_FQN: &'static str = "orders.v1.BatchModifyItem";
+impl ::buffa::ExtensionSet for BatchReplaceOrderItem {
+    const PROTO_FQN: &'static str = "orders.v1.BatchReplaceOrderItem";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -10227,21 +10588,21 @@ impl ::buffa::ExtensionSet for BatchModifyItem {
         &mut self.__buffa_unknown_fields
     }
 }
-impl<'de> serde::Deserialize<'de> for BatchModifyItem {
+impl<'de> serde::Deserialize<'de> for BatchReplaceOrderItem {
     fn deserialize<D: serde::Deserializer<'de>>(
         d: D,
     ) -> ::core::result::Result<Self, D::Error> {
         struct _V;
         impl<'de> serde::de::Visitor<'de> for _V {
-            type Value = BatchModifyItem;
+            type Value = BatchReplaceOrderItem;
             fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                f.write_str("struct BatchModifyItem")
+                f.write_str("struct BatchReplaceOrderItem")
             }
             #[allow(clippy::field_reassign_with_default)]
             fn visit_map<A: serde::de::MapAccess<'de>>(
                 self,
                 mut map: A,
-            ) -> ::core::result::Result<BatchModifyItem, A::Error> {
+            ) -> ::core::result::Result<BatchReplaceOrderItem, A::Error> {
                 let mut __f_new_price_ticks: ::core::option::Option<
                     ::core::option::Option<i64>,
                 > = None;
@@ -10251,14 +10612,11 @@ impl<'de> serde::Deserialize<'de> for BatchModifyItem {
                 let mut __f_new_attached_risk: ::core::option::Option<
                     ::buffa::MessageField<RiskPolicy>,
                 > = None;
-                let mut __f_behavior: ::core::option::Option<
-                    ::buffa::EnumValue<ModifyBehavior>,
-                > = None;
                 let mut __f_new_client_order_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __oneof_key: ::core::option::Option<
-                    __buffa::oneof::batch_modify_item::Key,
+                    __buffa::oneof::batch_replace_order_item::Key,
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
@@ -10303,24 +10661,6 @@ impl<'de> serde::Deserialize<'de> for BatchModifyItem {
                                 map.next_value::<::buffa::MessageField<RiskPolicy>>()?,
                             );
                         }
-                        "behavior" => {
-                            __f_behavior = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<ModifyBehavior>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<ModifyBehavior>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_enum::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
                         "newClientOrderId" | "new_client_order_id" => {
                             __f_new_client_order_id = Some({
                                 struct _S;
@@ -10363,7 +10703,7 @@ impl<'de> serde::Deserialize<'de> for BatchModifyItem {
                                     );
                                 }
                                 __oneof_key = Some(
-                                    __buffa::oneof::batch_modify_item::Key::OrderId(v),
+                                    __buffa::oneof::batch_replace_order_item::Key::OrderId(v),
                                 );
                             }
                         }
@@ -10387,7 +10727,9 @@ impl<'de> serde::Deserialize<'de> for BatchModifyItem {
                                     );
                                 }
                                 __oneof_key = Some(
-                                    __buffa::oneof::batch_modify_item::Key::ClientOrderId(v),
+                                    __buffa::oneof::batch_replace_order_item::Key::ClientOrderId(
+                                        v,
+                                    ),
                                 );
                             }
                         }
@@ -10396,7 +10738,7 @@ impl<'de> serde::Deserialize<'de> for BatchModifyItem {
                         }
                     }
                 }
-                let mut __r = <BatchModifyItem as ::core::default::Default>::default();
+                let mut __r = <BatchReplaceOrderItem as ::core::default::Default>::default();
                 if let ::core::option::Option::Some(v) = __f_new_price_ticks {
                     __r.new_price_ticks = v;
                 }
@@ -10405,9 +10747,6 @@ impl<'de> serde::Deserialize<'de> for BatchModifyItem {
                 }
                 if let ::core::option::Option::Some(v) = __f_new_attached_risk {
                     __r.new_attached_risk = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_behavior {
-                    __r.behavior = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_new_client_order_id {
                     __r.new_client_order_id = v;
@@ -10419,7 +10758,7 @@ impl<'de> serde::Deserialize<'de> for BatchModifyItem {
         d.deserialize_map(_V)
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for BatchModifyItem {
+impl ::buffa::json_helpers::ProtoElemJson for BatchReplaceOrderItem {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -10433,45 +10772,45 @@ impl ::buffa::json_helpers::ProtoElemJson for BatchModifyItem {
     }
 }
 #[doc(hidden)]
-pub const __BATCH_MODIFY_ITEM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/orders.v1.BatchModifyItem",
-    to_json: ::buffa::type_registry::any_to_json::<BatchModifyItem>,
-    from_json: ::buffa::type_registry::any_from_json::<BatchModifyItem>,
+pub const __BATCH_REPLACE_ORDER_ITEM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.BatchReplaceOrderItem",
+    to_json: ::buffa::type_registry::any_to_json::<BatchReplaceOrderItem>,
+    from_json: ::buffa::type_registry::any_from_json::<BatchReplaceOrderItem>,
     is_wkt: false,
 };
-pub mod batch_modify_item {
+pub mod batch_replace_order_item {
     #[allow(unused_imports)]
     use super::*;
     #[doc(inline)]
-    pub use super::__buffa::oneof::batch_modify_item::Key;
+    pub use super::__buffa::oneof::batch_replace_order_item::Key;
     #[doc(inline)]
-    pub use super::__buffa::view::oneof::batch_modify_item::Key as KeyView;
+    pub use super::__buffa::view::oneof::batch_replace_order_item::Key as KeyView;
 }
-/// BatchModifyResultItem contains one result in a batch modify response.
+/// BatchReplaceAdmissionItem contains the index-stable admission result for one item.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct BatchModifyResultItem {
-    /// "modified" or "rejected".
+pub struct BatchReplaceAdmissionItem {
+    /// Zero-based index in the request.
     ///
-    /// Field 1: `status`
+    /// Field 1: `item_index`
+    #[serde(
+        rename = "itemIndex",
+        alias = "item_index",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub item_index: u32,
+    /// Admission result for this item.
+    ///
+    /// Field 2: `status`
     #[serde(
         rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub status: ::buffa::alloc::string::String,
-    /// AMENDED or REPLACED when modified.
-    ///
-    /// Field 2: `action_taken`
-    #[serde(
-        rename = "actionTaken",
-        alias = "action_taken",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub action_taken: ::buffa::EnumValue<ModifyActionTaken>,
-    /// Original order ID that was amended or replaced.
+    pub status: ::buffa::EnumValue<BatchReplaceItemAdmissionStatus>,
+    /// Original order targeted by the replacement.
     ///
     /// Field 3: `old_order_id`
     #[serde(
@@ -10481,17 +10820,17 @@ pub struct BatchModifyResultItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub old_order_id: u64,
-    /// Final active order ID; same as old_order_id for amendments.
+    /// Assigned successor order ID. Zero when rejected before assignment.
     ///
-    /// Field 4: `final_order_id`
+    /// Field 4: `replacement_order_id`
     #[serde(
-        rename = "finalOrderId",
-        alias = "final_order_id",
+        rename = "replacementOrderId",
+        alias = "replacement_order_id",
         with = "::buffa::json_helpers::uint64",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
-    pub final_order_id: u64,
-    /// Client order ID associated with the final order when available.
+    pub replacement_order_id: u64,
+    /// Client order ID assigned to the successor when available.
     ///
     /// Field 5: `client_order_id`
     #[serde(
@@ -10501,7 +10840,7 @@ pub struct BatchModifyResultItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub client_order_id: ::buffa::alloc::string::String,
-    /// Error code if rejected.
+    /// Stable rejection code. Empty for admitted items.
     ///
     /// Field 6: `code`
     #[serde(
@@ -10510,93 +10849,37 @@ pub struct BatchModifyResultItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub code: ::buffa::alloc::string::String,
-    /// Trigger ID for attached take-profit after modification.
-    ///
-    /// Field 7: `take_profit_trigger_id`
-    #[serde(
-        rename = "takeProfitTriggerId",
-        alias = "take_profit_trigger_id",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub take_profit_trigger_id: ::core::option::Option<u64>,
-    /// Trigger ID for attached stop-loss after modification.
-    ///
-    /// Field 8: `stop_loss_trigger_id`
-    #[serde(
-        rename = "stopLossTriggerId",
-        alias = "stop_loss_trigger_id",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub stop_loss_trigger_id: ::core::option::Option<u64>,
-    /// Trigger ID for attached trailing stop after modification.
-    ///
-    /// Field 9: `trailing_stop_trigger_id`
-    #[serde(
-        rename = "trailingStopTriggerId",
-        alias = "trailing_stop_trigger_id",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub trailing_stop_trigger_id: ::core::option::Option<u64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for BatchModifyResultItem {
+impl ::core::fmt::Debug for BatchReplaceAdmissionItem {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("BatchModifyResultItem")
+        f.debug_struct("BatchReplaceAdmissionItem")
+            .field("item_index", &self.item_index)
             .field("status", &self.status)
-            .field("action_taken", &self.action_taken)
             .field("old_order_id", &self.old_order_id)
-            .field("final_order_id", &self.final_order_id)
+            .field("replacement_order_id", &self.replacement_order_id)
             .field("client_order_id", &self.client_order_id)
             .field("code", &self.code)
-            .field("take_profit_trigger_id", &self.take_profit_trigger_id)
-            .field("stop_loss_trigger_id", &self.stop_loss_trigger_id)
-            .field("trailing_stop_trigger_id", &self.trailing_stop_trigger_id)
             .finish()
     }
 }
-impl BatchModifyResultItem {
+impl BatchReplaceAdmissionItem {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyResultItem";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceAdmissionItem";
 }
-impl BatchModifyResultItem {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::take_profit_trigger_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_take_profit_trigger_id(mut self, value: u64) -> Self {
-        self.take_profit_trigger_id = Some(value);
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::stop_loss_trigger_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_stop_loss_trigger_id(mut self, value: u64) -> Self {
-        self.stop_loss_trigger_id = Some(value);
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::trailing_stop_trigger_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_trailing_stop_trigger_id(mut self, value: u64) -> Self {
-        self.trailing_stop_trigger_id = Some(value);
-        self
-    }
-}
-::buffa::impl_default_instance!(BatchModifyResultItem);
-impl ::buffa::MessageName for BatchModifyResultItem {
+::buffa::impl_default_instance!(BatchReplaceAdmissionItem);
+impl ::buffa::MessageName for BatchReplaceAdmissionItem {
     const PACKAGE: &'static str = "orders.v1";
-    const NAME: &'static str = "BatchModifyResultItem";
-    const FULL_NAME: &'static str = "orders.v1.BatchModifyResultItem";
-    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyResultItem";
+    const NAME: &'static str = "BatchReplaceAdmissionItem";
+    const FULL_NAME: &'static str = "orders.v1.BatchReplaceAdmissionItem";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceAdmissionItem";
 }
-impl ::buffa::Message for BatchModifyResultItem {
+impl ::buffa::Message for BatchReplaceAdmissionItem {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -10607,11 +10890,11 @@ impl ::buffa::Message for BatchModifyResultItem {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        if self.item_index != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.item_index) as u32;
         }
         {
-            let val = self.action_taken.to_i32();
+            let val = self.status.to_i32();
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -10619,7 +10902,7 @@ impl ::buffa::Message for BatchModifyResultItem {
         if self.old_order_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if self.final_order_id != 0u64 {
+        if self.replacement_order_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
         if !self.client_order_id.is_empty() {
@@ -10629,15 +10912,6 @@ impl ::buffa::Message for BatchModifyResultItem {
         }
         if !self.code.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
-        }
-        if let Some(v) = self.take_profit_trigger_id {
-            size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
-        }
-        if let Some(v) = self.stop_loss_trigger_id {
-            size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
-        }
-        if let Some(v) = self.trailing_stop_trigger_id {
-            size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -10649,11 +10923,11 @@ impl ::buffa::Message for BatchModifyResultItem {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.status, buf);
+        if self.item_index != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.item_index, buf);
         }
         {
-            let val = self.action_taken.to_i32();
+            let val = self.status.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(2u32, val, buf);
             }
@@ -10661,23 +10935,14 @@ impl ::buffa::Message for BatchModifyResultItem {
         if self.old_order_id != 0u64 {
             ::buffa::types::put_fixed64_field(3u32, self.old_order_id, buf);
         }
-        if self.final_order_id != 0u64 {
-            ::buffa::types::put_fixed64_field(4u32, self.final_order_id, buf);
+        if self.replacement_order_id != 0u64 {
+            ::buffa::types::put_fixed64_field(4u32, self.replacement_order_id, buf);
         }
         if !self.client_order_id.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.client_order_id, buf);
         }
         if !self.code.is_empty() {
             ::buffa::types::put_string_field(6u32, &self.code, buf);
-        }
-        if let Some(v) = self.take_profit_trigger_id {
-            ::buffa::types::put_uint64_field(7u32, v, buf);
-        }
-        if let Some(v) = self.stop_loss_trigger_id {
-            ::buffa::types::put_uint64_field(8u32, v, buf);
-        }
-        if let Some(v) = self.trailing_stop_trigger_id {
-            ::buffa::types::put_uint64_field(9u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -10695,16 +10960,16 @@ impl ::buffa::Message for BatchModifyResultItem {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                self.item_index = ::buffa::types::decode_uint32(buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.action_taken = ::buffa::EnumValue::from(
+                self.status = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -10720,7 +10985,7 @@ impl ::buffa::Message for BatchModifyResultItem {
                     tag,
                     ::buffa::encoding::WireType::Fixed64,
                 )?;
-                self.final_order_id = ::buffa::types::decode_fixed64(buf)?;
+                self.replacement_order_id = ::buffa::types::decode_fixed64(buf)?;
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -10736,33 +11001,6 @@ impl ::buffa::Message for BatchModifyResultItem {
                 )?;
                 ::buffa::types::merge_string(&mut self.code, buf)?;
             }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.take_profit_trigger_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
-            8u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.stop_loss_trigger_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
-            9u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.trailing_stop_trigger_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_uint64(buf)?,
-                );
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -10771,20 +11009,17 @@ impl ::buffa::Message for BatchModifyResultItem {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.status.clear();
-        self.action_taken = ::buffa::EnumValue::from(0);
+        self.item_index = 0u32;
+        self.status = ::buffa::EnumValue::from(0);
         self.old_order_id = 0u64;
-        self.final_order_id = 0u64;
+        self.replacement_order_id = 0u64;
         self.client_order_id.clear();
         self.code.clear();
-        self.take_profit_trigger_id = ::core::option::Option::None;
-        self.stop_loss_trigger_id = ::core::option::Option::None;
-        self.trailing_stop_trigger_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for BatchModifyResultItem {
-    const PROTO_FQN: &'static str = "orders.v1.BatchModifyResultItem";
+impl ::buffa::ExtensionSet for BatchReplaceAdmissionItem {
+    const PROTO_FQN: &'static str = "orders.v1.BatchReplaceAdmissionItem";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -10792,7 +11027,7 @@ impl ::buffa::ExtensionSet for BatchModifyResultItem {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for BatchModifyResultItem {
+impl ::buffa::json_helpers::ProtoElemJson for BatchReplaceAdmissionItem {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -10806,17 +11041,17 @@ impl ::buffa::json_helpers::ProtoElemJson for BatchModifyResultItem {
     }
 }
 #[doc(hidden)]
-pub const __BATCH_MODIFY_RESULT_ITEM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/orders.v1.BatchModifyResultItem",
-    to_json: ::buffa::type_registry::any_to_json::<BatchModifyResultItem>,
-    from_json: ::buffa::type_registry::any_from_json::<BatchModifyResultItem>,
+pub const __BATCH_REPLACE_ADMISSION_ITEM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.BatchReplaceAdmissionItem",
+    to_json: ::buffa::type_registry::any_to_json::<BatchReplaceAdmissionItem>,
+    from_json: ::buffa::type_registry::any_from_json::<BatchReplaceAdmissionItem>,
     is_wkt: false,
 };
-/// BatchModifyOrdersRequest updates multiple orders in one request.
+/// BatchReplaceOrdersRequest replaces same-symbol orders as one quote refresh.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct BatchModifyOrdersRequest {
+pub struct BatchReplaceOrdersRequest {
     /// Target sub-account numeric ID. When omitted, uses caller's root account.
     ///
     /// Field 1: `subaccount_id`
@@ -10827,9 +11062,19 @@ pub struct BatchModifyOrdersRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Idempotency key (required).
+    /// Trading symbol shared by every replacement.
     ///
-    /// Field 2: `request_id`
+    /// Field 2: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
+    /// Client idempotency key (required).
+    ///
+    /// Field 3: `request_id`
     #[serde(
         rename = "requestId",
         alias = "request_id",
@@ -10837,59 +11082,37 @@ pub struct BatchModifyOrdersRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
-    /// Modify items.
+    /// Replacement items.
     ///
-    /// Field 3: `items`
+    /// Field 4: `items`
     #[serde(
         rename = "items",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub items: ::buffa::alloc::vec::Vec<BatchModifyItem>,
-    /// Default behavior for items with unspecified behavior.
-    /// MODIFY_BEHAVIOR_UNSPECIFIED is treated as AMEND_OR_REPLACE.
-    ///
-    /// Field 4: `behavior_default`
-    #[serde(
-        rename = "behaviorDefault",
-        alias = "behavior_default",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub behavior_default: ::buffa::EnumValue<ModifyBehavior>,
-    /// Optional partial-success flag. Current behavior is best-effort per item.
-    ///
-    /// Field 5: `allow_partial`
-    #[serde(
-        rename = "allowPartial",
-        alias = "allow_partial",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub allow_partial: bool,
+    pub items: ::buffa::alloc::vec::Vec<BatchReplaceOrderItem>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for BatchModifyOrdersRequest {
+impl ::core::fmt::Debug for BatchReplaceOrdersRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("BatchModifyOrdersRequest")
+        f.debug_struct("BatchReplaceOrdersRequest")
             .field("subaccount_id", &self.subaccount_id)
+            .field("symbol_id", &self.symbol_id)
             .field("request_id", &self.request_id)
             .field("items", &self.items)
-            .field("behavior_default", &self.behavior_default)
-            .field("allow_partial", &self.allow_partial)
             .finish()
     }
 }
-impl BatchModifyOrdersRequest {
+impl BatchReplaceOrdersRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyOrdersRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceOrdersRequest";
 }
-impl BatchModifyOrdersRequest {
+impl BatchReplaceOrdersRequest {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
@@ -10898,14 +11121,14 @@ impl BatchModifyOrdersRequest {
         self
     }
 }
-::buffa::impl_default_instance!(BatchModifyOrdersRequest);
-impl ::buffa::MessageName for BatchModifyOrdersRequest {
+::buffa::impl_default_instance!(BatchReplaceOrdersRequest);
+impl ::buffa::MessageName for BatchReplaceOrdersRequest {
     const PACKAGE: &'static str = "orders.v1";
-    const NAME: &'static str = "BatchModifyOrdersRequest";
-    const FULL_NAME: &'static str = "orders.v1.BatchModifyOrdersRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyOrdersRequest";
+    const NAME: &'static str = "BatchReplaceOrdersRequest";
+    const FULL_NAME: &'static str = "orders.v1.BatchReplaceOrdersRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceOrdersRequest";
 }
-impl ::buffa::Message for BatchModifyOrdersRequest {
+impl ::buffa::Message for BatchReplaceOrdersRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -10919,6 +11142,9 @@ impl ::buffa::Message for BatchModifyOrdersRequest {
         if self.subaccount_id.is_some() {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
         if !self.request_id.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
         }
@@ -10929,15 +11155,6 @@ impl ::buffa::Message for BatchModifyOrdersRequest {
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
-        }
-        {
-            let val = self.behavior_default.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        if self.allow_partial {
-            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -10952,21 +11169,15 @@ impl ::buffa::Message for BatchModifyOrdersRequest {
         if let Some(v) = self.subaccount_id {
             ::buffa::types::put_fixed64_field(1u32, v, buf);
         }
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.symbol_id, buf);
+        }
         if !self.request_id.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.request_id, buf);
+            ::buffa::types::put_string_field(3u32, &self.request_id, buf);
         }
         for v in &self.items {
-            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
-        }
-        {
-            let val = self.behavior_default.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(4u32, val, buf);
-            }
-        }
-        if self.allow_partial {
-            ::buffa::types::put_bool_field(5u32, self.allow_partial, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -10993,11 +11204,18 @@ impl ::buffa::Message for BatchModifyOrdersRequest {
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.request_id, buf)?;
             }
-            3u32 => {
+            4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
@@ -11005,22 +11223,6 @@ impl ::buffa::Message for BatchModifyOrdersRequest {
                 let mut elem = ::core::default::Default::default();
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.items.push(elem);
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.behavior_default = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.allow_partial = ::buffa::types::decode_bool(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -11031,15 +11233,14 @@ impl ::buffa::Message for BatchModifyOrdersRequest {
     }
     fn clear(&mut self) {
         self.subaccount_id = ::core::option::Option::None;
+        self.symbol_id = 0u32;
         self.request_id.clear();
         self.items.clear();
-        self.behavior_default = ::buffa::EnumValue::from(0);
-        self.allow_partial = false;
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for BatchModifyOrdersRequest {
-    const PROTO_FQN: &'static str = "orders.v1.BatchModifyOrdersRequest";
+impl ::buffa::ExtensionSet for BatchReplaceOrdersRequest {
+    const PROTO_FQN: &'static str = "orders.v1.BatchReplaceOrdersRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -11047,7 +11248,7 @@ impl ::buffa::ExtensionSet for BatchModifyOrdersRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for BatchModifyOrdersRequest {
+impl ::buffa::json_helpers::ProtoElemJson for BatchReplaceOrdersRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -11061,49 +11262,58 @@ impl ::buffa::json_helpers::ProtoElemJson for BatchModifyOrdersRequest {
     }
 }
 #[doc(hidden)]
-pub const __BATCH_MODIFY_ORDERS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/orders.v1.BatchModifyOrdersRequest",
-    to_json: ::buffa::type_registry::any_to_json::<BatchModifyOrdersRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<BatchModifyOrdersRequest>,
+pub const __BATCH_REPLACE_ORDERS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.BatchReplaceOrdersRequest",
+    to_json: ::buffa::type_registry::any_to_json::<BatchReplaceOrdersRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<BatchReplaceOrdersRequest>,
     is_wkt: false,
 };
-/// BatchModifyOrdersResponse returns per-item modify outcomes.
+/// BatchReplaceOrdersResponse is the durable admission receipt for a batch.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct BatchModifyOrdersResponse {
-    /// Per-item results in the same order as the request items.
+pub struct BatchReplaceOrdersResponse {
+    /// Server-issued opaque identity used for status and private realtime correlation.
     ///
-    /// Field 1: `results`
+    /// Field 1: `batch_request_id`
+    #[serde(
+        rename = "batchRequestId",
+        alias = "batch_request_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub batch_request_id: u64,
+    /// Aggregate admission status.
+    ///
+    /// Field 2: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<BatchReplaceAdmissionStatus>,
+    /// Per-item admission results in request order.
+    ///
+    /// Field 3: `results`
     #[serde(
         rename = "results",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub results: ::buffa::alloc::vec::Vec<BatchModifyResultItem>,
-    /// Number of items amended in place.
+    pub results: ::buffa::alloc::vec::Vec<BatchReplaceAdmissionItem>,
+    /// Number of items admitted and handed to execution.
     ///
-    /// Field 2: `amended_count`
+    /// Field 4: `accepted_count`
     #[serde(
-        rename = "amendedCount",
-        alias = "amended_count",
+        rename = "acceptedCount",
+        alias = "accepted_count",
         with = "::buffa::json_helpers::uint32",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
-    pub amended_count: u32,
-    /// Number of items replaced with a new order.
+    pub accepted_count: u32,
+    /// Number of items rejected before execution handoff.
     ///
-    /// Field 3: `replaced_count`
-    #[serde(
-        rename = "replacedCount",
-        alias = "replaced_count",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub replaced_count: u32,
-    /// Number of items rejected.
-    ///
-    /// Field 4: `rejected_count`
+    /// Field 5: `rejected_count`
     #[serde(
         rename = "rejectedCount",
         alias = "rejected_count",
@@ -11111,55 +11321,57 @@ pub struct BatchModifyOrdersResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub rejected_count: u32,
-    /// Server timestamp.
+    /// Server acceptance timestamp.
     ///
-    /// Field 5: `ts`
+    /// Field 6: `accepted_ts`
     #[serde(
-        rename = "ts",
+        rename = "acceptedTs",
+        alias = "accepted_ts",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub ts: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Server timestamp as epoch nanoseconds (for bots).
+    pub accepted_ts: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Server acceptance timestamp as epoch nanoseconds.
     ///
-    /// Field 6: `ts_ns`
+    /// Field 7: `accepted_ts_ns`
     #[serde(
-        rename = "tsNs",
-        alias = "ts_ns",
+        rename = "acceptedTsNs",
+        alias = "accepted_ts_ns",
         with = "::buffa::json_helpers::uint64",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
-    pub ts_ns: u64,
+    pub accepted_ts_ns: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for BatchModifyOrdersResponse {
+impl ::core::fmt::Debug for BatchReplaceOrdersResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("BatchModifyOrdersResponse")
+        f.debug_struct("BatchReplaceOrdersResponse")
+            .field("batch_request_id", &self.batch_request_id)
+            .field("status", &self.status)
             .field("results", &self.results)
-            .field("amended_count", &self.amended_count)
-            .field("replaced_count", &self.replaced_count)
+            .field("accepted_count", &self.accepted_count)
             .field("rejected_count", &self.rejected_count)
-            .field("ts", &self.ts)
-            .field("ts_ns", &self.ts_ns)
+            .field("accepted_ts", &self.accepted_ts)
+            .field("accepted_ts_ns", &self.accepted_ts_ns)
             .finish()
     }
 }
-impl BatchModifyOrdersResponse {
+impl BatchReplaceOrdersResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyOrdersResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceOrdersResponse";
 }
-::buffa::impl_default_instance!(BatchModifyOrdersResponse);
-impl ::buffa::MessageName for BatchModifyOrdersResponse {
+::buffa::impl_default_instance!(BatchReplaceOrdersResponse);
+impl ::buffa::MessageName for BatchReplaceOrdersResponse {
     const PACKAGE: &'static str = "orders.v1";
-    const NAME: &'static str = "BatchModifyOrdersResponse";
-    const FULL_NAME: &'static str = "orders.v1.BatchModifyOrdersResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyOrdersResponse";
+    const NAME: &'static str = "BatchReplaceOrdersResponse";
+    const FULL_NAME: &'static str = "orders.v1.BatchReplaceOrdersResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceOrdersResponse";
 }
-impl ::buffa::Message for BatchModifyOrdersResponse {
+impl ::buffa::Message for BatchReplaceOrdersResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -11170,6 +11382,15 @@ impl ::buffa::Message for BatchModifyOrdersResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
+        if self.batch_request_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         for v in &self.results {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
@@ -11178,27 +11399,25 @@ impl ::buffa::Message for BatchModifyOrdersResponse {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if self.amended_count != 0u32 {
-            size += 1u32 + ::buffa::types::uint32_encoded_len(self.amended_count) as u32;
-        }
-        if self.replaced_count != 0u32 {
+        if self.accepted_count != 0u32 {
             size
-                += 1u32 + ::buffa::types::uint32_encoded_len(self.replaced_count) as u32;
+                += 1u32 + ::buffa::types::uint32_encoded_len(self.accepted_count) as u32;
         }
         if self.rejected_count != 0u32 {
             size
                 += 1u32 + ::buffa::types::uint32_encoded_len(self.rejected_count) as u32;
         }
-        if self.ts.is_set() {
+        if self.accepted_ts.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.ts.compute_size(__cache);
+            let inner_size = self.accepted_ts.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if self.ts_ns != 0u64 {
-            size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+        if self.accepted_ts_ns != 0u64 {
+            size
+                += 1u32 + ::buffa::types::uint64_encoded_len(self.accepted_ts_ns) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -11210,25 +11429,31 @@ impl ::buffa::Message for BatchModifyOrdersResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
+        if self.batch_request_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.batch_request_id, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
         for v in &self.results {
-            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
         }
-        if self.amended_count != 0u32 {
-            ::buffa::types::put_uint32_field(2u32, self.amended_count, buf);
-        }
-        if self.replaced_count != 0u32 {
-            ::buffa::types::put_uint32_field(3u32, self.replaced_count, buf);
+        if self.accepted_count != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.accepted_count, buf);
         }
         if self.rejected_count != 0u32 {
-            ::buffa::types::put_uint32_field(4u32, self.rejected_count, buf);
+            ::buffa::types::put_uint32_field(5u32, self.rejected_count, buf);
         }
-        if self.ts.is_set() {
-            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
-            self.ts.write_to(__cache, buf);
+        if self.accepted_ts.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.accepted_ts.write_to(__cache, buf);
         }
-        if self.ts_ns != 0u64 {
-            ::buffa::types::put_uint64_field(6u32, self.ts_ns, buf);
+        if self.accepted_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(7u32, self.accepted_ts_ns, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -11246,50 +11471,59 @@ impl ::buffa::Message for BatchModifyOrdersResponse {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Fixed64,
                 )?;
-                let mut elem = ::core::default::Default::default();
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.results.push(elem);
+                self.batch_request_id = ::buffa::types::decode_fixed64(buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.amended_count = ::buffa::types::decode_uint32(buf)?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.replaced_count = ::buffa::types::decode_uint32(buf)?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.results.push(elem);
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.rejected_count = ::buffa::types::decode_uint32(buf)?;
+                self.accepted_count = ::buffa::types::decode_uint32(buf)?;
             }
             5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.rejected_count = ::buffa::types::decode_uint32(buf)?;
+            }
+            6u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.ts.get_or_insert_default(),
+                    self.accepted_ts.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
             }
-            6u32 => {
+            7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.ts_ns = ::buffa::types::decode_uint64(buf)?;
+                self.accepted_ts_ns = ::buffa::types::decode_uint64(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -11299,17 +11533,18 @@ impl ::buffa::Message for BatchModifyOrdersResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
+        self.batch_request_id = 0u64;
+        self.status = ::buffa::EnumValue::from(0);
         self.results.clear();
-        self.amended_count = 0u32;
-        self.replaced_count = 0u32;
+        self.accepted_count = 0u32;
         self.rejected_count = 0u32;
-        self.ts = ::buffa::MessageField::none();
-        self.ts_ns = 0u64;
+        self.accepted_ts = ::buffa::MessageField::none();
+        self.accepted_ts_ns = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for BatchModifyOrdersResponse {
-    const PROTO_FQN: &'static str = "orders.v1.BatchModifyOrdersResponse";
+impl ::buffa::ExtensionSet for BatchReplaceOrdersResponse {
+    const PROTO_FQN: &'static str = "orders.v1.BatchReplaceOrdersResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -11317,7 +11552,7 @@ impl ::buffa::ExtensionSet for BatchModifyOrdersResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for BatchModifyOrdersResponse {
+impl ::buffa::json_helpers::ProtoElemJson for BatchReplaceOrdersResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -11331,10 +11566,10 @@ impl ::buffa::json_helpers::ProtoElemJson for BatchModifyOrdersResponse {
     }
 }
 #[doc(hidden)]
-pub const __BATCH_MODIFY_ORDERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/orders.v1.BatchModifyOrdersResponse",
-    to_json: ::buffa::type_registry::any_to_json::<BatchModifyOrdersResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<BatchModifyOrdersResponse>,
+pub const __BATCH_REPLACE_ORDERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.BatchReplaceOrdersResponse",
+    to_json: ::buffa::type_registry::any_to_json::<BatchReplaceOrdersResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<BatchReplaceOrdersResponse>,
     is_wkt: false,
 };
 /// BatchCancelItem identifies a single order to cancel within a batch.
@@ -12350,6 +12585,184 @@ impl ::buffa::Enumeration for OrderStatus {
             Self::FILLED,
             Self::CANCELED,
             Self::REJECTED,
+        ]
+    }
+}
+/// BatchReplacePhase is the recoverable execution phase for one replacement.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum BatchReplacePhase {
+    /// Phase is unavailable.
+    BATCH_REPLACE_PHASE_UNSPECIFIED = 0i32,
+    /// The replacement was admitted and handed to execution.
+    BATCH_REPLACE_PHASE_ADMITTED = 1i32,
+    /// The successor order is active.
+    BATCH_REPLACE_PHASE_WORKING = 2i32,
+    /// The replacement was rejected.
+    BATCH_REPLACE_PHASE_REJECTED = 3i32,
+    /// The successor reached a terminal order state.
+    BATCH_REPLACE_PHASE_TERMINAL = 4i32,
+}
+impl BatchReplacePhase {
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_PHASE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::BATCH_REPLACE_PHASE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_PHASE_ADMITTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Admitted: Self = Self::BATCH_REPLACE_PHASE_ADMITTED;
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_PHASE_WORKING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Working: Self = Self::BATCH_REPLACE_PHASE_WORKING;
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_PHASE_REJECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Rejected: Self = Self::BATCH_REPLACE_PHASE_REJECTED;
+    ///Idiomatic alias for [`Self::BATCH_REPLACE_PHASE_TERMINAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Terminal: Self = Self::BATCH_REPLACE_PHASE_TERMINAL;
+}
+impl ::core::default::Default for BatchReplacePhase {
+    fn default() -> Self {
+        Self::BATCH_REPLACE_PHASE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for BatchReplacePhase {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for BatchReplacePhase {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = BatchReplacePhase;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(BatchReplacePhase)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<BatchReplacePhase, E> {
+                <BatchReplacePhase as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<BatchReplacePhase, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BatchReplacePhase as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<BatchReplacePhase, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BatchReplacePhase as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<BatchReplacePhase, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchReplacePhase {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for BatchReplacePhase {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::BATCH_REPLACE_PHASE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::BATCH_REPLACE_PHASE_ADMITTED),
+            2i32 => ::core::option::Option::Some(Self::BATCH_REPLACE_PHASE_WORKING),
+            3i32 => ::core::option::Option::Some(Self::BATCH_REPLACE_PHASE_REJECTED),
+            4i32 => ::core::option::Option::Some(Self::BATCH_REPLACE_PHASE_TERMINAL),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::BATCH_REPLACE_PHASE_UNSPECIFIED => "BATCH_REPLACE_PHASE_UNSPECIFIED",
+            Self::BATCH_REPLACE_PHASE_ADMITTED => "BATCH_REPLACE_PHASE_ADMITTED",
+            Self::BATCH_REPLACE_PHASE_WORKING => "BATCH_REPLACE_PHASE_WORKING",
+            Self::BATCH_REPLACE_PHASE_REJECTED => "BATCH_REPLACE_PHASE_REJECTED",
+            Self::BATCH_REPLACE_PHASE_TERMINAL => "BATCH_REPLACE_PHASE_TERMINAL",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "BATCH_REPLACE_PHASE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::BATCH_REPLACE_PHASE_UNSPECIFIED)
+            }
+            "BATCH_REPLACE_PHASE_ADMITTED" => {
+                ::core::option::Option::Some(Self::BATCH_REPLACE_PHASE_ADMITTED)
+            }
+            "BATCH_REPLACE_PHASE_WORKING" => {
+                ::core::option::Option::Some(Self::BATCH_REPLACE_PHASE_WORKING)
+            }
+            "BATCH_REPLACE_PHASE_REJECTED" => {
+                ::core::option::Option::Some(Self::BATCH_REPLACE_PHASE_REJECTED)
+            }
+            "BATCH_REPLACE_PHASE_TERMINAL" => {
+                ::core::option::Option::Some(Self::BATCH_REPLACE_PHASE_TERMINAL)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::BATCH_REPLACE_PHASE_UNSPECIFIED,
+            Self::BATCH_REPLACE_PHASE_ADMITTED,
+            Self::BATCH_REPLACE_PHASE_WORKING,
+            Self::BATCH_REPLACE_PHASE_REJECTED,
+            Self::BATCH_REPLACE_PHASE_TERMINAL,
         ]
     }
 }
@@ -14435,6 +14848,16 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub version: u32,
+    /// Batch-replace identity that admitted this order. Zero for other origins.
+    ///
+    /// Field 27: `batch_request_id`
+    #[serde(
+        rename = "batchRequestId",
+        alias = "batch_request_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub batch_request_id: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -14467,6 +14890,7 @@ impl ::core::fmt::Debug for Order {
             .field("market_max_slippage_ticks", &self.market_max_slippage_ticks)
             .field("market_max_slippage_bps", &self.market_max_slippage_bps)
             .field("version", &self.version)
+            .field("batch_request_id", &self.batch_request_id)
             .finish()
     }
 }
@@ -14620,6 +15044,9 @@ impl ::buffa::Message for Order {
         if self.version != 0u32 {
             size += 2u32 + ::buffa::types::uint32_encoded_len(self.version) as u32;
         }
+        if self.batch_request_id != 0u64 {
+            size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -14728,6 +15155,9 @@ impl ::buffa::Message for Order {
         }
         if self.version != 0u32 {
             ::buffa::types::put_uint32_field(26u32, self.version, buf);
+        }
+        if self.batch_request_id != 0u64 {
+            ::buffa::types::put_fixed64_field(27u32, self.batch_request_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -14935,6 +15365,13 @@ impl ::buffa::Message for Order {
                 )?;
                 self.version = ::buffa::types::decode_uint32(buf)?;
             }
+            27u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.batch_request_id = ::buffa::types::decode_fixed64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -14968,6 +15405,7 @@ impl ::buffa::Message for Order {
         self.market_max_slippage_ticks = 0i32;
         self.market_max_slippage_bps = 0i32;
         self.version = 0u32;
+        self.batch_request_id = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -17939,6 +18377,758 @@ pub const __GET_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     type_url: "type.googleapis.com/orders.v1.GetOrderResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetOrderResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetOrderResponse>,
+    is_wkt: false,
+};
+/// GetBatchReplaceStatusRequest retrieves one admitted batch by server identity.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetBatchReplaceStatusRequest {
+    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    /// Server-issued batch identity from BatchReplaceOrders.
+    ///
+    /// Field 2: `batch_request_id`
+    #[serde(
+        rename = "batchRequestId",
+        alias = "batch_request_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub batch_request_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetBatchReplaceStatusRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetBatchReplaceStatusRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("batch_request_id", &self.batch_request_id)
+            .finish()
+    }
+}
+impl GetBatchReplaceStatusRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.GetBatchReplaceStatusRequest";
+}
+impl GetBatchReplaceStatusRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(GetBatchReplaceStatusRequest);
+impl ::buffa::MessageName for GetBatchReplaceStatusRequest {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "GetBatchReplaceStatusRequest";
+    const FULL_NAME: &'static str = "orders.v1.GetBatchReplaceStatusRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.GetBatchReplaceStatusRequest";
+}
+impl ::buffa::Message for GetBatchReplaceStatusRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.batch_request_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
+        if self.batch_request_id != 0u64 {
+            ::buffa::types::put_fixed64_field(2u32, self.batch_request_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.batch_request_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = ::core::option::Option::None;
+        self.batch_request_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetBatchReplaceStatusRequest {
+    const PROTO_FQN: &'static str = "orders.v1.GetBatchReplaceStatusRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetBatchReplaceStatusRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_BATCH_REPLACE_STATUS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.GetBatchReplaceStatusRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetBatchReplaceStatusRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetBatchReplaceStatusRequest>,
+    is_wkt: false,
+};
+/// BatchReplaceStatusItem is the index-stable execution status for one replacement.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BatchReplaceStatusItem {
+    /// Zero-based item index from the write request.
+    ///
+    /// Field 1: `item_index`
+    #[serde(
+        rename = "itemIndex",
+        alias = "item_index",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub item_index: u32,
+    /// Current recoverable phase.
+    ///
+    /// Field 2: `phase`
+    #[serde(
+        rename = "phase",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub phase: ::buffa::EnumValue<BatchReplacePhase>,
+    /// Original order targeted by the replacement.
+    ///
+    /// Field 3: `old_order_id`
+    #[serde(
+        rename = "oldOrderId",
+        alias = "old_order_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub old_order_id: u64,
+    /// Assigned successor order ID. Zero when rejected before assignment.
+    ///
+    /// Field 4: `replacement_order_id`
+    #[serde(
+        rename = "replacementOrderId",
+        alias = "replacement_order_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub replacement_order_id: u64,
+    /// Current successor order status when available.
+    ///
+    /// Field 5: `order_status`
+    #[serde(
+        rename = "orderStatus",
+        alias = "order_status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub order_status: ::buffa::EnumValue<OrderStatus>,
+    /// Stable rejection or terminal error code. Empty when none.
+    ///
+    /// Field 6: `code`
+    #[serde(
+        rename = "code",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub code: ::buffa::alloc::string::String,
+    /// Latest status timestamp in nanoseconds since epoch.
+    ///
+    /// Field 7: `updated_ts_ns`
+    #[serde(
+        rename = "updatedTsNs",
+        alias = "updated_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub updated_ts_ns: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BatchReplaceStatusItem {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BatchReplaceStatusItem")
+            .field("item_index", &self.item_index)
+            .field("phase", &self.phase)
+            .field("old_order_id", &self.old_order_id)
+            .field("replacement_order_id", &self.replacement_order_id)
+            .field("order_status", &self.order_status)
+            .field("code", &self.code)
+            .field("updated_ts_ns", &self.updated_ts_ns)
+            .finish()
+    }
+}
+impl BatchReplaceStatusItem {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceStatusItem";
+}
+::buffa::impl_default_instance!(BatchReplaceStatusItem);
+impl ::buffa::MessageName for BatchReplaceStatusItem {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "BatchReplaceStatusItem";
+    const FULL_NAME: &'static str = "orders.v1.BatchReplaceStatusItem";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceStatusItem";
+}
+impl ::buffa::Message for BatchReplaceStatusItem {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.item_index != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.item_index) as u32;
+        }
+        {
+            let val = self.phase.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.old_order_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.replacement_order_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        {
+            let val = self.order_status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.code.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
+        }
+        if self.updated_ts_ns != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.updated_ts_ns) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.item_index != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.item_index, buf);
+        }
+        {
+            let val = self.phase.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if self.old_order_id != 0u64 {
+            ::buffa::types::put_fixed64_field(3u32, self.old_order_id, buf);
+        }
+        if self.replacement_order_id != 0u64 {
+            ::buffa::types::put_fixed64_field(4u32, self.replacement_order_id, buf);
+        }
+        {
+            let val = self.order_status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
+        }
+        if !self.code.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.code, buf);
+        }
+        if self.updated_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(7u32, self.updated_ts_ns, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.item_index = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.phase = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.old_order_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.replacement_order_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.order_status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.code, buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.updated_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.item_index = 0u32;
+        self.phase = ::buffa::EnumValue::from(0);
+        self.old_order_id = 0u64;
+        self.replacement_order_id = 0u64;
+        self.order_status = ::buffa::EnumValue::from(0);
+        self.code.clear();
+        self.updated_ts_ns = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BatchReplaceStatusItem {
+    const PROTO_FQN: &'static str = "orders.v1.BatchReplaceStatusItem";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchReplaceStatusItem {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BATCH_REPLACE_STATUS_ITEM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.BatchReplaceStatusItem",
+    to_json: ::buffa::type_registry::any_to_json::<BatchReplaceStatusItem>,
+    from_json: ::buffa::type_registry::any_from_json::<BatchReplaceStatusItem>,
+    is_wkt: false,
+};
+/// GetBatchReplaceStatusResponse returns durable batch and per-item finality.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetBatchReplaceStatusResponse {
+    /// Server-issued batch identity.
+    ///
+    /// Field 1: `batch_request_id`
+    #[serde(
+        rename = "batchRequestId",
+        alias = "batch_request_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub batch_request_id: u64,
+    /// Aggregate admission status returned by the write receipt.
+    ///
+    /// Field 2: `admission_status`
+    #[serde(
+        rename = "admissionStatus",
+        alias = "admission_status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub admission_status: ::buffa::EnumValue<BatchReplaceAdmissionStatus>,
+    /// Per-item statuses in request order.
+    ///
+    /// Field 3: `items`
+    #[serde(
+        rename = "items",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub items: ::buffa::alloc::vec::Vec<BatchReplaceStatusItem>,
+    /// Number of admitted items.
+    ///
+    /// Field 4: `accepted_count`
+    #[serde(
+        rename = "acceptedCount",
+        alias = "accepted_count",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub accepted_count: u32,
+    /// Number of rejected items.
+    ///
+    /// Field 5: `rejected_count`
+    #[serde(
+        rename = "rejectedCount",
+        alias = "rejected_count",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub rejected_count: u32,
+    /// Server acceptance timestamp in nanoseconds since epoch.
+    ///
+    /// Field 6: `accepted_ts_ns`
+    #[serde(
+        rename = "acceptedTsNs",
+        alias = "accepted_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub accepted_ts_ns: u64,
+    /// Latest batch status timestamp in nanoseconds since epoch.
+    ///
+    /// Field 7: `updated_ts_ns`
+    #[serde(
+        rename = "updatedTsNs",
+        alias = "updated_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub updated_ts_ns: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetBatchReplaceStatusResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetBatchReplaceStatusResponse")
+            .field("batch_request_id", &self.batch_request_id)
+            .field("admission_status", &self.admission_status)
+            .field("items", &self.items)
+            .field("accepted_count", &self.accepted_count)
+            .field("rejected_count", &self.rejected_count)
+            .field("accepted_ts_ns", &self.accepted_ts_ns)
+            .field("updated_ts_ns", &self.updated_ts_ns)
+            .finish()
+    }
+}
+impl GetBatchReplaceStatusResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.GetBatchReplaceStatusResponse";
+}
+::buffa::impl_default_instance!(GetBatchReplaceStatusResponse);
+impl ::buffa::MessageName for GetBatchReplaceStatusResponse {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "GetBatchReplaceStatusResponse";
+    const FULL_NAME: &'static str = "orders.v1.GetBatchReplaceStatusResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.GetBatchReplaceStatusResponse";
+}
+impl ::buffa::Message for GetBatchReplaceStatusResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.batch_request_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        {
+            let val = self.admission_status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        for v in &self.items {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.accepted_count != 0u32 {
+            size
+                += 1u32 + ::buffa::types::uint32_encoded_len(self.accepted_count) as u32;
+        }
+        if self.rejected_count != 0u32 {
+            size
+                += 1u32 + ::buffa::types::uint32_encoded_len(self.rejected_count) as u32;
+        }
+        if self.accepted_ts_ns != 0u64 {
+            size
+                += 1u32 + ::buffa::types::uint64_encoded_len(self.accepted_ts_ns) as u32;
+        }
+        if self.updated_ts_ns != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.updated_ts_ns) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.batch_request_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.batch_request_id, buf);
+        }
+        {
+            let val = self.admission_status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        for v in &self.items {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.accepted_count != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.accepted_count, buf);
+        }
+        if self.rejected_count != 0u32 {
+            ::buffa::types::put_uint32_field(5u32, self.rejected_count, buf);
+        }
+        if self.accepted_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(6u32, self.accepted_ts_ns, buf);
+        }
+        if self.updated_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(7u32, self.updated_ts_ns, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.batch_request_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.admission_status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.items.push(elem);
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.accepted_count = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.rejected_count = ::buffa::types::decode_uint32(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.accepted_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.updated_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.batch_request_id = 0u64;
+        self.admission_status = ::buffa::EnumValue::from(0);
+        self.items.clear();
+        self.accepted_count = 0u32;
+        self.rejected_count = 0u32;
+        self.accepted_ts_ns = 0u64;
+        self.updated_ts_ns = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetBatchReplaceStatusResponse {
+    const PROTO_FQN: &'static str = "orders.v1.GetBatchReplaceStatusResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetBatchReplaceStatusResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_BATCH_REPLACE_STATUS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.GetBatchReplaceStatusResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetBatchReplaceStatusResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetBatchReplaceStatusResponse>,
     is_wkt: false,
 };
 #[allow(
@@ -29873,9 +31063,9 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// BatchModifyItem identifies one modify operation inside a batch request.
+        /// BatchReplaceOrderItem identifies one replacement inside a quote-refresh batch.
         #[derive(Clone, Debug, Default)]
-        pub struct BatchModifyItemView<'a> {
+        pub struct BatchReplaceOrderItemView<'a> {
             /// New limit price in quote units scaled by 1e6.
             ///
             /// Field 3: `new_price_ticks`
@@ -29891,22 +31081,17 @@ pub mod __buffa {
             pub new_attached_risk: ::buffa::MessageFieldView<
                 super::super::__buffa::view::RiskPolicyView<'a>,
             >,
-            /// Optional per-item behavior override.
-            /// MODIFY_BEHAVIOR_UNSPECIFIED means "use behavior_default".
-            ///
-            /// Field 6: `behavior`
-            pub behavior: ::buffa::EnumValue<super::super::ModifyBehavior>,
             /// Optional new client order id when replace path is taken.
             ///
-            /// Field 7: `new_client_order_id`
+            /// Field 6: `new_client_order_id`
             pub new_client_order_id: &'a str,
             pub key: ::core::option::Option<
-                super::super::__buffa::view::oneof::batch_modify_item::Key<'a>,
+                super::super::__buffa::view::oneof::batch_replace_order_item::Key<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for BatchModifyItemView<'a> {
-            type Owned = super::super::BatchModifyItem;
+        impl<'a> ::buffa::MessageView<'a> for BatchReplaceOrderItemView<'a> {
+            type Owned = super::super::BatchReplaceOrderItem;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -29982,15 +31167,6 @@ pub mod __buffa {
                     6u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.behavior = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.new_client_order_id = ::buffa::types::borrow_str(&mut cur)?;
@@ -30001,7 +31177,7 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Fixed64,
                         )?;
                         view.key = Some(
-                            super::super::__buffa::view::oneof::batch_modify_item::Key::OrderId(
+                            super::super::__buffa::view::oneof::batch_replace_order_item::Key::OrderId(
                                 ::buffa::types::decode_fixed64(&mut cur)?,
                             ),
                         );
@@ -30012,7 +31188,7 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.key = Some(
-                            super::super::__buffa::view::oneof::batch_modify_item::Key::ClientOrderId(
+                            super::super::__buffa::view::oneof::batch_replace_order_item::Key::ClientOrderId(
                                 ::buffa::types::borrow_str(&mut cur)?,
                             ),
                         );
@@ -30029,7 +31205,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::BatchModifyItem,
+                super::super::BatchReplaceOrderItem,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -30039,13 +31215,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::BatchModifyItem,
+                super::super::BatchReplaceOrderItem,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::BatchModifyItem {
+                ::core::result::Result::Ok(super::super::BatchReplaceOrderItem {
                     new_price_ticks: self.new_price_ticks,
                     new_qty_scaled: self.new_qty_scaled,
                     new_attached_risk: match self.new_attached_risk.as_option() {
@@ -30056,23 +31232,22 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    behavior: self.behavior,
                     new_client_order_id: self.new_client_order_id.to_string(),
                     key: self
                         .key
                         .as_ref()
                         .map(|v| match v {
-                            super::super::__buffa::view::oneof::batch_modify_item::Key::OrderId(
+                            super::super::__buffa::view::oneof::batch_replace_order_item::Key::OrderId(
                                 v,
                             ) => {
-                                super::super::__buffa::oneof::batch_modify_item::Key::OrderId(
+                                super::super::__buffa::oneof::batch_replace_order_item::Key::OrderId(
                                     *v,
                                 )
                             }
-                            super::super::__buffa::view::oneof::batch_modify_item::Key::ClientOrderId(
+                            super::super::__buffa::view::oneof::batch_replace_order_item::Key::ClientOrderId(
                                 v,
                             ) => {
-                                super::super::__buffa::oneof::batch_modify_item::Key::ClientOrderId(
+                                super::super::__buffa::oneof::batch_replace_order_item::Key::ClientOrderId(
                                     v.to_string(),
                                 )
                             }
@@ -30085,7 +31260,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for BatchModifyItemView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for BatchReplaceOrderItemView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -30093,12 +31268,12 @@ pub mod __buffa {
                 let mut size = 0u32;
                 if let ::core::option::Option::Some(ref v) = self.key {
                     match v {
-                        super::super::__buffa::view::oneof::batch_modify_item::Key::OrderId(
+                        super::super::__buffa::view::oneof::batch_replace_order_item::Key::OrderId(
                             _x,
                         ) => {
                             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                         }
-                        super::super::__buffa::view::oneof::batch_modify_item::Key::ClientOrderId(
+                        super::super::__buffa::view::oneof::batch_replace_order_item::Key::ClientOrderId(
                             x,
                         ) => {
                             size += 1u32 + ::buffa::types::string_encoded_len(x) as u32;
@@ -30118,12 +31293,6 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
-                }
-                {
-                    let val = self.behavior.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
                 }
                 if !self.new_client_order_id.is_empty() {
                     size
@@ -30145,12 +31314,12 @@ pub mod __buffa {
                 use ::buffa::Enumeration as _;
                 if let ::core::option::Option::Some(ref v) = self.key {
                     match v {
-                        super::super::__buffa::view::oneof::batch_modify_item::Key::OrderId(
+                        super::super::__buffa::view::oneof::batch_replace_order_item::Key::OrderId(
                             x,
                         ) => {
                             ::buffa::types::put_fixed64_field(1u32, *x, buf);
                         }
-                        super::super::__buffa::view::oneof::batch_modify_item::Key::ClientOrderId(
+                        super::super::__buffa::view::oneof::batch_replace_order_item::Key::ClientOrderId(
                             x,
                         ) => {
                             ::buffa::types::put_string_field(2u32, x, buf);
@@ -30171,15 +31340,9 @@ pub mod __buffa {
                     );
                     self.new_attached_risk.write_to(__cache, buf);
                 }
-                {
-                    let val = self.behavior.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(6u32, val, buf);
-                    }
-                }
                 if !self.new_client_order_id.is_empty() {
                     ::buffa::types::put_string_field(
-                        7u32,
+                        6u32,
                         &self.new_client_order_id,
                         buf,
                     );
@@ -30198,7 +31361,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for BatchModifyItemView<'__a> {
+        impl<'__a> ::serde::Serialize for BatchReplaceOrderItemView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -30227,11 +31390,6 @@ pub mod __buffa {
                         __map.serialize_entry("newAttachedRisk", __v)?;
                     }
                 }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.behavior,
-                ) {
-                    __map.serialize_entry("behavior", &self.behavior)?;
-                }
                 if !::buffa::json_helpers::skip_if::is_empty_str(
                     self.new_client_order_id,
                 ) {
@@ -30239,7 +31397,7 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.key {
                     match __ov {
-                        super::super::__buffa::view::oneof::batch_modify_item::Key::OrderId(
+                        super::super::__buffa::view::oneof::batch_replace_order_item::Key::OrderId(
                             v,
                         ) => {
                             __map
@@ -30248,7 +31406,7 @@ pub mod __buffa {
                                     &::buffa::json_helpers::ProtoJson(v),
                                 )?;
                         }
-                        super::super::__buffa::view::oneof::batch_modify_item::Key::ClientOrderId(
+                        super::super::__buffa::view::oneof::batch_replace_order_item::Key::ClientOrderId(
                             v,
                         ) => {
                             __map.serialize_entry("clientOrderId", v)?;
@@ -30258,24 +31416,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for BatchModifyItemView<'a> {
+        impl<'a> ::buffa::MessageName for BatchReplaceOrderItemView<'a> {
             const PACKAGE: &'static str = "orders.v1";
-            const NAME: &'static str = "BatchModifyItem";
-            const FULL_NAME: &'static str = "orders.v1.BatchModifyItem";
-            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyItem";
+            const NAME: &'static str = "BatchReplaceOrderItem";
+            const FULL_NAME: &'static str = "orders.v1.BatchReplaceOrderItem";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceOrderItem";
         }
-        ::buffa::impl_default_view_instance!(BatchModifyItemView);
-        ::buffa::impl_view_reborrow!(BatchModifyItemView);
-        /** Self-contained, `'static` owned view of a `BatchModifyItem` message.
+        ::buffa::impl_default_view_instance!(BatchReplaceOrderItemView);
+        ::buffa::impl_view_reborrow!(BatchReplaceOrderItemView);
+        /** Self-contained, `'static` owned view of a `BatchReplaceOrderItem` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`BatchModifyItemView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`BatchReplaceOrderItemView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchModifyItemView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchReplaceOrderItemView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct BatchModifyItemOwnedView(
-            ::buffa::OwnedView<BatchModifyItemView<'static>>,
+        pub struct BatchReplaceOrderItemOwnedView(
+            ::buffa::OwnedView<BatchReplaceOrderItemView<'static>>,
         );
-        impl BatchModifyItemOwnedView {
+        impl BatchReplaceOrderItemOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -30289,7 +31447,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyItemOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    BatchReplaceOrderItemOwnedView(::buffa::OwnedView::decode(bytes)?),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -30304,7 +31462,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyItemOwnedView(
+                    BatchReplaceOrderItemOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -30316,15 +31474,15 @@ pub mod __buffa {
             /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::BatchModifyItem,
+                msg: &super::super::BatchReplaceOrderItem,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyItemOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    BatchReplaceOrderItemOwnedView(::buffa::OwnedView::from_owned(msg)?),
                 )
             }
-            /// Borrow the full [`BatchModifyItemView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`BatchReplaceOrderItemView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &BatchModifyItemView<'_> {
+            pub fn view(&self) -> &BatchReplaceOrderItemView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -30336,7 +31494,7 @@ pub mod __buffa {
             pub fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::BatchModifyItem,
+                super::super::BatchReplaceOrderItem,
                 ::buffa::DecodeError,
             > {
                 self.0.to_owned_message()
@@ -30377,17 +31535,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().new_attached_risk
             }
-            /// Optional per-item behavior override.
-            /// MODIFY_BEHAVIOR_UNSPECIFIED means "use behavior_default".
-            ///
-            /// Field 6: `behavior`
-            #[must_use]
-            pub fn behavior(&self) -> ::buffa::EnumValue<super::super::ModifyBehavior> {
-                self.0.reborrow().behavior
-            }
             /// Optional new client order id when replace path is taken.
             ///
-            /// Field 7: `new_client_order_id`
+            /// Field 6: `new_client_order_id`
             #[must_use]
             pub fn new_client_order_id(&self) -> &'_ str {
                 self.0.reborrow().new_client_order_id
@@ -30397,34 +31547,38 @@ pub mod __buffa {
             pub fn key(
                 &self,
             ) -> ::core::option::Option<
-                &super::super::__buffa::view::oneof::batch_modify_item::Key<'_>,
+                &super::super::__buffa::view::oneof::batch_replace_order_item::Key<'_>,
             > {
                 self.0.reborrow().key.as_ref()
             }
         }
-        impl ::core::convert::From<::buffa::OwnedView<BatchModifyItemView<'static>>>
-        for BatchModifyItemOwnedView {
-            fn from(inner: ::buffa::OwnedView<BatchModifyItemView<'static>>) -> Self {
-                BatchModifyItemOwnedView(inner)
+        impl ::core::convert::From<
+            ::buffa::OwnedView<BatchReplaceOrderItemView<'static>>,
+        > for BatchReplaceOrderItemOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<BatchReplaceOrderItemView<'static>>,
+            ) -> Self {
+                BatchReplaceOrderItemOwnedView(inner)
             }
         }
-        impl ::core::convert::From<BatchModifyItemOwnedView>
-        for ::buffa::OwnedView<BatchModifyItemView<'static>> {
-            fn from(wrapper: BatchModifyItemOwnedView) -> Self {
+        impl ::core::convert::From<BatchReplaceOrderItemOwnedView>
+        for ::buffa::OwnedView<BatchReplaceOrderItemView<'static>> {
+            fn from(wrapper: BatchReplaceOrderItemOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<::buffa::OwnedView<BatchModifyItemView<'static>>>
-        for BatchModifyItemOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<BatchModifyItemView<'static>> {
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<BatchReplaceOrderItemView<'static>>,
+        > for BatchReplaceOrderItemOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<BatchReplaceOrderItemView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::BatchModifyItem {
-            type View<'a> = BatchModifyItemView<'a>;
-            type ViewHandle = BatchModifyItemOwnedView;
+        impl ::buffa::HasMessageView for super::super::BatchReplaceOrderItem {
+            type View<'a> = BatchReplaceOrderItemView<'a>;
+            type ViewHandle = BatchReplaceOrderItemOwnedView;
         }
-        impl ::serde::Serialize for BatchModifyItemOwnedView {
+        impl ::serde::Serialize for BatchReplaceOrderItemOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -30432,49 +31586,39 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// BatchModifyResultItem contains one result in a batch modify response.
+        /// BatchReplaceAdmissionItem contains the index-stable admission result for one item.
         #[derive(Clone, Debug, Default)]
-        pub struct BatchModifyResultItemView<'a> {
-            /// "modified" or "rejected".
+        pub struct BatchReplaceAdmissionItemView<'a> {
+            /// Zero-based index in the request.
             ///
-            /// Field 1: `status`
-            pub status: &'a str,
-            /// AMENDED or REPLACED when modified.
+            /// Field 1: `item_index`
+            pub item_index: u32,
+            /// Admission result for this item.
             ///
-            /// Field 2: `action_taken`
-            pub action_taken: ::buffa::EnumValue<super::super::ModifyActionTaken>,
-            /// Original order ID that was amended or replaced.
+            /// Field 2: `status`
+            pub status: ::buffa::EnumValue<
+                super::super::BatchReplaceItemAdmissionStatus,
+            >,
+            /// Original order targeted by the replacement.
             ///
             /// Field 3: `old_order_id`
             pub old_order_id: u64,
-            /// Final active order ID; same as old_order_id for amendments.
+            /// Assigned successor order ID. Zero when rejected before assignment.
             ///
-            /// Field 4: `final_order_id`
-            pub final_order_id: u64,
-            /// Client order ID associated with the final order when available.
+            /// Field 4: `replacement_order_id`
+            pub replacement_order_id: u64,
+            /// Client order ID assigned to the successor when available.
             ///
             /// Field 5: `client_order_id`
             pub client_order_id: &'a str,
-            /// Error code if rejected.
+            /// Stable rejection code. Empty for admitted items.
             ///
             /// Field 6: `code`
             pub code: &'a str,
-            /// Trigger ID for attached take-profit after modification.
-            ///
-            /// Field 7: `take_profit_trigger_id`
-            pub take_profit_trigger_id: ::core::option::Option<u64>,
-            /// Trigger ID for attached stop-loss after modification.
-            ///
-            /// Field 8: `stop_loss_trigger_id`
-            pub stop_loss_trigger_id: ::core::option::Option<u64>,
-            /// Trigger ID for attached trailing stop after modification.
-            ///
-            /// Field 9: `trailing_stop_trigger_id`
-            pub trailing_stop_trigger_id: ::core::option::Option<u64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for BatchModifyResultItemView<'a> {
-            type Owned = super::super::BatchModifyResultItem;
+        impl<'a> ::buffa::MessageView<'a> for BatchReplaceAdmissionItemView<'a> {
+            type Owned = super::super::BatchReplaceAdmissionItem;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -30507,16 +31651,16 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.item_index = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.action_taken = ::buffa::EnumValue::from(
+                        view.status = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
@@ -30532,7 +31676,9 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Fixed64,
                         )?;
-                        view.final_order_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                        view.replacement_order_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
                     }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -30548,33 +31694,6 @@ pub mod __buffa {
                         )?;
                         view.code = ::buffa::types::borrow_str(&mut cur)?;
                     }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.take_profit_trigger_id = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
-                    8u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.stop_loss_trigger_id = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
-                    9u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.trailing_stop_trigger_id = Some(
-                            ::buffa::types::decode_uint64(&mut cur)?,
-                        );
-                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -30587,7 +31706,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::BatchModifyResultItem,
+                super::super::BatchReplaceAdmissionItem,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -30597,22 +31716,19 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::BatchModifyResultItem,
+                super::super::BatchReplaceAdmissionItem,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::BatchModifyResultItem {
-                    status: self.status.to_string(),
-                    action_taken: self.action_taken,
+                ::core::result::Result::Ok(super::super::BatchReplaceAdmissionItem {
+                    item_index: self.item_index,
+                    status: self.status,
                     old_order_id: self.old_order_id,
-                    final_order_id: self.final_order_id,
+                    replacement_order_id: self.replacement_order_id,
                     client_order_id: self.client_order_id.to_string(),
                     code: self.code.to_string(),
-                    take_profit_trigger_id: self.take_profit_trigger_id,
-                    stop_loss_trigger_id: self.stop_loss_trigger_id,
-                    trailing_stop_trigger_id: self.trailing_stop_trigger_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -30621,19 +31737,19 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for BatchModifyResultItemView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for BatchReplaceAdmissionItemView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.status.is_empty() {
+                if self.item_index != 0u32 {
                     size
                         += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                            + ::buffa::types::uint32_encoded_len(self.item_index) as u32;
                 }
                 {
-                    let val = self.action_taken.to_i32();
+                    let val = self.status.to_i32();
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -30641,7 +31757,7 @@ pub mod __buffa {
                 if self.old_order_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if self.final_order_id != 0u64 {
+                if self.replacement_order_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
                 if !self.client_order_id.is_empty() {
@@ -30652,15 +31768,6 @@ pub mod __buffa {
                 }
                 if !self.code.is_empty() {
                     size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
-                }
-                if let Some(v) = self.take_profit_trigger_id {
-                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
-                }
-                if let Some(v) = self.stop_loss_trigger_id {
-                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
-                }
-                if let Some(v) = self.trailing_stop_trigger_id {
-                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -30673,11 +31780,11 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.status, buf);
+                if self.item_index != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.item_index, buf);
                 }
                 {
-                    let val = self.action_taken.to_i32();
+                    let val = self.status.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(2u32, val, buf);
                     }
@@ -30685,23 +31792,18 @@ pub mod __buffa {
                 if self.old_order_id != 0u64 {
                     ::buffa::types::put_fixed64_field(3u32, self.old_order_id, buf);
                 }
-                if self.final_order_id != 0u64 {
-                    ::buffa::types::put_fixed64_field(4u32, self.final_order_id, buf);
+                if self.replacement_order_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(
+                        4u32,
+                        self.replacement_order_id,
+                        buf,
+                    );
                 }
                 if !self.client_order_id.is_empty() {
                     ::buffa::types::put_string_field(5u32, &self.client_order_id, buf);
                 }
                 if !self.code.is_empty() {
                     ::buffa::types::put_string_field(6u32, &self.code, buf);
-                }
-                if let Some(v) = self.take_profit_trigger_id {
-                    ::buffa::types::put_uint64_field(7u32, v, buf);
-                }
-                if let Some(v) = self.stop_loss_trigger_id {
-                    ::buffa::types::put_uint64_field(8u32, v, buf);
-                }
-                if let Some(v) = self.trailing_stop_trigger_id {
-                    ::buffa::types::put_uint64_field(9u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -30717,20 +31819,22 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for BatchModifyResultItemView<'__a> {
+        impl<'__a> ::serde::Serialize for BatchReplaceAdmissionItemView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.item_index) {
+                    __map
+                        .serialize_entry(
+                            "itemIndex",
+                            &::buffa::json_helpers::ProtoJson(&self.item_index),
+                        )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.action_taken,
-                ) {
-                    __map.serialize_entry("actionTaken", &self.action_taken)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.old_order_id) {
                     __map
@@ -30739,11 +31843,13 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.old_order_id),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.final_order_id) {
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.replacement_order_id,
+                ) {
                     __map
                         .serialize_entry(
-                            "finalOrderId",
-                            &::buffa::json_helpers::ProtoJson(&self.final_order_id),
+                            "replacementOrderId",
+                            &::buffa::json_helpers::ProtoJson(&self.replacement_order_id),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.client_order_id) {
@@ -30752,49 +31858,27 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.code) {
                     __map.serialize_entry("code", self.code)?;
                 }
-                if let ::core::option::Option::Some(__v) = self.take_profit_trigger_id {
-                    __map
-                        .serialize_entry(
-                            "takeProfitTriggerId",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                if let ::core::option::Option::Some(__v) = self.stop_loss_trigger_id {
-                    __map
-                        .serialize_entry(
-                            "stopLossTriggerId",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                if let ::core::option::Option::Some(__v) = self.trailing_stop_trigger_id
-                {
-                    __map
-                        .serialize_entry(
-                            "trailingStopTriggerId",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for BatchModifyResultItemView<'a> {
+        impl<'a> ::buffa::MessageName for BatchReplaceAdmissionItemView<'a> {
             const PACKAGE: &'static str = "orders.v1";
-            const NAME: &'static str = "BatchModifyResultItem";
-            const FULL_NAME: &'static str = "orders.v1.BatchModifyResultItem";
-            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyResultItem";
+            const NAME: &'static str = "BatchReplaceAdmissionItem";
+            const FULL_NAME: &'static str = "orders.v1.BatchReplaceAdmissionItem";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceAdmissionItem";
         }
-        ::buffa::impl_default_view_instance!(BatchModifyResultItemView);
-        ::buffa::impl_view_reborrow!(BatchModifyResultItemView);
-        /** Self-contained, `'static` owned view of a `BatchModifyResultItem` message.
+        ::buffa::impl_default_view_instance!(BatchReplaceAdmissionItemView);
+        ::buffa::impl_view_reborrow!(BatchReplaceAdmissionItemView);
+        /** Self-contained, `'static` owned view of a `BatchReplaceAdmissionItem` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`BatchModifyResultItemView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`BatchReplaceAdmissionItemView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchModifyResultItemView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchReplaceAdmissionItemView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct BatchModifyResultItemOwnedView(
-            ::buffa::OwnedView<BatchModifyResultItemView<'static>>,
+        pub struct BatchReplaceAdmissionItemOwnedView(
+            ::buffa::OwnedView<BatchReplaceAdmissionItemView<'static>>,
         );
-        impl BatchModifyResultItemOwnedView {
+        impl BatchReplaceAdmissionItemOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -30808,7 +31892,9 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyResultItemOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    BatchReplaceAdmissionItemOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -30823,7 +31909,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyResultItemOwnedView(
+                    BatchReplaceAdmissionItemOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -30835,15 +31921,17 @@ pub mod __buffa {
             /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::BatchModifyResultItem,
+                msg: &super::super::BatchReplaceAdmissionItem,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyResultItemOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    BatchReplaceAdmissionItemOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
                 )
             }
-            /// Borrow the full [`BatchModifyResultItemView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`BatchReplaceAdmissionItemView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &BatchModifyResultItemView<'_> {
+            pub fn view(&self) -> &BatchReplaceAdmissionItemView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -30855,7 +31943,7 @@ pub mod __buffa {
             pub fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::BatchModifyResultItem,
+                super::super::BatchReplaceAdmissionItem,
                 ::buffa::DecodeError,
             > {
                 self.0.to_owned_message()
@@ -30870,99 +31958,80 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// "modified" or "rejected".
+            /// Zero-based index in the request.
             ///
-            /// Field 1: `status`
+            /// Field 1: `item_index`
             #[must_use]
-            pub fn status(&self) -> &'_ str {
+            pub fn item_index(&self) -> u32 {
+                self.0.reborrow().item_index
+            }
+            /// Admission result for this item.
+            ///
+            /// Field 2: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::BatchReplaceItemAdmissionStatus> {
                 self.0.reborrow().status
             }
-            /// AMENDED or REPLACED when modified.
-            ///
-            /// Field 2: `action_taken`
-            #[must_use]
-            pub fn action_taken(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::ModifyActionTaken> {
-                self.0.reborrow().action_taken
-            }
-            /// Original order ID that was amended or replaced.
+            /// Original order targeted by the replacement.
             ///
             /// Field 3: `old_order_id`
             #[must_use]
             pub fn old_order_id(&self) -> u64 {
                 self.0.reborrow().old_order_id
             }
-            /// Final active order ID; same as old_order_id for amendments.
+            /// Assigned successor order ID. Zero when rejected before assignment.
             ///
-            /// Field 4: `final_order_id`
+            /// Field 4: `replacement_order_id`
             #[must_use]
-            pub fn final_order_id(&self) -> u64 {
-                self.0.reborrow().final_order_id
+            pub fn replacement_order_id(&self) -> u64 {
+                self.0.reborrow().replacement_order_id
             }
-            /// Client order ID associated with the final order when available.
+            /// Client order ID assigned to the successor when available.
             ///
             /// Field 5: `client_order_id`
             #[must_use]
             pub fn client_order_id(&self) -> &'_ str {
                 self.0.reborrow().client_order_id
             }
-            /// Error code if rejected.
+            /// Stable rejection code. Empty for admitted items.
             ///
             /// Field 6: `code`
             #[must_use]
             pub fn code(&self) -> &'_ str {
                 self.0.reborrow().code
             }
-            /// Trigger ID for attached take-profit after modification.
-            ///
-            /// Field 7: `take_profit_trigger_id`
-            #[must_use]
-            pub fn take_profit_trigger_id(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().take_profit_trigger_id
-            }
-            /// Trigger ID for attached stop-loss after modification.
-            ///
-            /// Field 8: `stop_loss_trigger_id`
-            #[must_use]
-            pub fn stop_loss_trigger_id(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().stop_loss_trigger_id
-            }
-            /// Trigger ID for attached trailing stop after modification.
-            ///
-            /// Field 9: `trailing_stop_trigger_id`
-            #[must_use]
-            pub fn trailing_stop_trigger_id(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().trailing_stop_trigger_id
-            }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<BatchModifyResultItemView<'static>>,
-        > for BatchModifyResultItemOwnedView {
+            ::buffa::OwnedView<BatchReplaceAdmissionItemView<'static>>,
+        > for BatchReplaceAdmissionItemOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<BatchModifyResultItemView<'static>>,
+                inner: ::buffa::OwnedView<BatchReplaceAdmissionItemView<'static>>,
             ) -> Self {
-                BatchModifyResultItemOwnedView(inner)
+                BatchReplaceAdmissionItemOwnedView(inner)
             }
         }
-        impl ::core::convert::From<BatchModifyResultItemOwnedView>
-        for ::buffa::OwnedView<BatchModifyResultItemView<'static>> {
-            fn from(wrapper: BatchModifyResultItemOwnedView) -> Self {
+        impl ::core::convert::From<BatchReplaceAdmissionItemOwnedView>
+        for ::buffa::OwnedView<BatchReplaceAdmissionItemView<'static>> {
+            fn from(wrapper: BatchReplaceAdmissionItemOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<BatchModifyResultItemView<'static>>,
-        > for BatchModifyResultItemOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<BatchModifyResultItemView<'static>> {
+            ::buffa::OwnedView<BatchReplaceAdmissionItemView<'static>>,
+        > for BatchReplaceAdmissionItemOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<BatchReplaceAdmissionItemView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::BatchModifyResultItem {
-            type View<'a> = BatchModifyResultItemView<'a>;
-            type ViewHandle = BatchModifyResultItemOwnedView;
+        impl ::buffa::HasMessageView for super::super::BatchReplaceAdmissionItem {
+            type View<'a> = BatchReplaceAdmissionItemView<'a>;
+            type ViewHandle = BatchReplaceAdmissionItemOwnedView;
         }
-        impl ::serde::Serialize for BatchModifyResultItemOwnedView {
+        impl ::serde::Serialize for BatchReplaceAdmissionItemOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -30970,37 +32039,32 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// BatchModifyOrdersRequest updates multiple orders in one request.
+        /// BatchReplaceOrdersRequest replaces same-symbol orders as one quote refresh.
         #[derive(Clone, Debug, Default)]
-        pub struct BatchModifyOrdersRequestView<'a> {
+        pub struct BatchReplaceOrdersRequestView<'a> {
             /// Target sub-account numeric ID. When omitted, uses caller's root account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Idempotency key (required).
+            /// Trading symbol shared by every replacement.
             ///
-            /// Field 2: `request_id`
+            /// Field 2: `symbol_id`
+            pub symbol_id: u32,
+            /// Client idempotency key (required).
+            ///
+            /// Field 3: `request_id`
             pub request_id: &'a str,
-            /// Modify items.
+            /// Replacement items.
             ///
-            /// Field 3: `items`
+            /// Field 4: `items`
             pub items: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::BatchModifyItemView<'a>,
+                super::super::__buffa::view::BatchReplaceOrderItemView<'a>,
             >,
-            /// Default behavior for items with unspecified behavior.
-            /// MODIFY_BEHAVIOR_UNSPECIFIED is treated as AMEND_OR_REPLACE.
-            ///
-            /// Field 4: `behavior_default`
-            pub behavior_default: ::buffa::EnumValue<super::super::ModifyBehavior>,
-            /// Optional partial-success flag. Current behavior is best-effort per item.
-            ///
-            /// Field 5: `allow_partial`
-            pub allow_partial: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for BatchModifyOrdersRequestView<'a> {
-            type Owned = super::super::BatchModifyOrdersRequest;
+        impl<'a> ::buffa::MessageView<'a> for BatchReplaceOrdersRequestView<'a> {
+            type Owned = super::super::BatchReplaceOrdersRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -31042,27 +32106,18 @@ pub mod __buffa {
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.request_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.behavior_default = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.allow_partial = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
@@ -31071,7 +32126,7 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         view.items
                             .push(
-                                <super::super::__buffa::view::BatchModifyItemView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::BatchReplaceOrderItemView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -31089,7 +32144,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::BatchModifyOrdersRequest,
+                super::super::BatchReplaceOrdersRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -31099,22 +32154,21 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::BatchModifyOrdersRequest,
+                super::super::BatchReplaceOrdersRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::BatchModifyOrdersRequest {
+                ::core::result::Result::Ok(super::super::BatchReplaceOrdersRequest {
                     subaccount_id: self.subaccount_id,
+                    symbol_id: self.symbol_id,
                     request_id: self.request_id.to_string(),
                     items: self
                         .items
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    behavior_default: self.behavior_default,
-                    allow_partial: self.allow_partial,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -31123,7 +32177,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for BatchModifyOrdersRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for BatchReplaceOrdersRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -31131,6 +32185,11 @@ pub mod __buffa {
                 let mut size = 0u32;
                 if self.subaccount_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
                 }
                 if !self.request_id.is_empty() {
                     size
@@ -31146,15 +32205,6 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                {
-                    let val = self.behavior_default.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if self.allow_partial {
-                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -31169,25 +32219,19 @@ pub mod __buffa {
                 if let Some(v) = self.subaccount_id {
                     ::buffa::types::put_fixed64_field(1u32, v, buf);
                 }
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.symbol_id, buf);
+                }
                 if !self.request_id.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.request_id, buf);
+                    ::buffa::types::put_string_field(3u32, &self.request_id, buf);
                 }
                 for v in &self.items {
                     ::buffa::types::put_len_delimited_header(
-                        3u32,
+                        4u32,
                         __cache.consume_next(),
                         buf,
                     );
                     v.write_to(__cache, buf);
-                }
-                {
-                    let val = self.behavior_default.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(4u32, val, buf);
-                    }
-                }
-                if self.allow_partial {
-                    ::buffa::types::put_bool_field(5u32, self.allow_partial, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -31203,7 +32247,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for BatchModifyOrdersRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for BatchReplaceOrdersRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -31217,41 +32261,40 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
+                }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
                     __map.serialize_entry("requestId", self.request_id)?;
                 }
                 if !self.items.is_empty() {
                     __map.serialize_entry("items", &*self.items)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.behavior_default,
-                ) {
-                    __map.serialize_entry("behaviorDefault", &self.behavior_default)?;
-                }
-                if self.allow_partial {
-                    __map.serialize_entry("allowPartial", &self.allow_partial)?;
-                }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for BatchModifyOrdersRequestView<'a> {
+        impl<'a> ::buffa::MessageName for BatchReplaceOrdersRequestView<'a> {
             const PACKAGE: &'static str = "orders.v1";
-            const NAME: &'static str = "BatchModifyOrdersRequest";
-            const FULL_NAME: &'static str = "orders.v1.BatchModifyOrdersRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyOrdersRequest";
+            const NAME: &'static str = "BatchReplaceOrdersRequest";
+            const FULL_NAME: &'static str = "orders.v1.BatchReplaceOrdersRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceOrdersRequest";
         }
-        ::buffa::impl_default_view_instance!(BatchModifyOrdersRequestView);
-        ::buffa::impl_view_reborrow!(BatchModifyOrdersRequestView);
-        /** Self-contained, `'static` owned view of a `BatchModifyOrdersRequest` message.
+        ::buffa::impl_default_view_instance!(BatchReplaceOrdersRequestView);
+        ::buffa::impl_view_reborrow!(BatchReplaceOrdersRequestView);
+        /** Self-contained, `'static` owned view of a `BatchReplaceOrdersRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`BatchModifyOrdersRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`BatchReplaceOrdersRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchModifyOrdersRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchReplaceOrdersRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct BatchModifyOrdersRequestOwnedView(
-            ::buffa::OwnedView<BatchModifyOrdersRequestView<'static>>,
+        pub struct BatchReplaceOrdersRequestOwnedView(
+            ::buffa::OwnedView<BatchReplaceOrdersRequestView<'static>>,
         );
-        impl BatchModifyOrdersRequestOwnedView {
+        impl BatchReplaceOrdersRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -31265,7 +32308,9 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyOrdersRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    BatchReplaceOrdersRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -31280,7 +32325,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyOrdersRequestOwnedView(
+                    BatchReplaceOrdersRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -31292,17 +32337,17 @@ pub mod __buffa {
             /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::BatchModifyOrdersRequest,
+                msg: &super::super::BatchReplaceOrdersRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyOrdersRequestOwnedView(
+                    BatchReplaceOrdersRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`BatchModifyOrdersRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`BatchReplaceOrdersRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &BatchModifyOrdersRequestView<'_> {
+            pub fn view(&self) -> &BatchReplaceOrdersRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -31314,7 +32359,7 @@ pub mod __buffa {
             pub fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::BatchModifyOrdersRequest,
+                super::super::BatchReplaceOrdersRequest,
                 ::buffa::DecodeError,
             > {
                 self.0.to_owned_message()
@@ -31336,72 +32381,62 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Idempotency key (required).
+            /// Trading symbol shared by every replacement.
             ///
-            /// Field 2: `request_id`
+            /// Field 2: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
+            }
+            /// Client idempotency key (required).
+            ///
+            /// Field 3: `request_id`
             #[must_use]
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
             }
-            /// Modify items.
+            /// Replacement items.
             ///
-            /// Field 3: `items`
+            /// Field 4: `items`
             #[must_use]
             pub fn items(
                 &self,
             ) -> &::buffa::RepeatedView<
                 '_,
-                super::super::__buffa::view::BatchModifyItemView<'_>,
+                super::super::__buffa::view::BatchReplaceOrderItemView<'_>,
             > {
                 &self.0.reborrow().items
             }
-            /// Default behavior for items with unspecified behavior.
-            /// MODIFY_BEHAVIOR_UNSPECIFIED is treated as AMEND_OR_REPLACE.
-            ///
-            /// Field 4: `behavior_default`
-            #[must_use]
-            pub fn behavior_default(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::ModifyBehavior> {
-                self.0.reborrow().behavior_default
-            }
-            /// Optional partial-success flag. Current behavior is best-effort per item.
-            ///
-            /// Field 5: `allow_partial`
-            #[must_use]
-            pub fn allow_partial(&self) -> bool {
-                self.0.reborrow().allow_partial
-            }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<BatchModifyOrdersRequestView<'static>>,
-        > for BatchModifyOrdersRequestOwnedView {
+            ::buffa::OwnedView<BatchReplaceOrdersRequestView<'static>>,
+        > for BatchReplaceOrdersRequestOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<BatchModifyOrdersRequestView<'static>>,
+                inner: ::buffa::OwnedView<BatchReplaceOrdersRequestView<'static>>,
             ) -> Self {
-                BatchModifyOrdersRequestOwnedView(inner)
+                BatchReplaceOrdersRequestOwnedView(inner)
             }
         }
-        impl ::core::convert::From<BatchModifyOrdersRequestOwnedView>
-        for ::buffa::OwnedView<BatchModifyOrdersRequestView<'static>> {
-            fn from(wrapper: BatchModifyOrdersRequestOwnedView) -> Self {
+        impl ::core::convert::From<BatchReplaceOrdersRequestOwnedView>
+        for ::buffa::OwnedView<BatchReplaceOrdersRequestView<'static>> {
+            fn from(wrapper: BatchReplaceOrdersRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<BatchModifyOrdersRequestView<'static>>,
-        > for BatchModifyOrdersRequestOwnedView {
+            ::buffa::OwnedView<BatchReplaceOrdersRequestView<'static>>,
+        > for BatchReplaceOrdersRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<BatchModifyOrdersRequestView<'static>> {
+            ) -> &::buffa::OwnedView<BatchReplaceOrdersRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::BatchModifyOrdersRequest {
-            type View<'a> = BatchModifyOrdersRequestView<'a>;
-            type ViewHandle = BatchModifyOrdersRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::BatchReplaceOrdersRequest {
+            type View<'a> = BatchReplaceOrdersRequestView<'a>;
+            type ViewHandle = BatchReplaceOrdersRequestOwnedView;
         }
-        impl ::serde::Serialize for BatchModifyOrdersRequestOwnedView {
+        impl ::serde::Serialize for BatchReplaceOrdersRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -31409,42 +32444,46 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// BatchModifyOrdersResponse returns per-item modify outcomes.
+        /// BatchReplaceOrdersResponse is the durable admission receipt for a batch.
         #[derive(Clone, Debug, Default)]
-        pub struct BatchModifyOrdersResponseView<'a> {
-            /// Per-item results in the same order as the request items.
+        pub struct BatchReplaceOrdersResponseView<'a> {
+            /// Server-issued opaque identity used for status and private realtime correlation.
             ///
-            /// Field 1: `results`
+            /// Field 1: `batch_request_id`
+            pub batch_request_id: u64,
+            /// Aggregate admission status.
+            ///
+            /// Field 2: `status`
+            pub status: ::buffa::EnumValue<super::super::BatchReplaceAdmissionStatus>,
+            /// Per-item admission results in request order.
+            ///
+            /// Field 3: `results`
             pub results: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::BatchModifyResultItemView<'a>,
+                super::super::__buffa::view::BatchReplaceAdmissionItemView<'a>,
             >,
-            /// Number of items amended in place.
+            /// Number of items admitted and handed to execution.
             ///
-            /// Field 2: `amended_count`
-            pub amended_count: u32,
-            /// Number of items replaced with a new order.
+            /// Field 4: `accepted_count`
+            pub accepted_count: u32,
+            /// Number of items rejected before execution handoff.
             ///
-            /// Field 3: `replaced_count`
-            pub replaced_count: u32,
-            /// Number of items rejected.
-            ///
-            /// Field 4: `rejected_count`
+            /// Field 5: `rejected_count`
             pub rejected_count: u32,
-            /// Server timestamp.
+            /// Server acceptance timestamp.
             ///
-            /// Field 5: `ts`
-            pub ts: ::buffa::MessageFieldView<
+            /// Field 6: `accepted_ts`
+            pub accepted_ts: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Server timestamp as epoch nanoseconds (for bots).
+            /// Server acceptance timestamp as epoch nanoseconds.
             ///
-            /// Field 6: `ts_ns`
-            pub ts_ns: u64,
+            /// Field 7: `accepted_ts_ns`
+            pub accepted_ts_ns: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for BatchModifyOrdersResponseView<'a> {
-            type Owned = super::super::BatchModifyOrdersResponse;
+        impl<'a> ::buffa::MessageView<'a> for BatchReplaceOrdersResponseView<'a> {
+            type Owned = super::super::BatchReplaceOrdersResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -31474,35 +32513,46 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.batch_request_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.amended_count = ::buffa::types::decode_uint32(&mut cur)?;
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.replaced_count = ::buffa::types::decode_uint32(&mut cur)?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.rejected_count = ::buffa::types::decode_uint32(&mut cur)?;
+                        view.accepted_count = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.rejected_count = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    6u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         let __sub_ctx = ctx.descend()?;
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.ts.as_mut() {
+                        match view.accepted_ts.as_mut() {
                             Some(existing) => {
                                 ::buffa::MessageView::merge_into_view(
                                     existing,
@@ -31511,7 +32561,7 @@ pub mod __buffa {
                                 )?
                             }
                             None => {
-                                view.ts = ::buffa::MessageFieldView::set(
+                                view.accepted_ts = ::buffa::MessageFieldView::set(
                                     <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
@@ -31520,14 +32570,14 @@ pub mod __buffa {
                             }
                         }
                     }
-                    6u32 => {
+                    7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                        view.accepted_ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
                     }
-                    1u32 => {
+                    3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
@@ -31536,7 +32586,7 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         view.results
                             .push(
-                                <super::super::__buffa::view::BatchModifyResultItemView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::BatchReplaceAdmissionItemView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -31554,7 +32604,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::BatchModifyOrdersResponse,
+                super::super::BatchReplaceOrdersResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -31564,22 +32614,23 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::BatchModifyOrdersResponse,
+                super::super::BatchReplaceOrdersResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::BatchModifyOrdersResponse {
+                ::core::result::Result::Ok(super::super::BatchReplaceOrdersResponse {
+                    batch_request_id: self.batch_request_id,
+                    status: self.status,
                     results: self
                         .results
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    amended_count: self.amended_count,
-                    replaced_count: self.replaced_count,
+                    accepted_count: self.accepted_count,
                     rejected_count: self.rejected_count,
-                    ts: match self.ts.as_option() {
+                    accepted_ts: match self.accepted_ts.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
                                 ::buffa_types::google::protobuf::Timestamp,
@@ -31587,7 +32638,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    ts_ns: self.ts_ns,
+                    accepted_ts_ns: self.accepted_ts_ns,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -31596,12 +32647,21 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for BatchModifyOrdersResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for BatchReplaceOrdersResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
+                if self.batch_request_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 for v in &self.results {
                     let __slot = __cache.reserve();
                     let inner_size = v.compute_size(__cache);
@@ -31610,16 +32670,10 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if self.amended_count != 0u32 {
+                if self.accepted_count != 0u32 {
                     size
                         += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.amended_count)
-                                as u32;
-                }
-                if self.replaced_count != 0u32 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.replaced_count)
+                            + ::buffa::types::uint32_encoded_len(self.accepted_count)
                                 as u32;
                 }
                 if self.rejected_count != 0u32 {
@@ -31628,16 +32682,19 @@ pub mod __buffa {
                             + ::buffa::types::uint32_encoded_len(self.rejected_count)
                                 as u32;
                 }
-                if self.ts.is_set() {
+                if self.accepted_ts.is_set() {
                     let __slot = __cache.reserve();
-                    let inner_size = self.ts.compute_size(__cache);
+                    let inner_size = self.accepted_ts.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if self.ts_ns != 0u64 {
-                    size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+                if self.accepted_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.accepted_ts_ns)
+                                as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -31650,33 +32707,39 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
+                if self.batch_request_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.batch_request_id, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
                 for v in &self.results {
                     ::buffa::types::put_len_delimited_header(
-                        1u32,
+                        3u32,
                         __cache.consume_next(),
                         buf,
                     );
                     v.write_to(__cache, buf);
                 }
-                if self.amended_count != 0u32 {
-                    ::buffa::types::put_uint32_field(2u32, self.amended_count, buf);
-                }
-                if self.replaced_count != 0u32 {
-                    ::buffa::types::put_uint32_field(3u32, self.replaced_count, buf);
+                if self.accepted_count != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.accepted_count, buf);
                 }
                 if self.rejected_count != 0u32 {
-                    ::buffa::types::put_uint32_field(4u32, self.rejected_count, buf);
+                    ::buffa::types::put_uint32_field(5u32, self.rejected_count, buf);
                 }
-                if self.ts.is_set() {
+                if self.accepted_ts.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        5u32,
+                        6u32,
                         __cache.consume_next(),
                         buf,
                     );
-                    self.ts.write_to(__cache, buf);
+                    self.accepted_ts.write_to(__cache, buf);
                 }
-                if self.ts_ns != 0u64 {
-                    ::buffa::types::put_uint64_field(6u32, self.ts_ns, buf);
+                if self.accepted_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(7u32, self.accepted_ts_ns, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -31692,28 +32755,31 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for BatchModifyOrdersResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for BatchReplaceOrdersResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.batch_request_id) {
+                    __map
+                        .serialize_entry(
+                            "batchRequestId",
+                            &::buffa::json_helpers::ProtoJson(&self.batch_request_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
                 if !self.results.is_empty() {
                     __map.serialize_entry("results", &*self.results)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.amended_count) {
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.accepted_count) {
                     __map
                         .serialize_entry(
-                            "amendedCount",
-                            &::buffa::json_helpers::ProtoJson(&self.amended_count),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.replaced_count) {
-                    __map
-                        .serialize_entry(
-                            "replacedCount",
-                            &::buffa::json_helpers::ProtoJson(&self.replaced_count),
+                            "acceptedCount",
+                            &::buffa::json_helpers::ProtoJson(&self.accepted_count),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(&self.rejected_count) {
@@ -31724,38 +32790,41 @@ pub mod __buffa {
                         )?;
                 }
                 {
-                    if let ::core::option::Option::Some(__v) = self.ts.as_option() {
-                        __map.serialize_entry("ts", __v)?;
+                    if let ::core::option::Option::Some(__v) = self
+                        .accepted_ts
+                        .as_option()
+                    {
+                        __map.serialize_entry("acceptedTs", __v)?;
                     }
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.ts_ns) {
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.accepted_ts_ns) {
                     __map
                         .serialize_entry(
-                            "tsNs",
-                            &::buffa::json_helpers::ProtoJson(&self.ts_ns),
+                            "acceptedTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.accepted_ts_ns),
                         )?;
                 }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for BatchModifyOrdersResponseView<'a> {
+        impl<'a> ::buffa::MessageName for BatchReplaceOrdersResponseView<'a> {
             const PACKAGE: &'static str = "orders.v1";
-            const NAME: &'static str = "BatchModifyOrdersResponse";
-            const FULL_NAME: &'static str = "orders.v1.BatchModifyOrdersResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchModifyOrdersResponse";
+            const NAME: &'static str = "BatchReplaceOrdersResponse";
+            const FULL_NAME: &'static str = "orders.v1.BatchReplaceOrdersResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceOrdersResponse";
         }
-        ::buffa::impl_default_view_instance!(BatchModifyOrdersResponseView);
-        ::buffa::impl_view_reborrow!(BatchModifyOrdersResponseView);
-        /** Self-contained, `'static` owned view of a `BatchModifyOrdersResponse` message.
+        ::buffa::impl_default_view_instance!(BatchReplaceOrdersResponseView);
+        ::buffa::impl_view_reborrow!(BatchReplaceOrdersResponseView);
+        /** Self-contained, `'static` owned view of a `BatchReplaceOrdersResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`BatchModifyOrdersResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`BatchReplaceOrdersResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchModifyOrdersResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchReplaceOrdersResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct BatchModifyOrdersResponseOwnedView(
-            ::buffa::OwnedView<BatchModifyOrdersResponseView<'static>>,
+        pub struct BatchReplaceOrdersResponseOwnedView(
+            ::buffa::OwnedView<BatchReplaceOrdersResponseView<'static>>,
         );
-        impl BatchModifyOrdersResponseOwnedView {
+        impl BatchReplaceOrdersResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -31769,7 +32838,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyOrdersResponseOwnedView(
+                    BatchReplaceOrdersResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -31786,7 +32855,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyOrdersResponseOwnedView(
+                    BatchReplaceOrdersResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -31798,17 +32867,17 @@ pub mod __buffa {
             /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::BatchModifyOrdersResponse,
+                msg: &super::super::BatchReplaceOrdersResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    BatchModifyOrdersResponseOwnedView(
+                    BatchReplaceOrdersResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`BatchModifyOrdersResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`BatchReplaceOrdersResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &BatchModifyOrdersResponseView<'_> {
+            pub fn view(&self) -> &BatchReplaceOrdersResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -31820,7 +32889,7 @@ pub mod __buffa {
             pub fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::BatchModifyOrdersResponse,
+                super::super::BatchReplaceOrdersResponse,
                 ::buffa::DecodeError,
             > {
                 self.0.to_owned_message()
@@ -31835,87 +32904,96 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Per-item results in the same order as the request items.
+            /// Server-issued opaque identity used for status and private realtime correlation.
             ///
-            /// Field 1: `results`
+            /// Field 1: `batch_request_id`
+            #[must_use]
+            pub fn batch_request_id(&self) -> u64 {
+                self.0.reborrow().batch_request_id
+            }
+            /// Aggregate admission status.
+            ///
+            /// Field 2: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::BatchReplaceAdmissionStatus> {
+                self.0.reborrow().status
+            }
+            /// Per-item admission results in request order.
+            ///
+            /// Field 3: `results`
             #[must_use]
             pub fn results(
                 &self,
             ) -> &::buffa::RepeatedView<
                 '_,
-                super::super::__buffa::view::BatchModifyResultItemView<'_>,
+                super::super::__buffa::view::BatchReplaceAdmissionItemView<'_>,
             > {
                 &self.0.reborrow().results
             }
-            /// Number of items amended in place.
+            /// Number of items admitted and handed to execution.
             ///
-            /// Field 2: `amended_count`
+            /// Field 4: `accepted_count`
             #[must_use]
-            pub fn amended_count(&self) -> u32 {
-                self.0.reborrow().amended_count
+            pub fn accepted_count(&self) -> u32 {
+                self.0.reborrow().accepted_count
             }
-            /// Number of items replaced with a new order.
+            /// Number of items rejected before execution handoff.
             ///
-            /// Field 3: `replaced_count`
-            #[must_use]
-            pub fn replaced_count(&self) -> u32 {
-                self.0.reborrow().replaced_count
-            }
-            /// Number of items rejected.
-            ///
-            /// Field 4: `rejected_count`
+            /// Field 5: `rejected_count`
             #[must_use]
             pub fn rejected_count(&self) -> u32 {
                 self.0.reborrow().rejected_count
             }
-            /// Server timestamp.
+            /// Server acceptance timestamp.
             ///
-            /// Field 5: `ts`
+            /// Field 6: `accepted_ts`
             #[must_use]
-            pub fn ts(
+            pub fn accepted_ts(
                 &self,
             ) -> &::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
-                &self.0.reborrow().ts
+                &self.0.reborrow().accepted_ts
             }
-            /// Server timestamp as epoch nanoseconds (for bots).
+            /// Server acceptance timestamp as epoch nanoseconds.
             ///
-            /// Field 6: `ts_ns`
+            /// Field 7: `accepted_ts_ns`
             #[must_use]
-            pub fn ts_ns(&self) -> u64 {
-                self.0.reborrow().ts_ns
+            pub fn accepted_ts_ns(&self) -> u64 {
+                self.0.reborrow().accepted_ts_ns
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<BatchModifyOrdersResponseView<'static>>,
-        > for BatchModifyOrdersResponseOwnedView {
+            ::buffa::OwnedView<BatchReplaceOrdersResponseView<'static>>,
+        > for BatchReplaceOrdersResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<BatchModifyOrdersResponseView<'static>>,
+                inner: ::buffa::OwnedView<BatchReplaceOrdersResponseView<'static>>,
             ) -> Self {
-                BatchModifyOrdersResponseOwnedView(inner)
+                BatchReplaceOrdersResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<BatchModifyOrdersResponseOwnedView>
-        for ::buffa::OwnedView<BatchModifyOrdersResponseView<'static>> {
-            fn from(wrapper: BatchModifyOrdersResponseOwnedView) -> Self {
+        impl ::core::convert::From<BatchReplaceOrdersResponseOwnedView>
+        for ::buffa::OwnedView<BatchReplaceOrdersResponseView<'static>> {
+            fn from(wrapper: BatchReplaceOrdersResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<BatchModifyOrdersResponseView<'static>>,
-        > for BatchModifyOrdersResponseOwnedView {
+            ::buffa::OwnedView<BatchReplaceOrdersResponseView<'static>>,
+        > for BatchReplaceOrdersResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<BatchModifyOrdersResponseView<'static>> {
+            ) -> &::buffa::OwnedView<BatchReplaceOrdersResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::BatchModifyOrdersResponse {
-            type View<'a> = BatchModifyOrdersResponseView<'a>;
-            type ViewHandle = BatchModifyOrdersResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::BatchReplaceOrdersResponse {
+            type View<'a> = BatchReplaceOrdersResponseView<'a>;
+            type ViewHandle = BatchReplaceOrdersResponseOwnedView;
         }
-        impl ::serde::Serialize for BatchModifyOrdersResponseOwnedView {
+        impl ::serde::Serialize for BatchReplaceOrdersResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -36071,6 +37149,10 @@ pub mod __buffa {
             ///
             /// Field 26: `version`
             pub version: u32,
+            /// Batch-replace identity that admitted this order. Zero for other origins.
+            ///
+            /// Field 27: `batch_request_id`
+            pub batch_request_id: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for OrderView<'a> {
@@ -36335,6 +37417,15 @@ pub mod __buffa {
                         )?;
                         view.version = ::buffa::types::decode_uint32(&mut cur)?;
                     }
+                    27u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.batch_request_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -36397,6 +37488,7 @@ pub mod __buffa {
                     market_max_slippage_ticks: self.market_max_slippage_ticks,
                     market_max_slippage_bps: self.market_max_slippage_bps,
                     version: self.version,
+                    batch_request_id: self.batch_request_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -36560,6 +37652,9 @@ pub mod __buffa {
                         += 2u32
                             + ::buffa::types::uint32_encoded_len(self.version) as u32;
                 }
+                if self.batch_request_id != 0u64 {
+                    size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -36689,6 +37784,9 @@ pub mod __buffa {
                 }
                 if self.version != 0u32 {
                     ::buffa::types::put_uint32_field(26u32, self.version, buf);
+                }
+                if self.batch_request_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(27u32, self.batch_request_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -36875,6 +37973,13 @@ pub mod __buffa {
                         .serialize_entry(
                             "version",
                             &::buffa::json_helpers::ProtoJson(&self.version),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.batch_request_id) {
+                    __map
+                        .serialize_entry(
+                            "batchRequestId",
+                            &::buffa::json_helpers::ProtoJson(&self.batch_request_id),
                         )?;
                 }
                 __map.end()
@@ -37160,6 +38265,13 @@ pub mod __buffa {
             #[must_use]
             pub fn version(&self) -> u32 {
                 self.0.reborrow().version
+            }
+            /// Batch-replace identity that admitted this order. Zero for other origins.
+            ///
+            /// Field 27: `batch_request_id`
+            #[must_use]
+            pub fn batch_request_id(&self) -> u64 {
+                self.0.reborrow().batch_request_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<OrderView<'static>>>
@@ -41812,6 +42924,1331 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// GetBatchReplaceStatusRequest retrieves one admitted batch by server identity.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetBatchReplaceStatusRequestView<'a> {
+            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
+            /// Server-issued batch identity from BatchReplaceOrders.
+            ///
+            /// Field 2: `batch_request_id`
+            pub batch_request_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetBatchReplaceStatusRequestView<'a> {
+            type Owned = super::super::GetBatchReplaceStatusRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.batch_request_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetBatchReplaceStatusRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetBatchReplaceStatusRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetBatchReplaceStatusRequest {
+                    subaccount_id: self.subaccount_id,
+                    batch_request_id: self.batch_request_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetBatchReplaceStatusRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.batch_request_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(1u32, v, buf);
+                }
+                if self.batch_request_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(2u32, self.batch_request_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetBatchReplaceStatusRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.batch_request_id) {
+                    __map
+                        .serialize_entry(
+                            "batchRequestId",
+                            &::buffa::json_helpers::ProtoJson(&self.batch_request_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetBatchReplaceStatusRequestView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "GetBatchReplaceStatusRequest";
+            const FULL_NAME: &'static str = "orders.v1.GetBatchReplaceStatusRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.GetBatchReplaceStatusRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetBatchReplaceStatusRequestView);
+        ::buffa::impl_view_reborrow!(GetBatchReplaceStatusRequestView);
+        /** Self-contained, `'static` owned view of a `GetBatchReplaceStatusRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetBatchReplaceStatusRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetBatchReplaceStatusRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetBatchReplaceStatusRequestOwnedView(
+            ::buffa::OwnedView<GetBatchReplaceStatusRequestView<'static>>,
+        );
+        impl GetBatchReplaceStatusRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBatchReplaceStatusRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBatchReplaceStatusRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetBatchReplaceStatusRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBatchReplaceStatusRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetBatchReplaceStatusRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetBatchReplaceStatusRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetBatchReplaceStatusRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
+            }
+            /// Server-issued batch identity from BatchReplaceOrders.
+            ///
+            /// Field 2: `batch_request_id`
+            #[must_use]
+            pub fn batch_request_id(&self) -> u64 {
+                self.0.reborrow().batch_request_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetBatchReplaceStatusRequestView<'static>>,
+        > for GetBatchReplaceStatusRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetBatchReplaceStatusRequestView<'static>>,
+            ) -> Self {
+                GetBatchReplaceStatusRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetBatchReplaceStatusRequestOwnedView>
+        for ::buffa::OwnedView<GetBatchReplaceStatusRequestView<'static>> {
+            fn from(wrapper: GetBatchReplaceStatusRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetBatchReplaceStatusRequestView<'static>>,
+        > for GetBatchReplaceStatusRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetBatchReplaceStatusRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetBatchReplaceStatusRequest {
+            type View<'a> = GetBatchReplaceStatusRequestView<'a>;
+            type ViewHandle = GetBatchReplaceStatusRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetBatchReplaceStatusRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// BatchReplaceStatusItem is the index-stable execution status for one replacement.
+        #[derive(Clone, Debug, Default)]
+        pub struct BatchReplaceStatusItemView<'a> {
+            /// Zero-based item index from the write request.
+            ///
+            /// Field 1: `item_index`
+            pub item_index: u32,
+            /// Current recoverable phase.
+            ///
+            /// Field 2: `phase`
+            pub phase: ::buffa::EnumValue<super::super::BatchReplacePhase>,
+            /// Original order targeted by the replacement.
+            ///
+            /// Field 3: `old_order_id`
+            pub old_order_id: u64,
+            /// Assigned successor order ID. Zero when rejected before assignment.
+            ///
+            /// Field 4: `replacement_order_id`
+            pub replacement_order_id: u64,
+            /// Current successor order status when available.
+            ///
+            /// Field 5: `order_status`
+            pub order_status: ::buffa::EnumValue<super::super::OrderStatus>,
+            /// Stable rejection or terminal error code. Empty when none.
+            ///
+            /// Field 6: `code`
+            pub code: &'a str,
+            /// Latest status timestamp in nanoseconds since epoch.
+            ///
+            /// Field 7: `updated_ts_ns`
+            pub updated_ts_ns: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for BatchReplaceStatusItemView<'a> {
+            type Owned = super::super::BatchReplaceStatusItem;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.item_index = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.phase = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.old_order_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.replacement_order_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.order_status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.code = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.updated_ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchReplaceStatusItem,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BatchReplaceStatusItem,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BatchReplaceStatusItem {
+                    item_index: self.item_index,
+                    phase: self.phase,
+                    old_order_id: self.old_order_id,
+                    replacement_order_id: self.replacement_order_id,
+                    order_status: self.order_status,
+                    code: self.code.to_string(),
+                    updated_ts_ns: self.updated_ts_ns,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for BatchReplaceStatusItemView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.item_index != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.item_index) as u32;
+                }
+                {
+                    let val = self.phase.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.old_order_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.replacement_order_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                {
+                    let val = self.order_status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.code.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
+                }
+                if self.updated_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.updated_ts_ns)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.item_index != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.item_index, buf);
+                }
+                {
+                    let val = self.phase.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if self.old_order_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(3u32, self.old_order_id, buf);
+                }
+                if self.replacement_order_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(
+                        4u32,
+                        self.replacement_order_id,
+                        buf,
+                    );
+                }
+                {
+                    let val = self.order_status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(5u32, val, buf);
+                    }
+                }
+                if !self.code.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.code, buf);
+                }
+                if self.updated_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(7u32, self.updated_ts_ns, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for BatchReplaceStatusItemView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.item_index) {
+                    __map
+                        .serialize_entry(
+                            "itemIndex",
+                            &::buffa::json_helpers::ProtoJson(&self.item_index),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.phase) {
+                    __map.serialize_entry("phase", &self.phase)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.old_order_id) {
+                    __map
+                        .serialize_entry(
+                            "oldOrderId",
+                            &::buffa::json_helpers::ProtoJson(&self.old_order_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.replacement_order_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "replacementOrderId",
+                            &::buffa::json_helpers::ProtoJson(&self.replacement_order_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.order_status,
+                ) {
+                    __map.serialize_entry("orderStatus", &self.order_status)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.code) {
+                    __map.serialize_entry("code", self.code)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.updated_ts_ns) {
+                    __map
+                        .serialize_entry(
+                            "updatedTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.updated_ts_ns),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BatchReplaceStatusItemView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "BatchReplaceStatusItem";
+            const FULL_NAME: &'static str = "orders.v1.BatchReplaceStatusItem";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.BatchReplaceStatusItem";
+        }
+        ::buffa::impl_default_view_instance!(BatchReplaceStatusItemView);
+        ::buffa::impl_view_reborrow!(BatchReplaceStatusItemView);
+        /** Self-contained, `'static` owned view of a `BatchReplaceStatusItem` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BatchReplaceStatusItemView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchReplaceStatusItemView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BatchReplaceStatusItemOwnedView(
+            ::buffa::OwnedView<BatchReplaceStatusItemView<'static>>,
+        );
+        impl BatchReplaceStatusItemOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchReplaceStatusItemOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchReplaceStatusItemOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BatchReplaceStatusItem,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchReplaceStatusItemOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`BatchReplaceStatusItemView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BatchReplaceStatusItemView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchReplaceStatusItem,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Zero-based item index from the write request.
+            ///
+            /// Field 1: `item_index`
+            #[must_use]
+            pub fn item_index(&self) -> u32 {
+                self.0.reborrow().item_index
+            }
+            /// Current recoverable phase.
+            ///
+            /// Field 2: `phase`
+            #[must_use]
+            pub fn phase(&self) -> ::buffa::EnumValue<super::super::BatchReplacePhase> {
+                self.0.reborrow().phase
+            }
+            /// Original order targeted by the replacement.
+            ///
+            /// Field 3: `old_order_id`
+            #[must_use]
+            pub fn old_order_id(&self) -> u64 {
+                self.0.reborrow().old_order_id
+            }
+            /// Assigned successor order ID. Zero when rejected before assignment.
+            ///
+            /// Field 4: `replacement_order_id`
+            #[must_use]
+            pub fn replacement_order_id(&self) -> u64 {
+                self.0.reborrow().replacement_order_id
+            }
+            /// Current successor order status when available.
+            ///
+            /// Field 5: `order_status`
+            #[must_use]
+            pub fn order_status(&self) -> ::buffa::EnumValue<super::super::OrderStatus> {
+                self.0.reborrow().order_status
+            }
+            /// Stable rejection or terminal error code. Empty when none.
+            ///
+            /// Field 6: `code`
+            #[must_use]
+            pub fn code(&self) -> &'_ str {
+                self.0.reborrow().code
+            }
+            /// Latest status timestamp in nanoseconds since epoch.
+            ///
+            /// Field 7: `updated_ts_ns`
+            #[must_use]
+            pub fn updated_ts_ns(&self) -> u64 {
+                self.0.reborrow().updated_ts_ns
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<BatchReplaceStatusItemView<'static>>,
+        > for BatchReplaceStatusItemOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<BatchReplaceStatusItemView<'static>>,
+            ) -> Self {
+                BatchReplaceStatusItemOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BatchReplaceStatusItemOwnedView>
+        for ::buffa::OwnedView<BatchReplaceStatusItemView<'static>> {
+            fn from(wrapper: BatchReplaceStatusItemOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<BatchReplaceStatusItemView<'static>>,
+        > for BatchReplaceStatusItemOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<BatchReplaceStatusItemView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::BatchReplaceStatusItem {
+            type View<'a> = BatchReplaceStatusItemView<'a>;
+            type ViewHandle = BatchReplaceStatusItemOwnedView;
+        }
+        impl ::serde::Serialize for BatchReplaceStatusItemOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetBatchReplaceStatusResponse returns durable batch and per-item finality.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetBatchReplaceStatusResponseView<'a> {
+            /// Server-issued batch identity.
+            ///
+            /// Field 1: `batch_request_id`
+            pub batch_request_id: u64,
+            /// Aggregate admission status returned by the write receipt.
+            ///
+            /// Field 2: `admission_status`
+            pub admission_status: ::buffa::EnumValue<
+                super::super::BatchReplaceAdmissionStatus,
+            >,
+            /// Per-item statuses in request order.
+            ///
+            /// Field 3: `items`
+            pub items: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::BatchReplaceStatusItemView<'a>,
+            >,
+            /// Number of admitted items.
+            ///
+            /// Field 4: `accepted_count`
+            pub accepted_count: u32,
+            /// Number of rejected items.
+            ///
+            /// Field 5: `rejected_count`
+            pub rejected_count: u32,
+            /// Server acceptance timestamp in nanoseconds since epoch.
+            ///
+            /// Field 6: `accepted_ts_ns`
+            pub accepted_ts_ns: u64,
+            /// Latest batch status timestamp in nanoseconds since epoch.
+            ///
+            /// Field 7: `updated_ts_ns`
+            pub updated_ts_ns: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetBatchReplaceStatusResponseView<'a> {
+            type Owned = super::super::GetBatchReplaceStatusResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.batch_request_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.admission_status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.accepted_count = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.rejected_count = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.accepted_ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.updated_ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.items
+                            .push(
+                                <super::super::__buffa::view::BatchReplaceStatusItemView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetBatchReplaceStatusResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetBatchReplaceStatusResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetBatchReplaceStatusResponse {
+                    batch_request_id: self.batch_request_id,
+                    admission_status: self.admission_status,
+                    items: self
+                        .items
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    accepted_count: self.accepted_count,
+                    rejected_count: self.rejected_count,
+                    accepted_ts_ns: self.accepted_ts_ns,
+                    updated_ts_ns: self.updated_ts_ns,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetBatchReplaceStatusResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.batch_request_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                {
+                    let val = self.admission_status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                for v in &self.items {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.accepted_count != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.accepted_count)
+                                as u32;
+                }
+                if self.rejected_count != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.rejected_count)
+                                as u32;
+                }
+                if self.accepted_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.accepted_ts_ns)
+                                as u32;
+                }
+                if self.updated_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.updated_ts_ns)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.batch_request_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.batch_request_id, buf);
+                }
+                {
+                    let val = self.admission_status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                for v in &self.items {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.accepted_count != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.accepted_count, buf);
+                }
+                if self.rejected_count != 0u32 {
+                    ::buffa::types::put_uint32_field(5u32, self.rejected_count, buf);
+                }
+                if self.accepted_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(6u32, self.accepted_ts_ns, buf);
+                }
+                if self.updated_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(7u32, self.updated_ts_ns, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetBatchReplaceStatusResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.batch_request_id) {
+                    __map
+                        .serialize_entry(
+                            "batchRequestId",
+                            &::buffa::json_helpers::ProtoJson(&self.batch_request_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.admission_status,
+                ) {
+                    __map.serialize_entry("admissionStatus", &self.admission_status)?;
+                }
+                if !self.items.is_empty() {
+                    __map.serialize_entry("items", &*self.items)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.accepted_count) {
+                    __map
+                        .serialize_entry(
+                            "acceptedCount",
+                            &::buffa::json_helpers::ProtoJson(&self.accepted_count),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.rejected_count) {
+                    __map
+                        .serialize_entry(
+                            "rejectedCount",
+                            &::buffa::json_helpers::ProtoJson(&self.rejected_count),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.accepted_ts_ns) {
+                    __map
+                        .serialize_entry(
+                            "acceptedTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.accepted_ts_ns),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.updated_ts_ns) {
+                    __map
+                        .serialize_entry(
+                            "updatedTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.updated_ts_ns),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetBatchReplaceStatusResponseView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "GetBatchReplaceStatusResponse";
+            const FULL_NAME: &'static str = "orders.v1.GetBatchReplaceStatusResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.GetBatchReplaceStatusResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetBatchReplaceStatusResponseView);
+        ::buffa::impl_view_reborrow!(GetBatchReplaceStatusResponseView);
+        /** Self-contained, `'static` owned view of a `GetBatchReplaceStatusResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetBatchReplaceStatusResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetBatchReplaceStatusResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetBatchReplaceStatusResponseOwnedView(
+            ::buffa::OwnedView<GetBatchReplaceStatusResponseView<'static>>,
+        );
+        impl GetBatchReplaceStatusResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBatchReplaceStatusResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBatchReplaceStatusResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetBatchReplaceStatusResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetBatchReplaceStatusResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetBatchReplaceStatusResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetBatchReplaceStatusResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetBatchReplaceStatusResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Server-issued batch identity.
+            ///
+            /// Field 1: `batch_request_id`
+            #[must_use]
+            pub fn batch_request_id(&self) -> u64 {
+                self.0.reborrow().batch_request_id
+            }
+            /// Aggregate admission status returned by the write receipt.
+            ///
+            /// Field 2: `admission_status`
+            #[must_use]
+            pub fn admission_status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::BatchReplaceAdmissionStatus> {
+                self.0.reborrow().admission_status
+            }
+            /// Per-item statuses in request order.
+            ///
+            /// Field 3: `items`
+            #[must_use]
+            pub fn items(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::BatchReplaceStatusItemView<'_>,
+            > {
+                &self.0.reborrow().items
+            }
+            /// Number of admitted items.
+            ///
+            /// Field 4: `accepted_count`
+            #[must_use]
+            pub fn accepted_count(&self) -> u32 {
+                self.0.reborrow().accepted_count
+            }
+            /// Number of rejected items.
+            ///
+            /// Field 5: `rejected_count`
+            #[must_use]
+            pub fn rejected_count(&self) -> u32 {
+                self.0.reborrow().rejected_count
+            }
+            /// Server acceptance timestamp in nanoseconds since epoch.
+            ///
+            /// Field 6: `accepted_ts_ns`
+            #[must_use]
+            pub fn accepted_ts_ns(&self) -> u64 {
+                self.0.reborrow().accepted_ts_ns
+            }
+            /// Latest batch status timestamp in nanoseconds since epoch.
+            ///
+            /// Field 7: `updated_ts_ns`
+            #[must_use]
+            pub fn updated_ts_ns(&self) -> u64 {
+                self.0.reborrow().updated_ts_ns
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetBatchReplaceStatusResponseView<'static>>,
+        > for GetBatchReplaceStatusResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetBatchReplaceStatusResponseView<'static>>,
+            ) -> Self {
+                GetBatchReplaceStatusResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetBatchReplaceStatusResponseOwnedView>
+        for ::buffa::OwnedView<GetBatchReplaceStatusResponseView<'static>> {
+            fn from(wrapper: GetBatchReplaceStatusResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetBatchReplaceStatusResponseView<'static>>,
+        > for GetBatchReplaceStatusResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetBatchReplaceStatusResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetBatchReplaceStatusResponse {
+            type View<'a> = GetBatchReplaceStatusResponseView<'a>;
+            type ViewHandle = GetBatchReplaceStatusResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetBatchReplaceStatusResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
@@ -41946,7 +44383,7 @@ pub mod __buffa {
                     ClientOrderId(&'a str),
                 }
             }
-            pub mod batch_modify_item {
+            pub mod batch_replace_order_item {
                 #[allow(unused_imports)]
                 use super::*;
                 #[derive(Clone, Debug)]
@@ -42381,7 +44818,7 @@ pub mod __buffa {
                 }
             }
         }
-        pub mod batch_modify_item {
+        pub mod batch_replace_order_item {
             #[allow(unused_imports)]
             use super::*;
             #[derive(Clone, PartialEq, Debug)]
@@ -42476,10 +44913,10 @@ pub mod __buffa {
         reg.register_json_any(super::__BATCH_CREATE_ORDERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MODIFY_ORDER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__MODIFY_ORDER_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__BATCH_MODIFY_ITEM_JSON_ANY);
-        reg.register_json_any(super::__BATCH_MODIFY_RESULT_ITEM_JSON_ANY);
-        reg.register_json_any(super::__BATCH_MODIFY_ORDERS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__BATCH_MODIFY_ORDERS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__BATCH_REPLACE_ORDER_ITEM_JSON_ANY);
+        reg.register_json_any(super::__BATCH_REPLACE_ADMISSION_ITEM_JSON_ANY);
+        reg.register_json_any(super::__BATCH_REPLACE_ORDERS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__BATCH_REPLACE_ORDERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__BATCH_CANCEL_ITEM_JSON_ANY);
         reg.register_json_any(super::__BATCH_CANCEL_RESULT_ITEM_JSON_ANY);
         reg.register_json_any(super::__BATCH_CANCEL_ORDERS_REQUEST_JSON_ANY);
@@ -42501,6 +44938,9 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_USER_TRADES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_ORDER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_ORDER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_BATCH_REPLACE_STATUS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__BATCH_REPLACE_STATUS_ITEM_JSON_ANY);
+        reg.register_json_any(super::__GET_BATCH_REPLACE_STATUS_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -42620,21 +45060,21 @@ pub use self::__buffa::view::ModifyOrderResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ModifyOrderResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::BatchModifyItemView;
+pub use self::__buffa::view::BatchReplaceOrderItemView;
 #[doc(inline)]
-pub use self::__buffa::view::BatchModifyItemOwnedView;
+pub use self::__buffa::view::BatchReplaceOrderItemOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::BatchModifyResultItemView;
+pub use self::__buffa::view::BatchReplaceAdmissionItemView;
 #[doc(inline)]
-pub use self::__buffa::view::BatchModifyResultItemOwnedView;
+pub use self::__buffa::view::BatchReplaceAdmissionItemOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::BatchModifyOrdersRequestView;
+pub use self::__buffa::view::BatchReplaceOrdersRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::BatchModifyOrdersRequestOwnedView;
+pub use self::__buffa::view::BatchReplaceOrdersRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::BatchModifyOrdersResponseView;
+pub use self::__buffa::view::BatchReplaceOrdersResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::BatchModifyOrdersResponseOwnedView;
+pub use self::__buffa::view::BatchReplaceOrdersResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::BatchCancelItemView;
 #[doc(inline)]
@@ -42719,5 +45159,17 @@ pub use self::__buffa::view::GetOrderRequestOwnedView;
 pub use self::__buffa::view::GetOrderResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetOrderResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetBatchReplaceStatusRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetBatchReplaceStatusRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchReplaceStatusItemView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchReplaceStatusItemOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetBatchReplaceStatusResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetBatchReplaceStatusResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;
