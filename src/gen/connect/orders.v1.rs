@@ -48,13 +48,13 @@ pub type OwnedModifyOrderRequestView = ::buffa::view::OwnedView<
 pub type OwnedModifyOrderResponseView = ::buffa::view::OwnedView<
     crate::proto::orders::v1::__buffa::view::ModifyOrderResponseView<'static>,
 >;
-///Shorthand for `OwnedView<BatchModifyOrdersRequestView<'static>>`.
-pub type OwnedBatchModifyOrdersRequestView = ::buffa::view::OwnedView<
-    crate::proto::orders::v1::__buffa::view::BatchModifyOrdersRequestView<'static>,
+///Shorthand for `OwnedView<BatchReplaceOrdersRequestView<'static>>`.
+pub type OwnedBatchReplaceOrdersRequestView = ::buffa::view::OwnedView<
+    crate::proto::orders::v1::__buffa::view::BatchReplaceOrdersRequestView<'static>,
 >;
-///Shorthand for `OwnedView<BatchModifyOrdersResponseView<'static>>`.
-pub type OwnedBatchModifyOrdersResponseView = ::buffa::view::OwnedView<
-    crate::proto::orders::v1::__buffa::view::BatchModifyOrdersResponseView<'static>,
+///Shorthand for `OwnedView<BatchReplaceOrdersResponseView<'static>>`.
+pub type OwnedBatchReplaceOrdersResponseView = ::buffa::view::OwnedView<
+    crate::proto::orders::v1::__buffa::view::BatchReplaceOrdersResponseView<'static>,
 >;
 ///Shorthand for `OwnedView<BatchCancelOrdersRequestView<'static>>`.
 pub type OwnedBatchCancelOrdersRequestView = ::buffa::view::OwnedView<
@@ -184,8 +184,8 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::orders::v1::BatchModifyOrdersResponse>
-for crate::proto::orders::v1::__buffa::view::BatchModifyOrdersResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::orders::v1::BatchReplaceOrdersResponse>
+for crate::proto::orders::v1::__buffa::view::BatchReplaceOrdersResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -193,9 +193,9 @@ for crate::proto::orders::v1::__buffa::view::BatchModifyOrdersResponseView<'_> {
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::orders::v1::BatchModifyOrdersResponse>
+impl ::connectrpc::Encodable<crate::proto::orders::v1::BatchReplaceOrdersResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::orders::v1::__buffa::view::BatchModifyOrdersResponseView<'static>,
+    crate::proto::orders::v1::__buffa::view::BatchReplaceOrdersResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -280,12 +280,12 @@ pub const ORDERS_SERVICE_MODIFY_ORDER_SPEC: ::connectrpc::Spec = ::connectrpc::S
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `BatchModifyOrders` RPC.
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `BatchReplaceOrders` RPC.
 ///
 /// The dispatcher surfaces this on
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const ORDERS_SERVICE_BATCH_MODIFY_ORDERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/orders.v1.OrdersService/BatchModifyOrders",
+pub const ORDERS_SERVICE_BATCH_REPLACE_ORDERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/orders.v1.OrdersService/BatchReplaceOrders",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -494,7 +494,7 @@ pub trait OrdersService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Modifies multiple existing orders in one request.
+    /// Replaces same-symbol orders and returns after authoritative admission.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -503,17 +503,17 @@ pub trait OrdersService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn batch_modify_orders<'a>(
+    fn batch_replace_orders<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::orders::v1::BatchModifyOrdersRequest,
+            crate::proto::orders::v1::BatchReplaceOrdersRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::orders::v1::BatchModifyOrdersResponse,
+                crate::proto::orders::v1::BatchReplaceOrdersResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -750,13 +750,13 @@ impl<S: OrdersService> OrdersServiceExt for S {
             .with_spec(ORDERS_SERVICE_MODIFY_ORDER_SPEC)
             .route_view(
                 ORDERS_SERVICE_SERVICE_NAME,
-                "BatchModifyOrders",
+                "BatchReplaceOrders",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::orders::v1::__buffa::view::BatchModifyOrdersRequestView<
+                            crate::proto::orders::v1::__buffa::view::BatchReplaceOrdersRequestView<
                                 'static,
                             >,
                         >,
@@ -765,18 +765,18 @@ impl<S: OrdersService> OrdersServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::orders::v1::BatchModifyOrdersRequest,
+                                crate::proto::orders::v1::BatchReplaceOrdersRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.batch_modify_orders(ctx, sreq)
+                            svc.batch_replace_orders(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::orders::v1::BatchModifyOrdersResponse,
+                                    crate::proto::orders::v1::BatchReplaceOrdersResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(ORDERS_SERVICE_BATCH_MODIFY_ORDERS_SPEC)
+            .with_spec(ORDERS_SERVICE_BATCH_REPLACE_ORDERS_SPEC)
             .route_view(
                 ORDERS_SERVICE_SERVICE_NAME,
                 "BatchCancelOrders",
@@ -896,10 +896,10 @@ impl<T: OrdersService> ::connectrpc::Dispatcher for OrdersServiceServer<T> {
                         .with_spec(ORDERS_SERVICE_MODIFY_ORDER_SPEC),
                 )
             }
-            "BatchModifyOrders" => {
+            "BatchReplaceOrders" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(ORDERS_SERVICE_BATCH_MODIFY_ORDERS_SPEC),
+                        .with_spec(ORDERS_SERVICE_BATCH_REPLACE_ORDERS_SPEC),
                 )
             }
             "BatchCancelOrders" => {
@@ -1043,24 +1043,24 @@ impl<T: OrdersService> ::connectrpc::Dispatcher for OrdersServiceServer<T> {
                         .encode::<crate::proto::orders::v1::ModifyOrderResponse>(format)
                 })
             }
-            "BatchModifyOrders" => {
+            "BatchReplaceOrders" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::orders::v1::BatchModifyOrdersRequest,
+                        crate::proto::orders::v1::BatchReplaceOrdersRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::orders::v1::__buffa::view::BatchModifyOrdersRequestView<
+                    let req: crate::proto::orders::v1::__buffa::view::BatchReplaceOrdersRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::orders::v1::BatchModifyOrdersRequest,
+                        crate::proto::orders::v1::BatchReplaceOrdersRequest,
                     >::from_parts(&req, &body);
-                    svc.batch_modify_orders(ctx, req)
+                    svc.batch_replace_orders(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::orders::v1::BatchModifyOrdersResponse,
+                            crate::proto::orders::v1::BatchReplaceOrdersResponse,
                         >(format)
                 })
             }
@@ -1445,35 +1445,35 @@ where
             )
             .await
     }
-    /// Call the BatchModifyOrders RPC. Sends a request to /orders.v1.OrdersService/BatchModifyOrders.
-    pub async fn batch_modify_orders(
+    /// Call the BatchReplaceOrders RPC. Sends a request to /orders.v1.OrdersService/BatchReplaceOrders.
+    pub async fn batch_replace_orders(
         &self,
-        request: crate::proto::orders::v1::BatchModifyOrdersRequest,
+        request: crate::proto::orders::v1::BatchReplaceOrdersRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::orders::v1::__buffa::view::BatchModifyOrdersResponseView<
+                crate::proto::orders::v1::__buffa::view::BatchReplaceOrdersResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.batch_modify_orders_with_options(
+        self.batch_replace_orders_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the BatchModifyOrders RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn batch_modify_orders_with_options(
+    /// Call the BatchReplaceOrders RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn batch_replace_orders_with_options(
         &self,
-        request: crate::proto::orders::v1::BatchModifyOrdersRequest,
+        request: crate::proto::orders::v1::BatchReplaceOrdersRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::orders::v1::__buffa::view::BatchModifyOrdersResponseView<
+                crate::proto::orders::v1::__buffa::view::BatchReplaceOrdersResponseView<
                     'static,
                 >,
             >,
@@ -1484,7 +1484,7 @@ where
                 &self.transport,
                 &self.config,
                 ORDERS_SERVICE_SERVICE_NAME,
-                "BatchModifyOrders",
+                "BatchReplaceOrders",
                 request,
                 options,
             )
@@ -1569,6 +1569,14 @@ pub type OwnedGetOrderRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetOrderResponseView = ::buffa::view::OwnedView<
     crate::proto::orders::v1::__buffa::view::GetOrderResponseView<'static>,
 >;
+///Shorthand for `OwnedView<GetBatchReplaceStatusRequestView<'static>>`.
+pub type OwnedGetBatchReplaceStatusRequestView = ::buffa::view::OwnedView<
+    crate::proto::orders::v1::__buffa::view::GetBatchReplaceStatusRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetBatchReplaceStatusResponseView<'static>>`.
+pub type OwnedGetBatchReplaceStatusResponseView = ::buffa::view::OwnedView<
+    crate::proto::orders::v1::__buffa::view::GetBatchReplaceStatusResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::orders::v1::GetOpenOrdersResponse>
 for crate::proto::orders::v1::__buffa::view::GetOpenOrdersResponseView<'_> {
     fn encode(
@@ -1649,6 +1657,26 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::orders::v1::GetBatchReplaceStatusResponse>
+for crate::proto::orders::v1::__buffa::view::GetBatchReplaceStatusResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::orders::v1::GetBatchReplaceStatusResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::orders::v1::__buffa::view::GetBatchReplaceStatusResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const ORDERS_READ_SERVICE_SERVICE_NAME: &str = "orders.v1.OrdersReadService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetOpenOrders` RPC.
@@ -1684,6 +1712,15 @@ pub const ORDERS_READ_SERVICE_GET_USER_TRADES_SPEC: ::connectrpc::Spec = ::conne
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const ORDERS_READ_SERVICE_GET_ORDER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/orders.v1.OrdersReadService/GetOrder",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetBatchReplaceStatus` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const ORDERS_READ_SERVICE_GET_BATCH_REPLACE_STATUS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/orders.v1.OrdersReadService/GetBatchReplaceStatus",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -1830,6 +1867,29 @@ pub trait OrdersReadService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::orders::v1::GetOrderResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Retrieve durable execution status for one admitted batch replacement.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_batch_replace_status<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::orders::v1::GetBatchReplaceStatusRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::orders::v1::GetBatchReplaceStatusResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1981,6 +2041,35 @@ impl<S: OrdersReadService> OrdersReadServiceExt for S {
                 },
             )
             .with_spec(ORDERS_READ_SERVICE_GET_ORDER_SPEC)
+            .route_view(
+                ORDERS_READ_SERVICE_SERVICE_NAME,
+                "GetBatchReplaceStatus",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::orders::v1::__buffa::view::GetBatchReplaceStatusRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::orders::v1::GetBatchReplaceStatusRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_batch_replace_status(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::orders::v1::GetBatchReplaceStatusResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ORDERS_READ_SERVICE_GET_BATCH_REPLACE_STATUS_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -2057,6 +2146,12 @@ impl<T: OrdersReadService> ::connectrpc::Dispatcher for OrdersReadServiceServer<
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(ORDERS_READ_SERVICE_GET_ORDER_SPEC),
+                )
+            }
+            "GetBatchReplaceStatus" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ORDERS_READ_SERVICE_GET_BATCH_REPLACE_STATUS_SPEC),
                 )
             }
             _ => None,
@@ -2154,6 +2249,27 @@ impl<T: OrdersReadService> ::connectrpc::Dispatcher for OrdersReadServiceServer<
                     svc.get_order(ctx, req)
                         .await?
                         .encode::<crate::proto::orders::v1::GetOrderResponse>(format)
+                })
+            }
+            "GetBatchReplaceStatus" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::orders::v1::GetBatchReplaceStatusRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::orders::v1::__buffa::view::GetBatchReplaceStatusRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::orders::v1::GetBatchReplaceStatusRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_batch_replace_status(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::orders::v1::GetBatchReplaceStatusResponse,
+                        >(format)
                 })
             }
             _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
@@ -2429,6 +2545,51 @@ where
                 &self.config,
                 ORDERS_READ_SERVICE_SERVICE_NAME,
                 "GetOrder",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetBatchReplaceStatus RPC. Sends a request to /orders.v1.OrdersReadService/GetBatchReplaceStatus.
+    pub async fn get_batch_replace_status(
+        &self,
+        request: crate::proto::orders::v1::GetBatchReplaceStatusRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::orders::v1::__buffa::view::GetBatchReplaceStatusResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_batch_replace_status_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetBatchReplaceStatus RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_batch_replace_status_with_options(
+        &self,
+        request: crate::proto::orders::v1::GetBatchReplaceStatusRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::orders::v1::__buffa::view::GetBatchReplaceStatusResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ORDERS_READ_SERVICE_SERVICE_NAME,
+                "GetBatchReplaceStatus",
                 request,
                 options,
             )
