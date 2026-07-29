@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a21
+
+Package version: `0.1.0-alpha.21`. Git tag: `v0.1.0a21`.
+
 ### Breaking
 - `OrdersService::batch_modify` and `BatchModify*` models are replaced by admission-oriented
   `OrdersService::batch_replace` and `BatchReplace*`. Batch replacement is now a same-symbol
