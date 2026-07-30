@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a22
+
+Package version: `0.1.0-alpha.22`. Git tag: `v0.1.0a22`.
+
 ### Breaking
 - `OrderFeeSource` / `fee_source` are replaced by `FeeAsset` / `fee_asset`.
   Use `FeeAsset::Base` (BUY only) where older clients used the removed
