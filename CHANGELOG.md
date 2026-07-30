@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Breaking
+- `OrderFeeSource` / `fee_source` are replaced by `FeeAsset` / `fee_asset`.
+  Use `FeeAsset::Base` (BUY only) where older clients used the removed
+  received-asset fee mode; SELL orders must use `FeeAsset::Quote`.
+- `CreateOrderParams.quantity` is now optional because create sizing is an
+  explicit oneof: set exactly one of base `quantity` or
+  `max_quote_debit_scaled`. Create results now expose `resolved_base_qty` and
+  `submitted_max_quote_debit_scaled`; order history exposes the submitted
+  quote-debit budget when present.
+
+### Added
+- `OrdersService::preview` resolves advisory sizing, price bounds, and fees
+  before submission.
+- `BatchReplaceStatusResult::is_settled` and `is_batch_replace_settled` report
+  when every item is `working`, `rejected`, or `terminal`.
+
+### Changed
+- Batch-replace predecessor IDs can be stale after admission. Use each item's
+  `replacement_order_id`, reuse the same `request_id` on retry, and poll
+  `get_batch_replace_status` for reconciliation; its phases
+  (`admitted`/`working`/`rejected`/`terminal`) are not execution finality.
+
 ## 0.1.0a21
 
 Package version: `0.1.0-alpha.21`. Git tag: `v0.1.0a21`.
