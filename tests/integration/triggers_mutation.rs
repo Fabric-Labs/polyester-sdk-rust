@@ -93,7 +93,7 @@ async fn trigger_pause_resume_cancel() {
         ladder_price_max: None,
         ladder_levels: None,
         ladder_distribution: None,
-        fee_source: None,
+        fee_asset: None,
         self_trade_prevention_mode: None,
     };
 

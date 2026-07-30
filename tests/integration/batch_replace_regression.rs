@@ -126,7 +126,7 @@ async fn batch_replace_five_rounds_of_forty_with_safe_same_id_retry() {
             side: CreateSide::Buy,
             order_type: CreateOrderType::Limit,
             quantity: match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
-                Ok(q) => q,
+                Ok(q) => Some(q),
                 Err(err) => {
                     eprintln!("skip: qty: {err}");
                     let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
@@ -139,7 +139,8 @@ async fn batch_replace_five_rounds_of_forty_with_safe_same_id_retry() {
             subaccount_id: None,
             post_only: Some(true),
             market_client_ref_price: None,
-            fee_source: None,
+            max_quote_debit_scaled: None,
+            fee_asset: None,
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,

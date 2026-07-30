@@ -9,7 +9,7 @@ use crate::models::{
     TriggersList,
 };
 use crate::proto::orders::v1::{
-    FeeSource, SelfTradePreventionMode, TriggerDirection, TriggerPriceSource,
+    FeeAsset, SelfTradePreventionMode, TriggerDirection, TriggerPriceSource,
 };
 use crate::proto::triggers::v1::{
     CancelTriggerResponse, ConditionalTrigger, CreateTriggerResponse, GetTriggerResponse,
@@ -78,10 +78,10 @@ fn trigger_direction_label(value: buffa::EnumValue<TriggerDirection>) -> String 
     }
 }
 
-fn fee_source_label(value: buffa::EnumValue<FeeSource>) -> String {
+fn fee_asset_label(value: buffa::EnumValue<FeeAsset>) -> String {
     match value.as_known() {
-        Some(FeeSource::Quote) => "quote".to_owned(),
-        Some(FeeSource::Received) => "received".to_owned(),
+        Some(FeeAsset::Quote) => "quote".to_owned(),
+        Some(FeeAsset::Base) => "base".to_owned(),
         Some(_) => String::new(),
         None => format!("UNKNOWN({})", value.to_i32()),
     }
@@ -354,7 +354,7 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         time_in_force: proj.time_in_force,
         qty: decode_qty_scaled(msg.qty_scaled, None, symbol.clone(), symbol_id_opt),
         limit_price: proj.limit_price,
-        fee_source: fee_source_label(msg.fee_source),
+        fee_asset: fee_asset_label(msg.fee_asset),
         self_trade_prevention_mode: stp_mode_label(msg.self_trade_prevention_mode),
         post_only: proj.post_only,
         trigger_price,
