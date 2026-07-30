@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.21`, git tag `v0.1.0a21`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.23`, git tag `v0.1.0a23`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -65,18 +65,26 @@ API-key policy before retrying.
 
 ## Install
 
-The crate is not on crates.io yet. Pin the published git tag:
+crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a21" }
+polyester-sdk = "0.1.0-alpha.23"
+```
+
+Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
+`realtime` / `chain` Cargo features are empty compatibility flags.
+
+For a private git checkout instead of crates.io:
+
+```toml
+[dependencies]
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a23" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
-required. If Cargo cannot use your credential helper, run it with
+required for the git pin. If Cargo cannot use your credential helper, run it with
 `CARGO_NET_GIT_FETCH_WITH_CLI=true`.
-
-Realtime (Centrifugo) and on-chain Funding helpers are always included.
 
 For development from a git checkout:
 
