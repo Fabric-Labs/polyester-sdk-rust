@@ -20,6 +20,11 @@ pub struct Order {
     pub created_ts_ns: String,
     pub version: u32,
     pub post_only: bool,
+    /// Asset selected to pay fees: `quote`, `base`, or an
+    /// `UNKNOWN(<number>)` forward-compatible enum value.
+    pub fee_asset: String,
+    /// Hard all-in quote debit submitted with quote-budget sizing, when used.
+    pub submitted_max_quote_debit_scaled: Option<i64>,
     /// Attached risk policy when requested via `include_attached_risk`.
     pub attached_risk: Option<AttachedRisk>,
 }
@@ -35,6 +40,10 @@ pub struct OrderMutationResult {
     pub status: String,
     pub order_id: String,
     pub client_order_id: String,
+    /// Gross base quantity resolved by the admission service.
+    pub resolved_base_qty: Option<Quantity>,
+    /// Hard all-in quote debit submitted with quote-budget sizing, when used.
+    pub submitted_max_quote_debit_scaled: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,9 +62,9 @@ pub struct UserTrade {
     pub price: Option<Price>,
     pub qty: Option<Quantity>,
     pub fee_scaled: String,
-    /// Asset used to pay the fee: `quote`, `received`, or an
+    /// Asset used to pay the fee: `quote`, `base`, or an
     /// `UNKNOWN(<number>)` forward-compatible enum value.
-    pub fee_source: String,
+    pub fee_asset: String,
     pub referral_share_scaled: String,
     pub ts_ns: String,
 }
@@ -335,6 +344,27 @@ pub struct BatchReplaceStatusResult {
     pub updated_ts_ns: u64,
 }
 
+impl BatchReplaceStatusResult {
+    /// Returns true once every item has left admission processing.
+    ///
+    /// `working` means the replacement is live, not that it has reached an
+    /// execution terminal state. Continue polling/reconciling order state when
+    /// execution finality is required.
+    pub fn is_settled(&self) -> bool {
+        is_batch_replace_settled(self)
+    }
+}
+
+/// Returns true once every batch-replace item is `working`, `rejected`, or
+/// `terminal`. An empty status is not considered settled.
+pub fn is_batch_replace_settled(status: &BatchReplaceStatusResult) -> bool {
+    !status.items.is_empty()
+        && status
+            .items
+            .iter()
+            .all(|item| matches!(item.phase.as_str(), "working" | "rejected" | "terminal"))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CancelAllAfterResult {
     pub status: String,
@@ -403,7 +433,11 @@ pub struct CreateOrderParams {
     pub symbol: String,
     pub side: CreateSide,
     pub order_type: CreateOrderType,
-    pub quantity: Quantity,
+    /// Base quantity. Set exactly one of this and `max_quote_debit_scaled`.
+    pub quantity: Option<Quantity>,
+    /// Hard all-in quote debit limit in the pair's quote quantity scale. Set
+    /// exactly one of this and `quantity`.
+    pub max_quote_debit_scaled: Option<i64>,
     pub price: Option<Price>,
     pub time_in_force: Option<CreateTimeInForce>,
     /// Optional client order id (API-optional).
@@ -416,8 +450,8 @@ pub struct CreateOrderParams {
     pub post_only: Option<bool>,
     /// Client reference price for MARKET order reservation (price ticks domain).
     pub market_client_ref_price: Option<Price>,
-    /// BUY fee source (`Quote` is required for SELL orders).
-    pub fee_source: Option<OrderFeeSource>,
+    /// Fee asset. `Base` is valid only for BUY orders; SELL orders use `Quote`.
+    pub fee_asset: Option<FeeAsset>,
     /// Self-trade prevention policy for this order.
     pub self_trade_prevention: Option<OrderSelfTradePrevention>,
     /// Optional market-order slippage guard.
@@ -427,9 +461,47 @@ pub struct CreateOrderParams {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OrderFeeSource {
+pub enum FeeAsset {
     Quote,
-    Received,
+    Base,
+}
+
+/// Legacy name for [`FeeAsset`].
+///
+/// `Received` was removed by the API contract; use `FeeAsset::Base` for a
+/// BUY fee deducted from received base quantity.
+#[deprecated(note = "renamed to FeeAsset; use FeeAsset::Base instead of the removed Received")]
+pub type OrderFeeSource = FeeAsset;
+
+/// Order inputs accepted by [`crate::services::OrdersService::preview`].
+#[derive(Debug, Clone)]
+pub struct PreviewOrderParams {
+    pub symbol: String,
+    pub side: CreateSide,
+    pub order_type: CreateOrderType,
+    /// Base quantity. Set exactly one of this and `max_quote_debit_scaled`.
+    pub quantity: Option<Quantity>,
+    /// Hard all-in quote debit limit in the pair's quote quantity scale. Set
+    /// exactly one of this and `quantity`.
+    pub max_quote_debit_scaled: Option<i64>,
+    pub price: Option<Price>,
+    pub time_in_force: Option<CreateTimeInForce>,
+    pub subaccount_id: Option<u64>,
+    pub post_only: Option<bool>,
+    pub market_client_ref_price: Option<Price>,
+    pub fee_asset: Option<FeeAsset>,
+    pub market_max_slippage: Option<MaxSlippage>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewOrderResult {
+    pub resolved_base_qty: Option<Quantity>,
+    pub price_bound: Option<Price>,
+    pub estimated_quote_debit_scaled: i64,
+    pub estimated_fee_scaled: i64,
+    pub estimated_net_base_qty: Option<Quantity>,
+    pub fee_asset: String,
+    pub fresh_at_ts_ns: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

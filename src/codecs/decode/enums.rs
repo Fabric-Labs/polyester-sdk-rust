@@ -1,6 +1,6 @@
 //! Proto enum → SDK label helpers (Go `codecs/proto_helpers` parity).
 
-use crate::proto::orders::v1::{FeeSource, OrderStatus, OrderType, Side, TimeInForce};
+use crate::proto::orders::v1::{FeeAsset, OrderStatus, OrderType, Side, TimeInForce};
 use buffa::Enumeration;
 
 pub fn enum_proto_name<T: Enumeration>(value: &buffa::EnumValue<T>) -> String {
@@ -75,13 +75,13 @@ pub fn enum_value_order_status(value: buffa::EnumValue<OrderStatus>) -> String {
         .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
-pub fn enum_value_fee_source(value: buffa::EnumValue<FeeSource>) -> String {
+pub fn enum_value_fee_asset(value: buffa::EnumValue<FeeAsset>) -> String {
     value
         .as_known()
         .map(|known| match known {
-            FeeSource::Quote => "quote".to_owned(),
-            FeeSource::Received => "received".to_owned(),
-            FeeSource::FeeSourceUnspecified => String::new(),
+            FeeAsset::Quote => "quote".to_owned(),
+            FeeAsset::Base => "base".to_owned(),
+            FeeAsset::FeeAssetUnspecified => String::new(),
         })
         .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }

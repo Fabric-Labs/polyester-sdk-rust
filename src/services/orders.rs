@@ -9,7 +9,7 @@ use crate::codecs::decode::{
     batch_replace_status_from_proto, cancel_all_after_from_proto, cancel_all_from_proto,
     get_order_from_proto, modify_order_from_proto, order_mutation_from_cancel,
     order_mutation_from_create, orders_list_from_history, orders_list_from_open,
-    user_trades_list_from_proto,
+    preview_order_from_proto, user_trades_list_from_proto,
 };
 use crate::codecs::scalars::id_to_u64;
 use crate::connect::orders::v1::{OrdersReadServiceClient, OrdersServiceClient};
@@ -18,21 +18,22 @@ use crate::models::{
     AttachedRisk, BatchCancelItem, BatchCancelOrdersResult, BatchCreateOrdersResult,
     BatchReplaceItem, BatchReplaceOrdersResult, BatchReplaceStatusResult, CancelAllAfterResult,
     CancelAllOpts, CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType,
-    CreateSide, CreateTimeInForce, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts,
-    ListOrderHistoryOpts, MaxSlippage, ModifyOrderParams, ModifyOrderResult, Order, OrderFeeSource,
-    OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, RiskLeg, TrailingDistance,
-    TrailingStop, UserTrade, UserTradesList,
+    CreateSide, CreateTimeInForce, FeeAsset, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts,
+    ListOrderHistoryOpts, MaxSlippage, ModifyOrderParams, ModifyOrderResult, Order, OrderKey,
+    OrderMutationResult, OrderSelfTradePrevention, OrdersList, PreviewOrderParams,
+    PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
     BatchCancelItem as ProtoBatchCancelItem, BatchCancelOrdersRequest, BatchCreateOrdersRequest,
     BatchReplaceOrderItem as ProtoBatchReplaceOrderItem, BatchReplaceOrdersRequest,
     CancelAllAfterRequest, CancelAllOrdersRequest, CancelOrderRequest, CreateOrderRequest,
-    FeeSource, GetBatchReplaceStatusRequest, GetOpenOrdersRequest, GetOrderHistoryRequest,
-    GetOrderRequest, GetUserTradesRequest, LimitFok, LimitGtc, LimitIoc, MarketIoc, ModifyBehavior,
-    ModifyOrderRequest, OrderIntent, RiskExecution, RiskLimitGtc, RiskPolicy,
-    SelfTradePreventionMode, Side, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy,
-    batch_replace_order_item, cancel_order_request, get_order_request, market_ioc,
-    modify_order_request, order_intent, risk_execution, risk_policy, trailing_stop_policy,
+    FeeAsset as ProtoFeeAsset, GetBatchReplaceStatusRequest, GetOpenOrdersRequest,
+    GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, LimitFok, LimitGtc, LimitIoc,
+    MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, PreviewOrderRequest, RiskExecution,
+    RiskLimitGtc, RiskPolicy, SelfTradePreventionMode, Side, StopLossPolicy, TakeProfitPolicy,
+    TrailingStopPolicy, batch_replace_order_item, cancel_order_request, get_order_request,
+    market_ioc, modify_order_request, order_intent, preview_order_request, risk_execution,
+    risk_policy, trailing_stop_policy,
 };
 use crate::types::{Price, Quantity, resolve_price_ticks, resolve_qty_scaled};
 use rand_core::{OsRng, RngCore};
@@ -277,16 +278,8 @@ impl OrdersService {
     }
 
     fn order_intent_from_params(&self, params: &CreateOrderParams) -> Result<OrderIntent> {
-        let scale = self.require_quantity_scale(&params.symbol, params.quantity.scale())?;
-        let qty = resolve_qty_scaled(
-            &params.quantity,
-            scale,
-            Some(&params.symbol),
-            self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
-        )?;
         let mut intent = OrderIntent {
             symbol: params.symbol.clone(),
-            qty_scaled: qty,
             side: match params.side {
                 CreateSide::Buy => Side::Buy.into(),
                 CreateSide::Sell => Side::Sell.into(),
@@ -297,14 +290,34 @@ impl OrdersService {
         {
             intent.client_order_id = client_order_id;
         }
-        intent.fee_source = match params.fee_source.unwrap_or(OrderFeeSource::Quote) {
-            OrderFeeSource::Quote => FeeSource::Quote.into(),
-            OrderFeeSource::Received if matches!(params.side, CreateSide::Buy) => {
-                FeeSource::Received.into()
+        intent.sizing = Some(match (&params.quantity, params.max_quote_debit_scaled) {
+            (Some(quantity), None) => {
+                let scale = self.require_quantity_scale(&params.symbol, quantity.scale())?;
+                order_intent::Sizing::BaseQtyScaled(resolve_qty_scaled(
+                    quantity,
+                    scale,
+                    Some(&params.symbol),
+                    self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
+                )?)
             }
-            OrderFeeSource::Received => {
+            (None, Some(max_quote_debit_scaled)) if max_quote_debit_scaled > 0 => {
+                order_intent::Sizing::MaxQuoteDebitScaled(max_quote_debit_scaled)
+            }
+            (Some(_), Some(_)) | (None, None) => {
                 return Err(Error::validation(
-                    "fee_source=received is only valid for BUY orders",
+                    "set exactly one of quantity or max_quote_debit_scaled",
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(Error::validation("max_quote_debit_scaled must be positive"));
+            }
+        });
+        intent.fee_asset = match params.fee_asset.unwrap_or(FeeAsset::Quote) {
+            FeeAsset::Quote => ProtoFeeAsset::Quote.into(),
+            FeeAsset::Base if matches!(params.side, CreateSide::Buy) => ProtoFeeAsset::Base.into(),
+            FeeAsset::Base => {
+                return Err(Error::validation(
+                    "fee_asset=base is only valid for BUY orders",
                 ));
             }
         };
@@ -604,6 +617,78 @@ impl OrdersService {
         .await?
         .into_owned();
         order_mutation_from_create(&resp)
+    }
+
+    /// Resolve an order's executable size, price bound, and estimated fees
+    /// without submitting it. A preview is advisory; re-preview or submit
+    /// promptly when the market is moving.
+    pub async fn preview(&self, params: PreviewOrderParams) -> Result<PreviewOrderResult> {
+        self.ctx.wait_for_catalogs().await?;
+        let req = self.encode_preview_params(&params)?;
+        let client = self.write_client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/orders.v1.OrdersService/PreviewOrder",
+            req,
+            |req, opts| client.preview_order_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        Ok(preview_order_from_proto(&resp))
+    }
+
+    fn encode_preview_params(&self, params: &PreviewOrderParams) -> Result<PreviewOrderRequest> {
+        let create = CreateOrderParams {
+            symbol: params.symbol.clone(),
+            side: params.side,
+            order_type: params.order_type,
+            quantity: params.quantity.clone(),
+            max_quote_debit_scaled: params.max_quote_debit_scaled,
+            price: params.price.clone(),
+            time_in_force: params.time_in_force,
+            client_order_id: None,
+            subaccount_id: params.subaccount_id,
+            post_only: params.post_only,
+            market_client_ref_price: params.market_client_ref_price.clone(),
+            fee_asset: params.fee_asset,
+            self_trade_prevention: None,
+            market_max_slippage: params.market_max_slippage,
+            attached_risk: None,
+        };
+        let intent = self.order_intent_from_params(&create)?;
+        let execution = match intent.execution {
+            Some(order_intent::Execution::MarketIoc(value)) => {
+                preview_order_request::Execution::MarketIoc(value)
+            }
+            Some(order_intent::Execution::LimitGtc(value)) => {
+                preview_order_request::Execution::LimitGtc(value)
+            }
+            Some(order_intent::Execution::LimitIoc(value)) => {
+                preview_order_request::Execution::LimitIoc(value)
+            }
+            Some(order_intent::Execution::LimitFok(value)) => {
+                preview_order_request::Execution::LimitFok(value)
+            }
+            None => return Err(Error::validation("missing order execution")),
+        };
+        let sizing = match intent.sizing {
+            Some(order_intent::Sizing::BaseQtyScaled(value)) => {
+                preview_order_request::Sizing::BaseQtyScaled(value)
+            }
+            Some(order_intent::Sizing::MaxQuoteDebitScaled(value)) => {
+                preview_order_request::Sizing::MaxQuoteDebitScaled(value)
+            }
+            None => return Err(Error::validation("missing order sizing")),
+        };
+        Ok(PreviewOrderRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            symbol: intent.symbol,
+            side: intent.side,
+            fee_asset: intent.fee_asset,
+            sizing: Some(sizing),
+            execution: Some(execution),
+            ..Default::default()
+        })
     }
 
     /// Batch-create orders.
@@ -996,14 +1081,15 @@ impl OrdersService {
             symbol: symbol.into(),
             side,
             order_type,
-            quantity,
+            quantity: Some(quantity),
+            max_quote_debit_scaled: None,
             price,
             time_in_force: None,
             client_order_id,
             subaccount_id: None,
             post_only: None,
             market_client_ref_price: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
@@ -1143,14 +1229,15 @@ mod tests {
             symbol: "BTC-USDT".into(),
             side: CreateSide::Buy,
             order_type: CreateOrderType::Limit,
-            quantity,
+            quantity: Some(quantity),
+            max_quote_debit_scaled: None,
             price: Some(price),
             time_in_force: Some(CreateTimeInForce::Gtc),
             client_order_id: Some("order-equivalence".into()),
             subaccount_id: None,
             post_only: Some(true),
             market_client_ref_price: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
@@ -1357,12 +1444,12 @@ mod tests {
         params.order_type = CreateOrderType::Market;
         params.price = None;
         params.post_only = None;
-        params.fee_source = Some(OrderFeeSource::Received);
+        params.fee_asset = Some(FeeAsset::Base);
         params.self_trade_prevention = Some(OrderSelfTradePrevention::ExpireBoth);
         params.market_max_slippage = Some(MaxSlippage::Bps(25));
         let wire = client.orders.encode_create_params(&params).unwrap();
         let intent = wire.order.as_option().unwrap();
-        assert_eq!(intent.fee_source.as_known(), Some(FeeSource::Received));
+        assert_eq!(intent.fee_asset.as_known(), Some(ProtoFeeAsset::Base));
         assert_eq!(
             intent.self_trade_prevention_mode.as_known(),
             Some(SelfTradePreventionMode::ExpireBoth)
@@ -1384,6 +1471,42 @@ mod tests {
 
         params.price = None;
         params.market_max_slippage = Some(MaxSlippage::Ticks(0));
+        assert!(client.orders.encode_create_params(&params).is_err());
+    }
+
+    #[test]
+    fn create_encodes_quote_budget_sizing_and_rejects_ambiguous_sizing() {
+        let client = client();
+        let mut params = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        params.quantity = None;
+        params.max_quote_debit_scaled = Some(5_000_000);
+        let wire = client.orders.encode_create_params(&params).unwrap();
+        let intent = wire.order.as_option().unwrap();
+        assert!(matches!(
+            intent.sizing,
+            Some(order_intent::Sizing::MaxQuoteDebitScaled(5_000_000))
+        ));
+
+        params.quantity = Some(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+        );
         assert!(client.orders.encode_create_params(&params).is_err());
     }
 
@@ -1540,6 +1663,8 @@ mod tests {
                 created_ts_ns: String::new(),
                 version: 1,
                 post_only: false,
+                fee_asset: "quote".into(),
+                submitted_max_quote_debit_scaled: None,
                 attached_risk: None,
             }),
             trades: vec![],
@@ -1585,7 +1710,7 @@ mod tests {
                     .unwrap(),
                 ),
                 fee_scaled: "0".into(),
-                fee_source: "quote".into(),
+                fee_asset: "quote".into(),
                 referral_share_scaled: "0".into(),
                 ts_ns: String::new(),
             }],

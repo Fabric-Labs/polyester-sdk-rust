@@ -12,10 +12,10 @@ use crate::connect::triggers::v1::TriggersServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::{
     CreateOrderType, CreateSide, CreateTimeInForce, CreateTriggerParams, CreateTriggerType,
-    ListTriggersOpts, ModifyTriggerParams, Trigger, TriggerEvent, TriggerEventsList,
+    FeeAsset, ListTriggersOpts, ModifyTriggerParams, Trigger, TriggerEvent, TriggerEventsList,
     TriggerMutationResult, TriggersList,
 };
-use crate::proto::orders::v1::{FeeSource, SelfTradePreventionMode, Side};
+use crate::proto::orders::v1::{FeeAsset as ProtoFeeAsset, SelfTradePreventionMode, Side};
 use crate::proto::triggers::v1::{
     CancelTriggerRequest, ConditionalChildExecution, ConditionalTrigger, CreateTriggerRequest,
     GetTriggerRequest, LadderTrigger, ListTriggerEventsRequest, ListTriggersRequest,
@@ -128,8 +128,8 @@ impl TriggersService {
         };
         intent.client_trigger_id =
             require_client_style_id(&params.client_trigger_id, "client_trigger_id")?;
-        if let Some(src) = params.fee_source.as_deref() {
-            intent.fee_source = Self::fee_source(src)?.into();
+        if let Some(asset) = params.fee_asset {
+            intent.fee_asset = Self::fee_asset(asset, params.side)?.into();
         }
         if let Some(mode) = params.self_trade_prevention_mode.as_deref() {
             intent.self_trade_prevention_mode = Self::stp_mode(mode)?.into();
@@ -433,11 +433,13 @@ impl TriggersService {
         Ok(req)
     }
 
-    fn fee_source(label: &str) -> Result<FeeSource> {
-        match label.to_ascii_lowercase().as_str() {
-            "quote" => Ok(FeeSource::Quote),
-            "received" => Ok(FeeSource::Received),
-            _ => Err(Error::validation("fee_source must be quote or received")),
+    fn fee_asset(asset: FeeAsset, side: CreateSide) -> Result<ProtoFeeAsset> {
+        match (asset, side) {
+            (FeeAsset::Quote, _) => Ok(ProtoFeeAsset::Quote),
+            (FeeAsset::Base, CreateSide::Buy) => Ok(ProtoFeeAsset::Base),
+            (FeeAsset::Base, CreateSide::Sell) => Err(Error::validation(
+                "fee_asset=base is only valid for BUY triggers",
+            )),
         }
     }
 
@@ -658,7 +660,7 @@ mod tests {
             ladder_price_max: None,
             ladder_levels: None,
             ladder_distribution: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention_mode: None,
         }
     }

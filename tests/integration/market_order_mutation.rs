@@ -55,7 +55,7 @@ async fn market_buy_mutation() {
         side: CreateSide::Buy,
         order_type: CreateOrderType::Market,
         quantity: match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
-            Ok(q) => q,
+            Ok(q) => Some(q),
             Err(err) => {
                 eprintln!("skip: qty: {err}");
                 return;
@@ -75,7 +75,8 @@ async fn market_buy_mutation() {
                 }
             },
         ),
-        fee_source: None,
+        max_quote_debit_scaled: None,
+        fee_asset: None,
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,
@@ -161,7 +162,7 @@ async fn market_sell_mutation() {
         side: CreateSide::Sell,
         order_type: CreateOrderType::Market,
         quantity: match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
-            Ok(q) => q,
+            Ok(q) => Some(q),
             Err(err) => {
                 eprintln!("skip: qty: {err}");
                 return;
@@ -181,7 +182,8 @@ async fn market_sell_mutation() {
                 }
             },
         ),
-        fee_source: None,
+        max_quote_debit_scaled: None,
+        fee_asset: None,
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,

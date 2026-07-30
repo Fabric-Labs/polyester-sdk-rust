@@ -394,21 +394,24 @@ async fn digit_only_public_subaccount_id_uses_canonical_base58_on_order_wire() {
             symbol: "BTC-USDT".into(),
             side: CreateSide::Buy,
             order_type: CreateOrderType::Limit,
-            quantity: Quantity::from_scaled(
-                1,
-                Some(8),
-                QuantityDomain::OrderBase,
-                Some("BTC-USDT".into()),
-                Some(1),
-            )
-            .unwrap(),
+            quantity: Some(
+                Quantity::from_scaled(
+                    1,
+                    Some(8),
+                    QuantityDomain::OrderBase,
+                    Some("BTC-USDT".into()),
+                    Some(1),
+                )
+                .unwrap(),
+            ),
+            max_quote_debit_scaled: None,
             price: Some(Price::from_ticks(1, Some("BTC-USDT".into())).unwrap()),
             time_in_force: Some(CreateTimeInForce::Gtc),
             client_order_id: Some("scope-wire".into()),
             subaccount_id: None,
             post_only: None,
             market_client_ref_price: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
@@ -483,14 +486,15 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
             symbol: "BTC-USDT".into(),
             side: CreateSide::Buy,
             order_type: CreateOrderType::Limit,
-            quantity: quantity.clone(),
+            quantity: Some(quantity.clone()),
+            max_quote_debit_scaled: None,
             price: Some(price.clone()),
             time_in_force: Some(CreateTimeInForce::Gtc),
             client_order_id: Some("fault-order".into()),
             subaccount_id: Some(4),
             post_only: None,
             market_client_ref_price: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
@@ -525,7 +529,7 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
             ladder_price_max: None,
             ladder_levels: None,
             ladder_distribution: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention_mode: None,
         })
         .await
@@ -627,14 +631,15 @@ async fn l2_invalid_client_order_and_trigger_ids_fail_closed_without_hitting_con
             symbol: "BTC-USDT".into(),
             side: CreateSide::Buy,
             order_type: CreateOrderType::Limit,
-            quantity: quantity.clone(),
+            quantity: Some(quantity.clone()),
+            max_quote_debit_scaled: None,
             price: Some(price.clone()),
             time_in_force: Some(CreateTimeInForce::Gtc),
             client_order_id: Some("bad id!".into()),
             subaccount_id: None,
             post_only: None,
             market_client_ref_price: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
@@ -672,7 +677,7 @@ async fn l2_invalid_client_order_and_trigger_ids_fail_closed_without_hitting_con
             ladder_price_max: None,
             ladder_levels: None,
             ladder_distribution: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention_mode: None,
         })
         .await
@@ -2373,7 +2378,7 @@ async fn l2_wait_for_order_trades_complete_polls_get_order_until_trade_sum_match
                         symbol_id: 1,
                         qty_scaled: 40,
                         fee_scaled: 1,
-                        fee_source: polyester::proto::orders::v1::FeeSource::Received.into(),
+                        fee_asset: polyester::proto::orders::v1::FeeAsset::Base.into(),
                         referral_share_scaled: 1,
                         ..Default::default()
                     },
@@ -2420,7 +2425,7 @@ async fn l2_wait_for_order_trades_complete_polls_get_order_until_trade_sum_match
         .sum();
     assert_eq!(cum, 100);
     assert_eq!(sum, 100);
-    assert_eq!(result.trades[0].fee_source, "received");
+    assert_eq!(result.trades[0].fee_asset, "base");
     assert_eq!(result.trades[0].fee_scaled, "1");
     assert_eq!(result.trades[0].referral_share_scaled, "1");
 }

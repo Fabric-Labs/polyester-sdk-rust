@@ -112,15 +112,17 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
             symbol: symbol.clone(),
             side: CreateSide::Sell,
             order_type: CreateOrderType::Limit,
-            quantity: Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None)
-                .expect("qty"),
+            quantity: Some(
+                Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None).expect("qty"),
+            ),
+            max_quote_debit_scaled: None,
             price: Some(Price::from_decimal_str(&price, Some(symbol.clone())).expect("price")),
             time_in_force: Some(CreateTimeInForce::Gtc),
             client_order_id: Some(maker_cid.clone()),
             subaccount_id: None,
             post_only: Some(true),
             market_client_ref_price: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
@@ -138,7 +140,10 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         symbol: symbol.clone(),
         side: CreateSide::Buy,
         order_type: CreateOrderType::Market,
-        quantity: Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None).expect("qty"),
+        quantity: Some(
+            Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None).expect("qty"),
+        ),
+        max_quote_debit_scaled: None,
         price: None,
         time_in_force: Some(CreateTimeInForce::Ioc),
         client_order_id: Some(buy_cid.clone()),
@@ -147,7 +152,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         market_client_ref_price: Some(
             Price::from_decimal_str(&buy_ref_price, Some(symbol.clone())).expect("buy ref price"),
         ),
-        fee_source: None,
+        fee_asset: None,
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,
@@ -213,7 +218,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
     let received_fee = buy_projection
         .trades
         .iter()
-        .filter(|trade| trade.fee_source == "received")
+        .filter(|trade| trade.fee_asset == "base")
         .map(|trade| {
             trade
                 .fee_scaled
@@ -235,14 +240,17 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
             symbol: symbol.clone(),
             side: CreateSide::Buy,
             order_type: CreateOrderType::Limit,
-            quantity: Quantity::from_scaled(
-                net_received,
-                Some(scale),
-                QuantityDomain::OrderBase,
-                Some(symbol.clone()),
-                None,
-            )
-            .expect("filled qty"),
+            quantity: Some(
+                Quantity::from_scaled(
+                    net_received,
+                    Some(scale),
+                    QuantityDomain::OrderBase,
+                    Some(symbol.clone()),
+                    None,
+                )
+                .expect("filled qty"),
+            ),
+            max_quote_debit_scaled: None,
             price: Some(
                 Price::from_decimal_str(&maker_buy_price, Some(symbol.clone())).expect("price"),
             ),
@@ -251,7 +259,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
             subaccount_id: None,
             post_only: Some(true),
             market_client_ref_price: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
@@ -275,14 +283,17 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         symbol: symbol.clone(),
         side: CreateSide::Sell,
         order_type: CreateOrderType::Market,
-        quantity: Quantity::from_scaled(
-            net_received,
-            Some(scale),
-            QuantityDomain::OrderBase,
-            Some(symbol.clone()),
-            None,
-        )
-        .expect("sell qty"),
+        quantity: Some(
+            Quantity::from_scaled(
+                net_received,
+                Some(scale),
+                QuantityDomain::OrderBase,
+                Some(symbol.clone()),
+                None,
+            )
+            .expect("sell qty"),
+        ),
+        max_quote_debit_scaled: None,
         price: None,
         time_in_force: Some(CreateTimeInForce::Ioc),
         client_order_id: Some(sell_cid.clone()),
@@ -291,7 +302,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         market_client_ref_price: Some(
             Price::from_decimal_str(&sell_ref_price, Some(symbol.clone())).expect("sell ref price"),
         ),
-        fee_source: None,
+        fee_asset: None,
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,
