@@ -3155,16 +3155,16 @@ pub struct TriggerIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub qty_scaled: i64,
-    /// Fee source for BUY children. SELL children must use QUOTE.
+    /// Fee asset for BUY children. SELL children must use QUOTE.
     ///
-    /// Field 3: `fee_source`
+    /// Field 3: `fee_asset`
     #[serde(
-        rename = "feeSource",
-        alias = "fee_source",
+        rename = "feeAsset",
+        alias = "fee_asset",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub fee_source: ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
+    pub fee_asset: ::buffa::EnumValue<super::super::orders::v1::FeeAsset>,
     /// Child self-trade prevention mode. Defaults to EXPIRE_MAKER.
     ///
     /// Field 4: `self_trade_prevention_mode`
@@ -3198,7 +3198,7 @@ impl ::core::fmt::Debug for TriggerIntent {
         f.debug_struct("TriggerIntent")
             .field("symbol", &self.symbol)
             .field("qty_scaled", &self.qty_scaled)
-            .field("fee_source", &self.fee_source)
+            .field("fee_asset", &self.fee_asset)
             .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
             .field("client_trigger_id", &self.client_trigger_id)
             .field("strategy", &self.strategy)
@@ -3237,7 +3237,7 @@ impl ::buffa::Message for TriggerIntent {
             size += 1u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
         }
         {
-            let val = self.fee_source.to_i32();
+            let val = self.fee_asset.to_i32();
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -3314,7 +3314,7 @@ impl ::buffa::Message for TriggerIntent {
             ::buffa::types::put_int64_field(2u32, self.qty_scaled, buf);
         }
         {
-            let val = self.fee_source.to_i32();
+            let val = self.fee_asset.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(3u32, val, buf);
             }
@@ -3404,7 +3404,7 @@ impl ::buffa::Message for TriggerIntent {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.fee_source = ::buffa::EnumValue::from(
+                self.fee_asset = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -3538,7 +3538,7 @@ impl ::buffa::Message for TriggerIntent {
     fn clear(&mut self) {
         self.symbol.clear();
         self.qty_scaled = 0i64;
-        self.fee_source = ::buffa::EnumValue::from(0);
+        self.fee_asset = ::buffa::EnumValue::from(0);
         self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
         self.client_trigger_id.clear();
         self.strategy = ::core::option::Option::None;
@@ -3573,8 +3573,8 @@ impl<'de> serde::Deserialize<'de> for TriggerIntent {
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_qty_scaled: ::core::option::Option<i64> = None;
-                let mut __f_fee_source: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
+                let mut __f_fee_asset: ::core::option::Option<
+                    ::buffa::EnumValue<super::super::orders::v1::FeeAsset>,
                 > = None;
                 let mut __f_self_trade_prevention_mode: ::core::option::Option<
                     ::buffa::EnumValue<super::super::orders::v1::SelfTradePreventionMode>,
@@ -3620,18 +3620,18 @@ impl<'de> serde::Deserialize<'de> for TriggerIntent {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "feeSource" | "fee_source" => {
-                            __f_fee_source = Some({
+                        "feeAsset" | "fee_asset" => {
+                            __f_fee_asset = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = ::buffa::EnumValue<
-                                        super::super::orders::v1::FeeSource,
+                                        super::super::orders::v1::FeeAsset,
                                     >;
                                     fn deserialize<D: serde::Deserializer<'de>>(
                                         self,
                                         d: D,
                                     ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
+                                        ::buffa::EnumValue<super::super::orders::v1::FeeAsset>,
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_enum::deserialize(d)
@@ -3812,8 +3812,8 @@ impl<'de> serde::Deserialize<'de> for TriggerIntent {
                 if let ::core::option::Option::Some(v) = __f_qty_scaled {
                     __r.qty_scaled = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_fee_source {
-                    __r.fee_source = v;
+                if let ::core::option::Option::Some(v) = __f_fee_asset {
+                    __r.fee_asset = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_self_trade_prevention_mode {
                     __r.self_trade_prevention_mode = v;
@@ -8955,16 +8955,16 @@ pub struct Trigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub qty_scaled: i64,
-    /// Fee source for BUY child orders.
+    /// Fee asset for BUY child orders.
     ///
-    /// Field 21: `fee_source`
+    /// Field 21: `fee_asset`
     #[serde(
-        rename = "feeSource",
-        alias = "fee_source",
+        rename = "feeAsset",
+        alias = "fee_asset",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub fee_source: ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
+    pub fee_asset: ::buffa::EnumValue<super::super::orders::v1::FeeAsset>,
     /// Self-trade prevention mode for child orders.
     ///
     /// Field 22: `self_trade_prevention_mode`
@@ -9051,7 +9051,7 @@ impl ::core::fmt::Debug for Trigger {
             .field("status", &self.status)
             .field("parent_order_id", &self.parent_order_id)
             .field("qty_scaled", &self.qty_scaled)
-            .field("fee_source", &self.fee_source)
+            .field("fee_asset", &self.fee_asset)
             .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
             .field("client_trigger_id", &self.client_trigger_id)
             .field("created_at", &self.created_at)
@@ -9123,7 +9123,7 @@ impl ::buffa::Message for Trigger {
             size += 2u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
         }
         {
-            let val = self.fee_source.to_i32();
+            let val = self.fee_asset.to_i32();
             if val != 0 {
                 size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -9292,7 +9292,7 @@ impl ::buffa::Message for Trigger {
             ::buffa::types::put_int64_field(20u32, self.qty_scaled, buf);
         }
         {
-            let val = self.fee_source.to_i32();
+            let val = self.fee_asset.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(21u32, val, buf);
             }
@@ -9481,7 +9481,7 @@ impl ::buffa::Message for Trigger {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.fee_source = ::buffa::EnumValue::from(
+                self.fee_asset = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -9775,7 +9775,7 @@ impl ::buffa::Message for Trigger {
         self.status = ::buffa::EnumValue::from(0);
         self.parent_order_id = ::core::option::Option::None;
         self.qty_scaled = 0i64;
-        self.fee_source = ::buffa::EnumValue::from(0);
+        self.fee_asset = ::buffa::EnumValue::from(0);
         self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
         self.configuration = ::core::option::Option::None;
         self.client_trigger_id.clear();
@@ -9825,8 +9825,8 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                     ::core::option::Option<u64>,
                 > = None;
                 let mut __f_qty_scaled: ::core::option::Option<i64> = None;
-                let mut __f_fee_source: ::core::option::Option<
-                    ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
+                let mut __f_fee_asset: ::core::option::Option<
+                    ::buffa::EnumValue<super::super::orders::v1::FeeAsset>,
                 > = None;
                 let mut __f_self_trade_prevention_mode: ::core::option::Option<
                     ::buffa::EnumValue<super::super::orders::v1::SelfTradePreventionMode>,
@@ -9971,18 +9971,18 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "feeSource" | "fee_source" => {
-                            __f_fee_source = Some({
+                        "feeAsset" | "fee_asset" => {
+                            __f_fee_asset = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = ::buffa::EnumValue<
-                                        super::super::orders::v1::FeeSource,
+                                        super::super::orders::v1::FeeAsset,
                                     >;
                                     fn deserialize<D: serde::Deserializer<'de>>(
                                         self,
                                         d: D,
                                     ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<super::super::orders::v1::FeeSource>,
+                                        ::buffa::EnumValue<super::super::orders::v1::FeeAsset>,
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_enum::deserialize(d)
@@ -10332,8 +10332,8 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 if let ::core::option::Option::Some(v) = __f_qty_scaled {
                     __r.qty_scaled = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_fee_source {
-                    __r.fee_source = v;
+                if let ::core::option::Option::Some(v) = __f_fee_asset {
+                    __r.fee_asset = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_self_trade_prevention_mode {
                     __r.self_trade_prevention_mode = v;
@@ -14359,11 +14359,11 @@ pub mod __buffa {
             ///
             /// Field 2: `qty_scaled`
             pub qty_scaled: i64,
-            /// Fee source for BUY children. SELL children must use QUOTE.
+            /// Fee asset for BUY children. SELL children must use QUOTE.
             ///
-            /// Field 3: `fee_source`
-            pub fee_source: ::buffa::EnumValue<
-                super::super::super::super::orders::v1::FeeSource,
+            /// Field 3: `fee_asset`
+            pub fee_asset: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::FeeAsset,
             >,
             /// Child self-trade prevention mode. Defaults to EXPIRE_MAKER.
             ///
@@ -14430,7 +14430,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.fee_source = ::buffa::EnumValue::from(
+                        view.fee_asset = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
@@ -14636,7 +14636,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::TriggerIntent {
                     symbol: self.symbol.to_string(),
                     qty_scaled: self.qty_scaled,
-                    fee_source: self.fee_source,
+                    fee_asset: self.fee_asset,
                     self_trade_prevention_mode: self.self_trade_prevention_mode,
                     client_trigger_id: self.client_trigger_id.to_string(),
                     strategy: match self.strategy.as_ref() {
@@ -14718,7 +14718,7 @@ pub mod __buffa {
                             + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
                 }
                 {
-                    let val = self.fee_source.to_i32();
+                    let val = self.fee_asset.to_i32();
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -14807,7 +14807,7 @@ pub mod __buffa {
                     ::buffa::types::put_int64_field(2u32, self.qty_scaled, buf);
                 }
                 {
-                    let val = self.fee_source.to_i32();
+                    let val = self.fee_asset.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(3u32, val, buf);
                     }
@@ -14907,9 +14907,9 @@ pub mod __buffa {
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.fee_source,
+                    &self.fee_asset,
                 ) {
-                    __map.serialize_entry("feeSource", &self.fee_source)?;
+                    __map.serialize_entry("feeAsset", &self.fee_asset)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.self_trade_prevention_mode,
@@ -15064,14 +15064,14 @@ pub mod __buffa {
             pub fn qty_scaled(&self) -> i64 {
                 self.0.reborrow().qty_scaled
             }
-            /// Fee source for BUY children. SELL children must use QUOTE.
+            /// Fee asset for BUY children. SELL children must use QUOTE.
             ///
-            /// Field 3: `fee_source`
+            /// Field 3: `fee_asset`
             #[must_use]
-            pub fn fee_source(
+            pub fn fee_asset(
                 &self,
-            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::FeeSource> {
-                self.0.reborrow().fee_source
+            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::FeeAsset> {
+                self.0.reborrow().fee_asset
             }
             /// Child self-trade prevention mode. Defaults to EXPIRE_MAKER.
             ///
@@ -23740,11 +23740,11 @@ pub mod __buffa {
             ///
             /// Field 20: `qty_scaled`
             pub qty_scaled: i64,
-            /// Fee source for BUY child orders.
+            /// Fee asset for BUY child orders.
             ///
-            /// Field 21: `fee_source`
-            pub fee_source: ::buffa::EnumValue<
-                super::super::super::super::orders::v1::FeeSource,
+            /// Field 21: `fee_asset`
+            pub fee_asset: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::FeeAsset,
             >,
             /// Self-trade prevention mode for child orders.
             ///
@@ -23881,7 +23881,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.fee_source = ::buffa::EnumValue::from(
+                        view.fee_asset = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
@@ -24334,7 +24334,7 @@ pub mod __buffa {
                     status: self.status,
                     parent_order_id: self.parent_order_id,
                     qty_scaled: self.qty_scaled,
-                    fee_source: self.fee_source,
+                    fee_asset: self.fee_asset,
                     self_trade_prevention_mode: self.self_trade_prevention_mode,
                     client_trigger_id: self.client_trigger_id.to_string(),
                     created_at: match self.created_at.as_option() {
@@ -24514,7 +24514,7 @@ pub mod __buffa {
                             + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
                 }
                 {
-                    let val = self.fee_source.to_i32();
+                    let val = self.fee_asset.to_i32();
                     if val != 0 {
                         size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -24704,7 +24704,7 @@ pub mod __buffa {
                     ::buffa::types::put_int64_field(20u32, self.qty_scaled, buf);
                 }
                 {
-                    let val = self.fee_source.to_i32();
+                    let val = self.fee_asset.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(21u32, val, buf);
                     }
@@ -24923,9 +24923,9 @@ pub mod __buffa {
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.fee_source,
+                    &self.fee_asset,
                 ) {
-                    __map.serialize_entry("feeSource", &self.fee_source)?;
+                    __map.serialize_entry("feeAsset", &self.fee_asset)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.self_trade_prevention_mode,
@@ -25171,14 +25171,14 @@ pub mod __buffa {
             pub fn qty_scaled(&self) -> i64 {
                 self.0.reborrow().qty_scaled
             }
-            /// Fee source for BUY child orders.
+            /// Fee asset for BUY child orders.
             ///
-            /// Field 21: `fee_source`
+            /// Field 21: `fee_asset`
             #[must_use]
-            pub fn fee_source(
+            pub fn fee_asset(
                 &self,
-            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::FeeSource> {
-                self.0.reborrow().fee_source
+            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::FeeAsset> {
+                self.0.reborrow().fee_asset
             }
             /// Self-trade prevention mode for child orders.
             ///

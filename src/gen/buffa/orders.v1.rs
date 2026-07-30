@@ -442,33 +442,34 @@ impl ::buffa::Enumeration for TimeInForce {
         &[Self::TIME_IN_FORCE_UNSPECIFIED, Self::GTC, Self::IOC, Self::FOK]
     }
 }
+/// FeeAsset identifies the asset in which an order fee is charged.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
-pub enum FeeSource {
-    /// Fee source was not provided; buy orders default to QUOTE.
-    FEE_SOURCE_UNSPECIFIED = 0i32,
-    /// Fees are paid from the quote asset. SELL fees always use quote asset.
+pub enum FeeAsset {
+    /// Fee asset was not provided; orders default to QUOTE.
+    FEE_ASSET_UNSPECIFIED = 0i32,
+    /// Fees are charged in the quote asset. SELL fees always use quote asset.
     QUOTE = 1i32,
-    /// BUY-only option: fees are paid from the received base asset.
-    RECEIVED = 2i32,
+    /// BUY-only option: fees are deducted from the received base asset.
+    BASE = 2i32,
 }
-impl FeeSource {
-    ///Idiomatic alias for [`Self::FEE_SOURCE_UNSPECIFIED`]; `Debug` prints the variant name.
+impl FeeAsset {
+    ///Idiomatic alias for [`Self::FEE_ASSET_UNSPECIFIED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const FeeSourceUnspecified: Self = Self::FEE_SOURCE_UNSPECIFIED;
+    pub const FeeAssetUnspecified: Self = Self::FEE_ASSET_UNSPECIFIED;
     ///Idiomatic alias for [`Self::QUOTE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Quote: Self = Self::QUOTE;
-    ///Idiomatic alias for [`Self::RECEIVED`]; `Debug` prints the variant name.
+    ///Idiomatic alias for [`Self::BASE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const Received: Self = Self::RECEIVED;
+    pub const Base: Self = Self::BASE;
 }
-impl ::core::default::Default for FeeSource {
+impl ::core::default::Default for FeeAsset {
     fn default() -> Self {
-        Self::FEE_SOURCE_UNSPECIFIED
+        Self::FEE_ASSET_UNSPECIFIED
     }
 }
-impl ::serde::Serialize for FeeSource {
+impl ::serde::Serialize for FeeAsset {
     fn serialize<S: ::serde::Serializer>(
         &self,
         s: S,
@@ -476,39 +477,39 @@ impl ::serde::Serialize for FeeSource {
         s.serialize_str(::buffa::Enumeration::proto_name(self))
     }
 }
-impl<'de> ::serde::Deserialize<'de> for FeeSource {
+impl<'de> ::serde::Deserialize<'de> for FeeAsset {
     fn deserialize<D: ::serde::Deserializer<'de>>(
         d: D,
     ) -> ::core::result::Result<Self, D::Error> {
         struct _V;
         impl ::serde::de::Visitor<'_> for _V {
-            type Value = FeeSource;
+            type Value = FeeAsset;
             fn expecting(
                 &self,
                 f: &mut ::core::fmt::Formatter<'_>,
             ) -> ::core::fmt::Result {
                 f.write_str(
-                    concat!("a string, integer, or null for ", stringify!(FeeSource)),
+                    concat!("a string, integer, or null for ", stringify!(FeeAsset)),
                 )
             }
             fn visit_str<E: ::serde::de::Error>(
                 self,
                 v: &str,
-            ) -> ::core::result::Result<FeeSource, E> {
-                <FeeSource as ::buffa::Enumeration>::from_proto_name(v)
+            ) -> ::core::result::Result<FeeAsset, E> {
+                <FeeAsset as ::buffa::Enumeration>::from_proto_name(v)
                     .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
             }
             fn visit_i64<E: ::serde::de::Error>(
                 self,
                 v: i64,
-            ) -> ::core::result::Result<FeeSource, E> {
+            ) -> ::core::result::Result<FeeAsset, E> {
                 let v32 = i32::try_from(v)
                     .map_err(|_| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("enum value {v} out of i32 range"),
                         )
                     })?;
-                <FeeSource as ::buffa::Enumeration>::from_i32(v32)
+                <FeeAsset as ::buffa::Enumeration>::from_i32(v32)
                     .ok_or_else(|| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("unknown enum value {v32}"),
@@ -518,14 +519,14 @@ impl<'de> ::serde::Deserialize<'de> for FeeSource {
             fn visit_u64<E: ::serde::de::Error>(
                 self,
                 v: u64,
-            ) -> ::core::result::Result<FeeSource, E> {
+            ) -> ::core::result::Result<FeeAsset, E> {
                 let v32 = i32::try_from(v)
                     .map_err(|_| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("enum value {v} out of i32 range"),
                         )
                     })?;
-                <FeeSource as ::buffa::Enumeration>::from_i32(v32)
+                <FeeAsset as ::buffa::Enumeration>::from_i32(v32)
                     .ok_or_else(|| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("unknown enum value {v32}"),
@@ -534,14 +535,14 @@ impl<'de> ::serde::Deserialize<'de> for FeeSource {
             }
             fn visit_unit<E: ::serde::de::Error>(
                 self,
-            ) -> ::core::result::Result<FeeSource, E> {
+            ) -> ::core::result::Result<FeeAsset, E> {
                 ::core::result::Result::Ok(::core::default::Default::default())
             }
         }
         d.deserialize_any(_V)
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for FeeSource {
+impl ::buffa::json_helpers::ProtoElemJson for FeeAsset {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -554,12 +555,12 @@ impl ::buffa::json_helpers::ProtoElemJson for FeeSource {
         <Self as ::serde::Deserialize>::deserialize(d)
     }
 }
-impl ::buffa::Enumeration for FeeSource {
+impl ::buffa::Enumeration for FeeAsset {
     fn from_i32(value: i32) -> ::core::option::Option<Self> {
         match value {
-            0i32 => ::core::option::Option::Some(Self::FEE_SOURCE_UNSPECIFIED),
+            0i32 => ::core::option::Option::Some(Self::FEE_ASSET_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::QUOTE),
-            2i32 => ::core::option::Option::Some(Self::RECEIVED),
+            2i32 => ::core::option::Option::Some(Self::BASE),
             _ => ::core::option::Option::None,
         }
     }
@@ -568,23 +569,23 @@ impl ::buffa::Enumeration for FeeSource {
     }
     fn proto_name(&self) -> &'static str {
         match self {
-            Self::FEE_SOURCE_UNSPECIFIED => "FEE_SOURCE_UNSPECIFIED",
+            Self::FEE_ASSET_UNSPECIFIED => "FEE_ASSET_UNSPECIFIED",
             Self::QUOTE => "QUOTE",
-            Self::RECEIVED => "RECEIVED",
+            Self::BASE => "BASE",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
         match name {
-            "FEE_SOURCE_UNSPECIFIED" => {
-                ::core::option::Option::Some(Self::FEE_SOURCE_UNSPECIFIED)
+            "FEE_ASSET_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::FEE_ASSET_UNSPECIFIED)
             }
             "QUOTE" => ::core::option::Option::Some(Self::QUOTE),
-            "RECEIVED" => ::core::option::Option::Some(Self::RECEIVED),
+            "BASE" => ::core::option::Option::Some(Self::BASE),
             _ => ::core::option::Option::None,
         }
     }
     fn values() -> &'static [Self] {
-        &[Self::FEE_SOURCE_UNSPECIFIED, Self::QUOTE, Self::RECEIVED]
+        &[Self::FEE_ASSET_UNSPECIFIED, Self::QUOTE, Self::BASE]
     }
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -792,8 +793,8 @@ pub enum ErrorCode {
     ERROR_CODE_NOT_FOUND = 13i32,
     /// Upstream dependency returned an error.
     ERROR_CODE_UPSTREAM_ERROR = 14i32,
-    /// Requested fee source is not allowed for this order.
-    ERROR_CODE_FEE_SOURCE_NOT_ALLOWED = 15i32,
+    /// Requested fee asset is not allowed for this order.
+    ERROR_CODE_FEE_ASSET_NOT_ALLOWED = 15i32,
     /// Additional domain-specific codes used by the Orders API.
     ERROR_CODE_PAIR_DISABLED = 16i32,
     ERROR_CODE_ORDER_UNKNOWN = 17i32,
@@ -895,6 +896,8 @@ pub enum ErrorCode {
     ERROR_CODE_VALIDATION_ERROR = 66i32,
     /// This edge is at its bounded concurrent BatchReplace admission capacity.
     ERROR_CODE_OVERLOADED = 67i32,
+    /// The all-in quote budget cannot resolve one valid step-aligned base quantity.
+    ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL = 68i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -942,9 +945,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UPSTREAM_ERROR`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const UpstreamError: Self = Self::ERROR_CODE_UPSTREAM_ERROR;
-    ///Idiomatic alias for [`Self::ERROR_CODE_FEE_SOURCE_NOT_ALLOWED`]; `Debug` prints the variant name.
+    ///Idiomatic alias for [`Self::ERROR_CODE_FEE_ASSET_NOT_ALLOWED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const FeeSourceNotAllowed: Self = Self::ERROR_CODE_FEE_SOURCE_NOT_ALLOWED;
+    pub const FeeAssetNotAllowed: Self = Self::ERROR_CODE_FEE_ASSET_NOT_ALLOWED;
     ///Idiomatic alias for [`Self::ERROR_CODE_PAIR_DISABLED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const PairDisabled: Self = Self::ERROR_CODE_PAIR_DISABLED;
@@ -1089,6 +1092,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_OVERLOADED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Overloaded: Self = Self::ERROR_CODE_OVERLOADED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxQuoteDebitTooSmall: Self = Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -1203,9 +1209,7 @@ impl ::buffa::Enumeration for ErrorCode {
             12i32 => ::core::option::Option::Some(Self::ERROR_CODE_PERMISSION_DENIED),
             13i32 => ::core::option::Option::Some(Self::ERROR_CODE_NOT_FOUND),
             14i32 => ::core::option::Option::Some(Self::ERROR_CODE_UPSTREAM_ERROR),
-            15i32 => {
-                ::core::option::Option::Some(Self::ERROR_CODE_FEE_SOURCE_NOT_ALLOWED)
-            }
+            15i32 => ::core::option::Option::Some(Self::ERROR_CODE_FEE_ASSET_NOT_ALLOWED),
             16i32 => ::core::option::Option::Some(Self::ERROR_CODE_PAIR_DISABLED),
             17i32 => ::core::option::Option::Some(Self::ERROR_CODE_ORDER_UNKNOWN),
             18i32 => ::core::option::Option::Some(Self::ERROR_CODE_INTERNAL_ERROR),
@@ -1296,6 +1300,9 @@ impl ::buffa::Enumeration for ErrorCode {
             65i32 => ::core::option::Option::Some(Self::ERROR_CODE_STALE_QUOTE),
             66i32 => ::core::option::Option::Some(Self::ERROR_CODE_VALIDATION_ERROR),
             67i32 => ::core::option::Option::Some(Self::ERROR_CODE_OVERLOADED),
+            68i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1321,9 +1328,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_PERMISSION_DENIED => "ERROR_CODE_PERMISSION_DENIED",
             Self::ERROR_CODE_NOT_FOUND => "ERROR_CODE_NOT_FOUND",
             Self::ERROR_CODE_UPSTREAM_ERROR => "ERROR_CODE_UPSTREAM_ERROR",
-            Self::ERROR_CODE_FEE_SOURCE_NOT_ALLOWED => {
-                "ERROR_CODE_FEE_SOURCE_NOT_ALLOWED"
-            }
+            Self::ERROR_CODE_FEE_ASSET_NOT_ALLOWED => "ERROR_CODE_FEE_ASSET_NOT_ALLOWED",
             Self::ERROR_CODE_PAIR_DISABLED => "ERROR_CODE_PAIR_DISABLED",
             Self::ERROR_CODE_ORDER_UNKNOWN => "ERROR_CODE_ORDER_UNKNOWN",
             Self::ERROR_CODE_INTERNAL_ERROR => "ERROR_CODE_INTERNAL_ERROR",
@@ -1404,6 +1409,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_STALE_QUOTE => "ERROR_CODE_STALE_QUOTE",
             Self::ERROR_CODE_VALIDATION_ERROR => "ERROR_CODE_VALIDATION_ERROR",
             Self::ERROR_CODE_OVERLOADED => "ERROR_CODE_OVERLOADED",
+            Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL => {
+                "ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1455,8 +1463,8 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_UPSTREAM_ERROR" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_UPSTREAM_ERROR)
             }
-            "ERROR_CODE_FEE_SOURCE_NOT_ALLOWED" => {
-                ::core::option::Option::Some(Self::ERROR_CODE_FEE_SOURCE_NOT_ALLOWED)
+            "ERROR_CODE_FEE_ASSET_NOT_ALLOWED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_FEE_ASSET_NOT_ALLOWED)
             }
             "ERROR_CODE_PAIR_DISABLED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_PAIR_DISABLED)
@@ -1612,6 +1620,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_OVERLOADED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_OVERLOADED)
             }
+            "ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1632,7 +1643,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_PERMISSION_DENIED,
             Self::ERROR_CODE_NOT_FOUND,
             Self::ERROR_CODE_UPSTREAM_ERROR,
-            Self::ERROR_CODE_FEE_SOURCE_NOT_ALLOWED,
+            Self::ERROR_CODE_FEE_ASSET_NOT_ALLOWED,
             Self::ERROR_CODE_PAIR_DISABLED,
             Self::ERROR_CODE_ORDER_UNKNOWN,
             Self::ERROR_CODE_INTERNAL_ERROR,
@@ -1681,6 +1692,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_STALE_QUOTE,
             Self::ERROR_CODE_VALIDATION_ERROR,
             Self::ERROR_CODE_OVERLOADED,
+            Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL,
         ]
     }
 }
@@ -3424,16 +3436,6 @@ pub struct OrderIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub side: ::buffa::EnumValue<Side>,
-    /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
-    ///
-    /// Field 3: `qty_scaled`
-    #[serde(
-        rename = "qtyScaled",
-        alias = "qty_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub qty_scaled: i64,
     /// Optional client order identifier for idempotency.
     ///
     /// Field 20: `client_order_id`
@@ -3444,17 +3446,17 @@ pub struct OrderIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub client_order_id: ::buffa::alloc::string::String,
-    /// Fee source for BUY orders: QUOTE (default) or RECEIVED. SELL orders must
-    /// use QUOTE.
+    /// Asset charged for fees. Defaults to QUOTE. BASE is available only for BUY
+    /// orders; SELL orders must use QUOTE.
     ///
-    /// Field 21: `fee_source`
+    /// Field 21: `fee_asset`
     #[serde(
-        rename = "feeSource",
-        alias = "fee_source",
+        rename = "feeAsset",
+        alias = "fee_asset",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub fee_source: ::buffa::EnumValue<FeeSource>,
+    pub fee_asset: ::buffa::EnumValue<FeeAsset>,
     /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
     ///
     /// Field 22: `self_trade_prevention_mode`
@@ -3475,6 +3477,8 @@ pub struct OrderIntent {
     )]
     pub attached_risk: ::buffa::MessageField<RiskPolicy>,
     #[serde(flatten)]
+    pub sizing: ::core::option::Option<__buffa::oneof::order_intent::Sizing>,
+    #[serde(flatten)]
     pub execution: ::core::option::Option<__buffa::oneof::order_intent::Execution>,
     #[serde(skip)]
     #[doc(hidden)]
@@ -3485,11 +3489,11 @@ impl ::core::fmt::Debug for OrderIntent {
         f.debug_struct("OrderIntent")
             .field("symbol", &self.symbol)
             .field("side", &self.side)
-            .field("qty_scaled", &self.qty_scaled)
             .field("client_order_id", &self.client_order_id)
-            .field("fee_source", &self.fee_source)
+            .field("fee_asset", &self.fee_asset)
             .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
             .field("attached_risk", &self.attached_risk)
+            .field("sizing", &self.sizing)
             .field("execution", &self.execution)
             .finish()
     }
@@ -3528,8 +3532,15 @@ impl ::buffa::Message for OrderIntent {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
-        if self.qty_scaled != 0i64 {
-            size += 1u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+        if let ::core::option::Option::Some(ref v) = self.sizing {
+            match v {
+                __buffa::oneof::order_intent::Sizing::BaseQtyScaled(v) => {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                }
+                __buffa::oneof::order_intent::Sizing::MaxQuoteDebitScaled(v) => {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                }
+            }
         }
         if let ::core::option::Option::Some(ref v) = self.execution {
             match v {
@@ -3573,7 +3584,7 @@ impl ::buffa::Message for OrderIntent {
                     + ::buffa::types::string_encoded_len(&self.client_order_id) as u32;
         }
         {
-            let val = self.fee_source.to_i32();
+            let val = self.fee_asset.to_i32();
             if val != 0 {
                 size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -3611,8 +3622,15 @@ impl ::buffa::Message for OrderIntent {
                 ::buffa::types::put_int32_field(2u32, val, buf);
             }
         }
-        if self.qty_scaled != 0i64 {
-            ::buffa::types::put_int64_field(3u32, self.qty_scaled, buf);
+        if let ::core::option::Option::Some(ref v) = self.sizing {
+            match v {
+                __buffa::oneof::order_intent::Sizing::BaseQtyScaled(x) => {
+                    ::buffa::types::put_int64_field(3u32, *x, buf);
+                }
+                __buffa::oneof::order_intent::Sizing::MaxQuoteDebitScaled(x) => {
+                    ::buffa::types::put_int64_field(4u32, *x, buf);
+                }
+            }
         }
         if let ::core::option::Option::Some(ref v) = self.execution {
             match v {
@@ -3654,7 +3672,7 @@ impl ::buffa::Message for OrderIntent {
             ::buffa::types::put_string_field(20u32, &self.client_order_id, buf);
         }
         {
-            let val = self.fee_source.to_i32();
+            let val = self.fee_asset.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(21u32, val, buf);
             }
@@ -3701,7 +3719,22 @@ impl ::buffa::Message for OrderIntent {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.qty_scaled = ::buffa::types::decode_int64(buf)?;
+                self.sizing = ::core::option::Option::Some(
+                    __buffa::oneof::order_intent::Sizing::BaseQtyScaled(
+                        ::buffa::types::decode_int64(buf)?,
+                    ),
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.sizing = ::core::option::Option::Some(
+                    __buffa::oneof::order_intent::Sizing::MaxQuoteDebitScaled(
+                        ::buffa::types::decode_int64(buf)?,
+                    ),
+                );
             }
             10u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -3795,7 +3828,7 @@ impl ::buffa::Message for OrderIntent {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.fee_source = ::buffa::EnumValue::from(
+                self.fee_asset = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -3829,10 +3862,10 @@ impl ::buffa::Message for OrderIntent {
     fn clear(&mut self) {
         self.symbol.clear();
         self.side = ::buffa::EnumValue::from(0);
-        self.qty_scaled = 0i64;
+        self.sizing = ::core::option::Option::None;
         self.execution = ::core::option::Option::None;
         self.client_order_id.clear();
-        self.fee_source = ::buffa::EnumValue::from(0);
+        self.fee_asset = ::buffa::EnumValue::from(0);
         self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
         self.attached_risk = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
@@ -3866,18 +3899,20 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_side: ::core::option::Option<::buffa::EnumValue<Side>> = None;
-                let mut __f_qty_scaled: ::core::option::Option<i64> = None;
                 let mut __f_client_order_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
-                let mut __f_fee_source: ::core::option::Option<
-                    ::buffa::EnumValue<FeeSource>,
+                let mut __f_fee_asset: ::core::option::Option<
+                    ::buffa::EnumValue<FeeAsset>,
                 > = None;
                 let mut __f_self_trade_prevention_mode: ::core::option::Option<
                     ::buffa::EnumValue<SelfTradePreventionMode>,
                 > = None;
                 let mut __f_attached_risk: ::core::option::Option<
                     ::buffa::MessageField<RiskPolicy>,
+                > = None;
+                let mut __oneof_sizing: ::core::option::Option<
+                    __buffa::oneof::order_intent::Sizing,
                 > = None;
                 let mut __oneof_execution: ::core::option::Option<
                     __buffa::oneof::order_intent::Execution,
@@ -3920,21 +3955,6 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "qtyScaled" | "qty_scaled" => {
-                            __f_qty_scaled = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = i64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<i64, D::Error> {
-                                        ::buffa::json_helpers::int64::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
                         "clientOrderId" | "client_order_id" => {
                             __f_client_order_id = Some({
                                 struct _S;
@@ -3953,16 +3973,16 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "feeSource" | "fee_source" => {
-                            __f_fee_source = Some({
+                        "feeAsset" | "fee_asset" => {
+                            __f_fee_asset = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::EnumValue<FeeSource>;
+                                    type Value = ::buffa::EnumValue<FeeAsset>;
                                     fn deserialize<D: serde::Deserializer<'de>>(
                                         self,
                                         d: D,
                                     ) -> ::core::result::Result<
-                                        ::buffa::EnumValue<FeeSource>,
+                                        ::buffa::EnumValue<FeeAsset>,
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_enum::deserialize(d)
@@ -3993,6 +4013,62 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                             __f_attached_risk = Some(
                                 map.next_value::<::buffa::MessageField<RiskPolicy>>()?,
                             );
+                        }
+                        "baseQtyScaled" | "base_qty_scaled" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_sizing.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'sizing'",
+                                        ),
+                                    );
+                                }
+                                __oneof_sizing = Some(
+                                    __buffa::oneof::order_intent::Sizing::BaseQtyScaled(v),
+                                );
+                            }
+                        }
+                        "maxQuoteDebitScaled" | "max_quote_debit_scaled" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_sizing.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'sizing'",
+                                        ),
+                                    );
+                                }
+                                __oneof_sizing = Some(
+                                    __buffa::oneof::order_intent::Sizing::MaxQuoteDebitScaled(v),
+                                );
+                            }
                         }
                         "marketIoc" | "market_ioc" => {
                             let v: ::core::option::Option<MarketIoc> = map
@@ -4102,14 +4178,11 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                 if let ::core::option::Option::Some(v) = __f_side {
                     __r.side = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_qty_scaled {
-                    __r.qty_scaled = v;
-                }
                 if let ::core::option::Option::Some(v) = __f_client_order_id {
                     __r.client_order_id = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_fee_source {
-                    __r.fee_source = v;
+                if let ::core::option::Option::Some(v) = __f_fee_asset {
+                    __r.fee_asset = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_self_trade_prevention_mode {
                     __r.self_trade_prevention_mode = v;
@@ -4117,6 +4190,7 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                 if let ::core::option::Option::Some(v) = __f_attached_risk {
                     __r.attached_risk = v;
                 }
+                __r.sizing = __oneof_sizing;
                 __r.execution = __oneof_execution;
                 Ok(__r)
             }
@@ -4148,7 +4222,11 @@ pub mod order_intent {
     #[allow(unused_imports)]
     use super::*;
     #[doc(inline)]
+    pub use super::__buffa::oneof::order_intent::Sizing;
+    #[doc(inline)]
     pub use super::__buffa::oneof::order_intent::Execution;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::order_intent::Sizing as SizingView;
     #[doc(inline)]
     pub use super::__buffa::view::oneof::order_intent::Execution as ExecutionView;
 }
@@ -4370,6 +4448,29 @@ pub struct CreateOrderResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub accepted_at_ts_ns: u64,
+    /// Gross base quantity resolved for execution, scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig.
+    ///
+    /// Field 5: `resolved_base_qty_scaled`
+    #[serde(
+        rename = "resolvedBaseQtyScaled",
+        alias = "resolved_base_qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub resolved_base_qty_scaled: i64,
+    /// Submitted hard all-in quote debit limit, scaled by the pair's
+    /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+    /// method was submitted.
+    ///
+    /// Field 6: `submitted_max_quote_debit_scaled`
+    #[serde(
+        rename = "submittedMaxQuoteDebitScaled",
+        alias = "submitted_max_quote_debit_scaled",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
     /// Trigger ID for attached take-profit.
     ///
     /// Field 20: `take_profit_trigger_id`
@@ -4411,6 +4512,11 @@ impl ::core::fmt::Debug for CreateOrderResponse {
             .field("client_order_id", &self.client_order_id)
             .field("accepted_at", &self.accepted_at)
             .field("accepted_at_ts_ns", &self.accepted_at_ts_ns)
+            .field("resolved_base_qty_scaled", &self.resolved_base_qty_scaled)
+            .field(
+                "submitted_max_quote_debit_scaled",
+                &self.submitted_max_quote_debit_scaled,
+            )
             .field("take_profit_trigger_id", &self.take_profit_trigger_id)
             .field("stop_loss_trigger_id", &self.stop_loss_trigger_id)
             .field("trailing_stop_trigger_id", &self.trailing_stop_trigger_id)
@@ -4425,6 +4531,13 @@ impl CreateOrderResponse {
     pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.CreateOrderResponse";
 }
 impl CreateOrderResponse {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::submitted_max_quote_debit_scaled`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_submitted_max_quote_debit_scaled(mut self, value: i64) -> Self {
+        self.submitted_max_quote_debit_scaled = Some(value);
+        self
+    }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::take_profit_trigger_id`] to `Some(value)`, consuming and returning `self`.
@@ -4486,6 +4599,15 @@ impl ::buffa::Message for CreateOrderResponse {
                 += 1u32
                     + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns) as u32;
         }
+        if self.resolved_base_qty_scaled != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.resolved_base_qty_scaled)
+                        as u32;
+        }
+        if let Some(v) = self.submitted_max_quote_debit_scaled {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
         if let Some(v) = self.take_profit_trigger_id {
             size += 2u32 + ::buffa::types::uint64_encoded_len(v) as u32;
         }
@@ -4517,6 +4639,12 @@ impl ::buffa::Message for CreateOrderResponse {
         }
         if self.accepted_at_ts_ns != 0u64 {
             ::buffa::types::put_uint64_field(4u32, self.accepted_at_ts_ns, buf);
+        }
+        if self.resolved_base_qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(5u32, self.resolved_base_qty_scaled, buf);
+        }
+        if let Some(v) = self.submitted_max_quote_debit_scaled {
+            ::buffa::types::put_int64_field(6u32, v, buf);
         }
         if let Some(v) = self.take_profit_trigger_id {
             ::buffa::types::put_uint64_field(20u32, v, buf);
@@ -4572,6 +4700,22 @@ impl ::buffa::Message for CreateOrderResponse {
                 )?;
                 self.accepted_at_ts_ns = ::buffa::types::decode_uint64(buf)?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.resolved_base_qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.submitted_max_quote_debit_scaled = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
             20u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -4611,6 +4755,8 @@ impl ::buffa::Message for CreateOrderResponse {
         self.client_order_id.clear();
         self.accepted_at = ::buffa::MessageField::none();
         self.accepted_at_ts_ns = 0u64;
+        self.resolved_base_qty_scaled = 0i64;
+        self.submitted_max_quote_debit_scaled = ::core::option::Option::None;
         self.take_profit_trigger_id = ::core::option::Option::None;
         self.stop_loss_trigger_id = ::core::option::Option::None;
         self.trailing_stop_trigger_id = ::core::option::Option::None;
@@ -4644,6 +4790,1098 @@ pub const __CREATE_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     type_url: "type.googleapis.com/orders.v1.CreateOrderResponse",
     to_json: ::buffa::type_registry::any_to_json::<CreateOrderResponse>,
     from_json: ::buffa::type_registry::any_from_json::<CreateOrderResponse>,
+    is_wkt: false,
+};
+/// PreviewOrderRequest asks for an advisory resolution of one order intent.
+/// A preview does not reserve funds, submit an order, or guarantee later
+/// admission or execution.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct PreviewOrderRequest {
+    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    /// Trading pair symbol, for example "BTC-USDT".
+    ///
+    /// Field 2: `symbol`
+    #[serde(
+        rename = "symbol",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub symbol: ::buffa::alloc::string::String,
+    /// Order side.
+    ///
+    /// Field 3: `side`
+    #[serde(
+        rename = "side",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub side: ::buffa::EnumValue<Side>,
+    /// Asset charged for fees. Defaults to QUOTE. BASE is available only for BUY.
+    ///
+    /// Field 20: `fee_asset`
+    #[serde(
+        rename = "feeAsset",
+        alias = "fee_asset",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub fee_asset: ::buffa::EnumValue<FeeAsset>,
+    #[serde(flatten)]
+    pub sizing: ::core::option::Option<__buffa::oneof::preview_order_request::Sizing>,
+    #[serde(flatten)]
+    pub execution: ::core::option::Option<
+        __buffa::oneof::preview_order_request::Execution,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PreviewOrderRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PreviewOrderRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("symbol", &self.symbol)
+            .field("side", &self.side)
+            .field("fee_asset", &self.fee_asset)
+            .field("sizing", &self.sizing)
+            .field("execution", &self.execution)
+            .finish()
+    }
+}
+impl PreviewOrderRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.PreviewOrderRequest";
+}
+impl PreviewOrderRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(PreviewOrderRequest);
+impl ::buffa::MessageName for PreviewOrderRequest {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "PreviewOrderRequest";
+    const FULL_NAME: &'static str = "orders.v1.PreviewOrderRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.PreviewOrderRequest";
+}
+impl ::buffa::Message for PreviewOrderRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.symbol.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+        }
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if let ::core::option::Option::Some(ref v) = self.sizing {
+            match v {
+                __buffa::oneof::preview_order_request::Sizing::BaseQtyScaled(v) => {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                }
+                __buffa::oneof::preview_order_request::Sizing::MaxQuoteDebitScaled(
+                    v,
+                ) => {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                }
+            }
+        }
+        if let ::core::option::Option::Some(ref v) = self.execution {
+            match v {
+                __buffa::oneof::preview_order_request::Execution::MarketIoc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::preview_order_request::Execution::LimitGtc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::preview_order_request::Execution::LimitIoc(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::preview_order_request::Execution::LimitFok(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+            }
+        }
+        {
+            let val = self.fee_asset.to_i32();
+            if val != 0 {
+                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
+        if !self.symbol.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.symbol, buf);
+        }
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if let ::core::option::Option::Some(ref v) = self.sizing {
+            match v {
+                __buffa::oneof::preview_order_request::Sizing::BaseQtyScaled(x) => {
+                    ::buffa::types::put_int64_field(4u32, *x, buf);
+                }
+                __buffa::oneof::preview_order_request::Sizing::MaxQuoteDebitScaled(
+                    x,
+                ) => {
+                    ::buffa::types::put_int64_field(5u32, *x, buf);
+                }
+            }
+        }
+        if let ::core::option::Option::Some(ref v) = self.execution {
+            match v {
+                __buffa::oneof::preview_order_request::Execution::MarketIoc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::preview_order_request::Execution::LimitGtc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::preview_order_request::Execution::LimitIoc(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::preview_order_request::Execution::LimitFok(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        13u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        {
+            let val = self.fee_asset.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(20u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.symbol, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.sizing = ::core::option::Option::Some(
+                    __buffa::oneof::preview_order_request::Sizing::BaseQtyScaled(
+                        ::buffa::types::decode_int64(buf)?,
+                    ),
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.sizing = ::core::option::Option::Some(
+                    __buffa::oneof::preview_order_request::Sizing::MaxQuoteDebitScaled(
+                        ::buffa::types::decode_int64(buf)?,
+                    ),
+                );
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::preview_order_request::Execution::MarketIoc(
+                        ref mut existing,
+                    ),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::preview_order_request::Execution::MarketIoc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::preview_order_request::Execution::LimitGtc(
+                        ref mut existing,
+                    ),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::preview_order_request::Execution::LimitGtc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::preview_order_request::Execution::LimitIoc(
+                        ref mut existing,
+                    ),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::preview_order_request::Execution::LimitIoc(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::preview_order_request::Execution::LimitFok(
+                        ref mut existing,
+                    ),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::preview_order_request::Execution::LimitFok(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            20u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fee_asset = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = ::core::option::Option::None;
+        self.symbol.clear();
+        self.side = ::buffa::EnumValue::from(0);
+        self.sizing = ::core::option::Option::None;
+        self.execution = ::core::option::Option::None;
+        self.fee_asset = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PreviewOrderRequest {
+    const PROTO_FQN: &'static str = "orders.v1.PreviewOrderRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for PreviewOrderRequest {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = PreviewOrderRequest;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct PreviewOrderRequest")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<PreviewOrderRequest, A::Error> {
+                let mut __f_subaccount_id: ::core::option::Option<
+                    ::core::option::Option<u64>,
+                > = None;
+                let mut __f_symbol: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_side: ::core::option::Option<::buffa::EnumValue<Side>> = None;
+                let mut __f_fee_asset: ::core::option::Option<
+                    ::buffa::EnumValue<FeeAsset>,
+                > = None;
+                let mut __oneof_sizing: ::core::option::Option<
+                    __buffa::oneof::preview_order_request::Sizing,
+                > = None;
+                let mut __oneof_execution: ::core::option::Option<
+                    __buffa::oneof::preview_order_request::Execution,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "subaccountId" | "subaccount_id" => {
+                            __f_subaccount_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<u64>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<u64>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "symbol" => {
+                            __f_symbol = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "side" => {
+                            __f_side = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<Side>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<Side>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "feeAsset" | "fee_asset" => {
+                            __f_fee_asset = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<FeeAsset>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<FeeAsset>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "baseQtyScaled" | "base_qty_scaled" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_sizing.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'sizing'",
+                                        ),
+                                    );
+                                }
+                                __oneof_sizing = Some(
+                                    __buffa::oneof::preview_order_request::Sizing::BaseQtyScaled(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "maxQuoteDebitScaled" | "max_quote_debit_scaled" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_sizing.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'sizing'",
+                                        ),
+                                    );
+                                }
+                                __oneof_sizing = Some(
+                                    __buffa::oneof::preview_order_request::Sizing::MaxQuoteDebitScaled(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "marketIoc" | "market_ioc" => {
+                            let v: ::core::option::Option<MarketIoc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            MarketIoc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::preview_order_request::Execution::MarketIoc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "limitGtc" | "limit_gtc" => {
+                            let v: ::core::option::Option<LimitGtc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            LimitGtc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::preview_order_request::Execution::LimitGtc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "limitIoc" | "limit_ioc" => {
+                            let v: ::core::option::Option<LimitIoc> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            LimitIoc,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::preview_order_request::Execution::LimitIoc(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "limitFok" | "limit_fok" => {
+                            let v: ::core::option::Option<LimitFok> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            LimitFok,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::preview_order_request::Execution::LimitFok(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <PreviewOrderRequest as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_subaccount_id {
+                    __r.subaccount_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_symbol {
+                    __r.symbol = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_side {
+                    __r.side = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_fee_asset {
+                    __r.fee_asset = v;
+                }
+                __r.sizing = __oneof_sizing;
+                __r.execution = __oneof_execution;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PreviewOrderRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PREVIEW_ORDER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.PreviewOrderRequest",
+    to_json: ::buffa::type_registry::any_to_json::<PreviewOrderRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<PreviewOrderRequest>,
+    is_wkt: false,
+};
+pub mod preview_order_request {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::preview_order_request::Sizing;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::preview_order_request::Execution;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::preview_order_request::Sizing as SizingView;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::preview_order_request::Execution as ExecutionView;
+}
+/// PreviewOrderResponse returns an advisory sizing and fee estimate. Values may
+/// change before submission as prices, liquidity, and fees change.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PreviewOrderResponse {
+    /// Gross base quantity resolved for execution, scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig.
+    ///
+    /// Field 1: `resolved_base_qty_scaled`
+    #[serde(
+        rename = "resolvedBaseQtyScaled",
+        alias = "resolved_base_qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub resolved_base_qty_scaled: i64,
+    /// Protective execution price bound in quote units scaled by 1e6.
+    ///
+    /// Field 2: `price_bound_ticks`
+    #[serde(
+        rename = "priceBoundTicks",
+        alias = "price_bound_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_bound_ticks: i64,
+    /// Estimated all-in quote debit scaled by the pair's quote_quantity_scale
+    /// from GetSpotConfig.
+    ///
+    /// Field 3: `estimated_quote_debit_scaled`
+    #[serde(
+        rename = "estimatedQuoteDebitScaled",
+        alias = "estimated_quote_debit_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub estimated_quote_debit_scaled: i64,
+    /// Estimated fee amount scaled by the quantity scale of fee_asset.
+    ///
+    /// Field 4: `estimated_fee_scaled`
+    #[serde(
+        rename = "estimatedFeeScaled",
+        alias = "estimated_fee_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub estimated_fee_scaled: i64,
+    /// Estimated base quantity received after any BASE-denominated fee, scaled by
+    /// the pair's base_quantity_scale from GetSpotConfig.
+    ///
+    /// Field 5: `estimated_net_base_qty_scaled`
+    #[serde(
+        rename = "estimatedNetBaseQtyScaled",
+        alias = "estimated_net_base_qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub estimated_net_base_qty_scaled: i64,
+    /// Asset in which estimated_fee_scaled is denominated.
+    ///
+    /// Field 6: `fee_asset`
+    #[serde(
+        rename = "feeAsset",
+        alias = "fee_asset",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub fee_asset: ::buffa::EnumValue<FeeAsset>,
+    /// Time at which the market and fee inputs used by this preview were fresh.
+    ///
+    /// Field 7: `fresh_at`
+    #[serde(
+        rename = "freshAt",
+        alias = "fresh_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub fresh_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Freshness time as epoch nanoseconds (UTC).
+    ///
+    /// Field 8: `fresh_at_ts_ns`
+    #[serde(
+        rename = "freshAtTsNs",
+        alias = "fresh_at_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub fresh_at_ts_ns: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PreviewOrderResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PreviewOrderResponse")
+            .field("resolved_base_qty_scaled", &self.resolved_base_qty_scaled)
+            .field("price_bound_ticks", &self.price_bound_ticks)
+            .field("estimated_quote_debit_scaled", &self.estimated_quote_debit_scaled)
+            .field("estimated_fee_scaled", &self.estimated_fee_scaled)
+            .field("estimated_net_base_qty_scaled", &self.estimated_net_base_qty_scaled)
+            .field("fee_asset", &self.fee_asset)
+            .field("fresh_at", &self.fresh_at)
+            .field("fresh_at_ts_ns", &self.fresh_at_ts_ns)
+            .finish()
+    }
+}
+impl PreviewOrderResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.PreviewOrderResponse";
+}
+::buffa::impl_default_instance!(PreviewOrderResponse);
+impl ::buffa::MessageName for PreviewOrderResponse {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "PreviewOrderResponse";
+    const FULL_NAME: &'static str = "orders.v1.PreviewOrderResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.PreviewOrderResponse";
+}
+impl ::buffa::Message for PreviewOrderResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.resolved_base_qty_scaled != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.resolved_base_qty_scaled)
+                        as u32;
+        }
+        if self.price_bound_ticks != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.price_bound_ticks) as u32;
+        }
+        if self.estimated_quote_debit_scaled != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(
+                        self.estimated_quote_debit_scaled,
+                    ) as u32;
+        }
+        if self.estimated_fee_scaled != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.estimated_fee_scaled)
+                        as u32;
+        }
+        if self.estimated_net_base_qty_scaled != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(
+                        self.estimated_net_base_qty_scaled,
+                    ) as u32;
+        }
+        {
+            let val = self.fee_asset.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.fresh_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.fresh_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.fresh_at_ts_ns != 0u64 {
+            size
+                += 1u32 + ::buffa::types::uint64_encoded_len(self.fresh_at_ts_ns) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.resolved_base_qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.resolved_base_qty_scaled, buf);
+        }
+        if self.price_bound_ticks != 0i64 {
+            ::buffa::types::put_int64_field(2u32, self.price_bound_ticks, buf);
+        }
+        if self.estimated_quote_debit_scaled != 0i64 {
+            ::buffa::types::put_int64_field(
+                3u32,
+                self.estimated_quote_debit_scaled,
+                buf,
+            );
+        }
+        if self.estimated_fee_scaled != 0i64 {
+            ::buffa::types::put_int64_field(4u32, self.estimated_fee_scaled, buf);
+        }
+        if self.estimated_net_base_qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(
+                5u32,
+                self.estimated_net_base_qty_scaled,
+                buf,
+            );
+        }
+        {
+            let val = self.fee_asset.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(6u32, val, buf);
+            }
+        }
+        if self.fresh_at.is_set() {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            self.fresh_at.write_to(__cache, buf);
+        }
+        if self.fresh_at_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(8u32, self.fresh_at_ts_ns, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.resolved_base_qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_bound_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.estimated_quote_debit_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.estimated_fee_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.estimated_net_base_qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fee_asset = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.fresh_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fresh_at_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.resolved_base_qty_scaled = 0i64;
+        self.price_bound_ticks = 0i64;
+        self.estimated_quote_debit_scaled = 0i64;
+        self.estimated_fee_scaled = 0i64;
+        self.estimated_net_base_qty_scaled = 0i64;
+        self.fee_asset = ::buffa::EnumValue::from(0);
+        self.fresh_at = ::buffa::MessageField::none();
+        self.fresh_at_ts_ns = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PreviewOrderResponse {
+    const PROTO_FQN: &'static str = "orders.v1.PreviewOrderResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PreviewOrderResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PREVIEW_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.PreviewOrderResponse",
+    to_json: ::buffa::type_registry::any_to_json::<PreviewOrderResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<PreviewOrderResponse>,
     is_wkt: false,
 };
 /// CancelOrderRequest is the binary (protobuf) request for canceling orders.
@@ -8231,6 +9469,28 @@ pub struct BatchCreateAccepted {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub trailing_stop_trigger_id: ::core::option::Option<u64>,
+    /// Gross base quantity resolved for execution, scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig.
+    ///
+    /// Field 5: `resolved_base_qty_scaled`
+    #[serde(
+        rename = "resolvedBaseQtyScaled",
+        alias = "resolved_base_qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub resolved_base_qty_scaled: i64,
+    /// Submitted hard all-in quote debit limit, scaled by the pair's
+    /// quote_quantity_scale from GetSpotConfig. Present only when submitted.
+    ///
+    /// Field 6: `submitted_max_quote_debit_scaled`
+    #[serde(
+        rename = "submittedMaxQuoteDebitScaled",
+        alias = "submitted_max_quote_debit_scaled",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8242,6 +9502,11 @@ impl ::core::fmt::Debug for BatchCreateAccepted {
             .field("take_profit_trigger_id", &self.take_profit_trigger_id)
             .field("stop_loss_trigger_id", &self.stop_loss_trigger_id)
             .field("trailing_stop_trigger_id", &self.trailing_stop_trigger_id)
+            .field("resolved_base_qty_scaled", &self.resolved_base_qty_scaled)
+            .field(
+                "submitted_max_quote_debit_scaled",
+                &self.submitted_max_quote_debit_scaled,
+            )
             .finish()
     }
 }
@@ -8272,6 +9537,13 @@ impl BatchCreateAccepted {
     ///Sets [`Self::trailing_stop_trigger_id`] to `Some(value)`, consuming and returning `self`.
     pub fn with_trailing_stop_trigger_id(mut self, value: u64) -> Self {
         self.trailing_stop_trigger_id = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::submitted_max_quote_debit_scaled`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_submitted_max_quote_debit_scaled(mut self, value: i64) -> Self {
+        self.submitted_max_quote_debit_scaled = Some(value);
         self
     }
 }
@@ -8305,6 +9577,15 @@ impl ::buffa::Message for BatchCreateAccepted {
         if let Some(v) = self.trailing_stop_trigger_id {
             size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
         }
+        if self.resolved_base_qty_scaled != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.resolved_base_qty_scaled)
+                        as u32;
+        }
+        if let Some(v) = self.submitted_max_quote_debit_scaled {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8326,6 +9607,12 @@ impl ::buffa::Message for BatchCreateAccepted {
         }
         if let Some(v) = self.trailing_stop_trigger_id {
             ::buffa::types::put_uint64_field(4u32, v, buf);
+        }
+        if self.resolved_base_qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(5u32, self.resolved_base_qty_scaled, buf);
+        }
+        if let Some(v) = self.submitted_max_quote_debit_scaled {
+            ::buffa::types::put_int64_field(6u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8374,6 +9661,22 @@ impl ::buffa::Message for BatchCreateAccepted {
                     ::buffa::types::decode_uint64(buf)?,
                 );
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.resolved_base_qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.submitted_max_quote_debit_scaled = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8386,6 +9689,8 @@ impl ::buffa::Message for BatchCreateAccepted {
         self.take_profit_trigger_id = ::core::option::Option::None;
         self.stop_loss_trigger_id = ::core::option::Option::None;
         self.trailing_stop_trigger_id = ::core::option::Option::None;
+        self.resolved_base_qty_scaled = 0i64;
+        self.submitted_max_quote_debit_scaled = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -12399,7 +13704,7 @@ pub const __BATCH_CANCEL_ORDERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonA
 /// Read-only Orders API (open orders and historical orders).
 /// Separate from write surface to allow independent evolution/versioning.
 /// Shared enums (Side, OrderType, TimeInForce, SelfTradePreventionMode,
-/// FeeSource) are imported from orders.proto.
+/// FeeAsset) are imported from orders.proto.
 ///
 /// OrderStatus is specific to the read API (write API uses simple "accepted" status string).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -12407,8 +13712,7 @@ pub const __BATCH_CANCEL_ORDERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonA
 pub enum OrderStatus {
     /// Order status was not provided.
     ORDER_STATUS_UNSPECIFIED = 0i32,
-    /// Accepted by the admission layer and submitted for execution, but not yet
-    /// confirmed as working.
+    /// Accepted and submitted for execution, but not yet confirmed as working.
     PENDING = 1i32,
     /// Cancel requested; may still be working until cancel is confirmed.
     PENDING_CANCEL = 2i32,
@@ -12778,7 +14082,7 @@ pub enum OrderOriginScope {
     ATTACHED_RISK = 2i32,
     /// Child generated by a standalone trigger (STOP/TWAP/LADDER...).
     STANDALONE_TRIGGER = 3i32,
-    /// Internal/system automation (for example liquidation/ops actions).
+    /// System-managed automation, such as liquidation or account-protection actions.
     SYSTEM = 4i32,
 }
 impl OrderOriginScope {
@@ -14674,17 +15978,17 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub self_trade_prevention_mode: ::buffa::EnumValue<SelfTradePreventionMode>,
-    /// Fee source selected for BUY fills. This also determines the decode scale
+    /// Fee asset selected for fills. This also determines the decode scale
     /// for fee_scaled and referral_share_scaled on user trade rows.
     ///
-    /// Field 10: `fee_source`
+    /// Field 10: `fee_asset`
     #[serde(
-        rename = "feeSource",
-        alias = "fee_source",
+        rename = "feeAsset",
+        alias = "fee_asset",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub fee_source: ::buffa::EnumValue<FeeSource>,
+    pub fee_asset: ::buffa::EnumValue<FeeAsset>,
     /// True if the order was submitted as post-only (maker-only).
     ///
     /// Field 11: `post_only`
@@ -14858,6 +16162,18 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub batch_request_id: u64,
+    /// Submitted hard all-in quote debit limit, scaled by the pair's
+    /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+    /// method was submitted.
+    ///
+    /// Field 28: `submitted_max_quote_debit_scaled`
+    #[serde(
+        rename = "submittedMaxQuoteDebitScaled",
+        alias = "submitted_max_quote_debit_scaled",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -14873,7 +16189,7 @@ impl ::core::fmt::Debug for Order {
             .field("order_type", &self.order_type)
             .field("time_in_force", &self.time_in_force)
             .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
-            .field("fee_source", &self.fee_source)
+            .field("fee_asset", &self.fee_asset)
             .field("post_only", &self.post_only)
             .field("orig_qty_scaled", &self.orig_qty_scaled)
             .field("cum_qty_scaled", &self.cum_qty_scaled)
@@ -14891,6 +16207,10 @@ impl ::core::fmt::Debug for Order {
             .field("market_max_slippage_bps", &self.market_max_slippage_bps)
             .field("version", &self.version)
             .field("batch_request_id", &self.batch_request_id)
+            .field(
+                "submitted_max_quote_debit_scaled",
+                &self.submitted_max_quote_debit_scaled,
+            )
             .finish()
     }
 }
@@ -14900,6 +16220,15 @@ impl Order {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.Order";
+}
+impl Order {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::submitted_max_quote_debit_scaled`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_submitted_max_quote_debit_scaled(mut self, value: i64) -> Self {
+        self.submitted_max_quote_debit_scaled = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(Order);
 impl ::buffa::MessageName for Order {
@@ -14961,7 +16290,7 @@ impl ::buffa::Message for Order {
             }
         }
         {
-            let val = self.fee_source.to_i32();
+            let val = self.fee_asset.to_i32();
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -15047,6 +16376,9 @@ impl ::buffa::Message for Order {
         if self.batch_request_id != 0u64 {
             size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        if let Some(v) = self.submitted_max_quote_debit_scaled {
+            size += 2u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -15097,7 +16429,7 @@ impl ::buffa::Message for Order {
             }
         }
         {
-            let val = self.fee_source.to_i32();
+            let val = self.fee_asset.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(10u32, val, buf);
             }
@@ -15158,6 +16490,9 @@ impl ::buffa::Message for Order {
         }
         if self.batch_request_id != 0u64 {
             ::buffa::types::put_fixed64_field(27u32, self.batch_request_id, buf);
+        }
+        if let Some(v) = self.submitted_max_quote_debit_scaled {
+            ::buffa::types::put_int64_field(28u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -15241,7 +16576,7 @@ impl ::buffa::Message for Order {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.fee_source = ::buffa::EnumValue::from(
+                self.fee_asset = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -15372,6 +16707,15 @@ impl ::buffa::Message for Order {
                 )?;
                 self.batch_request_id = ::buffa::types::decode_fixed64(buf)?;
             }
+            28u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.submitted_max_quote_debit_scaled = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -15388,7 +16732,7 @@ impl ::buffa::Message for Order {
         self.order_type = ::buffa::EnumValue::from(0);
         self.time_in_force = ::buffa::EnumValue::from(0);
         self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
-        self.fee_source = ::buffa::EnumValue::from(0);
+        self.fee_asset = ::buffa::EnumValue::from(0);
         self.post_only = false;
         self.orig_qty_scaled = 0i64;
         self.cum_qty_scaled = 0i64;
@@ -15406,6 +16750,7 @@ impl ::buffa::Message for Order {
         self.market_max_slippage_bps = 0i32;
         self.version = 0u32;
         self.batch_request_id = 0u64;
+        self.submitted_max_quote_debit_scaled = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -15514,8 +16859,8 @@ pub struct UserTrade {
     )]
     pub qty_scaled: i64,
     /// Fee amount in the charged asset's scale. Use quote_quantity_scale when
-    /// fee_source is QUOTE or UNSPECIFIED; use base_quantity_scale when fee_source
-    /// is RECEIVED.
+    /// fee_asset is QUOTE or UNSPECIFIED; use base_quantity_scale when fee_asset
+    /// is BASE.
     ///
     /// Field 9: `fee_scaled`
     #[serde(
@@ -15525,17 +16870,17 @@ pub struct UserTrade {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub fee_scaled: i64,
-    /// Fee source charged for this fill. This determines how to decode fee_scaled
+    /// Fee asset charged for this fill. This determines how to decode fee_scaled
     /// and referral_share_scaled.
     ///
-    /// Field 10: `fee_source`
+    /// Field 10: `fee_asset`
     #[serde(
-        rename = "feeSource",
-        alias = "fee_source",
+        rename = "feeAsset",
+        alias = "fee_asset",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub fee_source: ::buffa::EnumValue<FeeSource>,
+    pub fee_asset: ::buffa::EnumValue<FeeAsset>,
     /// Referral share amount in the same denomination and scale as fee_scaled for
     /// this fill.
     ///
@@ -15572,7 +16917,7 @@ impl ::core::fmt::Debug for UserTrade {
             .field("price_ticks", &self.price_ticks)
             .field("qty_scaled", &self.qty_scaled)
             .field("fee_scaled", &self.fee_scaled)
-            .field("fee_source", &self.fee_source)
+            .field("fee_asset", &self.fee_asset)
             .field("referral_share_scaled", &self.referral_share_scaled)
             .field("ts_ns", &self.ts_ns)
             .finish()
@@ -15631,7 +16976,7 @@ impl ::buffa::Message for UserTrade {
             size += 1u32 + ::buffa::types::int64_encoded_len(self.fee_scaled) as u32;
         }
         {
-            let val = self.fee_source.to_i32();
+            let val = self.fee_asset.to_i32();
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -15683,7 +17028,7 @@ impl ::buffa::Message for UserTrade {
             ::buffa::types::put_int64_field(9u32, self.fee_scaled, buf);
         }
         {
-            let val = self.fee_source.to_i32();
+            let val = self.fee_asset.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(10u32, val, buf);
             }
@@ -15768,7 +17113,7 @@ impl ::buffa::Message for UserTrade {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.fee_source = ::buffa::EnumValue::from(
+                self.fee_asset = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -15802,7 +17147,7 @@ impl ::buffa::Message for UserTrade {
         self.price_ticks = 0i64;
         self.qty_scaled = 0i64;
         self.fee_scaled = 0i64;
-        self.fee_source = ::buffa::EnumValue::from(0);
+        self.fee_asset = ::buffa::EnumValue::from(0);
         self.referral_share_scaled = 0i64;
         self.ts_ns = 0u64;
         self.__buffa_unknown_fields.clear();
@@ -20356,19 +21701,15 @@ pub mod __buffa {
             ///
             /// Field 2: `side`
             pub side: ::buffa::EnumValue<super::super::Side>,
-            /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
-            ///
-            /// Field 3: `qty_scaled`
-            pub qty_scaled: i64,
             /// Optional client order identifier for idempotency.
             ///
             /// Field 20: `client_order_id`
             pub client_order_id: &'a str,
-            /// Fee source for BUY orders: QUOTE (default) or RECEIVED. SELL orders must
-            /// use QUOTE.
+            /// Asset charged for fees. Defaults to QUOTE. BASE is available only for BUY
+            /// orders; SELL orders must use QUOTE.
             ///
-            /// Field 21: `fee_source`
-            pub fee_source: ::buffa::EnumValue<super::super::FeeSource>,
+            /// Field 21: `fee_asset`
+            pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
             /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
             ///
             /// Field 22: `self_trade_prevention_mode`
@@ -20380,6 +21721,9 @@ pub mod __buffa {
             /// Field 30: `attached_risk`
             pub attached_risk: ::buffa::MessageFieldView<
                 super::super::__buffa::view::RiskPolicyView<'a>,
+            >,
+            pub sizing: ::core::option::Option<
+                super::super::__buffa::view::oneof::order_intent::Sizing,
             >,
             pub execution: ::core::option::Option<
                 super::super::__buffa::view::oneof::order_intent::Execution<'a>,
@@ -20433,13 +21777,6 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
-                    }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -20452,7 +21789,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.fee_source = ::buffa::EnumValue::from(
+                        view.fee_asset = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
@@ -20489,6 +21826,28 @@ pub mod __buffa {
                                 );
                             }
                         }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.sizing = Some(
+                            super::super::__buffa::view::oneof::order_intent::Sizing::BaseQtyScaled(
+                                ::buffa::types::decode_int64(&mut cur)?,
+                            ),
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.sizing = Some(
+                            super::super::__buffa::view::oneof::order_intent::Sizing::MaxQuoteDebitScaled(
+                                ::buffa::types::decode_int64(&mut cur)?,
+                            ),
+                        );
                     }
                     10u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -20645,9 +22004,8 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::OrderIntent {
                     symbol: self.symbol.to_string(),
                     side: self.side,
-                    qty_scaled: self.qty_scaled,
                     client_order_id: self.client_order_id.to_string(),
-                    fee_source: self.fee_source,
+                    fee_asset: self.fee_asset,
                     self_trade_prevention_mode: self.self_trade_prevention_mode,
                     attached_risk: match self.attached_risk.as_option() {
                         Some(v) => {
@@ -20657,6 +22015,25 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    sizing: self
+                        .sizing
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::order_intent::Sizing::BaseQtyScaled(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::order_intent::Sizing::BaseQtyScaled(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::order_intent::Sizing::MaxQuoteDebitScaled(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::order_intent::Sizing::MaxQuoteDebitScaled(
+                                    *v,
+                                )
+                            }
+                        }),
                     execution: match self.execution.as_ref() {
                         ::core::option::Option::Some(v) => {
                             ::core::option::Option::Some(
@@ -20727,10 +22104,19 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
-                if self.qty_scaled != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+                if let ::core::option::Option::Some(ref v) = self.sizing {
+                    match v {
+                        super::super::__buffa::view::oneof::order_intent::Sizing::BaseQtyScaled(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Sizing::MaxQuoteDebitScaled(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                        }
+                    }
                 }
                 if let ::core::option::Option::Some(ref v) = self.execution {
                     match v {
@@ -20783,7 +22169,7 @@ pub mod __buffa {
                                 as u32;
                 }
                 {
-                    let val = self.fee_source.to_i32();
+                    let val = self.fee_asset.to_i32();
                     if val != 0 {
                         size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -20822,8 +22208,19 @@ pub mod __buffa {
                         ::buffa::types::put_int32_field(2u32, val, buf);
                     }
                 }
-                if self.qty_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(3u32, self.qty_scaled, buf);
+                if let ::core::option::Option::Some(ref v) = self.sizing {
+                    match v {
+                        super::super::__buffa::view::oneof::order_intent::Sizing::BaseQtyScaled(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int64_field(3u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Sizing::MaxQuoteDebitScaled(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int64_field(4u32, *x, buf);
+                        }
+                    }
                 }
                 if let ::core::option::Option::Some(ref v) = self.execution {
                     match v {
@@ -20873,7 +22270,7 @@ pub mod __buffa {
                     ::buffa::types::put_string_field(20u32, &self.client_order_id, buf);
                 }
                 {
-                    let val = self.fee_source.to_i32();
+                    let val = self.fee_asset.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(21u32, val, buf);
                     }
@@ -20919,20 +22316,13 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
                     __map.serialize_entry("side", &self.side)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
-                    __map
-                        .serialize_entry(
-                            "qtyScaled",
-                            &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
-                        )?;
-                }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.client_order_id) {
                     __map.serialize_entry("clientOrderId", self.client_order_id)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.fee_source,
+                    &self.fee_asset,
                 ) {
-                    __map.serialize_entry("feeSource", &self.fee_source)?;
+                    __map.serialize_entry("feeAsset", &self.fee_asset)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.self_trade_prevention_mode,
@@ -20949,6 +22339,28 @@ pub mod __buffa {
                         .as_option()
                     {
                         __map.serialize_entry("attachedRisk", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.sizing {
+                    match __ov {
+                        super::super::__buffa::view::oneof::order_intent::Sizing::BaseQtyScaled(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "baseQtyScaled",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Sizing::MaxQuoteDebitScaled(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "maxQuoteDebitScaled",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
                     }
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.execution {
@@ -21083,13 +22495,6 @@ pub mod __buffa {
             pub fn side(&self) -> ::buffa::EnumValue<super::super::Side> {
                 self.0.reborrow().side
             }
-            /// Quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
-            ///
-            /// Field 3: `qty_scaled`
-            #[must_use]
-            pub fn qty_scaled(&self) -> i64 {
-                self.0.reborrow().qty_scaled
-            }
             /// Optional client order identifier for idempotency.
             ///
             /// Field 20: `client_order_id`
@@ -21097,13 +22502,13 @@ pub mod __buffa {
             pub fn client_order_id(&self) -> &'_ str {
                 self.0.reborrow().client_order_id
             }
-            /// Fee source for BUY orders: QUOTE (default) or RECEIVED. SELL orders must
-            /// use QUOTE.
+            /// Asset charged for fees. Defaults to QUOTE. BASE is available only for BUY
+            /// orders; SELL orders must use QUOTE.
             ///
-            /// Field 21: `fee_source`
+            /// Field 21: `fee_asset`
             #[must_use]
-            pub fn fee_source(&self) -> ::buffa::EnumValue<super::super::FeeSource> {
-                self.0.reborrow().fee_source
+            pub fn fee_asset(&self) -> ::buffa::EnumValue<super::super::FeeAsset> {
+                self.0.reborrow().fee_asset
             }
             /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
             ///
@@ -21124,6 +22529,15 @@ pub mod __buffa {
                 super::super::__buffa::view::RiskPolicyView<'_>,
             > {
                 &self.0.reborrow().attached_risk
+            }
+            /// Oneof `sizing`.
+            #[must_use]
+            pub fn sizing(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::order_intent::Sizing,
+            > {
+                self.0.reborrow().sizing.as_ref()
             }
             /// Oneof `execution`.
             #[must_use]
@@ -21531,6 +22945,17 @@ pub mod __buffa {
             ///
             /// Field 4: `accepted_at_ts_ns`
             pub accepted_at_ts_ns: u64,
+            /// Gross base quantity resolved for execution, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig.
+            ///
+            /// Field 5: `resolved_base_qty_scaled`
+            pub resolved_base_qty_scaled: i64,
+            /// Submitted hard all-in quote debit limit, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+            /// method was submitted.
+            ///
+            /// Field 6: `submitted_max_quote_debit_scaled`
+            pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
             /// Trigger ID for attached take-profit.
             ///
             /// Field 20: `take_profit_trigger_id`
@@ -21624,6 +23049,24 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.resolved_base_qty_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.submitted_max_quote_debit_scaled = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -21691,6 +23134,9 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     accepted_at_ts_ns: self.accepted_at_ts_ns,
+                    resolved_base_qty_scaled: self.resolved_base_qty_scaled,
+                    submitted_max_quote_debit_scaled: self
+                        .submitted_max_quote_debit_scaled,
                     take_profit_trigger_id: self.take_profit_trigger_id,
                     stop_loss_trigger_id: self.stop_loss_trigger_id,
                     trailing_stop_trigger_id: self.trailing_stop_trigger_id,
@@ -21731,6 +23177,16 @@ pub mod __buffa {
                             + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns)
                                 as u32;
                 }
+                if self.resolved_base_qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(
+                                self.resolved_base_qty_scaled,
+                            ) as u32;
+                }
+                if let Some(v) = self.submitted_max_quote_debit_scaled {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
                 if let Some(v) = self.take_profit_trigger_id {
                     size += 2u32 + ::buffa::types::uint64_encoded_len(v) as u32;
                 }
@@ -21767,6 +23223,16 @@ pub mod __buffa {
                 }
                 if self.accepted_at_ts_ns != 0u64 {
                     ::buffa::types::put_uint64_field(4u32, self.accepted_at_ts_ns, buf);
+                }
+                if self.resolved_base_qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(
+                        5u32,
+                        self.resolved_base_qty_scaled,
+                        buf,
+                    );
+                }
+                if let Some(v) = self.submitted_max_quote_debit_scaled {
+                    ::buffa::types::put_int64_field(6u32, v, buf);
                 }
                 if let Some(v) = self.take_profit_trigger_id {
                     ::buffa::types::put_uint64_field(20u32, v, buf);
@@ -21823,6 +23289,26 @@ pub mod __buffa {
                         .serialize_entry(
                             "acceptedAtTsNs",
                             &::buffa::json_helpers::ProtoJson(&self.accepted_at_ts_ns),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.resolved_base_qty_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "resolvedBaseQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.resolved_base_qty_scaled,
+                            ),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self
+                    .submitted_max_quote_debit_scaled
+                {
+                    __map
+                        .serialize_entry(
+                            "submittedMaxQuoteDebitScaled",
+                            &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
                 if let ::core::option::Option::Some(__v) = self.take_profit_trigger_id {
@@ -21975,6 +23461,25 @@ pub mod __buffa {
             pub fn accepted_at_ts_ns(&self) -> u64 {
                 self.0.reborrow().accepted_at_ts_ns
             }
+            /// Gross base quantity resolved for execution, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig.
+            ///
+            /// Field 5: `resolved_base_qty_scaled`
+            #[must_use]
+            pub fn resolved_base_qty_scaled(&self) -> i64 {
+                self.0.reborrow().resolved_base_qty_scaled
+            }
+            /// Submitted hard all-in quote debit limit, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+            /// method was submitted.
+            ///
+            /// Field 6: `submitted_max_quote_debit_scaled`
+            #[must_use]
+            pub fn submitted_max_quote_debit_scaled(
+                &self,
+            ) -> ::core::option::Option<i64> {
+                self.0.reborrow().submitted_max_quote_debit_scaled
+            }
             /// Trigger ID for attached take-profit.
             ///
             /// Field 20: `take_profit_trigger_id`
@@ -22022,6 +23527,1394 @@ pub mod __buffa {
             type ViewHandle = CreateOrderResponseOwnedView;
         }
         impl ::serde::Serialize for CreateOrderResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// PreviewOrderRequest asks for an advisory resolution of one order intent.
+        /// A preview does not reserve funds, submit an order, or guarantee later
+        /// admission or execution.
+        #[derive(Clone, Debug, Default)]
+        pub struct PreviewOrderRequestView<'a> {
+            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
+            /// Trading pair symbol, for example "BTC-USDT".
+            ///
+            /// Field 2: `symbol`
+            pub symbol: &'a str,
+            /// Order side.
+            ///
+            /// Field 3: `side`
+            pub side: ::buffa::EnumValue<super::super::Side>,
+            /// Asset charged for fees. Defaults to QUOTE. BASE is available only for BUY.
+            ///
+            /// Field 20: `fee_asset`
+            pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
+            pub sizing: ::core::option::Option<
+                super::super::__buffa::view::oneof::preview_order_request::Sizing,
+            >,
+            pub execution: ::core::option::Option<
+                super::super::__buffa::view::oneof::preview_order_request::Execution<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PreviewOrderRequestView<'a> {
+            type Owned = super::super::PreviewOrderRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.side = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    20u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fee_asset = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.sizing = Some(
+                            super::super::__buffa::view::oneof::preview_order_request::Sizing::BaseQtyScaled(
+                                ::buffa::types::decode_int64(&mut cur)?,
+                            ),
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.sizing = Some(
+                            super::super::__buffa::view::oneof::preview_order_request::Sizing::MaxQuoteDebitScaled(
+                                ::buffa::types::decode_int64(&mut cur)?,
+                            ),
+                        );
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::preview_order_request::Execution::MarketIoc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::preview_order_request::Execution::MarketIoc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::MarketIocView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::preview_order_request::Execution::LimitGtc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::preview_order_request::Execution::LimitGtc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::LimitGtcView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::preview_order_request::Execution::LimitIoc(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::preview_order_request::Execution::LimitIoc(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::LimitIocView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::preview_order_request::Execution::LimitFok(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::preview_order_request::Execution::LimitFok(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::LimitFokView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PreviewOrderRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PreviewOrderRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PreviewOrderRequest {
+                    subaccount_id: self.subaccount_id,
+                    symbol: self.symbol.to_string(),
+                    side: self.side,
+                    fee_asset: self.fee_asset,
+                    sizing: self
+                        .sizing
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::preview_order_request::Sizing::BaseQtyScaled(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::preview_order_request::Sizing::BaseQtyScaled(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::preview_order_request::Sizing::MaxQuoteDebitScaled(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::preview_order_request::Sizing::MaxQuoteDebitScaled(
+                                    *v,
+                                )
+                            }
+                        }),
+                    execution: match self.execution.as_ref() {
+                        ::core::option::Option::Some(v) => {
+                            ::core::option::Option::Some(
+                                match v {
+                                    super::super::__buffa::view::oneof::preview_order_request::Execution::MarketIoc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::preview_order_request::Execution::MarketIoc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::preview_order_request::Execution::LimitGtc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::preview_order_request::Execution::LimitGtc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::preview_order_request::Execution::LimitIoc(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::preview_order_request::Execution::LimitIoc(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::preview_order_request::Execution::LimitFok(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::preview_order_request::Execution::LimitFok(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        ::core::option::Option::None => ::core::option::Option::None,
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PreviewOrderRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.symbol.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+                }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if let ::core::option::Option::Some(ref v) = self.sizing {
+                    match v {
+                        super::super::__buffa::view::oneof::preview_order_request::Sizing::BaseQtyScaled(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Sizing::MaxQuoteDebitScaled(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                        }
+                    }
+                }
+                if let ::core::option::Option::Some(ref v) = self.execution {
+                    match v {
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::MarketIoc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::LimitGtc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::LimitIoc(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::LimitFok(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                    }
+                }
+                {
+                    let val = self.fee_asset.to_i32();
+                    if val != 0 {
+                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(1u32, v, buf);
+                }
+                if !self.symbol.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.symbol, buf);
+                }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                if let ::core::option::Option::Some(ref v) = self.sizing {
+                    match v {
+                        super::super::__buffa::view::oneof::preview_order_request::Sizing::BaseQtyScaled(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int64_field(4u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Sizing::MaxQuoteDebitScaled(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int64_field(5u32, *x, buf);
+                        }
+                    }
+                }
+                if let ::core::option::Option::Some(ref v) = self.execution {
+                    match v {
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::MarketIoc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                10u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::LimitGtc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                11u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::LimitIoc(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                12u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::LimitFok(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                13u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                    }
+                }
+                {
+                    let val = self.fee_asset.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(20u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PreviewOrderRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
+                    __map.serialize_entry("symbol", self.symbol)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
+                    __map.serialize_entry("side", &self.side)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.fee_asset,
+                ) {
+                    __map.serialize_entry("feeAsset", &self.fee_asset)?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.sizing {
+                    match __ov {
+                        super::super::__buffa::view::oneof::preview_order_request::Sizing::BaseQtyScaled(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "baseQtyScaled",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Sizing::MaxQuoteDebitScaled(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "maxQuoteDebitScaled",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                    }
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.execution {
+                    match __ov {
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::MarketIoc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("marketIoc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::LimitGtc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitGtc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::LimitIoc(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitIoc", v)?;
+                        }
+                        super::super::__buffa::view::oneof::preview_order_request::Execution::LimitFok(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitFok", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PreviewOrderRequestView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "PreviewOrderRequest";
+            const FULL_NAME: &'static str = "orders.v1.PreviewOrderRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.PreviewOrderRequest";
+        }
+        ::buffa::impl_default_view_instance!(PreviewOrderRequestView);
+        ::buffa::impl_view_reborrow!(PreviewOrderRequestView);
+        /** Self-contained, `'static` owned view of a `PreviewOrderRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PreviewOrderRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PreviewOrderRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PreviewOrderRequestOwnedView(
+            ::buffa::OwnedView<PreviewOrderRequestView<'static>>,
+        );
+        impl PreviewOrderRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewOrderRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewOrderRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PreviewOrderRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewOrderRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`PreviewOrderRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PreviewOrderRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PreviewOrderRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
+            }
+            /// Trading pair symbol, for example "BTC-USDT".
+            ///
+            /// Field 2: `symbol`
+            #[must_use]
+            pub fn symbol(&self) -> &'_ str {
+                self.0.reborrow().symbol
+            }
+            /// Order side.
+            ///
+            /// Field 3: `side`
+            #[must_use]
+            pub fn side(&self) -> ::buffa::EnumValue<super::super::Side> {
+                self.0.reborrow().side
+            }
+            /// Asset charged for fees. Defaults to QUOTE. BASE is available only for BUY.
+            ///
+            /// Field 20: `fee_asset`
+            #[must_use]
+            pub fn fee_asset(&self) -> ::buffa::EnumValue<super::super::FeeAsset> {
+                self.0.reborrow().fee_asset
+            }
+            /// Oneof `sizing`.
+            #[must_use]
+            pub fn sizing(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::preview_order_request::Sizing,
+            > {
+                self.0.reborrow().sizing.as_ref()
+            }
+            /// Oneof `execution`.
+            #[must_use]
+            pub fn execution(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::preview_order_request::Execution<'_>,
+            > {
+                self.0.reborrow().execution.as_ref()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<PreviewOrderRequestView<'static>>>
+        for PreviewOrderRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PreviewOrderRequestView<'static>>,
+            ) -> Self {
+                PreviewOrderRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PreviewOrderRequestOwnedView>
+        for ::buffa::OwnedView<PreviewOrderRequestView<'static>> {
+            fn from(wrapper: PreviewOrderRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<PreviewOrderRequestView<'static>>>
+        for PreviewOrderRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<PreviewOrderRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PreviewOrderRequest {
+            type View<'a> = PreviewOrderRequestView<'a>;
+            type ViewHandle = PreviewOrderRequestOwnedView;
+        }
+        impl ::serde::Serialize for PreviewOrderRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// PreviewOrderResponse returns an advisory sizing and fee estimate. Values may
+        /// change before submission as prices, liquidity, and fees change.
+        #[derive(Clone, Debug, Default)]
+        pub struct PreviewOrderResponseView<'a> {
+            /// Gross base quantity resolved for execution, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig.
+            ///
+            /// Field 1: `resolved_base_qty_scaled`
+            pub resolved_base_qty_scaled: i64,
+            /// Protective execution price bound in quote units scaled by 1e6.
+            ///
+            /// Field 2: `price_bound_ticks`
+            pub price_bound_ticks: i64,
+            /// Estimated all-in quote debit scaled by the pair's quote_quantity_scale
+            /// from GetSpotConfig.
+            ///
+            /// Field 3: `estimated_quote_debit_scaled`
+            pub estimated_quote_debit_scaled: i64,
+            /// Estimated fee amount scaled by the quantity scale of fee_asset.
+            ///
+            /// Field 4: `estimated_fee_scaled`
+            pub estimated_fee_scaled: i64,
+            /// Estimated base quantity received after any BASE-denominated fee, scaled by
+            /// the pair's base_quantity_scale from GetSpotConfig.
+            ///
+            /// Field 5: `estimated_net_base_qty_scaled`
+            pub estimated_net_base_qty_scaled: i64,
+            /// Asset in which estimated_fee_scaled is denominated.
+            ///
+            /// Field 6: `fee_asset`
+            pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
+            /// Time at which the market and fee inputs used by this preview were fresh.
+            ///
+            /// Field 7: `fresh_at`
+            pub fresh_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Freshness time as epoch nanoseconds (UTC).
+            ///
+            /// Field 8: `fresh_at_ts_ns`
+            pub fresh_at_ts_ns: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PreviewOrderResponseView<'a> {
+            type Owned = super::super::PreviewOrderResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.resolved_base_qty_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_bound_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.estimated_quote_debit_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.estimated_fee_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.estimated_net_base_qty_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fee_asset = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.fresh_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.fresh_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fresh_at_ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PreviewOrderResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PreviewOrderResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PreviewOrderResponse {
+                    resolved_base_qty_scaled: self.resolved_base_qty_scaled,
+                    price_bound_ticks: self.price_bound_ticks,
+                    estimated_quote_debit_scaled: self.estimated_quote_debit_scaled,
+                    estimated_fee_scaled: self.estimated_fee_scaled,
+                    estimated_net_base_qty_scaled: self.estimated_net_base_qty_scaled,
+                    fee_asset: self.fee_asset,
+                    fresh_at: match self.fresh_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    fresh_at_ts_ns: self.fresh_at_ts_ns,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PreviewOrderResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.resolved_base_qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(
+                                self.resolved_base_qty_scaled,
+                            ) as u32;
+                }
+                if self.price_bound_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_bound_ticks)
+                                as u32;
+                }
+                if self.estimated_quote_debit_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(
+                                self.estimated_quote_debit_scaled,
+                            ) as u32;
+                }
+                if self.estimated_fee_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(
+                                self.estimated_fee_scaled,
+                            ) as u32;
+                }
+                if self.estimated_net_base_qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(
+                                self.estimated_net_base_qty_scaled,
+                            ) as u32;
+                }
+                {
+                    let val = self.fee_asset.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.fresh_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.fresh_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.fresh_at_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.fresh_at_ts_ns)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.resolved_base_qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(
+                        1u32,
+                        self.resolved_base_qty_scaled,
+                        buf,
+                    );
+                }
+                if self.price_bound_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(2u32, self.price_bound_ticks, buf);
+                }
+                if self.estimated_quote_debit_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(
+                        3u32,
+                        self.estimated_quote_debit_scaled,
+                        buf,
+                    );
+                }
+                if self.estimated_fee_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(
+                        4u32,
+                        self.estimated_fee_scaled,
+                        buf,
+                    );
+                }
+                if self.estimated_net_base_qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(
+                        5u32,
+                        self.estimated_net_base_qty_scaled,
+                        buf,
+                    );
+                }
+                {
+                    let val = self.fee_asset.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(6u32, val, buf);
+                    }
+                }
+                if self.fresh_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.fresh_at.write_to(__cache, buf);
+                }
+                if self.fresh_at_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(8u32, self.fresh_at_ts_ns, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PreviewOrderResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.resolved_base_qty_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "resolvedBaseQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.resolved_base_qty_scaled,
+                            ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.price_bound_ticks,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "priceBoundTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_bound_ticks),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.estimated_quote_debit_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "estimatedQuoteDebitScaled",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.estimated_quote_debit_scaled,
+                            ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.estimated_fee_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "estimatedFeeScaled",
+                            &::buffa::json_helpers::ProtoJson(&self.estimated_fee_scaled),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.estimated_net_base_qty_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "estimatedNetBaseQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.estimated_net_base_qty_scaled,
+                            ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.fee_asset,
+                ) {
+                    __map.serialize_entry("feeAsset", &self.fee_asset)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.fresh_at.as_option()
+                    {
+                        __map.serialize_entry("freshAt", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.fresh_at_ts_ns) {
+                    __map
+                        .serialize_entry(
+                            "freshAtTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.fresh_at_ts_ns),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PreviewOrderResponseView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "PreviewOrderResponse";
+            const FULL_NAME: &'static str = "orders.v1.PreviewOrderResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.PreviewOrderResponse";
+        }
+        ::buffa::impl_default_view_instance!(PreviewOrderResponseView);
+        ::buffa::impl_view_reborrow!(PreviewOrderResponseView);
+        /** Self-contained, `'static` owned view of a `PreviewOrderResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PreviewOrderResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PreviewOrderResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PreviewOrderResponseOwnedView(
+            ::buffa::OwnedView<PreviewOrderResponseView<'static>>,
+        );
+        impl PreviewOrderResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewOrderResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewOrderResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PreviewOrderResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewOrderResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`PreviewOrderResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PreviewOrderResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PreviewOrderResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Gross base quantity resolved for execution, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig.
+            ///
+            /// Field 1: `resolved_base_qty_scaled`
+            #[must_use]
+            pub fn resolved_base_qty_scaled(&self) -> i64 {
+                self.0.reborrow().resolved_base_qty_scaled
+            }
+            /// Protective execution price bound in quote units scaled by 1e6.
+            ///
+            /// Field 2: `price_bound_ticks`
+            #[must_use]
+            pub fn price_bound_ticks(&self) -> i64 {
+                self.0.reborrow().price_bound_ticks
+            }
+            /// Estimated all-in quote debit scaled by the pair's quote_quantity_scale
+            /// from GetSpotConfig.
+            ///
+            /// Field 3: `estimated_quote_debit_scaled`
+            #[must_use]
+            pub fn estimated_quote_debit_scaled(&self) -> i64 {
+                self.0.reborrow().estimated_quote_debit_scaled
+            }
+            /// Estimated fee amount scaled by the quantity scale of fee_asset.
+            ///
+            /// Field 4: `estimated_fee_scaled`
+            #[must_use]
+            pub fn estimated_fee_scaled(&self) -> i64 {
+                self.0.reborrow().estimated_fee_scaled
+            }
+            /// Estimated base quantity received after any BASE-denominated fee, scaled by
+            /// the pair's base_quantity_scale from GetSpotConfig.
+            ///
+            /// Field 5: `estimated_net_base_qty_scaled`
+            #[must_use]
+            pub fn estimated_net_base_qty_scaled(&self) -> i64 {
+                self.0.reborrow().estimated_net_base_qty_scaled
+            }
+            /// Asset in which estimated_fee_scaled is denominated.
+            ///
+            /// Field 6: `fee_asset`
+            #[must_use]
+            pub fn fee_asset(&self) -> ::buffa::EnumValue<super::super::FeeAsset> {
+                self.0.reborrow().fee_asset
+            }
+            /// Time at which the market and fee inputs used by this preview were fresh.
+            ///
+            /// Field 7: `fresh_at`
+            #[must_use]
+            pub fn fresh_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().fresh_at
+            }
+            /// Freshness time as epoch nanoseconds (UTC).
+            ///
+            /// Field 8: `fresh_at_ts_ns`
+            #[must_use]
+            pub fn fresh_at_ts_ns(&self) -> u64 {
+                self.0.reborrow().fresh_at_ts_ns
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<PreviewOrderResponseView<'static>>>
+        for PreviewOrderResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PreviewOrderResponseView<'static>>,
+            ) -> Self {
+                PreviewOrderResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PreviewOrderResponseOwnedView>
+        for ::buffa::OwnedView<PreviewOrderResponseView<'static>> {
+            fn from(wrapper: PreviewOrderResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PreviewOrderResponseView<'static>>,
+        > for PreviewOrderResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<PreviewOrderResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PreviewOrderResponse {
+            type View<'a> = PreviewOrderResponseView<'a>;
+            type ViewHandle = PreviewOrderResponseOwnedView;
+        }
+        impl ::serde::Serialize for PreviewOrderResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -27900,6 +30793,16 @@ pub mod __buffa {
             ///
             /// Field 4: `trailing_stop_trigger_id`
             pub trailing_stop_trigger_id: ::core::option::Option<u64>,
+            /// Gross base quantity resolved for execution, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig.
+            ///
+            /// Field 5: `resolved_base_qty_scaled`
+            pub resolved_base_qty_scaled: i64,
+            /// Submitted hard all-in quote debit limit, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when submitted.
+            ///
+            /// Field 6: `submitted_max_quote_debit_scaled`
+            pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BatchCreateAcceptedView<'a> {
@@ -27967,6 +30870,24 @@ pub mod __buffa {
                             ::buffa::types::decode_uint64(&mut cur)?,
                         );
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.resolved_base_qty_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.submitted_max_quote_debit_scaled = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -28000,6 +30921,9 @@ pub mod __buffa {
                     take_profit_trigger_id: self.take_profit_trigger_id,
                     stop_loss_trigger_id: self.stop_loss_trigger_id,
                     trailing_stop_trigger_id: self.trailing_stop_trigger_id,
+                    resolved_base_qty_scaled: self.resolved_base_qty_scaled,
+                    submitted_max_quote_debit_scaled: self
+                        .submitted_max_quote_debit_scaled,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -28026,6 +30950,16 @@ pub mod __buffa {
                 if let Some(v) = self.trailing_stop_trigger_id {
                     size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
                 }
+                if self.resolved_base_qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(
+                                self.resolved_base_qty_scaled,
+                            ) as u32;
+                }
+                if let Some(v) = self.submitted_max_quote_debit_scaled {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -28048,6 +30982,16 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.trailing_stop_trigger_id {
                     ::buffa::types::put_uint64_field(4u32, v, buf);
+                }
+                if self.resolved_base_qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(
+                        5u32,
+                        self.resolved_base_qty_scaled,
+                        buf,
+                    );
+                }
+                if let Some(v) = self.submitted_max_quote_debit_scaled {
+                    ::buffa::types::put_int64_field(6u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -28096,6 +31040,26 @@ pub mod __buffa {
                     __map
                         .serialize_entry(
                             "trailingStopTriggerId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.resolved_base_qty_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "resolvedBaseQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.resolved_base_qty_scaled,
+                            ),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self
+                    .submitted_max_quote_debit_scaled
+                {
+                    __map
+                        .serialize_entry(
+                            "submittedMaxQuoteDebitScaled",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
@@ -28222,6 +31186,24 @@ pub mod __buffa {
             #[must_use]
             pub fn trailing_stop_trigger_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().trailing_stop_trigger_id
+            }
+            /// Gross base quantity resolved for execution, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig.
+            ///
+            /// Field 5: `resolved_base_qty_scaled`
+            #[must_use]
+            pub fn resolved_base_qty_scaled(&self) -> i64 {
+                self.0.reborrow().resolved_base_qty_scaled
+            }
+            /// Submitted hard all-in quote debit limit, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when submitted.
+            ///
+            /// Field 6: `submitted_max_quote_debit_scaled`
+            #[must_use]
+            pub fn submitted_max_quote_debit_scaled(
+                &self,
+            ) -> ::core::option::Option<i64> {
+                self.0.reborrow().submitted_max_quote_debit_scaled
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<BatchCreateAcceptedView<'static>>>
@@ -37069,11 +40051,11 @@ pub mod __buffa {
             pub self_trade_prevention_mode: ::buffa::EnumValue<
                 super::super::SelfTradePreventionMode,
             >,
-            /// Fee source selected for BUY fills. This also determines the decode scale
+            /// Fee asset selected for fills. This also determines the decode scale
             /// for fee_scaled and referral_share_scaled on user trade rows.
             ///
-            /// Field 10: `fee_source`
-            pub fee_source: ::buffa::EnumValue<super::super::FeeSource>,
+            /// Field 10: `fee_asset`
+            pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
             /// True if the order was submitted as post-only (maker-only).
             ///
             /// Field 11: `post_only`
@@ -37153,6 +40135,12 @@ pub mod __buffa {
             ///
             /// Field 27: `batch_request_id`
             pub batch_request_id: u64,
+            /// Submitted hard all-in quote debit limit, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+            /// method was submitted.
+            ///
+            /// Field 28: `submitted_max_quote_debit_scaled`
+            pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for OrderView<'a> {
@@ -37257,7 +40245,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.fee_source = ::buffa::EnumValue::from(
+                        view.fee_asset = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
@@ -37426,6 +40414,15 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    28u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.submitted_max_quote_debit_scaled = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -37457,7 +40454,7 @@ pub mod __buffa {
                     order_type: self.order_type,
                     time_in_force: self.time_in_force,
                     self_trade_prevention_mode: self.self_trade_prevention_mode,
-                    fee_source: self.fee_source,
+                    fee_asset: self.fee_asset,
                     post_only: self.post_only,
                     orig_qty_scaled: self.orig_qty_scaled,
                     cum_qty_scaled: self.cum_qty_scaled,
@@ -37489,6 +40486,8 @@ pub mod __buffa {
                     market_max_slippage_bps: self.market_max_slippage_bps,
                     version: self.version,
                     batch_request_id: self.batch_request_id,
+                    submitted_max_quote_debit_scaled: self
+                        .submitted_max_quote_debit_scaled,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -37548,7 +40547,7 @@ pub mod __buffa {
                     }
                 }
                 {
-                    let val = self.fee_source.to_i32();
+                    let val = self.fee_asset.to_i32();
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -37655,6 +40654,9 @@ pub mod __buffa {
                 if self.batch_request_id != 0u64 {
                     size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
+                if let Some(v) = self.submitted_max_quote_debit_scaled {
+                    size += 2u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -37706,7 +40708,7 @@ pub mod __buffa {
                     }
                 }
                 {
-                    let val = self.fee_source.to_i32();
+                    let val = self.fee_asset.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(10u32, val, buf);
                     }
@@ -37788,6 +40790,9 @@ pub mod __buffa {
                 if self.batch_request_id != 0u64 {
                     ::buffa::types::put_fixed64_field(27u32, self.batch_request_id, buf);
                 }
+                if let Some(v) = self.submitted_max_quote_debit_scaled {
+                    ::buffa::types::put_int64_field(28u32, v, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -37852,9 +40857,9 @@ pub mod __buffa {
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.fee_source,
+                    &self.fee_asset,
                 ) {
-                    __map.serialize_entry("feeSource", &self.fee_source)?;
+                    __map.serialize_entry("feeAsset", &self.fee_asset)?;
                 }
                 if self.post_only {
                     __map.serialize_entry("postOnly", &self.post_only)?;
@@ -37980,6 +40985,15 @@ pub mod __buffa {
                         .serialize_entry(
                             "batchRequestId",
                             &::buffa::json_helpers::ProtoJson(&self.batch_request_id),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self
+                    .submitted_max_quote_debit_scaled
+                {
+                    __map
+                        .serialize_entry(
+                            "submittedMaxQuoteDebitScaled",
+                            &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
                 __map.end()
@@ -38131,13 +41145,13 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::SelfTradePreventionMode> {
                 self.0.reborrow().self_trade_prevention_mode
             }
-            /// Fee source selected for BUY fills. This also determines the decode scale
+            /// Fee asset selected for fills. This also determines the decode scale
             /// for fee_scaled and referral_share_scaled on user trade rows.
             ///
-            /// Field 10: `fee_source`
+            /// Field 10: `fee_asset`
             #[must_use]
-            pub fn fee_source(&self) -> ::buffa::EnumValue<super::super::FeeSource> {
-                self.0.reborrow().fee_source
+            pub fn fee_asset(&self) -> ::buffa::EnumValue<super::super::FeeAsset> {
+                self.0.reborrow().fee_asset
             }
             /// True if the order was submitted as post-only (maker-only).
             ///
@@ -38273,6 +41287,17 @@ pub mod __buffa {
             pub fn batch_request_id(&self) -> u64 {
                 self.0.reborrow().batch_request_id
             }
+            /// Submitted hard all-in quote debit limit, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+            /// method was submitted.
+            ///
+            /// Field 28: `submitted_max_quote_debit_scaled`
+            #[must_use]
+            pub fn submitted_max_quote_debit_scaled(
+                &self,
+            ) -> ::core::option::Option<i64> {
+                self.0.reborrow().submitted_max_quote_debit_scaled
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<OrderView<'static>>>
         for OrderOwnedView {
@@ -38337,16 +41362,16 @@ pub mod __buffa {
             /// Field 8: `qty_scaled`
             pub qty_scaled: i64,
             /// Fee amount in the charged asset's scale. Use quote_quantity_scale when
-            /// fee_source is QUOTE or UNSPECIFIED; use base_quantity_scale when fee_source
-            /// is RECEIVED.
+            /// fee_asset is QUOTE or UNSPECIFIED; use base_quantity_scale when fee_asset
+            /// is BASE.
             ///
             /// Field 9: `fee_scaled`
             pub fee_scaled: i64,
-            /// Fee source charged for this fill. This determines how to decode fee_scaled
+            /// Fee asset charged for this fill. This determines how to decode fee_scaled
             /// and referral_share_scaled.
             ///
-            /// Field 10: `fee_source`
-            pub fee_source: ::buffa::EnumValue<super::super::FeeSource>,
+            /// Field 10: `fee_asset`
+            pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
             /// Referral share amount in the same denomination and scale as fee_scaled for
             /// this fill.
             ///
@@ -38452,7 +41477,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.fee_source = ::buffa::EnumValue::from(
+                        view.fee_asset = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
@@ -38503,7 +41528,7 @@ pub mod __buffa {
                     price_ticks: self.price_ticks,
                     qty_scaled: self.qty_scaled,
                     fee_scaled: self.fee_scaled,
-                    fee_source: self.fee_source,
+                    fee_asset: self.fee_asset,
                     referral_share_scaled: self.referral_share_scaled,
                     ts_ns: self.ts_ns,
                     __buffa_unknown_fields: self
@@ -38558,7 +41583,7 @@ pub mod __buffa {
                             + ::buffa::types::int64_encoded_len(self.fee_scaled) as u32;
                 }
                 {
-                    let val = self.fee_source.to_i32();
+                    let val = self.fee_asset.to_i32();
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -38612,7 +41637,7 @@ pub mod __buffa {
                     ::buffa::types::put_int64_field(9u32, self.fee_scaled, buf);
                 }
                 {
-                    let val = self.fee_source.to_i32();
+                    let val = self.fee_asset.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(10u32, val, buf);
                     }
@@ -38697,9 +41722,9 @@ pub mod __buffa {
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.fee_source,
+                    &self.fee_asset,
                 ) {
-                    __map.serialize_entry("feeSource", &self.fee_source)?;
+                    __map.serialize_entry("feeAsset", &self.fee_asset)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_i64(
                     &self.referral_share_scaled,
@@ -38861,21 +41886,21 @@ pub mod __buffa {
                 self.0.reborrow().qty_scaled
             }
             /// Fee amount in the charged asset's scale. Use quote_quantity_scale when
-            /// fee_source is QUOTE or UNSPECIFIED; use base_quantity_scale when fee_source
-            /// is RECEIVED.
+            /// fee_asset is QUOTE or UNSPECIFIED; use base_quantity_scale when fee_asset
+            /// is BASE.
             ///
             /// Field 9: `fee_scaled`
             #[must_use]
             pub fn fee_scaled(&self) -> i64 {
                 self.0.reborrow().fee_scaled
             }
-            /// Fee source charged for this fill. This determines how to decode fee_scaled
+            /// Fee asset charged for this fill. This determines how to decode fee_scaled
             /// and referral_share_scaled.
             ///
-            /// Field 10: `fee_source`
+            /// Field 10: `fee_asset`
             #[must_use]
-            pub fn fee_source(&self) -> ::buffa::EnumValue<super::super::FeeSource> {
-                self.0.reborrow().fee_source
+            pub fn fee_asset(&self) -> ::buffa::EnumValue<super::super::FeeAsset> {
+                self.0.reborrow().fee_asset
             }
             /// Referral share amount in the same denomination and scale as fee_scaled for
             /// this fill.
@@ -44265,6 +47290,43 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use super::*;
                 #[derive(Clone, Debug)]
+                pub enum Sizing {
+                    BaseQtyScaled(i64),
+                    MaxQuoteDebitScaled(i64),
+                }
+                #[derive(Clone, Debug)]
+                pub enum Execution<'a> {
+                    MarketIoc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::MarketIocView<'a>,
+                        >,
+                    ),
+                    LimitGtc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::LimitGtcView<'a>,
+                        >,
+                    ),
+                    LimitIoc(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::LimitIocView<'a>,
+                        >,
+                    ),
+                    LimitFok(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::LimitFokView<'a>,
+                        >,
+                    ),
+                }
+            }
+            pub mod preview_order_request {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Sizing {
+                    BaseQtyScaled(i64),
+                    MaxQuoteDebitScaled(i64),
+                }
+                #[derive(Clone, Debug)]
                 pub enum Execution<'a> {
                     MarketIoc(
                         ::buffa::alloc::boxed::Box<
@@ -44444,8 +47506,151 @@ pub mod __buffa {
         pub mod order_intent {
             #[allow(unused_imports)]
             use super::*;
+            /// Required order sizing intent. Exactly one sizing method must be supplied.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Sizing {
+                BaseQtyScaled(i64),
+                MaxQuoteDebitScaled(i64),
+            }
+            impl ::buffa::Oneof for Sizing {}
+            impl serde::Serialize for Sizing {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::BaseQtyScaled(v) => {
+                            map.serialize_entry(
+                                "baseQtyScaled",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                        Self::MaxQuoteDebitScaled(v) => {
+                            map.serialize_entry(
+                                "maxQuoteDebitScaled",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                    }
+                    map.end()
+                }
+            }
             /// Required execution behavior. The selected variant exposes only fields that
             /// can be honored together.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Execution {
+                MarketIoc(::buffa::alloc::boxed::Box<super::super::super::MarketIoc>),
+                LimitGtc(::buffa::alloc::boxed::Box<super::super::super::LimitGtc>),
+                LimitIoc(::buffa::alloc::boxed::Box<super::super::super::LimitIoc>),
+                LimitFok(::buffa::alloc::boxed::Box<super::super::super::LimitFok>),
+            }
+            impl ::buffa::Oneof for Execution {}
+            impl From<super::super::super::MarketIoc> for Execution {
+                fn from(v: super::super::super::MarketIoc) -> Self {
+                    Self::MarketIoc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::MarketIoc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::MarketIoc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::LimitGtc> for Execution {
+                fn from(v: super::super::super::LimitGtc) -> Self {
+                    Self::LimitGtc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::LimitGtc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::LimitGtc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::LimitIoc> for Execution {
+                fn from(v: super::super::super::LimitIoc) -> Self {
+                    Self::LimitIoc(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::LimitIoc>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::LimitIoc) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl From<super::super::super::LimitFok> for Execution {
+                fn from(v: super::super::super::LimitFok) -> Self {
+                    Self::LimitFok(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::LimitFok>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::LimitFok) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
+            impl serde::Serialize for Execution {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::MarketIoc(v) => {
+                            map.serialize_entry("marketIoc", v)?;
+                        }
+                        Self::LimitGtc(v) => {
+                            map.serialize_entry("limitGtc", v)?;
+                        }
+                        Self::LimitIoc(v) => {
+                            map.serialize_entry("limitIoc", v)?;
+                        }
+                        Self::LimitFok(v) => {
+                            map.serialize_entry("limitFok", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
+        pub mod preview_order_request {
+            #[allow(unused_imports)]
+            use super::*;
+            /// Required advisory sizing input.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Sizing {
+                BaseQtyScaled(i64),
+                MaxQuoteDebitScaled(i64),
+            }
+            impl ::buffa::Oneof for Sizing {}
+            impl serde::Serialize for Sizing {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::BaseQtyScaled(v) => {
+                            map.serialize_entry(
+                                "baseQtyScaled",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                        Self::MaxQuoteDebitScaled(v) => {
+                            map.serialize_entry(
+                                "maxQuoteDebitScaled",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+            /// Required execution behavior used to establish the preview price bound.
             #[derive(Clone, PartialEq, Debug)]
             pub enum Execution {
                 MarketIoc(::buffa::alloc::boxed::Box<super::super::super::MarketIoc>),
@@ -44891,6 +48096,8 @@ pub mod __buffa {
         reg.register_json_any(super::__ORDER_INTENT_JSON_ANY);
         reg.register_json_any(super::__CREATE_ORDER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_ORDER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__PREVIEW_ORDER_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__PREVIEW_ORDER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ORDER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ORDER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__FIELD_VIOLATION_JSON_ANY);
@@ -44971,6 +48178,14 @@ pub use self::__buffa::view::CreateOrderRequestOwnedView;
 pub use self::__buffa::view::CreateOrderResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateOrderResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PreviewOrderRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::PreviewOrderRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PreviewOrderResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::PreviewOrderResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CancelOrderRequestView;
 #[doc(inline)]
