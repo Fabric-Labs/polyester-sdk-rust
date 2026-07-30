@@ -61,7 +61,7 @@ async fn order_hold_visible_while_open() {
         side: CreateSide::Buy,
         order_type: CreateOrderType::Limit,
         quantity: match Quantity::from_decimal_str(&qty_str, scale, Some(symbol.clone()), None) {
-            Ok(q) => q,
+            Ok(q) => Some(q),
             Err(err) => {
                 eprintln!("skip: qty: {err}");
                 return;
@@ -81,7 +81,8 @@ async fn order_hold_visible_while_open() {
         subaccount_id: None,
         post_only: Some(true),
         market_client_ref_price: None,
-        fee_source: None,
+        max_quote_debit_scaled: None,
+        fee_asset: None,
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,

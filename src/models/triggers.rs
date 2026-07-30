@@ -1,6 +1,6 @@
 //! Trigger SDK models (Go `models` parity).
 
-use super::{CreateOrderType, CreateSide, CreateTimeInForce};
+use super::{CreateOrderType, CreateSide, CreateTimeInForce, FeeAsset};
 use crate::types::{Price, Quantity};
 use buffa_types::google::protobuf::Timestamp;
 
@@ -40,7 +40,8 @@ pub struct CreateTriggerParams {
     pub ladder_price_max: Option<Price>,
     pub ladder_levels: Option<i32>,
     pub ladder_distribution: Option<String>,
-    pub fee_source: Option<String>,
+    /// Fee asset. `base` is valid only for BUY child orders.
+    pub fee_asset: Option<FeeAsset>,
     pub self_trade_prevention_mode: Option<String>,
 }
 
@@ -139,7 +140,7 @@ pub struct Trigger {
     pub time_in_force: String,
     pub qty: Option<Quantity>,
     pub limit_price: Option<Price>,
-    pub fee_source: String,
+    pub fee_asset: String,
     pub self_trade_prevention_mode: String,
     pub post_only: bool,
     /// Convenience: stop-trigger price when details are `Stop`.

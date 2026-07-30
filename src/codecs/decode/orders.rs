@@ -1,7 +1,7 @@
 //! Orders read/mutation decoders.
 
 use super::enums::{
-    enum_value_fee_source, enum_value_order_status, enum_value_order_type, enum_value_side,
+    enum_value_fee_asset, enum_value_order_status, enum_value_order_type, enum_value_side,
     enum_value_time_in_force,
 };
 use super::money::{decode_price_ticks, decode_qty_scaled, decode_qty_scaled_allow_zero};
@@ -12,7 +12,8 @@ use crate::models::{
     BatchCreateResultItem, BatchReplaceAdmissionItem, BatchReplaceOrdersResult,
     BatchReplaceStatusItem, BatchReplaceStatusResult, CancelAllAfterResult, CancelAllOrdersResult,
     CreateOrderType, GetOrderResult, MaxSlippage, ModifyOrderResult, Order, OrderMutationResult,
-    OrdersList, RiskLeg, TrailingDistance, TrailingStop, UserTrade, UserTradesList,
+    OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, UserTrade,
+    UserTradesList,
 };
 use crate::proto::orders::v1::{
     AttachedRisk as ProtoAttachedRisk, BatchCancelOrdersResponse, BatchCreateOrdersResponse,
@@ -20,8 +21,9 @@ use crate::proto::orders::v1::{
     BatchReplacePhase, CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse,
     CreateOrderResponse, GetBatchReplaceStatusResponse, GetOpenOrdersResponse,
     GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse,
-    Order as ProtoOrder, RiskExecution, StopLossPolicy, TakeProfitPolicy, TrailingStopPolicy,
-    UserTrade as ProtoUserTrade, batch_create_result_item, risk_execution, trailing_stop_policy,
+    Order as ProtoOrder, PreviewOrderResponse, RiskExecution, StopLossPolicy, TakeProfitPolicy,
+    TrailingStopPolicy, UserTrade as ProtoUserTrade, batch_create_result_item, risk_execution,
+    trailing_stop_policy,
 };
 use buffa::Enumeration;
 
@@ -52,6 +54,8 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Order {
         },
         version: msg.version,
         post_only: msg.post_only,
+        fee_asset: enum_value_fee_asset(msg.fee_asset),
+        submitted_max_quote_debit_scaled: msg.submitted_max_quote_debit_scaled,
         attached_risk: msg
             .attached_risk
             .as_option()
@@ -196,7 +200,7 @@ pub fn user_trade_from_proto(msg: &ProtoUserTrade) -> UserTrade {
         } else {
             msg.fee_scaled.to_string()
         },
-        fee_source: enum_value_fee_source(msg.fee_source),
+        fee_asset: enum_value_fee_asset(msg.fee_asset),
         referral_share_scaled: if msg.referral_share_scaled == 0 {
             String::new()
         } else {
@@ -230,11 +234,10 @@ pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> Result<OrderMuta
     if msg.order_id == 0 {
         return Err(Error::response_contract("CreateOrder", "missing order_id"));
     }
-    Ok(order_mutation(
-        "accepted",
-        msg.order_id,
-        &msg.client_order_id,
-    ))
+    let mut result = order_mutation("accepted", msg.order_id, &msg.client_order_id);
+    result.resolved_base_qty = decode_qty_scaled(msg.resolved_base_qty_scaled, None, None, None);
+    result.submitted_max_quote_debit_scaled = msg.submitted_max_quote_debit_scaled;
+    Ok(result)
 }
 
 pub fn order_mutation_from_cancel(msg: &CancelOrderResponse) -> Result<OrderMutationResult> {
@@ -252,6 +255,25 @@ fn order_mutation(status: &str, order_id: u64, client_order_id: &str) -> OrderMu
         status: status.to_owned(),
         order_id: format_uint64_id(order_id),
         client_order_id: client_order_id.to_owned(),
+        resolved_base_qty: None,
+        submitted_max_quote_debit_scaled: None,
+    }
+}
+
+pub fn preview_order_from_proto(msg: &PreviewOrderResponse) -> PreviewOrderResult {
+    PreviewOrderResult {
+        resolved_base_qty: decode_qty_scaled(msg.resolved_base_qty_scaled, None, None, None),
+        price_bound: decode_price_ticks(msg.price_bound_ticks, None),
+        estimated_quote_debit_scaled: msg.estimated_quote_debit_scaled,
+        estimated_fee_scaled: msg.estimated_fee_scaled,
+        estimated_net_base_qty: decode_qty_scaled(
+            msg.estimated_net_base_qty_scaled,
+            None,
+            None,
+            None,
+        ),
+        fee_asset: enum_value_fee_asset(msg.fee_asset),
+        fresh_at_ts_ns: msg.fresh_at_ts_ns,
     }
 }
 
@@ -522,6 +544,8 @@ pub fn batch_replace_status_from_proto(
                 format!("unknown admission status {}", msg.admission_status.to_i32()),
             )
         })?;
+    let mut admitted = 0u32;
+    let mut rejected = 0u32;
     let mut items = Vec::with_capacity(msg.items.len());
     for item in &msg.items {
         let phase = batch_replace_phase_name(item.phase).ok_or_else(|| {
@@ -530,6 +554,14 @@ pub fn batch_replace_status_from_proto(
                 format!("unknown batch replace phase {}", item.phase.to_i32()),
             )
         })?;
+        match phase {
+            "admitted" => admitted += 1,
+            "rejected" => rejected += 1,
+            // Working and terminal entries were admitted successfully before
+            // their post-admission state transition.
+            "working" | "terminal" => admitted += 1,
+            _ => unreachable!("known batch replace phase"),
+        }
         items.push(BatchReplaceStatusItem {
             item_index: item.item_index,
             phase: phase.to_owned(),
@@ -539,6 +571,23 @@ pub fn batch_replace_status_from_proto(
             code: item.code.clone(),
             updated_ts_ns: item.updated_ts_ns,
         });
+    }
+    if admitted != msg.accepted_count
+        || rejected != msg.rejected_count
+        || admitted
+            .checked_add(rejected)
+            .and_then(|count| usize::try_from(count).ok())
+            != Some(items.len())
+    {
+        return Err(Error::response_contract(
+            "GetBatchReplaceStatus",
+            format!(
+                "response counts mismatch: decoded {admitted} admitted/{rejected} rejected for {} items, server reported {}/{}",
+                items.len(),
+                msg.accepted_count,
+                msg.rejected_count
+            ),
+        ));
     }
     Ok(BatchReplaceStatusResult {
         batch_request_id: format_uint64_id(msg.batch_request_id),
@@ -800,7 +849,7 @@ mod tests {
                 order_id: 7,
                 side: Side::Buy.into(),
                 fee_scaled: 5,
-                fee_source: crate::proto::orders::v1::FeeSource::Received.into(),
+                fee_asset: crate::proto::orders::v1::FeeAsset::Base.into(),
                 referral_share_scaled: 2,
                 ..Default::default()
             }],
@@ -811,7 +860,7 @@ mod tests {
         assert_eq!(result.trades.len(), 1);
         assert_eq!(result.trades[0].match_id, "99");
         assert_eq!(result.trades[0].fee_scaled, "5");
-        assert_eq!(result.trades[0].fee_source, "received");
+        assert_eq!(result.trades[0].fee_asset, "base");
         assert_eq!(result.trades[0].referral_share_scaled, "2");
     }
 
@@ -870,6 +919,36 @@ mod tests {
         assert!(order_mutation_from_create(&CreateOrderResponse::default()).is_err());
         assert!(order_mutation_from_cancel(&CancelOrderResponse::default()).is_err());
         assert!(modify_order_from_proto(&ModifyOrderResponse::default()).is_err());
+    }
+
+    #[test]
+    fn preview_order_surfaces_resolved_sizing_and_fee_asset() {
+        use crate::proto::orders::v1::{FeeAsset, PreviewOrderResponse};
+
+        let preview = preview_order_from_proto(&PreviewOrderResponse {
+            resolved_base_qty_scaled: 100,
+            price_bound_ticks: 5_000,
+            estimated_quote_debit_scaled: 510,
+            estimated_fee_scaled: 1,
+            estimated_net_base_qty_scaled: 99,
+            fee_asset: FeeAsset::Base.into(),
+            fresh_at_ts_ns: 42,
+            ..Default::default()
+        });
+        assert_eq!(
+            preview
+                .resolved_base_qty
+                .as_ref()
+                .map(|qty| qty.as_scaled()),
+            Some(100)
+        );
+        assert_eq!(
+            preview.price_bound.as_ref().map(|price| price.as_ticks()),
+            Some(5_000)
+        );
+        assert_eq!(preview.estimated_quote_debit_scaled, 510);
+        assert_eq!(preview.fee_asset, "base");
+        assert_eq!(preview.fresh_at_ts_ns, 42);
     }
 
     #[test]
@@ -1079,12 +1158,40 @@ mod tests {
                     ..Default::default()
                 },
             ],
+            accepted_count: 2,
+            rejected_count: 0,
             ..Default::default()
         })
         .expect("known phases decode");
         assert_eq!(status.admission_status, "admitted");
         assert_eq!(status.items[0].phase, "working");
         assert_eq!(status.items[1].phase, "terminal");
+        assert!(status.is_settled());
+
+        let mismatch = GetBatchReplaceStatusResponse {
+            batch_request_id: 9,
+            admission_status: BatchReplaceAdmissionStatus::PartiallyAdmitted.into(),
+            items: vec![
+                ProtoStatusItem {
+                    item_index: 0,
+                    phase: BatchReplacePhase::Admitted.into(),
+                    ..Default::default()
+                },
+                ProtoStatusItem {
+                    item_index: 1,
+                    phase: BatchReplacePhase::Rejected.into(),
+                    ..Default::default()
+                },
+            ],
+            accepted_count: 2,
+            rejected_count: 0,
+            ..Default::default()
+        };
+        let err =
+            batch_replace_status_from_proto(&mismatch).expect_err("status counts must reconcile");
+        assert!(matches!(err, Error::ResponseContract { .. }));
+        assert!(err.mutation_outcome_unknown());
+        assert!(err.to_string().contains("response counts"));
     }
 
     #[test]

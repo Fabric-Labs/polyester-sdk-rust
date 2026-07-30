@@ -260,6 +260,13 @@ Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
 admission acknowledgement and reconcile with `list_open` before releasing local
 state.
 
+Create sizing is explicit: set exactly one of base `quantity` or
+`max_quote_debit_scaled` (a hard all-in quote-debit budget in the pair's quote
+quantity scale). Use `OrdersService::preview(PreviewOrderParams { ... })` to
+obtain advisory resolved base quantity, price bound, and fee estimates before
+submitting a quote-budget order. Fee selection is `FeeAsset::Quote` or, for
+BUYs only, `FeeAsset::Base`; the former `received` fee mode no longer exists.
+
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
 Do **not** pass floats. Price ticks are Polyester protocol price units (fixed
 1e6), not market tick-size alignment (server validates tick size).
@@ -404,6 +411,13 @@ stable `request_id` once, persist it with the attempt, and pass the same value o
 rule as `client_order_id` on create). Convenience helpers that do not accept `request_id`
 (for example `cancel_all`) are one-shot oriented - use the `*_with` / explicit-argument form when
 you need retry-safe identity.
+
+Batch replace returns admission, not execution finality. After admission,
+predecessor IDs may be stale: use `replacement_order_id` from each result.
+Reuse the same `request_id` when retrying a logical batch, then poll
+`get_batch_replace_status`. Its item phases are `admitted`, `working`,
+`rejected`, and `terminal`; `is_batch_replace_settled()` means every item has
+left admission processing (`working` is live, not terminal execution).
 
 ```rust,no_run
 use polyester::models::{CreateOrderParams, ModifyOrderParams};
