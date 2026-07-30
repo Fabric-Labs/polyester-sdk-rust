@@ -3617,7 +3617,7 @@ impl ::buffa::Enumeration for PairStatus {
 }
 /// ---------------------------------------------------------------------------
 /// GetTrades: Binary (protobuf) request/response with scaled integers.
-/// REST surfaces expose decimal strings via DTO conversion.
+/// REST responses expose decimal strings.
 /// ---------------------------------------------------------------------------
 ///
 /// GetTradesRequest selects recent public trades for one spot market.
@@ -4325,7 +4325,7 @@ pub const __GET_TRADES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
 };
 /// ---------------------------------------------------------------------------
 /// GetCandles: Binary (protobuf) request/response with scaled integers.
-/// REST surfaces expose decimal string responses via DTO conversion.
+/// REST responses expose decimal strings.
 /// ---------------------------------------------------------------------------
 ///
 /// GetCandlesRequest selects a spot market candle series.
@@ -6486,7 +6486,7 @@ pub const __GET_CANDLES_COLUMNS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonA
     is_wkt: false,
 };
 /// ---------------------------------------------------------------------------
-/// Candle DTO shared by public candle reads and backend current-candle lookup.
+/// Candle contains one public OHLCV bucket.
 /// ---------------------------------------------------------------------------
 ///
 /// Candle represents a single OHLCV bucket for a symbol and timeframe.
@@ -7279,17 +7279,17 @@ pub struct PairConfig {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub min_qty_base: ::buffa::alloc::string::String,
-    /// Whether BUY order fees may be paid from the received base asset instead of
-    /// the spent quote asset when the order request selects that fee source.
+    /// Whether BUY order fees may be paid from the base asset instead of the
+    /// spent quote asset when the order request selects the base fee asset.
     ///
-    /// Field 9: `allow_buy_fee_from_received`
+    /// Field 9: `allow_buy_fee_from_base`
     #[serde(
-        rename = "allowBuyFeeFromReceived",
-        alias = "allow_buy_fee_from_received",
+        rename = "allowBuyFeeFromBase",
+        alias = "allow_buy_fee_from_base",
         with = "::buffa::json_helpers::proto_bool",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
-    pub allow_buy_fee_from_received: bool,
+    pub allow_buy_fee_from_base: bool,
     /// Quantity scale for base-asset amounts in this pair.
     ///
     /// Field 10: `base_quantity_scale`
@@ -7396,7 +7396,7 @@ impl ::core::fmt::Debug for PairConfig {
             .field("step_size", &self.step_size)
             .field("min_notional_quote", &self.min_notional_quote)
             .field("min_qty_base", &self.min_qty_base)
-            .field("allow_buy_fee_from_received", &self.allow_buy_fee_from_received)
+            .field("allow_buy_fee_from_base", &self.allow_buy_fee_from_base)
             .field("base_quantity_scale", &self.base_quantity_scale)
             .field("quote_quantity_scale", &self.quote_quantity_scale)
             .field("marketdata", &self.marketdata)
@@ -7467,7 +7467,7 @@ impl ::buffa::Message for PairConfig {
         if !self.min_qty_base.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.min_qty_base) as u32;
         }
-        if self.allow_buy_fee_from_received {
+        if self.allow_buy_fee_from_base {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
         if self.base_quantity_scale != 0u32 {
@@ -7566,8 +7566,8 @@ impl ::buffa::Message for PairConfig {
         if !self.min_qty_base.is_empty() {
             ::buffa::types::put_string_field(8u32, &self.min_qty_base, buf);
         }
-        if self.allow_buy_fee_from_received {
-            ::buffa::types::put_bool_field(9u32, self.allow_buy_fee_from_received, buf);
+        if self.allow_buy_fee_from_base {
+            ::buffa::types::put_bool_field(9u32, self.allow_buy_fee_from_base, buf);
         }
         if self.base_quantity_scale != 0u32 {
             ::buffa::types::put_uint32_field(10u32, self.base_quantity_scale, buf);
@@ -7684,7 +7684,7 @@ impl ::buffa::Message for PairConfig {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.allow_buy_fee_from_received = ::buffa::types::decode_bool(buf)?;
+                self.allow_buy_fee_from_base = ::buffa::types::decode_bool(buf)?;
             }
             10u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -7783,7 +7783,7 @@ impl ::buffa::Message for PairConfig {
         self.step_size.clear();
         self.min_notional_quote.clear();
         self.min_qty_base.clear();
-        self.allow_buy_fee_from_received = false;
+        self.allow_buy_fee_from_base = false;
         self.base_quantity_scale = 0u32;
         self.quote_quantity_scale = 0u32;
         self.marketdata = ::buffa::MessageField::none();
@@ -12701,7 +12701,7 @@ pub mod __buffa {
         }
         /// ---------------------------------------------------------------------------
         /// GetTrades: Binary (protobuf) request/response with scaled integers.
-        /// REST surfaces expose decimal strings via DTO conversion.
+        /// REST responses expose decimal strings.
         /// ---------------------------------------------------------------------------
         ///
         /// GetTradesRequest selects recent public trades for one spot market.
@@ -14002,7 +14002,7 @@ pub mod __buffa {
         }
         /// ---------------------------------------------------------------------------
         /// GetCandles: Binary (protobuf) request/response with scaled integers.
-        /// REST surfaces expose decimal string responses via DTO conversion.
+        /// REST responses expose decimal strings.
         /// ---------------------------------------------------------------------------
         ///
         /// GetCandlesRequest selects a spot market candle series.
@@ -17273,7 +17273,7 @@ pub mod __buffa {
             }
         }
         /// ---------------------------------------------------------------------------
-        /// Candle DTO shared by public candle reads and backend current-candle lookup.
+        /// Candle contains one public OHLCV bucket.
         /// ---------------------------------------------------------------------------
         ///
         /// Candle represents a single OHLCV bucket for a symbol and timeframe.
@@ -18526,11 +18526,11 @@ pub mod __buffa {
             ///
             /// Field 8: `min_qty_base`
             pub min_qty_base: &'a str,
-            /// Whether BUY order fees may be paid from the received base asset instead of
-            /// the spent quote asset when the order request selects that fee source.
+            /// Whether BUY order fees may be paid from the base asset instead of the
+            /// spent quote asset when the order request selects the base fee asset.
             ///
-            /// Field 9: `allow_buy_fee_from_received`
-            pub allow_buy_fee_from_received: bool,
+            /// Field 9: `allow_buy_fee_from_base`
+            pub allow_buy_fee_from_base: bool,
             /// Quantity scale for base-asset amounts in this pair.
             ///
             /// Field 10: `base_quantity_scale`
@@ -18673,7 +18673,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.allow_buy_fee_from_received = ::buffa::types::decode_bool(
+                        view.allow_buy_fee_from_base = ::buffa::types::decode_bool(
                             &mut cur,
                         )?;
                     }
@@ -18837,7 +18837,7 @@ pub mod __buffa {
                     step_size: self.step_size.to_string(),
                     min_notional_quote: self.min_notional_quote.to_string(),
                     min_qty_base: self.min_qty_base.to_string(),
-                    allow_buy_fee_from_received: self.allow_buy_fee_from_received,
+                    allow_buy_fee_from_base: self.allow_buy_fee_from_base,
                     base_quantity_scale: self.base_quantity_scale,
                     quote_quantity_scale: self.quote_quantity_scale,
                     marketdata: match self.marketdata.as_option() {
@@ -18929,7 +18929,7 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.min_qty_base)
                                 as u32;
                 }
-                if self.allow_buy_fee_from_received {
+                if self.allow_buy_fee_from_base {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
                 if self.base_quantity_scale != 0u32 {
@@ -19036,10 +19036,10 @@ pub mod __buffa {
                 if !self.min_qty_base.is_empty() {
                     ::buffa::types::put_string_field(8u32, &self.min_qty_base, buf);
                 }
-                if self.allow_buy_fee_from_received {
+                if self.allow_buy_fee_from_base {
                     ::buffa::types::put_bool_field(
                         9u32,
-                        self.allow_buy_fee_from_received,
+                        self.allow_buy_fee_from_base,
                         buf,
                     );
                 }
@@ -19159,11 +19159,11 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.min_qty_base) {
                     __map.serialize_entry("minQtyBase", self.min_qty_base)?;
                 }
-                if self.allow_buy_fee_from_received {
+                if self.allow_buy_fee_from_base {
                     __map
                         .serialize_entry(
-                            "allowBuyFeeFromReceived",
-                            &self.allow_buy_fee_from_received,
+                            "allowBuyFeeFromBase",
+                            &self.allow_buy_fee_from_base,
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(
@@ -19393,13 +19393,13 @@ pub mod __buffa {
             pub fn min_qty_base(&self) -> &'_ str {
                 self.0.reborrow().min_qty_base
             }
-            /// Whether BUY order fees may be paid from the received base asset instead of
-            /// the spent quote asset when the order request selects that fee source.
+            /// Whether BUY order fees may be paid from the base asset instead of the
+            /// spent quote asset when the order request selects the base fee asset.
             ///
-            /// Field 9: `allow_buy_fee_from_received`
+            /// Field 9: `allow_buy_fee_from_base`
             #[must_use]
-            pub fn allow_buy_fee_from_received(&self) -> bool {
-                self.0.reborrow().allow_buy_fee_from_received
+            pub fn allow_buy_fee_from_base(&self) -> bool {
+                self.0.reborrow().allow_buy_fee_from_base
             }
             /// Quantity scale for base-asset amounts in this pair.
             ///
