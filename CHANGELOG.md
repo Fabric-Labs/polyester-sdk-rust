@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.0a23
+
+Package version: `0.1.0-alpha.23`. Git tag: `v0.1.0a23`.
+
+### Changed
+- First publish to [crates.io](https://crates.io/crates/polyester-sdk). Install via Cargo registry; git-tag pins remain supported for private clones. No API changes from `0.1.0-alpha.22`.
+
 ## 0.1.0a22
 
 Package version: `0.1.0-alpha.22`. Git tag: `v0.1.0a22`.
