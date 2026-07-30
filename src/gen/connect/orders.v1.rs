@@ -386,8 +386,8 @@ pub const ORDERS_SERVICE_BATCH_CANCEL_ORDERS_SPEC: ::connectrpc::Spec = ::connec
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait OrdersService: Send + Sync + 'static {
-    /// Preview advisory order sizing and fees without reserving funds or
-    /// submitting an order.
+    /// Check whether an order is currently admissible without creating an order,
+    /// claiming its client order ID, or reserving funds.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
