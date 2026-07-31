@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a24
+
+Package version: `0.1.0-alpha.24`. Git tag: `v0.1.0a24`.
+
 ### Breaking
 - `CreateOrderParams::max_quote_debit_scaled` and
   `PreviewOrderParams::max_quote_debit_scaled` now take a typed `Quantity`
