@@ -60,17 +60,17 @@ jobs:
       - name: SDK Connect coverage
         run: python3 scripts/check_sdk_coverage.py
 
-      - name: Refresh internal coverage scoreboard
+      - name: Refresh public capability matrix
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.FABRIC_CONTEXT_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.FABRIC_APPS_DISPATCH_TOKEN }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "FABRIC_CONTEXT_DISPATCH_TOKEN unset; skipping scoreboard dispatch"
+            echo "FABRIC_APPS_DISPATCH_TOKEN unset; skipping capability matrix dispatch"
             exit 0
           fi
-          gh api repos/Fabric-Labs/fabric-context/dispatches \
+          gh api repos/Fabric-Labs/fabric-apps/dispatches \
             -f event_type=sdk-coverage-refresh \
             -f 'client_payload[sdk]=rust' \
             -f 'client_payload[sha]=${{ github.sha }}'
