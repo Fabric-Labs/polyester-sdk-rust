@@ -35,7 +35,9 @@ use crate::proto::orders::v1::{
     market_ioc, modify_order_request, order_intent, preview_order_request, risk_execution,
     risk_policy, trailing_stop_policy,
 };
-use crate::types::{Price, Quantity, resolve_price_ticks, resolve_qty_scaled};
+use crate::types::{
+    Price, Quantity, resolve_price_ticks, resolve_qty_scaled, resolve_quote_qty_scaled,
+};
 use rand_core::{OsRng, RngCore};
 use std::time::Duration;
 
@@ -45,6 +47,8 @@ pub struct OrdersService {
 }
 
 impl OrdersService {
+    const MAX_BATCH_ITEMS: usize = 20;
+
     pub fn new(ctx: ServiceContext) -> Self {
         Self { ctx }
     }
@@ -277,6 +281,32 @@ impl OrdersService {
         )))
     }
 
+    fn require_quote_quantity_scale(&self, symbol: &str) -> Result<u32> {
+        self.ctx
+            .catalogs
+            .quote_quantity_scale_for_symbol(symbol)
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "quote quantity scale for {symbol:?} is unavailable; await client.wait_for_catalogs() before using a quote-debit budget"
+                ))
+            })
+    }
+
+    fn validate_batch_size(operation: &str, len: usize) -> Result<()> {
+        if len == 0 {
+            return Err(Error::validation(format!(
+                "{operation} requires at least one item"
+            )));
+        }
+        if len > Self::MAX_BATCH_ITEMS {
+            return Err(Error::validation(format!(
+                "{operation} accepts at most {} items; received {len}",
+                Self::MAX_BATCH_ITEMS
+            )));
+        }
+        Ok(())
+    }
+
     fn order_intent_from_params(&self, params: &CreateOrderParams) -> Result<OrderIntent> {
         let mut intent = OrderIntent {
             symbol: params.symbol.clone(),
@@ -290,7 +320,7 @@ impl OrdersService {
         {
             intent.client_order_id = client_order_id;
         }
-        intent.sizing = Some(match (&params.quantity, params.max_quote_debit_scaled) {
+        intent.sizing = Some(match (&params.quantity, &params.max_quote_debit_scaled) {
             (Some(quantity), None) => {
                 let scale = self.require_quantity_scale(&params.symbol, quantity.scale())?;
                 order_intent::Sizing::BaseQtyScaled(resolve_qty_scaled(
@@ -300,16 +330,19 @@ impl OrdersService {
                     self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
                 )?)
             }
-            (None, Some(max_quote_debit_scaled)) if max_quote_debit_scaled > 0 => {
-                order_intent::Sizing::MaxQuoteDebitScaled(max_quote_debit_scaled)
+            (None, Some(max_quote_debit)) => {
+                let scale = self.require_quote_quantity_scale(&params.symbol)?;
+                order_intent::Sizing::MaxQuoteDebitScaled(resolve_quote_qty_scaled(
+                    max_quote_debit,
+                    scale,
+                    Some(&params.symbol),
+                    self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
+                )?)
             }
             (Some(_), Some(_)) | (None, None) => {
                 return Err(Error::validation(
                     "set exactly one of quantity or max_quote_debit_scaled",
                 ));
-            }
-            (None, Some(_)) => {
-                return Err(Error::validation("max_quote_debit_scaled must be positive"));
             }
         });
         intent.fee_asset = match params.fee_asset.unwrap_or(FeeAsset::Quote) {
@@ -634,7 +667,15 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(preview_order_from_proto(&resp))
+        let base_scale = self.require_quantity_scale(&params.symbol, None)?;
+        let quote_scale = self.require_quote_quantity_scale(&params.symbol)?;
+        preview_order_from_proto(
+            &resp,
+            base_scale,
+            quote_scale,
+            &params.symbol,
+            self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
+        )
     }
 
     fn encode_preview_params(&self, params: &PreviewOrderParams) -> Result<PreviewOrderRequest> {
@@ -643,7 +684,7 @@ impl OrdersService {
             side: params.side,
             order_type: params.order_type,
             quantity: params.quantity.clone(),
-            max_quote_debit_scaled: params.max_quote_debit_scaled,
+            max_quote_debit_scaled: params.max_quote_debit_scaled.clone(),
             price: params.price.clone(),
             time_in_force: params.time_in_force,
             client_order_id: None,
@@ -701,10 +742,8 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         request_id: Option<String>,
     ) -> Result<BatchCreateOrdersResult> {
+        Self::validate_batch_size("batch_create", items.len())?;
         self.ctx.wait_for_catalogs().await?;
-        if items.is_empty() {
-            return Err(Error::validation("batch_create requires at least one item"));
-        }
         let mut encoded = Vec::with_capacity(items.len());
         for item in &items {
             encoded.push(self.order_intent_from_params(item)?);
@@ -737,9 +776,7 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         request_id: Option<String>,
     ) -> Result<BatchCancelOrdersResult> {
-        if items.is_empty() {
-            return Err(Error::validation("batch_cancel requires at least one item"));
-        }
+        Self::validate_batch_size("batch_cancel", items.len())?;
         let mut proto_items = Vec::with_capacity(items.len());
         for item in items {
             let mut proto = ProtoBatchCancelItem::default();
@@ -785,12 +822,8 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         request_id: Option<String>,
     ) -> Result<BatchReplaceOrdersResult> {
+        Self::validate_batch_size("batch_replace", items.len())?;
         self.ctx.wait_for_catalogs().await?;
-        if items.is_empty() {
-            return Err(Error::validation(
-                "batch_replace requires at least one item",
-            ));
-        }
         let symbol_id = self
             .ctx
             .catalogs
@@ -1217,7 +1250,8 @@ mod tests {
                 "pairs": [{
                     "symbol": "BTC-USDT",
                     "symbol_id": 7,
-                    "base_quantity_scale": 8
+                    "base_quantity_scale": 8,
+                    "quote_quantity_scale": 6
                 }]
             }))
             .expect("hydrate");
@@ -1489,7 +1523,9 @@ mod tests {
             Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
         );
         params.quantity = None;
-        params.max_quote_debit_scaled = Some(5_000_000);
+        params.max_quote_debit_scaled = Some(
+            Quantity::from_quote_scaled(5_000_000, 6, Some("BTC-USDT".into()), Some(7)).unwrap(),
+        );
         let wire = client.orders.encode_create_params(&params).unwrap();
         let intent = wire.order.as_option().unwrap();
         assert!(matches!(
@@ -1508,6 +1544,30 @@ mod tests {
             .unwrap(),
         );
         assert!(client.orders.encode_create_params(&params).is_err());
+
+        params.quantity = None;
+        params.max_quote_debit_scaled =
+            Some(Quantity::from_quote_scaled(5_000_000, 8, None, None).unwrap());
+        let err = client.orders.encode_create_params(&params).unwrap_err();
+        assert!(err.to_string().contains("scale mismatch"));
+    }
+
+    #[test]
+    fn batch_size_guard_rejects_empty_and_more_than_twenty() {
+        assert!(OrdersService::validate_batch_size("batch_create", 1).is_ok());
+        assert!(OrdersService::validate_batch_size("batch_create", 20).is_ok());
+        assert!(
+            OrdersService::validate_batch_size("batch_create", 0)
+                .unwrap_err()
+                .to_string()
+                .contains("at least one")
+        );
+        assert!(
+            OrdersService::validate_batch_size("batch_create", 21)
+                .unwrap_err()
+                .to_string()
+                .contains("at most 20")
+        );
     }
 
     #[test]

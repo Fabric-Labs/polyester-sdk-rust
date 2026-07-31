@@ -28,6 +28,11 @@ pub fn spot_config_from_proto(msg: &GetSpotConfigResponse) -> SpotConfig {
                     "baseQuantityScale".to_owned(),
                     Value::from(typed.base_quantity_scale),
                 );
+                object.remove("quote_quantity_scale");
+                object.insert(
+                    "quoteQuantityScale".to_owned(),
+                    Value::from(typed.quote_quantity_scale),
+                );
             }
         }
     }
@@ -228,16 +233,20 @@ mod tests {
                 symbol: "WHOLE-USDT".into(),
                 symbol_id: 9,
                 base_quantity_scale: 0,
+                quote_quantity_scale: 0,
                 ..Default::default()
             }],
             ..Default::default()
         };
         let spot = spot_config_from_proto(&msg);
         assert_eq!(spot.raw["pairs"][0]["baseQuantityScale"], 0);
+        assert_eq!(spot.raw["pairs"][0]["quoteQuantityScale"], 0);
         assert!(spot.raw["pairs"][0].get("base_quantity_scale").is_none());
+        assert!(spot.raw["pairs"][0].get("quote_quantity_scale").is_none());
         let round_trip: GetSpotConfigResponse =
             serde_json::from_value(spot.raw.clone()).expect("spot config round-trip");
         assert_eq!(round_trip.pairs[0].base_quantity_scale, 0);
+        assert_eq!(round_trip.pairs[0].quote_quantity_scale, 0);
     }
 
     #[test]
