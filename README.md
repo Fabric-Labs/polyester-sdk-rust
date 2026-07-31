@@ -227,8 +227,10 @@ client.wait_for_catalogs().await?;
 
 If a client is constructed before entering a Tokio runtime,
 `wait_for_catalogs()` starts hydration on the current runtime. Scaled bot inputs
-(`Price::from_ticks`, `Quantity::from_scaled`, `AssetAmount::from_scaled`) do not
-need catalog lookup solely to scale the value.
+must carry their source scale. `AssetAmount::from_scaled(..., None, ...)` is
+accepted for composition only and fails closed on transfer/withdraw encoding
+unless the request's `amount_scale` / `quantity_scale` is explicit. Prefer
+`from_decimal_str` / `from_decimal`, or pass `Some(scale)` to `from_scaled`.
 
 ## Create and cancel orders
 
@@ -269,11 +271,37 @@ admission acknowledgement and reconcile with `list_open` before releasing local
 state.
 
 Create sizing is explicit: set exactly one of base `quantity` or
-`max_quote_debit_scaled` (a hard all-in quote-debit budget in the pair's quote
-quantity scale). Use `OrdersService::preview(PreviewOrderParams { ... })` to
-obtain advisory resolved base quantity, price bound, and fee estimates before
-submitting a quote-budget order. Fee selection is `FeeAsset::Quote` or, for
-BUYs only, `FeeAsset::Base`; the former `received` fee mode no longer exists.
+`max_quote_debit_scaled` (a typed hard all-in quote-debit budget). Construct the
+latter with `Quantity::from_quote_decimal_str` / `from_quote_decimal` /
+`from_quote_scaled`; the SDK validates its `OrderQuote` domain and scale against
+`Catalogs::quote_quantity_scale_for_symbol`.
+
+```rust,no_run
+let quote_scale = client
+    .catalogs
+    .quote_quantity_scale_for_symbol("BNB-USDT")
+    .expect("catalog hydrated with quote scale");
+params.quantity = None;
+params.max_quote_debit_scaled = Some(Quantity::from_quote_decimal_str(
+    "25.00",
+    quote_scale,
+    Some("BNB-USDT".into()),
+    client.catalogs.symbol_id_for_symbol("BNB-USDT"),
+)?);
+```
+
+Use `OrdersService::preview(PreviewOrderParams { ... })` to obtain advisory
+resolved base quantity, price bound, and typed quote/fee estimates before
+submitting a quote-budget order. `estimated_quote_debit` always has
+`OrderQuote` domain; `estimated_fee` has `OrderBase` or `OrderQuote` according
+to `fee_asset`. Preview is not deployed on every API host, so handle an
+unimplemented/not-found response and do not make Preview a prerequisite for
+order submission. Fee selection is `FeeAsset::Quote` or, for BUYs only,
+`FeeAsset::Base`; the former `received` fee mode no longer exists.
+
+Market orders are IOC and enforce a slippage-derived execution boundary. See
+[Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)
+before overriding `market_max_slippage`.
 
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
 Do **not** pass floats. Price ticks are Polyester protocol price units (fixed
@@ -334,6 +362,9 @@ Public order/trigger write paths take **`Price` / `Quantity` wrappers only**:
 - **Reject bare integers** on public order APIs; use the named constructors.
 - **Reject excess fractional digits** on decimal→scaled conversion (no silent floor).
 - Price ticks are fixed **1e6**; qty scale comes from pair `base_quantity_scale` (catalog).
+- Quote budgets use pair `quote_quantity_scale`; retrieve it with
+  `Catalogs::quote_quantity_scale_for_symbol[_id]` and construct an
+  `OrderQuote` `Quantity`.
 
 ## Balances: funding vs trading
 

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Breaking
+- `CreateOrderParams::max_quote_debit_scaled` and
+  `PreviewOrderParams::max_quote_debit_scaled` now take a typed `Quantity`
+  with `QuantityDomain::OrderQuote` instead of a bare `i64`. Construct quote
+  budgets with `Quantity::from_quote_scaled`, `from_quote_decimal_str`, or
+  `from_quote_decimal`; the SDK validates the embedded scale against the pair's
+  catalog `quote_quantity_scale`.
+- `PreviewOrderResult` now exposes typed `estimated_quote_debit` and
+  `estimated_fee` values instead of bare `*_scaled` integers.
+
+### Added
+- Catalog quote-quantity-scale lookup by symbol and symbol ID.
+- Local validation rejects create, cancel, and replace batches above 20 items.
+
+### Fixed
+- Transfer and trading-withdraw amounts fail closed when neither the
+  `AssetAmount` nor request parameters provide a source scale.
+- Spot-config decoding preserves valid zero quote quantity scales.
+
 ## 0.1.0a23
 
 Package version: `0.1.0-alpha.23`. Git tag: `v0.1.0a23`.

@@ -1886,6 +1886,14 @@ mod tests {
         assert!(internal_transfer_amount_e18(&inexact, Some(19), 7).is_err());
     }
 
+    #[test]
+    fn internal_transfer_rejects_missing_amount_scale_before_transport() {
+        let amount = AssetAmount::from_scaled(1, None, QuantityDomain::LedgerE18, Some(7)).unwrap();
+        let err = internal_transfer_amount_e18(&amount, None, 7)
+            .expect_err("missing scale must not silently mean e18");
+        assert!(err.to_string().contains("amount scale is required"));
+    }
+
     #[tokio::test]
     async fn internal_transfer_requires_destination_before_transport() {
         let client = crate::Client::new(crate::Config {
