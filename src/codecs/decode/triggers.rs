@@ -287,10 +287,14 @@ fn trigger_config_projection(
                 proj.trigger_price = decode_price_ticks(cond.trigger_price_ticks, symbol);
             }
         }
-        Some(trigger::Configuration::TrailingStop(_)) => {
-            // Trailing stop is an implicit SELL market-IOC strategy.
+        Some(trigger::Configuration::TrailingStop(trailing)) => {
+            // Trailing stop is market-IOC; side is carried on the wire (standalone
+            // creates are SELL; attached risk may be either side opposite parent).
             proj.trigger_type = "trailing_stop".to_owned();
-            proj.side = "sell".to_owned();
+            proj.side = enum_value_side(trailing.side).to_owned();
+            if proj.side.is_empty() {
+                proj.side = "sell".to_owned();
+            }
             proj.order_type = "market".to_owned();
             proj.time_in_force = "ioc".to_owned();
         }
@@ -480,6 +484,40 @@ mod tests {
         ListTriggerEventsResponse, ListTriggersResponse, StopDetails, TriggerEventType,
         TriggerLimitGtc,
     };
+
+    #[test]
+    fn trigger_from_proto_projects_attached_trailing_stop_side_and_parent() {
+        use crate::proto::triggers::v1::TrailingStopTrigger;
+
+        let msg = ProtoTrigger {
+            trigger_id: 77,
+            subaccount_id: 9,
+            symbol_id: 3,
+            symbol: "ETH-USDT".into(),
+            status: TriggerStatus::StatusArmed.into(),
+            parent_order_id: Some(9001),
+            qty_scaled: 100,
+            client_trigger_id: "trail-attached".into(),
+            configuration: Some(trigger::Configuration::TrailingStop(Box::new(
+                TrailingStopTrigger {
+                    side: Side::Buy.into(),
+                    trailing_distance: Some(
+                        crate::proto::triggers::v1::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                            50,
+                        ),
+                    ),
+                    ..Default::default()
+                },
+            ))),
+            ..Default::default()
+        };
+        let t = trigger_from_proto(&msg);
+        assert_eq!(t.trigger_type, "trailing_stop");
+        assert_eq!(t.side, "buy");
+        assert_eq!(t.order_type, "market");
+        assert_eq!(t.time_in_force, "ioc");
+        assert_eq!(t.parent_order_id, Some(format_uint64_id(9001)));
+    }
 
     #[test]
     fn trigger_from_proto_maps_status_and_stop_price() {
