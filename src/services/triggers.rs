@@ -168,11 +168,16 @@ impl TriggersService {
                 }
             }
             CreateTriggerType::TrailingStop => {
-                // The wire strategy has no side field and executes as SELL.
+                // Standalone trailing stops remain SELL market-IOC. Attached
+                // trailing risk may use either side (opposite the parent) and is
+                // encoded via order AttachedRisk, not this create path.
                 if !matches!(params.side, CreateSide::Sell) {
                     return Err(Error::validation("trailing_stop only supports side=sell"));
                 }
-                let mut trailing = TrailingStopTrigger::default();
+                let mut trailing = TrailingStopTrigger {
+                    side: side.into(),
+                    ..Default::default()
+                };
                 if params.trailing_distance_ticks.is_some()
                     == params.trailing_distance_bps.is_some()
                 {
@@ -758,11 +763,21 @@ mod tests {
         params.limit_price = None;
         let wire = client.triggers.encode_create_params(&params).unwrap();
         let intent = wire.trigger.expect("trigger intent");
-        assert!(
-            matches!(intent.strategy, Some(Strategy::TrailingStop(_))),
-            "expected TrailingStop strategy, got {:?}",
-            intent.strategy
+        let Some(Strategy::TrailingStop(trailing)) = intent.strategy.as_ref() else {
+            panic!("expected TrailingStop strategy, got {:?}", intent.strategy);
+        };
+        assert_eq!(
+            trailing.side.as_known(),
+            Some(crate::proto::orders::v1::Side::Sell)
         );
+        assert!(matches!(
+            trailing.trailing_distance,
+            Some(
+                crate::proto::triggers::v1::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(
+                    100
+                )
+            )
+        ));
     }
 
     #[test]

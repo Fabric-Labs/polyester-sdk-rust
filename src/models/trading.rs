@@ -475,6 +475,10 @@ pub enum FeeAsset {
 pub type OrderFeeSource = FeeAsset;
 
 /// Order inputs accepted by [`crate::services::OrdersService::preview`].
+///
+/// Preview uses the same [`OrderIntent`](crate::proto::orders::v1::OrderIntent)
+/// contract as create. The host performs an admissibility check only: no hold is
+/// placed, and `client_order_id` is accepted but not claimed.
 #[derive(Debug, Clone)]
 pub struct PreviewOrderParams {
     pub symbol: String,
@@ -488,11 +492,18 @@ pub struct PreviewOrderParams {
     pub max_quote_debit_scaled: Option<Quantity>,
     pub price: Option<Price>,
     pub time_in_force: Option<CreateTimeInForce>,
+    /// Optional client order id. Accepted for shape parity with create; preview
+    /// does not claim it.
+    pub client_order_id: Option<String>,
     pub subaccount_id: Option<u64>,
     pub post_only: Option<bool>,
     pub market_client_ref_price: Option<Price>,
     pub fee_asset: Option<FeeAsset>,
+    pub self_trade_prevention: Option<OrderSelfTradePrevention>,
     pub market_max_slippage: Option<MaxSlippage>,
+    /// Optional TP/SL/trailing controls. Preview validates the full intent;
+    /// nothing is armed until a subsequent create.
+    pub attached_risk: Option<AttachedRisk>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
