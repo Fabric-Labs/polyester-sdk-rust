@@ -1630,9 +1630,11 @@ async fn l2_cancel_subscribe_raw_during_token_body_stall_cleans_peers() {
     let rt = private_rt(&ws, &http, Duration::from_secs(30));
 
     let join = tokio::spawn(async move { rt.subscribe_raw(PRIVATE_CHANNEL).await });
+    // Arming wait only: under CI load (shared with the 10k auth soak) the
+    // subscribe task may take longer than 2s to open the token HTTP request.
     wait_until(
         || http.in_flight.load(Ordering::SeqCst) >= 1,
-        Duration::from_secs(2),
+        Duration::from_secs(5),
     )
     .await;
     let started = Instant::now();
@@ -1658,7 +1660,7 @@ async fn l2_cancel_subscribe_raw_during_centrifugo_wait_cleans_peers() {
     let join = tokio::spawn(async move { rt.subscribe_raw(PUBLIC_CHANNEL).await });
     wait_until(
         || ws_active.load(Ordering::SeqCst) >= 1,
-        Duration::from_secs(2),
+        Duration::from_secs(5),
     )
     .await;
     let started = Instant::now();
