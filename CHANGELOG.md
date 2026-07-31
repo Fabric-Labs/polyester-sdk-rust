@@ -11,7 +11,7 @@
   catalog `quote_quantity_scale`.
 - `PreviewOrderResult` now exposes typed `estimated_quote_debit` and
   `estimated_fee` values instead of bare `*_scaled` integers.
-- Wire regen (POLY-3779 / POLY-3787): `PreviewOrder` now wraps a full
+- Wire regen: `PreviewOrder` now wraps a full
   `OrderIntent` (same contract as create). `PreviewOrderParams` gains
   `client_order_id`, `self_trade_prevention`, and `attached_risk` for intent
   parity; preview still does not place a hold or claim a client order id.
