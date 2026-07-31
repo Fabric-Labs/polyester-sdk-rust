@@ -4967,99 +4967,17 @@ pub const __PREVIEW_ORDER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     is_wkt: false,
 };
 /// PreviewOrderResponse reports whether an order is currently admissible and
-/// returns its resolved financial values. The result is advisory: account,
-/// market, and fee inputs may change, and CreateOrder always evaluates the
-/// intent again.
+/// returns any sizing and price-protection values resolved during evaluation.
+/// The result is advisory: account, market, and policy inputs may change, and
+/// CreateOrder always evaluates the intent again.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct PreviewOrderResponse {
-    /// Gross base quantity resolved for execution, scaled by the pair's
-    /// base_quantity_scale from GetSpotConfig.
-    ///
-    /// Field 1: `resolved_base_qty_scaled`
-    #[serde(
-        rename = "resolvedBaseQtyScaled",
-        alias = "resolved_base_qty_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub resolved_base_qty_scaled: i64,
-    /// Protective execution price bound in quote units scaled by 1e6.
-    ///
-    /// Field 2: `price_bound_ticks`
-    #[serde(
-        rename = "priceBoundTicks",
-        alias = "price_bound_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub price_bound_ticks: i64,
-    /// Estimated all-in quote debit scaled by the pair's quote_quantity_scale
-    /// from GetSpotConfig.
-    ///
-    /// Field 3: `estimated_quote_debit_scaled`
-    #[serde(
-        rename = "estimatedQuoteDebitScaled",
-        alias = "estimated_quote_debit_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub estimated_quote_debit_scaled: i64,
-    /// Estimated fee amount scaled by the quantity scale of fee_asset.
-    ///
-    /// Field 4: `estimated_fee_scaled`
-    #[serde(
-        rename = "estimatedFeeScaled",
-        alias = "estimated_fee_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub estimated_fee_scaled: i64,
-    /// Estimated base quantity received after any BASE-denominated fee, scaled by
-    /// the pair's base_quantity_scale from GetSpotConfig.
-    ///
-    /// Field 5: `estimated_net_base_qty_scaled`
-    #[serde(
-        rename = "estimatedNetBaseQtyScaled",
-        alias = "estimated_net_base_qty_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub estimated_net_base_qty_scaled: i64,
-    /// Asset in which estimated_fee_scaled is denominated.
-    ///
-    /// Field 6: `fee_asset`
-    #[serde(
-        rename = "feeAsset",
-        alias = "fee_asset",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub fee_asset: ::buffa::EnumValue<FeeAsset>,
-    /// Time at which the market and fee inputs used by this preview were fresh.
-    ///
-    /// Field 7: `fresh_at`
-    #[serde(
-        rename = "freshAt",
-        alias = "fresh_at",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub fresh_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Freshness time as epoch nanoseconds (UTC).
-    ///
-    /// Field 8: `fresh_at_ts_ns`
-    #[serde(
-        rename = "freshAtTsNs",
-        alias = "fresh_at_ts_ns",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub fresh_at_ts_ns: u64,
     /// Whether the order passed the current validation, policy, risk, and
     /// available-balance checks.
     ///
-    /// Field 9: `admissible`
+    /// Field 1: `admissible`
     #[serde(
         rename = "admissible",
         skip_serializing_if = "::core::option::Option::is_none"
@@ -5068,12 +4986,43 @@ pub struct PreviewOrderResponse {
     /// Typed reason the order is not currently admissible. Omitted when
     /// admissible is true.
     ///
-    /// Field 10: `rejection`
+    /// Field 2: `rejection`
     #[serde(
         rename = "rejection",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub rejection: ::buffa::MessageField<ErrorDetail>,
+    /// Gross base quantity resolved for execution, scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
+    ///
+    /// Field 3: `resolved_base_qty_scaled`
+    #[serde(
+        rename = "resolvedBaseQtyScaled",
+        alias = "resolved_base_qty_scaled",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub resolved_base_qty_scaled: ::core::option::Option<i64>,
+    /// Protective execution boundary in quote units scaled by 1e6. This is not an
+    /// expected fill price. Present when price protection was resolved.
+    ///
+    /// Field 4: `protected_price_bound_ticks`
+    #[serde(
+        rename = "protectedPriceBoundTicks",
+        alias = "protected_price_bound_ticks",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub protected_price_bound_ticks: ::core::option::Option<i64>,
+    /// Time at which this admission evaluation completed.
+    ///
+    /// Field 5: `evaluated_at`
+    #[serde(
+        rename = "evaluatedAt",
+        alias = "evaluated_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub evaluated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5081,16 +5030,11 @@ pub struct PreviewOrderResponse {
 impl ::core::fmt::Debug for PreviewOrderResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("PreviewOrderResponse")
-            .field("resolved_base_qty_scaled", &self.resolved_base_qty_scaled)
-            .field("price_bound_ticks", &self.price_bound_ticks)
-            .field("estimated_quote_debit_scaled", &self.estimated_quote_debit_scaled)
-            .field("estimated_fee_scaled", &self.estimated_fee_scaled)
-            .field("estimated_net_base_qty_scaled", &self.estimated_net_base_qty_scaled)
-            .field("fee_asset", &self.fee_asset)
-            .field("fresh_at", &self.fresh_at)
-            .field("fresh_at_ts_ns", &self.fresh_at_ts_ns)
             .field("admissible", &self.admissible)
             .field("rejection", &self.rejection)
+            .field("resolved_base_qty_scaled", &self.resolved_base_qty_scaled)
+            .field("protected_price_bound_ticks", &self.protected_price_bound_ticks)
+            .field("evaluated_at", &self.evaluated_at)
             .finish()
     }
 }
@@ -5107,6 +5051,20 @@ impl PreviewOrderResponse {
     ///Sets [`Self::admissible`] to `Some(value)`, consuming and returning `self`.
     pub fn with_admissible(mut self, value: bool) -> Self {
         self.admissible = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::resolved_base_qty_scaled`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_resolved_base_qty_scaled(mut self, value: i64) -> Self {
+        self.resolved_base_qty_scaled = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::protected_price_bound_ticks`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_protected_price_bound_ticks(mut self, value: i64) -> Self {
+        self.protected_price_bound_ticks = Some(value);
         self
     }
 }
@@ -5128,61 +5086,26 @@ impl ::buffa::Message for PreviewOrderResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if self.resolved_base_qty_scaled != 0i64 {
-            size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(self.resolved_base_qty_scaled)
-                        as u32;
-        }
-        if self.price_bound_ticks != 0i64 {
-            size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(self.price_bound_ticks) as u32;
-        }
-        if self.estimated_quote_debit_scaled != 0i64 {
-            size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(
-                        self.estimated_quote_debit_scaled,
-                    ) as u32;
-        }
-        if self.estimated_fee_scaled != 0i64 {
-            size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(self.estimated_fee_scaled)
-                        as u32;
-        }
-        if self.estimated_net_base_qty_scaled != 0i64 {
-            size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(
-                        self.estimated_net_base_qty_scaled,
-                    ) as u32;
-        }
-        {
-            let val = self.fee_asset.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        if self.fresh_at.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.fresh_at.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
-        }
-        if self.fresh_at_ts_ns != 0u64 {
-            size
-                += 1u32 + ::buffa::types::uint64_encoded_len(self.fresh_at_ts_ns) as u32;
-        }
         if self.admissible.is_some() {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
         if self.rejection.is_set() {
             let __slot = __cache.reserve();
             let inner_size = self.rejection.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if let Some(v) = self.resolved_base_qty_scaled {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
+        if let Some(v) = self.protected_price_bound_ticks {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
+        if self.evaluated_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.evaluated_at.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
@@ -5198,48 +5121,22 @@ impl ::buffa::Message for PreviewOrderResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if self.resolved_base_qty_scaled != 0i64 {
-            ::buffa::types::put_int64_field(1u32, self.resolved_base_qty_scaled, buf);
-        }
-        if self.price_bound_ticks != 0i64 {
-            ::buffa::types::put_int64_field(2u32, self.price_bound_ticks, buf);
-        }
-        if self.estimated_quote_debit_scaled != 0i64 {
-            ::buffa::types::put_int64_field(
-                3u32,
-                self.estimated_quote_debit_scaled,
-                buf,
-            );
-        }
-        if self.estimated_fee_scaled != 0i64 {
-            ::buffa::types::put_int64_field(4u32, self.estimated_fee_scaled, buf);
-        }
-        if self.estimated_net_base_qty_scaled != 0i64 {
-            ::buffa::types::put_int64_field(
-                5u32,
-                self.estimated_net_base_qty_scaled,
-                buf,
-            );
-        }
-        {
-            let val = self.fee_asset.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(6u32, val, buf);
-            }
-        }
-        if self.fresh_at.is_set() {
-            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
-            self.fresh_at.write_to(__cache, buf);
-        }
-        if self.fresh_at_ts_ns != 0u64 {
-            ::buffa::types::put_uint64_field(8u32, self.fresh_at_ts_ns, buf);
-        }
         if let Some(v) = self.admissible {
-            ::buffa::types::put_bool_field(9u32, v, buf);
+            ::buffa::types::put_bool_field(1u32, v, buf);
         }
         if self.rejection.is_set() {
-            ::buffa::types::put_len_delimited_header(10u32, __cache.consume_next(), buf);
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
             self.rejection.write_to(__cache, buf);
+        }
+        if let Some(v) = self.resolved_base_qty_scaled {
+            ::buffa::types::put_int64_field(3u32, v, buf);
+        }
+        if let Some(v) = self.protected_price_bound_ticks {
+            ::buffa::types::put_int64_field(4u32, v, buf);
+        }
+        if self.evaluated_at.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.evaluated_at.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5259,79 +5156,46 @@ impl ::buffa::Message for PreviewOrderResponse {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.resolved_base_qty_scaled = ::buffa::types::decode_int64(buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.price_bound_ticks = ::buffa::types::decode_int64(buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.estimated_quote_debit_scaled = ::buffa::types::decode_int64(buf)?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.estimated_fee_scaled = ::buffa::types::decode_int64(buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.estimated_net_base_qty_scaled = ::buffa::types::decode_int64(buf)?;
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.fee_asset = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.fresh_at.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            8u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.fresh_at_ts_ns = ::buffa::types::decode_uint64(buf)?;
-            }
-            9u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
                 self.admissible = ::core::option::Option::Some(
                     ::buffa::types::decode_bool(buf)?,
                 );
             }
-            10u32 => {
+            2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
                     self.rejection.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.resolved_base_qty_scaled = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.protected_price_bound_ticks = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.evaluated_at.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
@@ -5344,16 +5208,11 @@ impl ::buffa::Message for PreviewOrderResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.resolved_base_qty_scaled = 0i64;
-        self.price_bound_ticks = 0i64;
-        self.estimated_quote_debit_scaled = 0i64;
-        self.estimated_fee_scaled = 0i64;
-        self.estimated_net_base_qty_scaled = 0i64;
-        self.fee_asset = ::buffa::EnumValue::from(0);
-        self.fresh_at = ::buffa::MessageField::none();
-        self.fresh_at_ts_ns = 0u64;
         self.admissible = ::core::option::Option::None;
         self.rejection = ::buffa::MessageField::none();
+        self.resolved_base_qty_scaled = ::core::option::Option::None;
+        self.protected_price_bound_ticks = ::core::option::Option::None;
+        self.evaluated_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -23384,59 +23243,38 @@ pub mod __buffa {
             }
         }
         /// PreviewOrderResponse reports whether an order is currently admissible and
-        /// returns its resolved financial values. The result is advisory: account,
-        /// market, and fee inputs may change, and CreateOrder always evaluates the
-        /// intent again.
+        /// returns any sizing and price-protection values resolved during evaluation.
+        /// The result is advisory: account, market, and policy inputs may change, and
+        /// CreateOrder always evaluates the intent again.
         #[derive(Clone, Debug, Default)]
         pub struct PreviewOrderResponseView<'a> {
-            /// Gross base quantity resolved for execution, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
-            ///
-            /// Field 1: `resolved_base_qty_scaled`
-            pub resolved_base_qty_scaled: i64,
-            /// Protective execution price bound in quote units scaled by 1e6.
-            ///
-            /// Field 2: `price_bound_ticks`
-            pub price_bound_ticks: i64,
-            /// Estimated all-in quote debit scaled by the pair's quote_quantity_scale
-            /// from GetSpotConfig.
-            ///
-            /// Field 3: `estimated_quote_debit_scaled`
-            pub estimated_quote_debit_scaled: i64,
-            /// Estimated fee amount scaled by the quantity scale of fee_asset.
-            ///
-            /// Field 4: `estimated_fee_scaled`
-            pub estimated_fee_scaled: i64,
-            /// Estimated base quantity received after any BASE-denominated fee, scaled by
-            /// the pair's base_quantity_scale from GetSpotConfig.
-            ///
-            /// Field 5: `estimated_net_base_qty_scaled`
-            pub estimated_net_base_qty_scaled: i64,
-            /// Asset in which estimated_fee_scaled is denominated.
-            ///
-            /// Field 6: `fee_asset`
-            pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
-            /// Time at which the market and fee inputs used by this preview were fresh.
-            ///
-            /// Field 7: `fresh_at`
-            pub fresh_at: ::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
-            >,
-            /// Freshness time as epoch nanoseconds (UTC).
-            ///
-            /// Field 8: `fresh_at_ts_ns`
-            pub fresh_at_ts_ns: u64,
             /// Whether the order passed the current validation, policy, risk, and
             /// available-balance checks.
             ///
-            /// Field 9: `admissible`
+            /// Field 1: `admissible`
             pub admissible: ::core::option::Option<bool>,
             /// Typed reason the order is not currently admissible. Omitted when
             /// admissible is true.
             ///
-            /// Field 10: `rejection`
+            /// Field 2: `rejection`
             pub rejection: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ErrorDetailView<'a>,
+            >,
+            /// Gross base quantity resolved for execution, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
+            ///
+            /// Field 3: `resolved_base_qty_scaled`
+            pub resolved_base_qty_scaled: ::core::option::Option<i64>,
+            /// Protective execution boundary in quote units scaled by 1e6. This is not an
+            /// expected fill price. Present when price protection was resolved.
+            ///
+            /// Field 4: `protected_price_bound_ticks`
+            pub protected_price_bound_ticks: ::core::option::Option<i64>,
+            /// Time at which this admission evaluation completed.
+            ///
+            /// Field 5: `evaluated_at`
+            pub evaluated_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -23476,93 +23314,9 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.resolved_base_qty_scaled = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.price_bound_ticks = ::buffa::types::decode_int64(&mut cur)?;
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.estimated_quote_debit_scaled = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.estimated_fee_scaled = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.estimated_net_base_qty_scaled = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.fee_asset = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.fresh_at.as_mut() {
-                            Some(existing) => {
-                                ::buffa::MessageView::merge_into_view(
-                                    existing,
-                                    sub,
-                                    __sub_ctx,
-                                )?
-                            }
-                            None => {
-                                view.fresh_at = ::buffa::MessageFieldView::set(
-                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
-                                        sub,
-                                        __sub_ctx,
-                                    )?,
-                                );
-                            }
-                        }
-                    }
-                    8u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.fresh_at_ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
-                    }
-                    9u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
                         view.admissible = Some(::buffa::types::decode_bool(&mut cur)?);
                     }
-                    10u32 => {
+                    2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
@@ -23580,6 +23334,49 @@ pub mod __buffa {
                             None => {
                                 view.rejection = ::buffa::MessageFieldView::set(
                                     <super::super::__buffa::view::ErrorDetailView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.resolved_base_qty_scaled = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.protected_price_bound_ticks = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.evaluated_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.evaluated_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -23616,26 +23413,21 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::PreviewOrderResponse {
-                    resolved_base_qty_scaled: self.resolved_base_qty_scaled,
-                    price_bound_ticks: self.price_bound_ticks,
-                    estimated_quote_debit_scaled: self.estimated_quote_debit_scaled,
-                    estimated_fee_scaled: self.estimated_fee_scaled,
-                    estimated_net_base_qty_scaled: self.estimated_net_base_qty_scaled,
-                    fee_asset: self.fee_asset,
-                    fresh_at: match self.fresh_at.as_option() {
-                        Some(v) => {
-                            ::buffa::MessageField::<
-                                ::buffa_types::google::protobuf::Timestamp,
-                            >::some(v.to_owned_from_source(__buffa_src)?)
-                        }
-                        None => ::buffa::MessageField::none(),
-                    },
-                    fresh_at_ts_ns: self.fresh_at_ts_ns,
                     admissible: self.admissible,
                     rejection: match self.rejection.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
                                 super::super::ErrorDetail,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    resolved_base_qty_scaled: self.resolved_base_qty_scaled,
+                    protected_price_bound_ticks: self.protected_price_bound_ticks,
+                    evaluated_at: match self.evaluated_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -23654,66 +23446,26 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if self.resolved_base_qty_scaled != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.resolved_base_qty_scaled,
-                            ) as u32;
-                }
-                if self.price_bound_ticks != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.price_bound_ticks)
-                                as u32;
-                }
-                if self.estimated_quote_debit_scaled != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.estimated_quote_debit_scaled,
-                            ) as u32;
-                }
-                if self.estimated_fee_scaled != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.estimated_fee_scaled,
-                            ) as u32;
-                }
-                if self.estimated_net_base_qty_scaled != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.estimated_net_base_qty_scaled,
-                            ) as u32;
-                }
-                {
-                    let val = self.fee_asset.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if self.fresh_at.is_set() {
-                    let __slot = __cache.reserve();
-                    let inner_size = self.fresh_at.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
-                }
-                if self.fresh_at_ts_ns != 0u64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint64_encoded_len(self.fresh_at_ts_ns)
-                                as u32;
-                }
                 if self.admissible.is_some() {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
                 if self.rejection.is_set() {
                     let __slot = __cache.reserve();
                     let inner_size = self.rejection.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if let Some(v) = self.resolved_base_qty_scaled {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
+                if let Some(v) = self.protected_price_bound_ticks {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
+                if self.evaluated_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.evaluated_at.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
@@ -23730,64 +23482,30 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if self.resolved_base_qty_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        1u32,
-                        self.resolved_base_qty_scaled,
-                        buf,
-                    );
-                }
-                if self.price_bound_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(2u32, self.price_bound_ticks, buf);
-                }
-                if self.estimated_quote_debit_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        3u32,
-                        self.estimated_quote_debit_scaled,
-                        buf,
-                    );
-                }
-                if self.estimated_fee_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        4u32,
-                        self.estimated_fee_scaled,
-                        buf,
-                    );
-                }
-                if self.estimated_net_base_qty_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        5u32,
-                        self.estimated_net_base_qty_scaled,
-                        buf,
-                    );
-                }
-                {
-                    let val = self.fee_asset.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(6u32, val, buf);
-                    }
-                }
-                if self.fresh_at.is_set() {
-                    ::buffa::types::put_len_delimited_header(
-                        7u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    self.fresh_at.write_to(__cache, buf);
-                }
-                if self.fresh_at_ts_ns != 0u64 {
-                    ::buffa::types::put_uint64_field(8u32, self.fresh_at_ts_ns, buf);
-                }
                 if let Some(v) = self.admissible {
-                    ::buffa::types::put_bool_field(9u32, v, buf);
+                    ::buffa::types::put_bool_field(1u32, v, buf);
                 }
                 if self.rejection.is_set() {
                     ::buffa::types::put_len_delimited_header(
-                        10u32,
+                        2u32,
                         __cache.consume_next(),
                         buf,
                     );
                     self.rejection.write_to(__cache, buf);
+                }
+                if let Some(v) = self.resolved_base_qty_scaled {
+                    ::buffa::types::put_int64_field(3u32, v, buf);
+                }
+                if let Some(v) = self.protected_price_bound_ticks {
+                    ::buffa::types::put_int64_field(4u32, v, buf);
+                }
+                if self.evaluated_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.evaluated_at.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -23810,75 +23528,6 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.resolved_base_qty_scaled,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "resolvedBaseQtyScaled",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.resolved_base_qty_scaled,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.price_bound_ticks,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "priceBoundTicks",
-                            &::buffa::json_helpers::ProtoJson(&self.price_bound_ticks),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.estimated_quote_debit_scaled,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "estimatedQuoteDebitScaled",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.estimated_quote_debit_scaled,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.estimated_fee_scaled,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "estimatedFeeScaled",
-                            &::buffa::json_helpers::ProtoJson(&self.estimated_fee_scaled),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.estimated_net_base_qty_scaled,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "estimatedNetBaseQtyScaled",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.estimated_net_base_qty_scaled,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.fee_asset,
-                ) {
-                    __map.serialize_entry("feeAsset", &self.fee_asset)?;
-                }
-                {
-                    if let ::core::option::Option::Some(__v) = self.fresh_at.as_option()
-                    {
-                        __map.serialize_entry("freshAt", __v)?;
-                    }
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.fresh_at_ts_ns) {
-                    __map
-                        .serialize_entry(
-                            "freshAtTsNs",
-                            &::buffa::json_helpers::ProtoJson(&self.fresh_at_ts_ns),
-                        )?;
-                }
                 if let ::core::option::Option::Some(__v) = self.admissible {
                     __map.serialize_entry("admissible", &__v)?;
                 }
@@ -23886,6 +23535,31 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.rejection.as_option()
                     {
                         __map.serialize_entry("rejection", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(__v) = self.resolved_base_qty_scaled
+                {
+                    __map
+                        .serialize_entry(
+                            "resolvedBaseQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self
+                    .protected_price_bound_ticks
+                {
+                    __map
+                        .serialize_entry(
+                            "protectedPriceBoundTicks",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .evaluated_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("evaluatedAt", __v)?;
                     }
                 }
                 __map.end()
@@ -23984,73 +23658,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Gross base quantity resolved for execution, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
-            ///
-            /// Field 1: `resolved_base_qty_scaled`
-            #[must_use]
-            pub fn resolved_base_qty_scaled(&self) -> i64 {
-                self.0.reborrow().resolved_base_qty_scaled
-            }
-            /// Protective execution price bound in quote units scaled by 1e6.
-            ///
-            /// Field 2: `price_bound_ticks`
-            #[must_use]
-            pub fn price_bound_ticks(&self) -> i64 {
-                self.0.reborrow().price_bound_ticks
-            }
-            /// Estimated all-in quote debit scaled by the pair's quote_quantity_scale
-            /// from GetSpotConfig.
-            ///
-            /// Field 3: `estimated_quote_debit_scaled`
-            #[must_use]
-            pub fn estimated_quote_debit_scaled(&self) -> i64 {
-                self.0.reborrow().estimated_quote_debit_scaled
-            }
-            /// Estimated fee amount scaled by the quantity scale of fee_asset.
-            ///
-            /// Field 4: `estimated_fee_scaled`
-            #[must_use]
-            pub fn estimated_fee_scaled(&self) -> i64 {
-                self.0.reborrow().estimated_fee_scaled
-            }
-            /// Estimated base quantity received after any BASE-denominated fee, scaled by
-            /// the pair's base_quantity_scale from GetSpotConfig.
-            ///
-            /// Field 5: `estimated_net_base_qty_scaled`
-            #[must_use]
-            pub fn estimated_net_base_qty_scaled(&self) -> i64 {
-                self.0.reborrow().estimated_net_base_qty_scaled
-            }
-            /// Asset in which estimated_fee_scaled is denominated.
-            ///
-            /// Field 6: `fee_asset`
-            #[must_use]
-            pub fn fee_asset(&self) -> ::buffa::EnumValue<super::super::FeeAsset> {
-                self.0.reborrow().fee_asset
-            }
-            /// Time at which the market and fee inputs used by this preview were fresh.
-            ///
-            /// Field 7: `fresh_at`
-            #[must_use]
-            pub fn fresh_at(
-                &self,
-            ) -> &::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
-            > {
-                &self.0.reborrow().fresh_at
-            }
-            /// Freshness time as epoch nanoseconds (UTC).
-            ///
-            /// Field 8: `fresh_at_ts_ns`
-            #[must_use]
-            pub fn fresh_at_ts_ns(&self) -> u64 {
-                self.0.reborrow().fresh_at_ts_ns
-            }
             /// Whether the order passed the current validation, policy, risk, and
             /// available-balance checks.
             ///
-            /// Field 9: `admissible`
+            /// Field 1: `admissible`
             #[must_use]
             pub fn admissible(&self) -> ::core::option::Option<bool> {
                 self.0.reborrow().admissible
@@ -24058,7 +23669,7 @@ pub mod __buffa {
             /// Typed reason the order is not currently admissible. Omitted when
             /// admissible is true.
             ///
-            /// Field 10: `rejection`
+            /// Field 2: `rejection`
             #[must_use]
             pub fn rejection(
                 &self,
@@ -24066,6 +23677,33 @@ pub mod __buffa {
                 super::super::__buffa::view::ErrorDetailView<'_>,
             > {
                 &self.0.reborrow().rejection
+            }
+            /// Gross base quantity resolved for execution, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
+            ///
+            /// Field 3: `resolved_base_qty_scaled`
+            #[must_use]
+            pub fn resolved_base_qty_scaled(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().resolved_base_qty_scaled
+            }
+            /// Protective execution boundary in quote units scaled by 1e6. This is not an
+            /// expected fill price. Present when price protection was resolved.
+            ///
+            /// Field 4: `protected_price_bound_ticks`
+            #[must_use]
+            pub fn protected_price_bound_ticks(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().protected_price_bound_ticks
+            }
+            /// Time at which this admission evaluation completed.
+            ///
+            /// Field 5: `evaluated_at`
+            #[must_use]
+            pub fn evaluated_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().evaluated_at
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<PreviewOrderResponseView<'static>>>
