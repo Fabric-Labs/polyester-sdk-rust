@@ -32,8 +32,8 @@ use crate::proto::orders::v1::{
     MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, PreviewOrderRequest, RiskExecution,
     RiskLimitGtc, RiskPolicy, SelfTradePreventionMode, Side, StopLossPolicy, TakeProfitPolicy,
     TrailingStopPolicy, batch_replace_order_item, cancel_order_request, get_order_request,
-    market_ioc, modify_order_request, order_intent, preview_order_request, risk_execution,
-    risk_policy, trailing_stop_policy,
+    market_ioc, modify_order_request, order_intent, risk_execution, risk_policy,
+    trailing_stop_policy,
 };
 use crate::types::{
     Price, Quantity, resolve_price_ticks, resolve_qty_scaled, resolve_quote_qty_scaled,
@@ -679,6 +679,9 @@ impl OrdersService {
     }
 
     fn encode_preview_params(&self, params: &PreviewOrderParams) -> Result<PreviewOrderRequest> {
+        // Preview uses the same OrderIntent contract as CreateOrder. The host
+        // runs an admissibility check only — no hold is placed and any
+        // client_order_id is accepted but not claimed.
         let create = CreateOrderParams {
             symbol: params.symbol.clone(),
             side: params.side,
@@ -687,49 +690,22 @@ impl OrdersService {
             max_quote_debit_scaled: params.max_quote_debit_scaled.clone(),
             price: params.price.clone(),
             time_in_force: params.time_in_force,
-            client_order_id: None,
+            client_order_id: params.client_order_id.clone(),
             subaccount_id: params.subaccount_id,
             post_only: params.post_only,
             market_client_ref_price: params.market_client_ref_price.clone(),
             fee_asset: params.fee_asset,
-            self_trade_prevention: None,
+            self_trade_prevention: params.self_trade_prevention,
             market_max_slippage: params.market_max_slippage,
-            attached_risk: None,
+            attached_risk: params.attached_risk.clone(),
         };
-        let intent = self.order_intent_from_params(&create)?;
-        let execution = match intent.execution {
-            Some(order_intent::Execution::MarketIoc(value)) => {
-                preview_order_request::Execution::MarketIoc(value)
-            }
-            Some(order_intent::Execution::LimitGtc(value)) => {
-                preview_order_request::Execution::LimitGtc(value)
-            }
-            Some(order_intent::Execution::LimitIoc(value)) => {
-                preview_order_request::Execution::LimitIoc(value)
-            }
-            Some(order_intent::Execution::LimitFok(value)) => {
-                preview_order_request::Execution::LimitFok(value)
-            }
-            None => return Err(Error::validation("missing order execution")),
-        };
-        let sizing = match intent.sizing {
-            Some(order_intent::Sizing::BaseQtyScaled(value)) => {
-                preview_order_request::Sizing::BaseQtyScaled(value)
-            }
-            Some(order_intent::Sizing::MaxQuoteDebitScaled(value)) => {
-                preview_order_request::Sizing::MaxQuoteDebitScaled(value)
-            }
-            None => return Err(Error::validation("missing order sizing")),
-        };
-        Ok(PreviewOrderRequest {
+        let order = self.order_intent_from_params(&create)?;
+        let mut req = PreviewOrderRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
-            symbol: intent.symbol,
-            side: intent.side,
-            fee_asset: intent.fee_asset,
-            sizing: Some(sizing),
-            execution: Some(execution),
             ..Default::default()
-        })
+        };
+        *req.order.get_or_insert_default() = order;
+        Ok(req)
     }
 
     /// Batch-create orders.
@@ -1436,6 +1412,57 @@ mod tests {
             .unwrap_err();
         assert!(matches!(&err, Error::Validation(_)));
         assert!(err.to_string().contains("always uses last trade"));
+    }
+
+    #[test]
+    fn preview_encodes_full_order_intent() {
+        let client = client();
+        let create = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        let preview = PreviewOrderParams {
+            symbol: create.symbol.clone(),
+            side: create.side,
+            order_type: create.order_type,
+            quantity: create.quantity.clone(),
+            max_quote_debit_scaled: None,
+            price: create.price.clone(),
+            time_in_force: create.time_in_force,
+            client_order_id: Some("preview-cid".into()),
+            subaccount_id: Some(9),
+            post_only: create.post_only,
+            market_client_ref_price: None,
+            fee_asset: Some(FeeAsset::Quote),
+            self_trade_prevention: Some(OrderSelfTradePrevention::ExpireTaker),
+            market_max_slippage: None,
+            attached_risk: None,
+        };
+        let wire = client.orders.encode_preview_params(&preview).unwrap();
+        assert_eq!(wire.subaccount_id, Some(9));
+        let intent = wire.order.as_option().expect("preview order intent");
+        assert_eq!(intent.symbol, "BTC-USDT");
+        assert_eq!(intent.side.as_known(), Some(Side::Buy));
+        assert_eq!(intent.client_order_id, "preview-cid");
+        assert!(matches!(
+            intent.sizing,
+            Some(order_intent::Sizing::BaseQtyScaled(10_000_000))
+        ));
+        assert!(matches!(
+            intent.execution,
+            Some(order_intent::Execution::LimitGtc(_))
+        ));
+        assert_eq!(
+            intent.self_trade_prevention_mode.as_known(),
+            Some(SelfTradePreventionMode::ExpireTaker)
+        );
     }
 
     #[test]

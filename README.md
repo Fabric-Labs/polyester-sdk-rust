@@ -292,12 +292,20 @@ params.max_quote_debit_scaled = Some(Quantity::from_quote_decimal_str(
 
 Use `OrdersService::preview(PreviewOrderParams { ... })` to obtain advisory
 resolved base quantity, price bound, and typed quote/fee estimates before
-submitting a quote-budget order. `estimated_quote_debit` always has
-`OrderQuote` domain; `estimated_fee` has `OrderBase` or `OrderQuote` according
-to `fee_asset`. Preview is not deployed on every API host, so handle an
+submitting a quote-budget order. Preview sends the same `OrderIntent` contract
+as create (sizing, execution, fee asset, STP, optional attached risk). The host
+runs an admissibility check only: no hold is placed, and `client_order_id` is
+accepted but not claimed. `estimated_quote_debit` always has `OrderQuote`
+domain; `estimated_fee` has `OrderBase` or `OrderQuote` according to
+`fee_asset`. Preview is not deployed on every API host, so handle an
 unimplemented/not-found response and do not make Preview a prerequisite for
 order submission. Fee selection is `FeeAsset::Quote` or, for BUYs only,
 `FeeAsset::Base`; the former `received` fee mode no longer exists.
+
+Standalone trailing-stop triggers remain SELL market-IOC and now encode wire
+`side` explicitly. Attached trailing-stop risk may use either side (opposite
+the parent); trigger reads project `trigger_type`, `side`, and
+`parent_order_id` from the host response.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
 [Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)

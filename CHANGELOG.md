@@ -11,6 +11,13 @@
   catalog `quote_quantity_scale`.
 - `PreviewOrderResult` now exposes typed `estimated_quote_debit` and
   `estimated_fee` values instead of bare `*_scaled` integers.
+- Wire regen (POLY-3779 / POLY-3787): `PreviewOrder` now wraps a full
+  `OrderIntent` (same contract as create). `PreviewOrderParams` gains
+  `client_order_id`, `self_trade_prevention`, and `attached_risk` for intent
+  parity; preview still does not place a hold or claim a client order id.
+- `TrailingStopTrigger` carries child `side` on the wire. Standalone create
+  remains SELL-only; trigger reads project attached trailing `side` and
+  `parent_order_id` instead of hard-coding sell / omitting parent linkage.
 
 ### Added
 - Catalog quote-quantity-scale lookup by symbol and symbol ID.
