@@ -50,6 +50,12 @@ fn parse_scale(value: Option<&Value>, field: &str) -> Result<u32> {
     Ok(scale)
 }
 
+fn parse_optional_scale(value: Option<&Value>, field: &str) -> Result<Option<u32>> {
+    value
+        .map(|value| parse_scale(Some(value), field))
+        .transpose()
+}
+
 #[derive(Debug, Default)]
 pub struct Manager {
     inner: RwLock<Inner>,
@@ -60,6 +66,8 @@ struct Inner {
     symbol_to_id: HashMap<String, u32>,
     id_to_base_scale: HashMap<u32, u32>,
     symbol_to_base_scale: HashMap<String, u32>,
+    id_to_quote_scale: HashMap<u32, u32>,
+    symbol_to_quote_scale: HashMap<String, u32>,
     asset_to_ledger_id: HashMap<String, u32>,
     asset_to_qty_scale: HashMap<String, u32>,
     zipped_id_to_scale: HashMap<u32, u32>,
@@ -75,6 +83,8 @@ struct SpotSnapshot {
     symbol_to_id: HashMap<String, u32>,
     id_to_base_scale: HashMap<u32, u32>,
     symbol_to_base_scale: HashMap<String, u32>,
+    id_to_quote_scale: HashMap<u32, u32>,
+    symbol_to_quote_scale: HashMap<String, u32>,
     orderbook_buckets: HashMap<String, Vec<String>>,
     spot_config: Value,
 }
@@ -118,6 +128,11 @@ fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
                 .or_else(|| m.get("baseQuantityScale")),
             "base_quantity_scale",
         )?;
+        let quote_scale = parse_optional_scale(
+            m.get("quote_quantity_scale")
+                .or_else(|| m.get("quoteQuantityScale")),
+            "quote_quantity_scale",
+        )?;
         if snap.symbol_to_id.contains_key(symbol) {
             return Err(Error::validation(format!(
                 "catalog contains duplicate symbol {symbol}"
@@ -131,6 +146,11 @@ fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
         snap.symbol_to_id.insert(symbol.to_owned(), symbol_id);
         snap.symbol_to_base_scale.insert(symbol.to_owned(), scale);
         snap.id_to_base_scale.insert(symbol_id, scale);
+        if let Some(quote_scale) = quote_scale {
+            snap.symbol_to_quote_scale
+                .insert(symbol.to_owned(), quote_scale);
+            snap.id_to_quote_scale.insert(symbol_id, quote_scale);
+        }
         id_to_symbol.insert(symbol_id, symbol.to_owned());
         let buckets = m
             .get("orderbook_price_buckets")
@@ -305,6 +325,24 @@ impl Manager {
             .copied()
     }
 
+    /// Returns the pair quote quantity scale, or `None` when unknown/unhydrated.
+    ///
+    /// Quote-debit budgets must use this scale. Callers must not infer it from
+    /// the base quantity scale or from the quote asset's display decimals.
+    pub fn quote_quantity_scale_for_symbol(&self, symbol: &str) -> Option<u32> {
+        read_unpoisoned(&self.inner)
+            .symbol_to_quote_scale
+            .get(symbol)
+            .copied()
+    }
+
+    pub fn quote_quantity_scale_for_symbol_id(&self, id: u32) -> Option<u32> {
+        read_unpoisoned(&self.inner)
+            .id_to_quote_scale
+            .get(&id)
+            .copied()
+    }
+
     pub fn quantity_scale_for_zipped_asset_id(&self, id: u32) -> Option<u32> {
         read_unpoisoned(&self.inner)
             .zipped_id_to_scale
@@ -377,6 +415,8 @@ fn apply_spot(inner: &mut Inner, snap: SpotSnapshot) {
     inner.symbol_to_id = snap.symbol_to_id;
     inner.id_to_base_scale = snap.id_to_base_scale;
     inner.symbol_to_base_scale = snap.symbol_to_base_scale;
+    inner.id_to_quote_scale = snap.id_to_quote_scale;
+    inner.symbol_to_quote_scale = snap.symbol_to_quote_scale;
     inner.orderbook_buckets = snap.orderbook_buckets;
     inner.spot_config = Some(snap.spot_config);
 }
@@ -402,6 +442,7 @@ mod tests {
                 "symbol": "BTC-USDT",
                 "symbol_id": 1,
                 "base_quantity_scale": 8,
+                "quote_quantity_scale": 6,
                 "orderbook_price_buckets": [0.01, 0.1, 1.0]
             }]
         }))
@@ -409,6 +450,8 @@ mod tests {
         assert_eq!(mgr.symbol_id_for_symbol("BTC-USDT"), Some(1));
         assert_eq!(mgr.base_quantity_scale_for_symbol("BTC-USDT"), Some(8));
         assert_eq!(mgr.base_quantity_scale_for_symbol_id(1), Some(8));
+        assert_eq!(mgr.quote_quantity_scale_for_symbol("BTC-USDT"), Some(6));
+        assert_eq!(mgr.quote_quantity_scale_for_symbol_id(1), Some(6));
         assert_eq!(
             mgr.orderbook_price_buckets_for_symbol("BTC-USDT"),
             vec!["0.01".to_owned(), "0.1".to_owned(), "1.0".to_owned()]
@@ -599,6 +642,26 @@ mod tests {
         let mgr = Manager::new();
         assert_eq!(mgr.base_quantity_scale_for_symbol("NOPE"), None);
         assert_eq!(mgr.base_quantity_scale_for_symbol("ETH-USDT"), None);
+        assert_eq!(mgr.quote_quantity_scale_for_symbol("NOPE"), None);
+        assert_eq!(mgr.quote_quantity_scale_for_symbol_id(999), None);
+    }
+
+    #[test]
+    fn malformed_quote_scale_rejects_catalog_atomically() {
+        let mgr = Manager::new();
+        let err = mgr
+            .hydrate_spot_config_json(json!({
+                "pairs": [{
+                    "symbol": "BTC-USDT",
+                    "symbol_id": 1,
+                    "base_quantity_scale": 8,
+                    "quote_quantity_scale": 65535
+                }]
+            }))
+            .expect_err("invalid quote scale must fail");
+        assert!(err.to_string().contains("scale"));
+        assert_eq!(mgr.symbol_id_for_symbol("BTC-USDT"), None);
+        assert_eq!(mgr.quote_quantity_scale_for_symbol("BTC-USDT"), None);
     }
 
     #[test]

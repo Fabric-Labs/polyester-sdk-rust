@@ -67,7 +67,7 @@ pub use services::{
 };
 pub use types::{
     AssetAmount, Price, PriceTicks, QtyScaled, Quantity, QuantityDomain,
-    resolve_asset_amount_scaled, resolve_price_ticks, resolve_qty_scaled,
+    resolve_asset_amount_scaled, resolve_price_ticks, resolve_qty_scaled, resolve_quote_qty_scaled,
 };
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

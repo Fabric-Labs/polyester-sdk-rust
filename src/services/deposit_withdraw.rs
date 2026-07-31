@@ -570,6 +570,24 @@ mod tests {
         assert!(encode(&amount).is_err());
     }
 
+    #[test]
+    fn withdraw_rejects_missing_amount_scale_before_transport() {
+        let amount = AssetAmount::from_scaled(1, None, QuantityDomain::LedgerE18, Some(7)).unwrap();
+        let err = WithdrawService::encode_payload(EncodeWithdrawPayload {
+            action: TradingWithdrawAction::ToFunding,
+            asset_id: 7,
+            amount: &amount,
+            amount_scale: None,
+            idempotency_key: "missing-scale".into(),
+            destination_chain_id: 0,
+            destination_address: String::new(),
+            deadline_ts_sec: 1_800_000_000,
+            nonce: 42,
+        })
+        .expect_err("missing scale must not silently mean e18");
+        assert!(err.to_string().contains("amount scale is required"));
+    }
+
     #[tokio::test]
     async fn withdraw_rejects_missing_signature_before_transport() {
         let client = crate::Client::new(crate::Config {

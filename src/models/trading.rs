@@ -435,9 +435,10 @@ pub struct CreateOrderParams {
     pub order_type: CreateOrderType,
     /// Base quantity. Set exactly one of this and `max_quote_debit_scaled`.
     pub quantity: Option<Quantity>,
-    /// Hard all-in quote debit limit in the pair's quote quantity scale. Set
-    /// exactly one of this and `quantity`.
-    pub max_quote_debit_scaled: Option<i64>,
+    /// Hard all-in quote debit limit. The [`Quantity`] must use
+    /// [`crate::types::QuantityDomain::OrderQuote`] and carry the pair's
+    /// catalog quote scale. Set exactly one of this and `quantity`.
+    pub max_quote_debit_scaled: Option<Quantity>,
     pub price: Option<Price>,
     pub time_in_force: Option<CreateTimeInForce>,
     /// Optional client order id (API-optional).
@@ -481,9 +482,10 @@ pub struct PreviewOrderParams {
     pub order_type: CreateOrderType,
     /// Base quantity. Set exactly one of this and `max_quote_debit_scaled`.
     pub quantity: Option<Quantity>,
-    /// Hard all-in quote debit limit in the pair's quote quantity scale. Set
-    /// exactly one of this and `quantity`.
-    pub max_quote_debit_scaled: Option<i64>,
+    /// Hard all-in quote debit limit. The [`Quantity`] must use
+    /// [`crate::types::QuantityDomain::OrderQuote`] and carry the pair's
+    /// catalog quote scale. Set exactly one of this and `quantity`.
+    pub max_quote_debit_scaled: Option<Quantity>,
     pub price: Option<Price>,
     pub time_in_force: Option<CreateTimeInForce>,
     pub subaccount_id: Option<u64>,
@@ -497,8 +499,11 @@ pub struct PreviewOrderParams {
 pub struct PreviewOrderResult {
     pub resolved_base_qty: Option<Quantity>,
     pub price_bound: Option<Price>,
-    pub estimated_quote_debit_scaled: i64,
-    pub estimated_fee_scaled: i64,
+    /// All-in quote debit with `OrderQuote` domain + catalog quote scale.
+    pub estimated_quote_debit: Quantity,
+    /// Estimated fee with `OrderBase` or `OrderQuote` domain according to
+    /// [`Self::fee_asset`].
+    pub estimated_fee: Quantity,
     pub estimated_net_base_qty: Option<Quantity>,
     pub fee_asset: String,
     pub fresh_at_ts_ns: u64,

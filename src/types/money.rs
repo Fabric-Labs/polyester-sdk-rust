@@ -12,6 +12,7 @@ use rust_decimal::Decimal;
 pub enum QuantityDomain {
     #[default]
     OrderBase,
+    OrderQuote,
     Asset,
     LedgerE18,
 }
@@ -133,6 +134,14 @@ impl Quantity {
         if scaled < 0 {
             return Err(Error::validation("scaled must be non-negative"));
         }
+        if !matches!(
+            domain,
+            QuantityDomain::OrderBase | QuantityDomain::OrderQuote
+        ) {
+            return Err(Error::validation(
+                "Quantity domain must be order_base or order_quote",
+            ));
+        }
         if let Some(scale) = scale {
             crate::codecs::scalars::validate_protocol_scale(scale)?;
         }
@@ -175,6 +184,45 @@ impl Quantity {
             symbol,
             symbol_id,
         )
+    }
+
+    /// Construct a quote-debit budget from scaled integer units.
+    ///
+    /// `scale` is required so a bare integer can never silently inherit the
+    /// catalog scale. Use [`crate::catalogs::Manager::quote_quantity_scale_for_symbol`].
+    pub fn from_quote_scaled(
+        scaled: i64,
+        scale: u32,
+        symbol: Option<String>,
+        symbol_id: Option<u32>,
+    ) -> Result<Self> {
+        Self::from_scaled(
+            scaled,
+            Some(scale),
+            QuantityDomain::OrderQuote,
+            symbol,
+            symbol_id,
+        )
+    }
+
+    pub fn from_quote_decimal_str(
+        raw: &str,
+        scale: u32,
+        symbol: Option<String>,
+        symbol_id: Option<u32>,
+    ) -> Result<Self> {
+        let scaled = parse_qty_scaled_str(raw, scale, "quote amount")?;
+        Self::from_quote_scaled(scaled, scale, symbol, symbol_id)
+    }
+
+    pub fn from_quote_decimal(
+        raw: Decimal,
+        scale: u32,
+        symbol: Option<String>,
+        symbol_id: Option<u32>,
+    ) -> Result<Self> {
+        let scaled = parse_qty_scaled(raw, scale, "quote amount")?;
+        Self::from_quote_scaled(scaled, scale, symbol, symbol_id)
     }
 
     pub fn as_scaled(&self) -> i64 {
@@ -380,6 +428,26 @@ pub fn resolve_qty_scaled(
     Ok(scaled)
 }
 
+/// Resolve a quote-debit budget. The value must carry the catalog quote scale.
+pub fn resolve_quote_qty_scaled(
+    value: &Quantity,
+    scale: u32,
+    symbol: Option<&str>,
+    symbol_id: Option<u32>,
+) -> Result<i64> {
+    if value.scale().is_none() {
+        return Err(Error::validation(
+            "quote amount scale is required; use Quantity::from_quote_scaled/from_quote_decimal",
+        ));
+    }
+    value.compatible_with(QuantityDomain::OrderQuote, Some(scale), symbol, symbol_id)?;
+    let scaled = value.as_scaled();
+    if scaled <= 0 {
+        return Err(Error::validation("quote amount must be positive"));
+    }
+    Ok(scaled)
+}
+
 /// Resolve asset/ledger amount for transfer/withdraw write paths.
 pub fn resolve_asset_amount_scaled(
     value: &AssetAmount,
@@ -414,7 +482,11 @@ pub(crate) fn resolve_asset_amount_scaled_with_input_scale(
     if value.scaled <= 0 {
         return Err(Error::validation("amount must be positive"));
     }
-    let source_scale = value.scale.or(input_scale).unwrap_or(target_scale);
+    let source_scale = value.scale.or(input_scale).ok_or_else(|| {
+        Error::validation(
+            "amount scale is required; construct AssetAmount with an explicit scale or pass amount_scale/quantity_scale",
+        )
+    })?;
     let scaled = if source_scale < target_scale {
         let factor = 10_i128
             .checked_pow(target_scale - source_scale)
@@ -519,6 +591,22 @@ mod tests {
     }
 
     #[test]
+    fn quote_amount_requires_explicit_matching_scale() {
+        let quote =
+            Quantity::from_quote_decimal_str("12.5", 6, Some("BTC-USDT".into()), Some(1)).unwrap();
+        assert_eq!(
+            resolve_quote_qty_scaled(&quote, 6, Some("BTC-USDT"), Some(1)).unwrap(),
+            12_500_000
+        );
+        assert!(resolve_quote_qty_scaled(&quote, 8, Some("BTC-USDT"), Some(1)).is_err());
+
+        let missing_scale =
+            Quantity::from_scaled(12_500_000, None, QuantityDomain::OrderQuote, None, None)
+                .unwrap();
+        assert!(resolve_quote_qty_scaled(&missing_scale, 6, None, None).is_err());
+    }
+
+    #[test]
     fn asset_amount_dual_path() {
         let from_dec =
             AssetAmount::from_decimal_str("0.5", 18, QuantityDomain::LedgerE18, Some(7)).unwrap();
@@ -608,6 +696,26 @@ mod tests {
             AssetAmount::from_scaled(0, Some(18), QuantityDomain::LedgerE18, Some(7)).unwrap();
         assert!(
             resolve_asset_amount_scaled(&amount, 18, QuantityDomain::LedgerE18, Some(7)).is_err()
+        );
+    }
+
+    #[test]
+    fn asset_amount_without_value_or_parameter_scale_fails_closed() {
+        let amount = AssetAmount::from_scaled(1, None, QuantityDomain::LedgerE18, Some(7)).unwrap();
+        let err = resolve_asset_amount_scaled(&amount, 18, QuantityDomain::LedgerE18, Some(7))
+            .expect_err("missing source scale must not be treated as e18");
+        assert!(err.to_string().contains("amount scale is required"));
+
+        assert_eq!(
+            resolve_asset_amount_scaled_with_input_scale(
+                &amount,
+                Some(6),
+                18,
+                QuantityDomain::LedgerE18,
+                Some(7),
+            )
+            .unwrap(),
+            1_000_000_000_000
         );
     }
 

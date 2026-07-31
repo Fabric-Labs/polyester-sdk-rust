@@ -25,6 +25,7 @@ use crate::proto::orders::v1::{
     TrailingStopPolicy, UserTrade as ProtoUserTrade, batch_create_result_item, risk_execution,
     trailing_stop_policy,
 };
+use crate::types::{Quantity, QuantityDomain};
 use buffa::Enumeration;
 
 pub fn order_from_proto(msg: &ProtoOrder) -> Order {
@@ -260,21 +261,56 @@ fn order_mutation(status: &str, order_id: u64, client_order_id: &str) -> OrderMu
     }
 }
 
-pub fn preview_order_from_proto(msg: &PreviewOrderResponse) -> PreviewOrderResult {
-    PreviewOrderResult {
-        resolved_base_qty: decode_qty_scaled(msg.resolved_base_qty_scaled, None, None, None),
-        price_bound: decode_price_ticks(msg.price_bound_ticks, None),
-        estimated_quote_debit_scaled: msg.estimated_quote_debit_scaled,
-        estimated_fee_scaled: msg.estimated_fee_scaled,
+pub fn preview_order_from_proto(
+    msg: &PreviewOrderResponse,
+    base_scale: u32,
+    quote_scale: u32,
+    symbol: &str,
+    symbol_id: Option<u32>,
+) -> Result<PreviewOrderResult> {
+    let fee_asset = enum_value_fee_asset(msg.fee_asset);
+    let (fee_domain, fee_scale) = match fee_asset.as_str() {
+        "base" => (QuantityDomain::OrderBase, base_scale),
+        "quote" => (QuantityDomain::OrderQuote, quote_scale),
+        other => {
+            return Err(Error::response_contract(
+                "PreviewOrder",
+                format!("unknown fee_asset {other:?}"),
+            ));
+        }
+    };
+    let symbol = Some(symbol.to_owned());
+    Ok(PreviewOrderResult {
+        resolved_base_qty: decode_qty_scaled(
+            msg.resolved_base_qty_scaled,
+            Some(base_scale),
+            symbol.clone(),
+            symbol_id,
+        ),
+        price_bound: decode_price_ticks(msg.price_bound_ticks, symbol.clone()),
+        estimated_quote_debit: Quantity::from_scaled(
+            msg.estimated_quote_debit_scaled,
+            Some(quote_scale),
+            QuantityDomain::OrderQuote,
+            symbol.clone(),
+            symbol_id,
+        )?,
+        estimated_fee: Quantity::from_scaled(
+            msg.estimated_fee_scaled,
+            Some(fee_scale),
+            fee_domain,
+            symbol.clone(),
+            symbol_id,
+        )?,
         estimated_net_base_qty: decode_qty_scaled(
             msg.estimated_net_base_qty_scaled,
-            None,
-            None,
-            None,
+            Some(base_scale),
+            symbol,
+            symbol_id,
         ),
-        fee_asset: enum_value_fee_asset(msg.fee_asset),
+        fee_asset,
         fresh_at_ts_ns: msg.fresh_at_ts_ns,
-    }
+    })
 }
 
 pub fn modify_order_from_proto(msg: &ModifyOrderResponse) -> Result<ModifyOrderResult> {
@@ -925,16 +961,23 @@ mod tests {
     fn preview_order_surfaces_resolved_sizing_and_fee_asset() {
         use crate::proto::orders::v1::{FeeAsset, PreviewOrderResponse};
 
-        let preview = preview_order_from_proto(&PreviewOrderResponse {
-            resolved_base_qty_scaled: 100,
-            price_bound_ticks: 5_000,
-            estimated_quote_debit_scaled: 510,
-            estimated_fee_scaled: 1,
-            estimated_net_base_qty_scaled: 99,
-            fee_asset: FeeAsset::Base.into(),
-            fresh_at_ts_ns: 42,
-            ..Default::default()
-        });
+        let preview = preview_order_from_proto(
+            &PreviewOrderResponse {
+                resolved_base_qty_scaled: 100,
+                price_bound_ticks: 5_000,
+                estimated_quote_debit_scaled: 510,
+                estimated_fee_scaled: 1,
+                estimated_net_base_qty_scaled: 99,
+                fee_asset: FeeAsset::Base.into(),
+                fresh_at_ts_ns: 42,
+                ..Default::default()
+            },
+            8,
+            6,
+            "BTC-USDT",
+            Some(1),
+        )
+        .unwrap();
         assert_eq!(
             preview
                 .resolved_base_qty
@@ -946,7 +989,15 @@ mod tests {
             preview.price_bound.as_ref().map(|price| price.as_ticks()),
             Some(5_000)
         );
-        assert_eq!(preview.estimated_quote_debit_scaled, 510);
+        assert_eq!(preview.estimated_quote_debit.as_scaled(), 510);
+        assert_eq!(
+            preview.estimated_quote_debit.domain(),
+            QuantityDomain::OrderQuote
+        );
+        assert_eq!(preview.estimated_quote_debit.scale(), Some(6));
+        assert_eq!(preview.estimated_fee.as_scaled(), 1);
+        assert_eq!(preview.estimated_fee.domain(), QuantityDomain::OrderBase);
+        assert_eq!(preview.estimated_fee.scale(), Some(8));
         assert_eq!(preview.fee_asset, "base");
         assert_eq!(preview.fresh_at_ts_ns, 42);
     }
