@@ -1,15 +1,15 @@
 error[E0451]: fields `scaled`, `scale`, `domain`, `symbol` and `symbol_id` of struct `Quantity` are private
   --> tests/ui/no_quantity_struct_literal.rs:6:9
    |
- 5 |     let _ = Quantity {
+5  |     let _ = Quantity {
    |             -------- in this type
- 6 |         scaled: loop {},
+6  |         scaled: loop {},
    |         ^^^^^^ private field
- 7 |         scale: Some(8),
+7  |         scale: Some(8),
    |         ^^^^^ private field
- 8 |         domain: QuantityDomain::OrderBase,
+8  |         domain: QuantityDomain::OrderBase,
    |         ^^^^^^ private field
- 9 |         symbol: Some("BTC-USDT".into()),
+9  |         symbol: Some("BTC-USDT".into()),
    |         ^^^^^^ private field
 10 |         symbol_id: Some(7),
    |         ^^^^^^^^^ private field
