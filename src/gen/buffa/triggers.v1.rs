@@ -1813,8 +1813,9 @@ pub const __CONDITIONAL_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     from_json: ::buffa::type_registry::any_from_json::<ConditionalTrigger>,
     is_wkt: false,
 };
-/// TrailingStopTrigger configures the supported spot trailing-stop strategy.
-/// It tracks last trade price and submits a SELL market-IOC child when fired.
+/// TrailingStopTrigger configures a spot trailing-stop strategy.
+/// Standalone triggers currently support SELL market-IOC children. Attached
+/// trailing stops may use either side, opposite their parent order.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -1829,6 +1830,15 @@ pub struct TrailingStopTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub activation_price_ticks: i64,
+    /// Child order side.
+    ///
+    /// Field 6: `side`
+    #[serde(
+        rename = "side",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
     #[serde(flatten)]
     pub trailing_distance: ::core::option::Option<
         __buffa::oneof::trailing_stop_trigger::TrailingDistance,
@@ -1845,6 +1855,7 @@ impl ::core::fmt::Debug for TrailingStopTrigger {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("TrailingStopTrigger")
             .field("activation_price_ticks", &self.activation_price_ticks)
+            .field("side", &self.side)
             .field("trailing_distance", &self.trailing_distance)
             .field("max_slippage", &self.max_slippage)
             .finish()
@@ -1909,6 +1920,12 @@ impl ::buffa::Message for TrailingStopTrigger {
                 }
             }
         }
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1948,6 +1965,12 @@ impl ::buffa::Message for TrailingStopTrigger {
                 ) => {
                     ::buffa::types::put_int32_field(5u32, *x, buf);
                 }
+            }
+        }
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(6u32, val, buf);
             }
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -2014,6 +2037,13 @@ impl ::buffa::Message for TrailingStopTrigger {
                     ),
                 );
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2025,6 +2055,7 @@ impl ::buffa::Message for TrailingStopTrigger {
         self.trailing_distance = ::core::option::Option::None;
         self.activation_price_ticks = 0i64;
         self.max_slippage = ::core::option::Option::None;
+        self.side = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2053,6 +2084,9 @@ impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
                 mut map: A,
             ) -> ::core::result::Result<TrailingStopTrigger, A::Error> {
                 let mut __f_activation_price_ticks: ::core::option::Option<i64> = None;
+                let mut __f_side: ::core::option::Option<
+                    ::buffa::EnumValue<super::super::orders::v1::Side>,
+                > = None;
                 let mut __oneof_trailing_distance: ::core::option::Option<
                     __buffa::oneof::trailing_stop_trigger::TrailingDistance,
                 > = None;
@@ -2071,6 +2105,26 @@ impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
                                         d: D,
                                     ) -> ::core::result::Result<i64, D::Error> {
                                         ::buffa::json_helpers::int64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "side" => {
+                            __f_side = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<
+                                        super::super::orders::v1::Side,
+                                    >;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<super::super::orders::v1::Side>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -2204,6 +2258,9 @@ impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
                 let mut __r = <TrailingStopTrigger as ::core::default::Default>::default();
                 if let ::core::option::Option::Some(v) = __f_activation_price_ticks {
                     __r.activation_price_ticks = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_side {
+                    __r.side = v;
                 }
                 __r.trailing_distance = __oneof_trailing_distance;
                 __r.max_slippage = __oneof_max_slippage;
@@ -12431,14 +12488,19 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// TrailingStopTrigger configures the supported spot trailing-stop strategy.
-        /// It tracks last trade price and submits a SELL market-IOC child when fired.
+        /// TrailingStopTrigger configures a spot trailing-stop strategy.
+        /// Standalone triggers currently support SELL market-IOC children. Attached
+        /// trailing stops may use either side, opposite their parent order.
         #[derive(Clone, Debug, Default)]
         pub struct TrailingStopTriggerView<'a> {
             /// Optional activation price in quote units scaled by 1e6.
             ///
             /// Field 3: `activation_price_ticks`
             pub activation_price_ticks: i64,
+            /// Child order side.
+            ///
+            /// Field 6: `side`
+            pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
             pub trailing_distance: ::core::option::Option<
                 super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance,
             >,
@@ -12486,6 +12548,15 @@ pub mod __buffa {
                         view.activation_price_ticks = ::buffa::types::decode_int64(
                             &mut cur,
                         )?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.side = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -12561,6 +12632,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::TrailingStopTrigger {
                     activation_price_ticks: self.activation_price_ticks,
+                    side: self.side,
                     trailing_distance: self
                         .trailing_distance
                         .as_ref()
@@ -12648,6 +12720,12 @@ pub mod __buffa {
                         }
                     }
                 }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -12694,6 +12772,12 @@ pub mod __buffa {
                         }
                     }
                 }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(6u32, val, buf);
+                    }
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -12725,6 +12809,9 @@ pub mod __buffa {
                                 &self.activation_price_ticks,
                             ),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
+                    __map.serialize_entry("side", &self.side)?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.trailing_distance {
                     match __ov {
@@ -12872,6 +12959,15 @@ pub mod __buffa {
             #[must_use]
             pub fn activation_price_ticks(&self) -> i64 {
                 self.0.reborrow().activation_price_ticks
+            }
+            /// Child order side.
+            ///
+            /// Field 6: `side`
+            #[must_use]
+            pub fn side(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
+                self.0.reborrow().side
             }
             /// Oneof `trailing_distance`.
             #[must_use]
