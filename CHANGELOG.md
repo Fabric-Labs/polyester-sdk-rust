@@ -7,7 +7,7 @@
 Package version: `0.1.0-alpha.25`. Git tag: `v0.1.0a25`.
 
 ### Breaking
-- `PreviewOrderResult` is now admission-oriented (POLY-3779):
+- `PreviewOrderResult` is now admission-oriented:
   `admissible`, optional `rejection` (`OrderErrorDetail` /
   `OrderFieldViolation`), optional `resolved_base_qty`, optional
   `protected_price_bound` (renamed from `price_bound`), and required
@@ -17,8 +17,8 @@ Package version: `0.1.0-alpha.25`. Git tag: `v0.1.0a25`.
   `BAD_QTY`; unknown open-enum values use `UNKNOWN_ERROR_CODE(<n>)`.
 - `LifecycleFlowSummary` thickens with `lifecycle_reason` (snake labels +
   `unknown_reason_<n>`) and optional `zipper_reason`
-  (`ZipperReasonDetails { code, reason_id, message }`) for POLY-3820
-  (`FlowReason` -> `LifecycleReason`). Tx-match flows preserve
+  (`ZipperReasonDetails { code, reason_id, message }`) after the
+  `FlowReason` -> `LifecycleReason` rename. Tx-match flows preserve
   `owner_account_id`; present-zero preview sizing/protection values are kept.
 
 ## 0.1.0a24
