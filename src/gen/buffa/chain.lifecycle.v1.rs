@@ -156,72 +156,72 @@ impl ::buffa::Enumeration for RequestFeeStatus {
         ]
     }
 }
-/// FlowReason is the stable product-facing reason catalog for failed, dropped,
+/// LifecycleReason is the stable product-facing reason catalog for failed, dropped,
 /// refunded, or otherwise notable lifecycle states.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
-pub enum FlowReason {
-    FLOW_REASON_UNSPECIFIED = 0i32,
+pub enum LifecycleReason {
+    REASON_UNSPECIFIED = 0i32,
     /// Zipper validators reached the rejection quorum.
-    FLOW_REASON_ZIPPER_VALIDATION_REJECTED = 101i32,
+    ZIPPER_VALIDATION_REJECTED = 101i32,
     /// Zipper execution rejected the request.
-    FLOW_REASON_ZIPPER_EXECUTION_REJECTED = 102i32,
+    ZIPPER_EXECUTION_REJECTED = 102i32,
     /// Zipper withdraw execution failed.
-    FLOW_REASON_ZIPPER_WITHDRAW_EXECUTION_FAILED = 103i32,
+    ZIPPER_WITHDRAW_EXECUTION_FAILED = 103i32,
     /// Zipper deposit refund failed.
-    FLOW_REASON_ZIPPER_DEPOSIT_REFUND_FAILED = 104i32,
+    ZIPPER_DEPOSIT_REFUND_FAILED = 104i32,
     /// Ledger mirror rejected a command before it could be durably applied.
-    FLOW_REASON_LEDGER_MIRROR_REJECTED = 200i32,
+    LEDGER_MIRROR_REJECTED = 200i32,
     /// Ledger settlement rejected the mirror command because the source account did
     /// not have enough credits for the transfer.
-    FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS = 201i32,
+    LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS = 201i32,
     /// Ledger settlement reported that the transfer already exists for this mirror
     /// command identity.
-    FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXISTS = 202i32,
+    LEDGER_MIRROR_TRANSFER_EXISTS = 202i32,
     /// Ledger settlement reported that the pending transfer referenced by the
     /// command was not found.
-    FLOW_REASON_LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND = 203i32,
+    LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND = 203i32,
     /// Ledger settlement reported that this transfer id is already marked failed.
-    FLOW_REASON_LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED = 204i32,
+    LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED = 204i32,
 }
-impl FlowReason {
-    ///Idiomatic alias for [`Self::FLOW_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
+impl LifecycleReason {
+    ///Idiomatic alias for [`Self::REASON_UNSPECIFIED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const Unspecified: Self = Self::FLOW_REASON_UNSPECIFIED;
-    ///Idiomatic alias for [`Self::FLOW_REASON_ZIPPER_VALIDATION_REJECTED`]; `Debug` prints the variant name.
+    pub const ReasonUnspecified: Self = Self::REASON_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ZIPPER_VALIDATION_REJECTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const ZipperValidationRejected: Self = Self::FLOW_REASON_ZIPPER_VALIDATION_REJECTED;
-    ///Idiomatic alias for [`Self::FLOW_REASON_ZIPPER_EXECUTION_REJECTED`]; `Debug` prints the variant name.
+    pub const ZipperValidationRejected: Self = Self::ZIPPER_VALIDATION_REJECTED;
+    ///Idiomatic alias for [`Self::ZIPPER_EXECUTION_REJECTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const ZipperExecutionRejected: Self = Self::FLOW_REASON_ZIPPER_EXECUTION_REJECTED;
-    ///Idiomatic alias for [`Self::FLOW_REASON_ZIPPER_WITHDRAW_EXECUTION_FAILED`]; `Debug` prints the variant name.
+    pub const ZipperExecutionRejected: Self = Self::ZIPPER_EXECUTION_REJECTED;
+    ///Idiomatic alias for [`Self::ZIPPER_WITHDRAW_EXECUTION_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const ZipperWithdrawExecutionFailed: Self = Self::FLOW_REASON_ZIPPER_WITHDRAW_EXECUTION_FAILED;
-    ///Idiomatic alias for [`Self::FLOW_REASON_ZIPPER_DEPOSIT_REFUND_FAILED`]; `Debug` prints the variant name.
+    pub const ZipperWithdrawExecutionFailed: Self = Self::ZIPPER_WITHDRAW_EXECUTION_FAILED;
+    ///Idiomatic alias for [`Self::ZIPPER_DEPOSIT_REFUND_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const ZipperDepositRefundFailed: Self = Self::FLOW_REASON_ZIPPER_DEPOSIT_REFUND_FAILED;
-    ///Idiomatic alias for [`Self::FLOW_REASON_LEDGER_MIRROR_REJECTED`]; `Debug` prints the variant name.
+    pub const ZipperDepositRefundFailed: Self = Self::ZIPPER_DEPOSIT_REFUND_FAILED;
+    ///Idiomatic alias for [`Self::LEDGER_MIRROR_REJECTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const LedgerMirrorRejected: Self = Self::FLOW_REASON_LEDGER_MIRROR_REJECTED;
-    ///Idiomatic alias for [`Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS`]; `Debug` prints the variant name.
+    pub const LedgerMirrorRejected: Self = Self::LEDGER_MIRROR_REJECTED;
+    ///Idiomatic alias for [`Self::LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const LedgerMirrorTransferExceedsCredits: Self = Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS;
-    ///Idiomatic alias for [`Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXISTS`]; `Debug` prints the variant name.
+    pub const LedgerMirrorTransferExceedsCredits: Self = Self::LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS;
+    ///Idiomatic alias for [`Self::LEDGER_MIRROR_TRANSFER_EXISTS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const LedgerMirrorTransferExists: Self = Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXISTS;
-    ///Idiomatic alias for [`Self::FLOW_REASON_LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND`]; `Debug` prints the variant name.
+    pub const LedgerMirrorTransferExists: Self = Self::LEDGER_MIRROR_TRANSFER_EXISTS;
+    ///Idiomatic alias for [`Self::LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const LedgerMirrorPendingTransferNotFound: Self = Self::FLOW_REASON_LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND;
-    ///Idiomatic alias for [`Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED`]; `Debug` prints the variant name.
+    pub const LedgerMirrorPendingTransferNotFound: Self = Self::LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND;
+    ///Idiomatic alias for [`Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const LedgerMirrorTransferIdAlreadyFailed: Self = Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED;
+    pub const LedgerMirrorTransferIdAlreadyFailed: Self = Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED;
 }
-impl ::core::default::Default for FlowReason {
+impl ::core::default::Default for LifecycleReason {
     fn default() -> Self {
-        Self::FLOW_REASON_UNSPECIFIED
+        Self::REASON_UNSPECIFIED
     }
 }
-impl ::serde::Serialize for FlowReason {
+impl ::serde::Serialize for LifecycleReason {
     fn serialize<S: ::serde::Serializer>(
         &self,
         s: S,
@@ -229,39 +229,41 @@ impl ::serde::Serialize for FlowReason {
         s.serialize_str(::buffa::Enumeration::proto_name(self))
     }
 }
-impl<'de> ::serde::Deserialize<'de> for FlowReason {
+impl<'de> ::serde::Deserialize<'de> for LifecycleReason {
     fn deserialize<D: ::serde::Deserializer<'de>>(
         d: D,
     ) -> ::core::result::Result<Self, D::Error> {
         struct _V;
         impl ::serde::de::Visitor<'_> for _V {
-            type Value = FlowReason;
+            type Value = LifecycleReason;
             fn expecting(
                 &self,
                 f: &mut ::core::fmt::Formatter<'_>,
             ) -> ::core::fmt::Result {
                 f.write_str(
-                    concat!("a string, integer, or null for ", stringify!(FlowReason)),
+                    concat!(
+                        "a string, integer, or null for ", stringify!(LifecycleReason)
+                    ),
                 )
             }
             fn visit_str<E: ::serde::de::Error>(
                 self,
                 v: &str,
-            ) -> ::core::result::Result<FlowReason, E> {
-                <FlowReason as ::buffa::Enumeration>::from_proto_name(v)
+            ) -> ::core::result::Result<LifecycleReason, E> {
+                <LifecycleReason as ::buffa::Enumeration>::from_proto_name(v)
                     .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
             }
             fn visit_i64<E: ::serde::de::Error>(
                 self,
                 v: i64,
-            ) -> ::core::result::Result<FlowReason, E> {
+            ) -> ::core::result::Result<LifecycleReason, E> {
                 let v32 = i32::try_from(v)
                     .map_err(|_| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("enum value {v} out of i32 range"),
                         )
                     })?;
-                <FlowReason as ::buffa::Enumeration>::from_i32(v32)
+                <LifecycleReason as ::buffa::Enumeration>::from_i32(v32)
                     .ok_or_else(|| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("unknown enum value {v32}"),
@@ -271,14 +273,14 @@ impl<'de> ::serde::Deserialize<'de> for FlowReason {
             fn visit_u64<E: ::serde::de::Error>(
                 self,
                 v: u64,
-            ) -> ::core::result::Result<FlowReason, E> {
+            ) -> ::core::result::Result<LifecycleReason, E> {
                 let v32 = i32::try_from(v)
                     .map_err(|_| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("enum value {v} out of i32 range"),
                         )
                     })?;
-                <FlowReason as ::buffa::Enumeration>::from_i32(v32)
+                <LifecycleReason as ::buffa::Enumeration>::from_i32(v32)
                     .ok_or_else(|| {
                         ::serde::de::Error::custom(
                             ::buffa::alloc::format!("unknown enum value {v32}"),
@@ -287,14 +289,14 @@ impl<'de> ::serde::Deserialize<'de> for FlowReason {
             }
             fn visit_unit<E: ::serde::de::Error>(
                 self,
-            ) -> ::core::result::Result<FlowReason, E> {
+            ) -> ::core::result::Result<LifecycleReason, E> {
                 ::core::result::Result::Ok(::core::default::Default::default())
             }
         }
         d.deserialize_any(_V)
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for FlowReason {
+impl ::buffa::json_helpers::ProtoElemJson for LifecycleReason {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -307,49 +309,31 @@ impl ::buffa::json_helpers::ProtoElemJson for FlowReason {
         <Self as ::serde::Deserialize>::deserialize(d)
     }
 }
-impl ::buffa::Enumeration for FlowReason {
+impl ::buffa::Enumeration for LifecycleReason {
     fn from_i32(value: i32) -> ::core::option::Option<Self> {
         match value {
-            0i32 => ::core::option::Option::Some(Self::FLOW_REASON_UNSPECIFIED),
-            101i32 => {
-                ::core::option::Option::Some(
-                    Self::FLOW_REASON_ZIPPER_VALIDATION_REJECTED,
-                )
-            }
-            102i32 => {
-                ::core::option::Option::Some(Self::FLOW_REASON_ZIPPER_EXECUTION_REJECTED)
-            }
+            0i32 => ::core::option::Option::Some(Self::REASON_UNSPECIFIED),
+            101i32 => ::core::option::Option::Some(Self::ZIPPER_VALIDATION_REJECTED),
+            102i32 => ::core::option::Option::Some(Self::ZIPPER_EXECUTION_REJECTED),
             103i32 => {
-                ::core::option::Option::Some(
-                    Self::FLOW_REASON_ZIPPER_WITHDRAW_EXECUTION_FAILED,
-                )
+                ::core::option::Option::Some(Self::ZIPPER_WITHDRAW_EXECUTION_FAILED)
             }
-            104i32 => {
-                ::core::option::Option::Some(
-                    Self::FLOW_REASON_ZIPPER_DEPOSIT_REFUND_FAILED,
-                )
-            }
-            200i32 => {
-                ::core::option::Option::Some(Self::FLOW_REASON_LEDGER_MIRROR_REJECTED)
-            }
+            104i32 => ::core::option::Option::Some(Self::ZIPPER_DEPOSIT_REFUND_FAILED),
+            200i32 => ::core::option::Option::Some(Self::LEDGER_MIRROR_REJECTED),
             201i32 => {
                 ::core::option::Option::Some(
-                    Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS,
+                    Self::LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS,
                 )
             }
-            202i32 => {
-                ::core::option::Option::Some(
-                    Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXISTS,
-                )
-            }
+            202i32 => ::core::option::Option::Some(Self::LEDGER_MIRROR_TRANSFER_EXISTS),
             203i32 => {
                 ::core::option::Option::Some(
-                    Self::FLOW_REASON_LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND,
+                    Self::LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND,
                 )
             }
             204i32 => {
                 ::core::option::Option::Some(
-                    Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED,
+                    Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED,
                 )
             }
             _ => ::core::option::Option::None,
@@ -360,80 +344,60 @@ impl ::buffa::Enumeration for FlowReason {
     }
     fn proto_name(&self) -> &'static str {
         match self {
-            Self::FLOW_REASON_UNSPECIFIED => "FLOW_REASON_UNSPECIFIED",
-            Self::FLOW_REASON_ZIPPER_VALIDATION_REJECTED => {
-                "FLOW_REASON_ZIPPER_VALIDATION_REJECTED"
+            Self::REASON_UNSPECIFIED => "REASON_UNSPECIFIED",
+            Self::ZIPPER_VALIDATION_REJECTED => "ZIPPER_VALIDATION_REJECTED",
+            Self::ZIPPER_EXECUTION_REJECTED => "ZIPPER_EXECUTION_REJECTED",
+            Self::ZIPPER_WITHDRAW_EXECUTION_FAILED => "ZIPPER_WITHDRAW_EXECUTION_FAILED",
+            Self::ZIPPER_DEPOSIT_REFUND_FAILED => "ZIPPER_DEPOSIT_REFUND_FAILED",
+            Self::LEDGER_MIRROR_REJECTED => "LEDGER_MIRROR_REJECTED",
+            Self::LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS => {
+                "LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS"
             }
-            Self::FLOW_REASON_ZIPPER_EXECUTION_REJECTED => {
-                "FLOW_REASON_ZIPPER_EXECUTION_REJECTED"
+            Self::LEDGER_MIRROR_TRANSFER_EXISTS => "LEDGER_MIRROR_TRANSFER_EXISTS",
+            Self::LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND => {
+                "LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND"
             }
-            Self::FLOW_REASON_ZIPPER_WITHDRAW_EXECUTION_FAILED => {
-                "FLOW_REASON_ZIPPER_WITHDRAW_EXECUTION_FAILED"
-            }
-            Self::FLOW_REASON_ZIPPER_DEPOSIT_REFUND_FAILED => {
-                "FLOW_REASON_ZIPPER_DEPOSIT_REFUND_FAILED"
-            }
-            Self::FLOW_REASON_LEDGER_MIRROR_REJECTED => {
-                "FLOW_REASON_LEDGER_MIRROR_REJECTED"
-            }
-            Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS => {
-                "FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS"
-            }
-            Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXISTS => {
-                "FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXISTS"
-            }
-            Self::FLOW_REASON_LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND => {
-                "FLOW_REASON_LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND"
-            }
-            Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED => {
-                "FLOW_REASON_LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED"
+            Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED => {
+                "LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED"
             }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
         match name {
-            "FLOW_REASON_UNSPECIFIED" => {
-                ::core::option::Option::Some(Self::FLOW_REASON_UNSPECIFIED)
+            "REASON_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::REASON_UNSPECIFIED)
             }
-            "FLOW_REASON_ZIPPER_VALIDATION_REJECTED" => {
+            "ZIPPER_VALIDATION_REJECTED" => {
+                ::core::option::Option::Some(Self::ZIPPER_VALIDATION_REJECTED)
+            }
+            "ZIPPER_EXECUTION_REJECTED" => {
+                ::core::option::Option::Some(Self::ZIPPER_EXECUTION_REJECTED)
+            }
+            "ZIPPER_WITHDRAW_EXECUTION_FAILED" => {
+                ::core::option::Option::Some(Self::ZIPPER_WITHDRAW_EXECUTION_FAILED)
+            }
+            "ZIPPER_DEPOSIT_REFUND_FAILED" => {
+                ::core::option::Option::Some(Self::ZIPPER_DEPOSIT_REFUND_FAILED)
+            }
+            "LEDGER_MIRROR_REJECTED" => {
+                ::core::option::Option::Some(Self::LEDGER_MIRROR_REJECTED)
+            }
+            "LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS" => {
                 ::core::option::Option::Some(
-                    Self::FLOW_REASON_ZIPPER_VALIDATION_REJECTED,
+                    Self::LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS,
                 )
             }
-            "FLOW_REASON_ZIPPER_EXECUTION_REJECTED" => {
-                ::core::option::Option::Some(Self::FLOW_REASON_ZIPPER_EXECUTION_REJECTED)
+            "LEDGER_MIRROR_TRANSFER_EXISTS" => {
+                ::core::option::Option::Some(Self::LEDGER_MIRROR_TRANSFER_EXISTS)
             }
-            "FLOW_REASON_ZIPPER_WITHDRAW_EXECUTION_FAILED" => {
+            "LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND" => {
                 ::core::option::Option::Some(
-                    Self::FLOW_REASON_ZIPPER_WITHDRAW_EXECUTION_FAILED,
+                    Self::LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND,
                 )
             }
-            "FLOW_REASON_ZIPPER_DEPOSIT_REFUND_FAILED" => {
+            "LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED" => {
                 ::core::option::Option::Some(
-                    Self::FLOW_REASON_ZIPPER_DEPOSIT_REFUND_FAILED,
-                )
-            }
-            "FLOW_REASON_LEDGER_MIRROR_REJECTED" => {
-                ::core::option::Option::Some(Self::FLOW_REASON_LEDGER_MIRROR_REJECTED)
-            }
-            "FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS" => {
-                ::core::option::Option::Some(
-                    Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS,
-                )
-            }
-            "FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXISTS" => {
-                ::core::option::Option::Some(
-                    Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXISTS,
-                )
-            }
-            "FLOW_REASON_LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND" => {
-                ::core::option::Option::Some(
-                    Self::FLOW_REASON_LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND,
-                )
-            }
-            "FLOW_REASON_LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED" => {
-                ::core::option::Option::Some(
-                    Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED,
+                    Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED,
                 )
             }
             _ => ::core::option::Option::None,
@@ -441,16 +405,16 @@ impl ::buffa::Enumeration for FlowReason {
     }
     fn values() -> &'static [Self] {
         &[
-            Self::FLOW_REASON_UNSPECIFIED,
-            Self::FLOW_REASON_ZIPPER_VALIDATION_REJECTED,
-            Self::FLOW_REASON_ZIPPER_EXECUTION_REJECTED,
-            Self::FLOW_REASON_ZIPPER_WITHDRAW_EXECUTION_FAILED,
-            Self::FLOW_REASON_ZIPPER_DEPOSIT_REFUND_FAILED,
-            Self::FLOW_REASON_LEDGER_MIRROR_REJECTED,
-            Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS,
-            Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_EXISTS,
-            Self::FLOW_REASON_LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND,
-            Self::FLOW_REASON_LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED,
+            Self::REASON_UNSPECIFIED,
+            Self::ZIPPER_VALIDATION_REJECTED,
+            Self::ZIPPER_EXECUTION_REJECTED,
+            Self::ZIPPER_WITHDRAW_EXECUTION_FAILED,
+            Self::ZIPPER_DEPOSIT_REFUND_FAILED,
+            Self::LEDGER_MIRROR_REJECTED,
+            Self::LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS,
+            Self::LEDGER_MIRROR_TRANSFER_EXISTS,
+            Self::LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND,
+            Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED,
         ]
     }
 }
@@ -4476,14 +4440,14 @@ pub struct FlowTxMatchView {
     pub destination_address: ::buffa::alloc::string::String,
     /// Product-facing reason for failed, dropped, or otherwise notable flows.
     ///
-    /// Field 17: `reason_code`
+    /// Field 17: `lifecycle_reason`
     #[serde(
-        rename = "reasonCode",
-        alias = "reason_code",
+        rename = "lifecycleReason",
+        alias = "lifecycle_reason",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub reason_code: ::buffa::EnumValue<FlowReason>,
+    pub lifecycle_reason: ::buffa::EnumValue<LifecycleReason>,
     /// Timestamp used for list ordering in milliseconds since epoch (UTC).
     ///
     /// Field 18: `last_activity_at_unix_ms`
@@ -4514,6 +4478,17 @@ pub struct FlowTxMatchView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
+    /// Specific reason details when a notable outcome has a catalog entry.
+    ///
+    /// Field 21: `zipper_reason`
+    #[serde(
+        rename = "zipperReason",
+        alias = "zipper_reason",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub zipper_reason: ::buffa::MessageField<
+        super::super::zipper::v1::ZipperReasonDetails,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -4536,10 +4511,11 @@ impl ::core::fmt::Debug for FlowTxMatchView {
             .field("amount_e18", &self.amount_e18)
             .field("source_address", &self.source_address)
             .field("destination_address", &self.destination_address)
-            .field("reason_code", &self.reason_code)
+            .field("lifecycle_reason", &self.lifecycle_reason)
             .field("last_activity_at_unix_ms", &self.last_activity_at_unix_ms)
             .field("owner_account_id", &self.owner_account_id)
             .field("smart_account_address", &self.smart_account_address)
+            .field("zipper_reason", &self.zipper_reason)
             .finish()
     }
 }
@@ -4649,7 +4625,7 @@ impl ::buffa::Message for FlowTxMatchView {
                         as u32;
         }
         {
-            let val = self.reason_code.to_i32();
+            let val = self.lifecycle_reason.to_i32();
             if val != 0 {
                 size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -4668,6 +4644,14 @@ impl ::buffa::Message for FlowTxMatchView {
                 += 2u32
                     + ::buffa::types::string_encoded_len(&self.smart_account_address)
                         as u32;
+        }
+        if self.zipper_reason.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.zipper_reason.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -4739,7 +4723,7 @@ impl ::buffa::Message for FlowTxMatchView {
             ::buffa::types::put_string_field(16u32, &self.destination_address, buf);
         }
         {
-            let val = self.reason_code.to_i32();
+            let val = self.lifecycle_reason.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(17u32, val, buf);
             }
@@ -4752,6 +4736,10 @@ impl ::buffa::Message for FlowTxMatchView {
         }
         if !self.smart_account_address.is_empty() {
             ::buffa::types::put_string_field(20u32, &self.smart_account_address, buf);
+        }
+        if self.zipper_reason.is_set() {
+            ::buffa::types::put_len_delimited_header(21u32, __cache.consume_next(), buf);
+            self.zipper_reason.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4892,7 +4880,7 @@ impl ::buffa::Message for FlowTxMatchView {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.reason_code = ::buffa::EnumValue::from(
+                self.lifecycle_reason = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -4917,6 +4905,17 @@ impl ::buffa::Message for FlowTxMatchView {
                 )?;
                 ::buffa::types::merge_string(&mut self.smart_account_address, buf)?;
             }
+            21u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.zipper_reason.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4940,10 +4939,11 @@ impl ::buffa::Message for FlowTxMatchView {
         self.amount_e18 = ::buffa::MessageField::none();
         self.source_address.clear();
         self.destination_address.clear();
-        self.reason_code = ::buffa::EnumValue::from(0);
+        self.lifecycle_reason = ::buffa::EnumValue::from(0);
         self.last_activity_at_unix_ms = 0u64;
         self.owner_account_id = 0u64;
         self.smart_account_address.clear();
+        self.zipper_reason = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5356,14 +5356,25 @@ pub struct FlowSummaryView {
     pub latest_lifecycle_source: ::buffa::EnumValue<LifecycleSource>,
     /// Product-facing reason for failed, dropped, or otherwise notable flows.
     ///
-    /// Field 17: `reason_code`
+    /// Field 17: `lifecycle_reason`
     #[serde(
-        rename = "reasonCode",
-        alias = "reason_code",
+        rename = "lifecycleReason",
+        alias = "lifecycle_reason",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub reason_code: ::buffa::EnumValue<FlowReason>,
+    pub lifecycle_reason: ::buffa::EnumValue<LifecycleReason>,
+    /// Specific reason details when a notable outcome has a catalog entry.
+    ///
+    /// Field 35: `zipper_reason`
+    #[serde(
+        rename = "zipperReason",
+        alias = "zipper_reason",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub zipper_reason: ::buffa::MessageField<
+        super::super::zipper::v1::ZipperReasonDetails,
+    >,
     /// First observed business timestamp in milliseconds since epoch (UTC).
     ///
     /// Field 18: `started_at_unix_ms`
@@ -5488,7 +5499,8 @@ impl ::core::fmt::Debug for FlowSummaryView {
             .field("source_domain", &self.source_domain)
             .field("destination_domain", &self.destination_domain)
             .field("latest_lifecycle_source", &self.latest_lifecycle_source)
-            .field("reason_code", &self.reason_code)
+            .field("lifecycle_reason", &self.lifecycle_reason)
+            .field("zipper_reason", &self.zipper_reason)
             .field("started_at_unix_ms", &self.started_at_unix_ms)
             .field("updated_at_unix_ms", &self.updated_at_unix_ms)
             .field("terminal_at_unix_ms", &self.terminal_at_unix_ms)
@@ -5590,7 +5602,7 @@ impl ::buffa::Message for FlowSummaryView {
             }
         }
         {
-            let val = self.reason_code.to_i32();
+            let val = self.lifecycle_reason.to_i32();
             if val != 0 {
                 size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -5687,6 +5699,14 @@ impl ::buffa::Message for FlowSummaryView {
                     + ::buffa::types::string_encoded_len(&self.smart_account_address)
                         as u32;
         }
+        if self.zipper_reason.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.zipper_reason.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5742,7 +5762,7 @@ impl ::buffa::Message for FlowSummaryView {
             }
         }
         {
-            let val = self.reason_code.to_i32();
+            let val = self.lifecycle_reason.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(17u32, val, buf);
             }
@@ -5807,6 +5827,10 @@ impl ::buffa::Message for FlowSummaryView {
         }
         if !self.smart_account_address.is_empty() {
             ::buffa::types::put_string_field(34u32, &self.smart_account_address, buf);
+        }
+        if self.zipper_reason.is_set() {
+            ::buffa::types::put_len_delimited_header(35u32, __cache.consume_next(), buf);
+            self.zipper_reason.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5917,7 +5941,7 @@ impl ::buffa::Message for FlowSummaryView {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.reason_code = ::buffa::EnumValue::from(
+                self.lifecycle_reason = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -6047,6 +6071,17 @@ impl ::buffa::Message for FlowSummaryView {
                 )?;
                 ::buffa::types::merge_string(&mut self.smart_account_address, buf)?;
             }
+            35u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.zipper_reason.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6066,7 +6101,7 @@ impl ::buffa::Message for FlowSummaryView {
         self.destination_address.clear();
         self.latest_tx_ref.clear();
         self.latest_lifecycle_source = ::buffa::EnumValue::from(0);
-        self.reason_code = ::buffa::EnumValue::from(0);
+        self.lifecycle_reason = ::buffa::EnumValue::from(0);
         self.started_at_unix_ms = 0u64;
         self.updated_at_unix_ms = 0u64;
         self.terminal_at_unix_ms = 0u64;
@@ -6083,6 +6118,7 @@ impl ::buffa::Message for FlowSummaryView {
         self.tx_occurrence_index = 0u64;
         self.flow_id.clear();
         self.smart_account_address.clear();
+        self.zipper_reason = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6570,14 +6606,25 @@ pub struct FlowStepView {
     pub lifecycle_source: ::buffa::EnumValue<LifecycleSource>,
     /// Product-facing reason for failed, dropped, or otherwise notable steps.
     ///
-    /// Field 13: `reason_code`
+    /// Field 13: `lifecycle_reason`
     #[serde(
-        rename = "reasonCode",
-        alias = "reason_code",
+        rename = "lifecycleReason",
+        alias = "lifecycle_reason",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub reason_code: ::buffa::EnumValue<FlowReason>,
+    pub lifecycle_reason: ::buffa::EnumValue<LifecycleReason>,
+    /// Specific reason details when a notable outcome has a catalog entry.
+    ///
+    /// Field 25: `zipper_reason`
+    #[serde(
+        rename = "zipperReason",
+        alias = "zipper_reason",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub zipper_reason: ::buffa::MessageField<
+        super::super::zipper::v1::ZipperReasonDetails,
+    >,
     /// Current source confirmation count when confirmations apply.
     ///
     /// Field 14: `current_confirmations`
@@ -6694,7 +6741,8 @@ impl ::core::fmt::Debug for FlowStepView {
             .field("request_fee", &self.request_fee)
             .field("milestone_tx_ref", &self.milestone_tx_ref)
             .field("lifecycle_source", &self.lifecycle_source)
-            .field("reason_code", &self.reason_code)
+            .field("lifecycle_reason", &self.lifecycle_reason)
+            .field("zipper_reason", &self.zipper_reason)
             .field("current_confirmations", &self.current_confirmations)
             .field("required_confirmations", &self.required_confirmations)
             .field("approve_count", &self.approve_count)
@@ -6775,7 +6823,7 @@ impl ::buffa::Message for FlowStepView {
             }
         }
         {
-            let val = self.reason_code.to_i32();
+            let val = self.lifecycle_reason.to_i32();
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -6843,6 +6891,14 @@ impl ::buffa::Message for FlowStepView {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.zipper_reason.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.zipper_reason.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -6883,7 +6939,7 @@ impl ::buffa::Message for FlowStepView {
             }
         }
         {
-            let val = self.reason_code.to_i32();
+            let val = self.lifecycle_reason.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(13u32, val, buf);
             }
@@ -6926,6 +6982,10 @@ impl ::buffa::Message for FlowStepView {
         if self.request_fee.is_set() {
             ::buffa::types::put_len_delimited_header(24u32, __cache.consume_next(), buf);
             self.request_fee.write_to(__cache, buf);
+        }
+        if self.zipper_reason.is_set() {
+            ::buffa::types::put_len_delimited_header(25u32, __cache.consume_next(), buf);
+            self.zipper_reason.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7004,7 +7064,7 @@ impl ::buffa::Message for FlowStepView {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.reason_code = ::buffa::EnumValue::from(
+                self.lifecycle_reason = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -7091,6 +7151,17 @@ impl ::buffa::Message for FlowStepView {
                     ctx,
                 )?;
             }
+            25u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.zipper_reason.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7106,7 +7177,7 @@ impl ::buffa::Message for FlowStepView {
         self.amount_e18 = ::buffa::MessageField::none();
         self.milestone_tx_ref.clear();
         self.lifecycle_source = ::buffa::EnumValue::from(0);
-        self.reason_code = ::buffa::EnumValue::from(0);
+        self.lifecycle_reason = ::buffa::EnumValue::from(0);
         self.current_confirmations = 0u32;
         self.required_confirmations = 0u32;
         self.approve_count = 0u32;
@@ -7118,6 +7189,7 @@ impl ::buffa::Message for FlowStepView {
         self.required_approvals = 0u32;
         self.required_rejections = 0u32;
         self.request_fee = ::buffa::MessageField::none();
+        self.zipper_reason = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7196,14 +7268,25 @@ pub struct FlowStepActivityView {
     pub lifecycle_source: ::buffa::EnumValue<LifecycleSource>,
     /// Product-facing reason for notable activity states.
     ///
-    /// Field 5: `reason_code`
+    /// Field 5: `lifecycle_reason`
     #[serde(
-        rename = "reasonCode",
-        alias = "reason_code",
+        rename = "lifecycleReason",
+        alias = "lifecycle_reason",
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub reason_code: ::buffa::EnumValue<FlowReason>,
+    pub lifecycle_reason: ::buffa::EnumValue<LifecycleReason>,
+    /// Specific reason details when a notable outcome has a catalog entry.
+    ///
+    /// Field 16: `zipper_reason`
+    #[serde(
+        rename = "zipperReason",
+        alias = "zipper_reason",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub zipper_reason: ::buffa::MessageField<
+        super::super::zipper::v1::ZipperReasonDetails,
+    >,
     /// Current source confirmation count when confirmations apply.
     ///
     /// Field 6: `current_confirmations`
@@ -7317,7 +7400,8 @@ impl ::core::fmt::Debug for FlowStepActivityView {
             .field("tx_ref", &self.tx_ref)
             .field("occurred_at_unix_ms", &self.occurred_at_unix_ms)
             .field("lifecycle_source", &self.lifecycle_source)
-            .field("reason_code", &self.reason_code)
+            .field("lifecycle_reason", &self.lifecycle_reason)
+            .field("zipper_reason", &self.zipper_reason)
             .field("current_confirmations", &self.current_confirmations)
             .field("required_confirmations", &self.required_confirmations)
             .field("approve_count", &self.approve_count)
@@ -7375,7 +7459,7 @@ impl ::buffa::Message for FlowStepActivityView {
             }
         }
         {
-            let val = self.reason_code.to_i32();
+            let val = self.lifecycle_reason.to_i32();
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -7434,6 +7518,14 @@ impl ::buffa::Message for FlowStepActivityView {
                     + ::buffa::types::string_encoded_len(&self.ledger_transfer_id)
                         as u32;
         }
+        if self.zipper_reason.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.zipper_reason.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7460,7 +7552,7 @@ impl ::buffa::Message for FlowStepActivityView {
             }
         }
         {
-            let val = self.reason_code.to_i32();
+            let val = self.lifecycle_reason.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(5u32, val, buf);
             }
@@ -7498,6 +7590,10 @@ impl ::buffa::Message for FlowStepActivityView {
         }
         if !self.ledger_transfer_id.is_empty() {
             ::buffa::types::put_string_field(15u32, &self.ledger_transfer_id, buf);
+        }
+        if self.zipper_reason.is_set() {
+            ::buffa::types::put_len_delimited_header(16u32, __cache.consume_next(), buf);
+            self.zipper_reason.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7547,7 +7643,7 @@ impl ::buffa::Message for FlowStepActivityView {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.reason_code = ::buffa::EnumValue::from(
+                self.lifecycle_reason = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -7625,6 +7721,17 @@ impl ::buffa::Message for FlowStepActivityView {
                 )?;
                 ::buffa::types::merge_string(&mut self.ledger_transfer_id, buf)?;
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.zipper_reason.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7637,7 +7744,7 @@ impl ::buffa::Message for FlowStepActivityView {
         self.tx_ref.clear();
         self.occurred_at_unix_ms = 0u64;
         self.lifecycle_source = ::buffa::EnumValue::from(0);
-        self.reason_code = ::buffa::EnumValue::from(0);
+        self.lifecycle_reason = ::buffa::EnumValue::from(0);
         self.current_confirmations = 0u32;
         self.required_confirmations = 0u32;
         self.approve_count = 0u32;
@@ -7648,6 +7755,7 @@ impl ::buffa::Message for FlowStepActivityView {
         self.required_rejections = 0u32;
         self.amount_e18 = ::buffa::MessageField::none();
         self.ledger_transfer_id.clear();
+        self.zipper_reason = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -11061,8 +11169,8 @@ pub mod __buffa {
             pub destination_address: &'a str,
             /// Product-facing reason for failed, dropped, or otherwise notable flows.
             ///
-            /// Field 17: `reason_code`
-            pub reason_code: ::buffa::EnumValue<super::super::FlowReason>,
+            /// Field 17: `lifecycle_reason`
+            pub lifecycle_reason: ::buffa::EnumValue<super::super::LifecycleReason>,
             /// Timestamp used for list ordering in milliseconds since epoch (UTC).
             ///
             /// Field 18: `last_activity_at_unix_ms`
@@ -11075,6 +11183,14 @@ pub mod __buffa {
             ///
             /// Field 20: `smart_account_address`
             pub smart_account_address: &'a str,
+            /// Specific reason details when a notable outcome has a catalog entry.
+            ///
+            /// Field 21: `zipper_reason`
+            pub zipper_reason: ::buffa::MessageFieldView<
+                super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView<
+                    'a,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for FlowTxMatchViewView<'a> {
@@ -11266,7 +11382,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.reason_code = ::buffa::EnumValue::from(
+                        view.lifecycle_reason = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
@@ -11296,6 +11412,31 @@ pub mod __buffa {
                         view.smart_account_address = ::buffa::types::borrow_str(
                             &mut cur,
                         )?;
+                    }
+                    21u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.zipper_reason.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.zipper_reason = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -11355,10 +11496,18 @@ pub mod __buffa {
                     },
                     source_address: self.source_address.to_string(),
                     destination_address: self.destination_address.to_string(),
-                    reason_code: self.reason_code,
+                    lifecycle_reason: self.lifecycle_reason,
                     last_activity_at_unix_ms: self.last_activity_at_unix_ms,
                     owner_account_id: self.owner_account_id,
                     smart_account_address: self.smart_account_address.to_string(),
+                    zipper_reason: match self.zipper_reason.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::zipper::v1::ZipperReasonDetails,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -11463,7 +11612,7 @@ pub mod __buffa {
                             ) as u32;
                 }
                 {
-                    let val = self.reason_code.to_i32();
+                    let val = self.lifecycle_reason.to_i32();
                     if val != 0 {
                         size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -11484,6 +11633,14 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(
                                 &self.smart_account_address,
                             ) as u32;
+                }
+                if self.zipper_reason.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.zipper_reason.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -11576,7 +11733,7 @@ pub mod __buffa {
                     );
                 }
                 {
-                    let val = self.reason_code.to_i32();
+                    let val = self.lifecycle_reason.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(17u32, val, buf);
                     }
@@ -11597,6 +11754,14 @@ pub mod __buffa {
                         &self.smart_account_address,
                         buf,
                     );
+                }
+                if self.zipper_reason.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        21u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.zipper_reason.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -11700,9 +11865,9 @@ pub mod __buffa {
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.reason_code,
+                    &self.lifecycle_reason,
                 ) {
-                    __map.serialize_entry("reasonCode", &self.reason_code)?;
+                    __map.serialize_entry("lifecycleReason", &self.lifecycle_reason)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(
                     &self.last_activity_at_unix_ms,
@@ -11730,6 +11895,14 @@ pub mod __buffa {
                             "smartAccountAddress",
                             self.smart_account_address,
                         )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .zipper_reason
+                        .as_option()
+                    {
+                        __map.serialize_entry("zipperReason", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -11948,10 +12121,12 @@ pub mod __buffa {
             }
             /// Product-facing reason for failed, dropped, or otherwise notable flows.
             ///
-            /// Field 17: `reason_code`
+            /// Field 17: `lifecycle_reason`
             #[must_use]
-            pub fn reason_code(&self) -> ::buffa::EnumValue<super::super::FlowReason> {
-                self.0.reborrow().reason_code
+            pub fn lifecycle_reason(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::LifecycleReason> {
+                self.0.reborrow().lifecycle_reason
             }
             /// Timestamp used for list ordering in milliseconds since epoch (UTC).
             ///
@@ -11973,6 +12148,19 @@ pub mod __buffa {
             #[must_use]
             pub fn smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().smart_account_address
+            }
+            /// Specific reason details when a notable outcome has a catalog entry.
+            ///
+            /// Field 21: `zipper_reason`
+            #[must_use]
+            pub fn zipper_reason(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().zipper_reason
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<FlowTxMatchViewView<'static>>>
@@ -12467,8 +12655,16 @@ pub mod __buffa {
             >,
             /// Product-facing reason for failed, dropped, or otherwise notable flows.
             ///
-            /// Field 17: `reason_code`
-            pub reason_code: ::buffa::EnumValue<super::super::FlowReason>,
+            /// Field 17: `lifecycle_reason`
+            pub lifecycle_reason: ::buffa::EnumValue<super::super::LifecycleReason>,
+            /// Specific reason details when a notable outcome has a catalog entry.
+            ///
+            /// Field 35: `zipper_reason`
+            pub zipper_reason: ::buffa::MessageFieldView<
+                super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView<
+                    'a,
+                >,
+            >,
             /// First observed business timestamp in milliseconds since epoch (UTC).
             ///
             /// Field 18: `started_at_unix_ms`
@@ -12744,9 +12940,34 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.reason_code = ::buffa::EnumValue::from(
+                        view.lifecycle_reason = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
+                    }
+                    35u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.zipper_reason.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.zipper_reason = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     18u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -12923,7 +13144,15 @@ pub mod __buffa {
                     source_domain: self.source_domain,
                     destination_domain: self.destination_domain,
                     latest_lifecycle_source: self.latest_lifecycle_source,
-                    reason_code: self.reason_code,
+                    lifecycle_reason: self.lifecycle_reason,
+                    zipper_reason: match self.zipper_reason.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::zipper::v1::ZipperReasonDetails,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     started_at_unix_ms: self.started_at_unix_ms,
                     updated_at_unix_ms: self.updated_at_unix_ms,
                     terminal_at_unix_ms: self.terminal_at_unix_ms,
@@ -13028,7 +13257,7 @@ pub mod __buffa {
                     }
                 }
                 {
-                    let val = self.reason_code.to_i32();
+                    let val = self.lifecycle_reason.to_i32();
                     if val != 0 {
                         size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -13134,6 +13363,14 @@ pub mod __buffa {
                                 &self.smart_account_address,
                             ) as u32;
                 }
+                if self.zipper_reason.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.zipper_reason.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -13202,7 +13439,7 @@ pub mod __buffa {
                     }
                 }
                 {
-                    let val = self.reason_code.to_i32();
+                    let val = self.lifecycle_reason.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(17u32, val, buf);
                     }
@@ -13307,6 +13544,14 @@ pub mod __buffa {
                         &self.smart_account_address,
                         buf,
                     );
+                }
+                if self.zipper_reason.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        35u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.zipper_reason.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -13437,9 +13682,17 @@ pub mod __buffa {
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.reason_code,
+                    &self.lifecycle_reason,
                 ) {
-                    __map.serialize_entry("reasonCode", &self.reason_code)?;
+                    __map.serialize_entry("lifecycleReason", &self.lifecycle_reason)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .zipper_reason
+                        .as_option()
+                    {
+                        __map.serialize_entry("zipperReason", __v)?;
+                    }
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(
                     &self.started_at_unix_ms,
@@ -13767,10 +14020,25 @@ pub mod __buffa {
             }
             /// Product-facing reason for failed, dropped, or otherwise notable flows.
             ///
-            /// Field 17: `reason_code`
+            /// Field 17: `lifecycle_reason`
             #[must_use]
-            pub fn reason_code(&self) -> ::buffa::EnumValue<super::super::FlowReason> {
-                self.0.reborrow().reason_code
+            pub fn lifecycle_reason(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::LifecycleReason> {
+                self.0.reborrow().lifecycle_reason
+            }
+            /// Specific reason details when a notable outcome has a catalog entry.
+            ///
+            /// Field 35: `zipper_reason`
+            #[must_use]
+            pub fn zipper_reason(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().zipper_reason
             }
             /// First observed business timestamp in milliseconds since epoch (UTC).
             ///
@@ -14557,8 +14825,16 @@ pub mod __buffa {
             pub lifecycle_source: ::buffa::EnumValue<super::super::LifecycleSource>,
             /// Product-facing reason for failed, dropped, or otherwise notable steps.
             ///
-            /// Field 13: `reason_code`
-            pub reason_code: ::buffa::EnumValue<super::super::FlowReason>,
+            /// Field 13: `lifecycle_reason`
+            pub lifecycle_reason: ::buffa::EnumValue<super::super::LifecycleReason>,
+            /// Specific reason details when a notable outcome has a catalog entry.
+            ///
+            /// Field 25: `zipper_reason`
+            pub zipper_reason: ::buffa::MessageFieldView<
+                super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView<
+                    'a,
+                >,
+            >,
             /// Current source confirmation count when confirmations apply.
             ///
             /// Field 14: `current_confirmations`
@@ -14758,9 +15034,34 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.reason_code = ::buffa::EnumValue::from(
+                        view.lifecycle_reason = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
+                    }
+                    25u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.zipper_reason.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.zipper_reason = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     14u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -14910,7 +15211,15 @@ pub mod __buffa {
                     },
                     milestone_tx_ref: self.milestone_tx_ref.to_string(),
                     lifecycle_source: self.lifecycle_source,
-                    reason_code: self.reason_code,
+                    lifecycle_reason: self.lifecycle_reason,
+                    zipper_reason: match self.zipper_reason.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::zipper::v1::ZipperReasonDetails,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     current_confirmations: self.current_confirmations,
                     required_confirmations: self.required_confirmations,
                     approve_count: self.approve_count,
@@ -14985,7 +15294,7 @@ pub mod __buffa {
                     }
                 }
                 {
-                    let val = self.reason_code.to_i32();
+                    let val = self.lifecycle_reason.to_i32();
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -15065,6 +15374,14 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.zipper_reason.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.zipper_reason.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -15114,7 +15431,7 @@ pub mod __buffa {
                     }
                 }
                 {
-                    let val = self.reason_code.to_i32();
+                    let val = self.lifecycle_reason.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(13u32, val, buf);
                     }
@@ -15185,6 +15502,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.request_fee.write_to(__cache, buf);
+                }
+                if self.zipper_reason.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        25u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.zipper_reason.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -15257,9 +15582,17 @@ pub mod __buffa {
                     __map.serialize_entry("lifecycleSource", &self.lifecycle_source)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.reason_code,
+                    &self.lifecycle_reason,
                 ) {
-                    __map.serialize_entry("reasonCode", &self.reason_code)?;
+                    __map.serialize_entry("lifecycleReason", &self.lifecycle_reason)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .zipper_reason
+                        .as_option()
+                    {
+                        __map.serialize_entry("zipperReason", __v)?;
+                    }
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(
                     &self.current_confirmations,
@@ -15514,10 +15847,25 @@ pub mod __buffa {
             }
             /// Product-facing reason for failed, dropped, or otherwise notable steps.
             ///
-            /// Field 13: `reason_code`
+            /// Field 13: `lifecycle_reason`
             #[must_use]
-            pub fn reason_code(&self) -> ::buffa::EnumValue<super::super::FlowReason> {
-                self.0.reborrow().reason_code
+            pub fn lifecycle_reason(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::LifecycleReason> {
+                self.0.reborrow().lifecycle_reason
+            }
+            /// Specific reason details when a notable outcome has a catalog entry.
+            ///
+            /// Field 25: `zipper_reason`
+            #[must_use]
+            pub fn zipper_reason(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().zipper_reason
             }
             /// Current source confirmation count when confirmations apply.
             ///
@@ -15648,8 +15996,16 @@ pub mod __buffa {
             pub lifecycle_source: ::buffa::EnumValue<super::super::LifecycleSource>,
             /// Product-facing reason for notable activity states.
             ///
-            /// Field 5: `reason_code`
-            pub reason_code: ::buffa::EnumValue<super::super::FlowReason>,
+            /// Field 5: `lifecycle_reason`
+            pub lifecycle_reason: ::buffa::EnumValue<super::super::LifecycleReason>,
+            /// Specific reason details when a notable outcome has a catalog entry.
+            ///
+            /// Field 16: `zipper_reason`
+            pub zipper_reason: ::buffa::MessageFieldView<
+                super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView<
+                    'a,
+                >,
+            >,
             /// Current source confirmation count when confirmations apply.
             ///
             /// Field 6: `current_confirmations`
@@ -15766,9 +16122,34 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.reason_code = ::buffa::EnumValue::from(
+                        view.lifecycle_reason = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
+                    }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.zipper_reason.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.zipper_reason = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     6u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -15901,7 +16282,15 @@ pub mod __buffa {
                     tx_ref: self.tx_ref.to_string(),
                     occurred_at_unix_ms: self.occurred_at_unix_ms,
                     lifecycle_source: self.lifecycle_source,
-                    reason_code: self.reason_code,
+                    lifecycle_reason: self.lifecycle_reason,
+                    zipper_reason: match self.zipper_reason.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::zipper::v1::ZipperReasonDetails,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     current_confirmations: self.current_confirmations,
                     required_confirmations: self.required_confirmations,
                     approve_count: self.approve_count,
@@ -15957,7 +16346,7 @@ pub mod __buffa {
                     }
                 }
                 {
-                    let val = self.reason_code.to_i32();
+                    let val = self.lifecycle_reason.to_i32();
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -16028,6 +16417,14 @@ pub mod __buffa {
                                 &self.ledger_transfer_id,
                             ) as u32;
                 }
+                if self.zipper_reason.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.zipper_reason.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -16059,7 +16456,7 @@ pub mod __buffa {
                     }
                 }
                 {
-                    let val = self.reason_code.to_i32();
+                    let val = self.lifecycle_reason.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(5u32, val, buf);
                     }
@@ -16122,6 +16519,14 @@ pub mod __buffa {
                         buf,
                     );
                 }
+                if self.zipper_reason.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        16u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.zipper_reason.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -16168,9 +16573,17 @@ pub mod __buffa {
                     __map.serialize_entry("lifecycleSource", &self.lifecycle_source)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.reason_code,
+                    &self.lifecycle_reason,
                 ) {
-                    __map.serialize_entry("reasonCode", &self.reason_code)?;
+                    __map.serialize_entry("lifecycleReason", &self.lifecycle_reason)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .zipper_reason
+                        .as_option()
+                    {
+                        __map.serialize_entry("zipperReason", __v)?;
+                    }
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(
                     &self.current_confirmations,
@@ -16377,10 +16790,25 @@ pub mod __buffa {
             }
             /// Product-facing reason for notable activity states.
             ///
-            /// Field 5: `reason_code`
+            /// Field 5: `lifecycle_reason`
             #[must_use]
-            pub fn reason_code(&self) -> ::buffa::EnumValue<super::super::FlowReason> {
-                self.0.reborrow().reason_code
+            pub fn lifecycle_reason(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::LifecycleReason> {
+                self.0.reborrow().lifecycle_reason
+            }
+            /// Specific reason details when a notable outcome has a catalog entry.
+            ///
+            /// Field 16: `zipper_reason`
+            #[must_use]
+            pub fn zipper_reason(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::zipper::v1::__buffa::view::ZipperReasonDetailsView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().zipper_reason
             }
             /// Current source confirmation count when confirmations apply.
             ///
