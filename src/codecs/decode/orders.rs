@@ -4,28 +4,30 @@ use super::enums::{
     enum_value_fee_asset, enum_value_order_status, enum_value_order_type, enum_value_side,
     enum_value_time_in_force,
 };
-use super::money::{decode_price_ticks, decode_qty_scaled, decode_qty_scaled_allow_zero};
+use super::money::{
+    decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled,
+    decode_qty_scaled_allow_zero,
+};
 use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
 use crate::models::{
     AttachedRisk, BatchCancelOrdersResult, BatchCancelResultItem, BatchCreateOrdersResult,
     BatchCreateResultItem, BatchReplaceAdmissionItem, BatchReplaceOrdersResult,
     BatchReplaceStatusItem, BatchReplaceStatusResult, CancelAllAfterResult, CancelAllOrdersResult,
-    CreateOrderType, GetOrderResult, MaxSlippage, ModifyOrderResult, Order, OrderMutationResult,
-    OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, UserTrade,
-    UserTradesList,
+    CreateOrderType, GetOrderResult, MaxSlippage, ModifyOrderResult, Order, OrderErrorDetail,
+    OrderFieldViolation, OrderMutationResult, OrdersList, PreviewOrderResult, RiskLeg,
+    TrailingDistance, TrailingStop, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
     AttachedRisk as ProtoAttachedRisk, BatchCancelOrdersResponse, BatchCreateOrdersResponse,
     BatchReplaceAdmissionStatus, BatchReplaceItemAdmissionStatus, BatchReplaceOrdersResponse,
     BatchReplacePhase, CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse,
-    CreateOrderResponse, GetBatchReplaceStatusResponse, GetOpenOrdersResponse,
+    CreateOrderResponse, ErrorDetail, GetBatchReplaceStatusResponse, GetOpenOrdersResponse,
     GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse,
     Order as ProtoOrder, PreviewOrderResponse, RiskExecution, StopLossPolicy, TakeProfitPolicy,
     TrailingStopPolicy, UserTrade as ProtoUserTrade, batch_create_result_item, risk_execution,
     trailing_stop_policy,
 };
-use crate::types::{Quantity, QuantityDomain};
 use buffa::Enumeration;
 
 pub fn order_from_proto(msg: &ProtoOrder) -> Order {
@@ -261,55 +263,60 @@ fn order_mutation(status: &str, order_id: u64, client_order_id: &str) -> OrderMu
     }
 }
 
+fn timestamp_ms(ts: &buffa_types::google::protobuf::Timestamp) -> i64 {
+    ts.seconds.saturating_mul(1000) + (ts.nanos as i64) / 1_000_000
+}
+
+fn order_error_detail_from_proto(msg: &ErrorDetail) -> OrderErrorDetail {
+    OrderErrorDetail {
+        code: match msg.code.as_known() {
+            Some(code) => code
+                .proto_name()
+                .strip_prefix("ERROR_CODE_")
+                .unwrap_or(code.proto_name())
+                .to_owned(),
+            None => format!("UNKNOWN_ERROR_CODE({})", msg.code.to_i32()),
+        },
+        violations: msg
+            .violations
+            .iter()
+            .map(|v| OrderFieldViolation {
+                field_path: v.field_path.clone(),
+                rule_id: v.rule_id.clone(),
+                message: v.message.clone(),
+            })
+            .collect(),
+    }
+}
+
+/// Decode an admission-oriented preview response.
+///
+/// Quote/fee scales are no longer required. `base_scale` is used only when
+/// `resolved_base_qty_scaled` is present so the public [`Quantity`] carries the
+/// pair's catalog base scale.
 pub fn preview_order_from_proto(
     msg: &PreviewOrderResponse,
     base_scale: u32,
-    quote_scale: u32,
     symbol: &str,
     symbol_id: Option<u32>,
 ) -> Result<PreviewOrderResult> {
-    let fee_asset = enum_value_fee_asset(msg.fee_asset);
-    let (fee_domain, fee_scale) = match fee_asset.as_str() {
-        "base" => (QuantityDomain::OrderBase, base_scale),
-        "quote" => (QuantityDomain::OrderQuote, quote_scale),
-        other => {
-            return Err(Error::response_contract(
-                "PreviewOrder",
-                format!("unknown fee_asset {other:?}"),
-            ));
-        }
-    };
     let symbol = Some(symbol.to_owned());
+    let evaluated_at = msg.evaluated_at.as_option().ok_or_else(|| {
+        Error::response_contract(
+            "PreviewOrder",
+            "successful response is missing evaluated_at",
+        )
+    })?;
     Ok(PreviewOrderResult {
-        resolved_base_qty: decode_qty_scaled(
-            msg.resolved_base_qty_scaled,
-            Some(base_scale),
-            symbol.clone(),
-            symbol_id,
-        ),
-        price_bound: decode_price_ticks(msg.price_bound_ticks, symbol.clone()),
-        estimated_quote_debit: Quantity::from_scaled(
-            msg.estimated_quote_debit_scaled,
-            Some(quote_scale),
-            QuantityDomain::OrderQuote,
-            symbol.clone(),
-            symbol_id,
-        )?,
-        estimated_fee: Quantity::from_scaled(
-            msg.estimated_fee_scaled,
-            Some(fee_scale),
-            fee_domain,
-            symbol.clone(),
-            symbol_id,
-        )?,
-        estimated_net_base_qty: decode_qty_scaled(
-            msg.estimated_net_base_qty_scaled,
-            Some(base_scale),
-            symbol,
-            symbol_id,
-        ),
-        fee_asset,
-        fresh_at_ts_ns: msg.fresh_at_ts_ns,
+        admissible: msg.admissible,
+        rejection: msg.rejection.as_option().map(order_error_detail_from_proto),
+        resolved_base_qty: msg.resolved_base_qty_scaled.and_then(|scaled| {
+            decode_qty_scaled_allow_zero(scaled, Some(base_scale), symbol.clone(), symbol_id)
+        }),
+        protected_price_bound: msg
+            .protected_price_bound_ticks
+            .and_then(|ticks| decode_price_ticks_allow_zero(ticks, symbol.clone())),
+        evaluated_at_ms: timestamp_ms(evaluated_at),
     })
 }
 
@@ -958,26 +965,46 @@ mod tests {
     }
 
     #[test]
-    fn preview_order_surfaces_resolved_sizing_and_fee_asset() {
-        use crate::proto::orders::v1::{FeeAsset, PreviewOrderResponse};
+    fn preview_order_surfaces_admission_sizing_and_protection() {
+        use crate::proto::orders::v1::{
+            ErrorCode, ErrorDetail, FieldViolation, PreviewOrderResponse,
+        };
+        use buffa_types::google::protobuf::Timestamp;
 
         let preview = preview_order_from_proto(
             &PreviewOrderResponse {
-                resolved_base_qty_scaled: 100,
-                price_bound_ticks: 5_000,
-                estimated_quote_debit_scaled: 510,
-                estimated_fee_scaled: 1,
-                estimated_net_base_qty_scaled: 99,
-                fee_asset: FeeAsset::Base.into(),
-                fresh_at_ts_ns: 42,
+                admissible: Some(false),
+                rejection: ErrorDetail {
+                    code: ErrorCode::BadQty.into(),
+                    violations: vec![FieldViolation {
+                        field_path: "order.base_qty_scaled".into(),
+                        rule_id: "qty.min".into(),
+                        message: "quantity below minimum".into(),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }
+                .into(),
+                resolved_base_qty_scaled: Some(100),
+                protected_price_bound_ticks: Some(5_000),
+                evaluated_at: Timestamp {
+                    seconds: 1,
+                    nanos: 250_000_000,
+                    ..Default::default()
+                }
+                .into(),
                 ..Default::default()
             },
             8,
-            6,
             "BTC-USDT",
             Some(1),
         )
         .unwrap();
+        assert_eq!(preview.admissible, Some(false));
+        let rejection = preview.rejection.expect("rejection");
+        assert_eq!(rejection.code, "BAD_QTY");
+        assert_eq!(rejection.violations.len(), 1);
+        assert_eq!(rejection.violations[0].field_path, "order.base_qty_scaled");
         assert_eq!(
             preview
                 .resolved_base_qty
@@ -986,20 +1013,71 @@ mod tests {
             Some(100)
         );
         assert_eq!(
-            preview.price_bound.as_ref().map(|price| price.as_ticks()),
+            preview
+                .protected_price_bound
+                .as_ref()
+                .map(|price| price.as_ticks()),
             Some(5_000)
         );
-        assert_eq!(preview.estimated_quote_debit.as_scaled(), 510);
+        assert_eq!(preview.evaluated_at_ms, 1_250);
+    }
+
+    #[test]
+    fn preview_order_preserves_unknown_rejection_code() {
+        use crate::proto::orders::v1::{ErrorDetail, PreviewOrderResponse};
+        use buffa_types::google::protobuf::Timestamp;
+
+        let preview = preview_order_from_proto(
+            &PreviewOrderResponse {
+                admissible: Some(false),
+                rejection: ErrorDetail {
+                    code: buffa::EnumValue::from(999),
+                    ..Default::default()
+                }
+                .into(),
+                resolved_base_qty_scaled: Some(0),
+                protected_price_bound_ticks: Some(0),
+                evaluated_at: Timestamp {
+                    seconds: 1,
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            },
+            8,
+            "BTC-USDT",
+            Some(1),
+        )
+        .unwrap();
         assert_eq!(
-            preview.estimated_quote_debit.domain(),
-            QuantityDomain::OrderQuote
+            preview.rejection.as_ref().map(|r| r.code.as_str()),
+            Some("UNKNOWN_ERROR_CODE(999)")
         );
-        assert_eq!(preview.estimated_quote_debit.scale(), Some(6));
-        assert_eq!(preview.estimated_fee.as_scaled(), 1);
-        assert_eq!(preview.estimated_fee.domain(), QuantityDomain::OrderBase);
-        assert_eq!(preview.estimated_fee.scale(), Some(8));
-        assert_eq!(preview.fee_asset, "base");
-        assert_eq!(preview.fresh_at_ts_ns, 42);
+        assert_eq!(
+            preview
+                .resolved_base_qty
+                .as_ref()
+                .map(|qty| qty.as_scaled()),
+            Some(0)
+        );
+        assert_eq!(
+            preview
+                .protected_price_bound
+                .as_ref()
+                .map(|price| price.as_ticks()),
+            Some(0)
+        );
+        assert_eq!(preview.evaluated_at_ms, 1_000);
+    }
+
+    #[test]
+    fn preview_order_rejects_missing_evaluated_at() {
+        use crate::proto::orders::v1::PreviewOrderResponse;
+
+        let err =
+            preview_order_from_proto(&PreviewOrderResponse::default(), 8, "BTC-USDT", Some(1))
+                .expect_err("missing evaluated_at must fail");
+        assert!(err.to_string().contains("missing evaluated_at"));
     }
 
     #[test]
