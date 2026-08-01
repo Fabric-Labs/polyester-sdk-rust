@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.24`, git tag `v0.1.0a24`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.25`, git tag `v0.1.0a25`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.24"
+polyester-sdk = "0.1.0-alpha.25"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -79,7 +79,7 @@ For a private git checkout instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a24" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a25" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -290,17 +290,18 @@ params.max_quote_debit_scaled = Some(Quantity::from_quote_decimal_str(
 )?);
 ```
 
-Use `OrdersService::preview(PreviewOrderParams { ... })` to obtain advisory
-resolved base quantity, price bound, and typed quote/fee estimates before
-submitting a quote-budget order. Preview sends the same `OrderIntent` contract
-as create (sizing, execution, fee asset, STP, optional attached risk). The host
-runs an admissibility check only: no hold is placed, and `client_order_id` is
-accepted but not claimed. `estimated_quote_debit` always has `OrderQuote`
-domain; `estimated_fee` has `OrderBase` or `OrderQuote` according to
-`fee_asset`. Preview is not deployed on every API host, so handle an
-unimplemented/not-found response and do not make Preview a prerequisite for
-order submission. Fee selection is `FeeAsset::Quote` or, for BUYs only,
-`FeeAsset::Base`; the former `received` fee mode no longer exists.
+Use `OrdersService::preview(PreviewOrderParams { ... })` to check whether an
+order intent is currently admissible before submitting. Preview sends the same
+`OrderIntent` contract as create (sizing, execution, fee asset, STP, optional
+attached risk). The host runs an admissibility check only: no hold is placed,
+and `client_order_id` is accepted but not claimed. The result reports
+`admissible`, optional typed `rejection` (`OrderErrorDetail`), optional
+`resolved_base_qty`, optional `protected_price_bound`, and `evaluated_at_ms`.
+Known rejection codes use stable labels such as `BAD_QTY`.
+Preview no longer returns fee/quote estimates. Preview is not deployed on every
+API host, so handle an unimplemented/not-found response and do not make Preview
+a prerequisite for order submission. Fee selection is `FeeAsset::Quote` or, for
+BUYs only, `FeeAsset::Base`; the former `received` fee mode no longer exists.
 
 Standalone trailing-stop triggers remain SELL market-IOC and now encode wire
 `side` explicitly. Attached trailing-stop risk may use either side (opposite

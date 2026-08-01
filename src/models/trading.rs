@@ -506,18 +506,37 @@ pub struct PreviewOrderParams {
     pub attached_risk: Option<AttachedRisk>,
 }
 
+/// One actionable field-level validation failure from preview/create rejection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderFieldViolation {
+    pub field_path: String,
+    pub rule_id: String,
+    pub message: String,
+}
+
+/// Typed rejection detail when a preview (or related) admission check fails.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderErrorDetail {
+    /// Public error code label (for example `BAD_QTY`), or
+    /// `UNKNOWN_ERROR_CODE(<n>)` for open-enum forward compatibility.
+    pub code: String,
+    pub violations: Vec<OrderFieldViolation>,
+}
+
+/// Advisory admission result for [`crate::services::OrdersService::preview`].
+///
+/// Preview no longer returns fee/quote estimates. It reports whether the intent
+/// is currently admissible, any typed rejection, and any sizing / price-
+/// protection values resolved during evaluation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreviewOrderResult {
+    pub admissible: Option<bool>,
+    pub rejection: Option<OrderErrorDetail>,
     pub resolved_base_qty: Option<Quantity>,
-    pub price_bound: Option<Price>,
-    /// All-in quote debit with `OrderQuote` domain + catalog quote scale.
-    pub estimated_quote_debit: Quantity,
-    /// Estimated fee with `OrderBase` or `OrderQuote` domain according to
-    /// [`Self::fee_asset`].
-    pub estimated_fee: Quantity,
-    pub estimated_net_base_qty: Option<Quantity>,
-    pub fee_asset: String,
-    pub fresh_at_ts_ns: u64,
+    /// Protective execution boundary (renamed from `price_bound`).
+    pub protected_price_bound: Option<Price>,
+    /// Evaluation completion time as epoch milliseconds.
+    pub evaluated_at_ms: i64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

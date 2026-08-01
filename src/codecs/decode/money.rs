@@ -9,6 +9,11 @@ pub fn decode_price_ticks(ticks: i64, symbol: Option<String>) -> Option<Price> {
     Price::from_ticks(ticks, symbol).ok()
 }
 
+/// Decode price ticks where a present zero is meaningful.
+pub fn decode_price_ticks_allow_zero(ticks: i64, symbol: Option<String>) -> Option<Price> {
+    Price::from_ticks(ticks, symbol).ok()
+}
+
 pub fn decode_qty_scaled(
     scaled: i64,
     scale: Option<u32>,

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.1.0a25
+
+Package version: `0.1.0-alpha.25`. Git tag: `v0.1.0a25`.
+
+### Breaking
+- `PreviewOrderResult` is now admission-oriented (POLY-3779):
+  `admissible`, optional `rejection` (`OrderErrorDetail` /
+  `OrderFieldViolation`), optional `resolved_base_qty`, optional
+  `protected_price_bound` (renamed from `price_bound`), and required
+  `evaluated_at_ms`. Removed `estimated_quote_debit`, `estimated_fee`,
+  `estimated_net_base_qty`, `fee_asset`, and `fresh_at_ts_ns`.
+  Known Preview rejection codes use TypeScript-compatible labels such as
+  `BAD_QTY`; unknown open-enum values use `UNKNOWN_ERROR_CODE(<n>)`.
+- `LifecycleFlowSummary` thickens with `lifecycle_reason` (snake labels +
+  `unknown_reason_<n>`) and optional `zipper_reason`
+  (`ZipperReasonDetails { code, reason_id, message }`) for POLY-3820
+  (`FlowReason` -> `LifecycleReason`). Tx-match flows preserve
+  `owner_account_id`; present-zero preview sizing/protection values are kept.
+
 ## 0.1.0a24
 
 Package version: `0.1.0-alpha.24`. Git tag: `v0.1.0a24`.
