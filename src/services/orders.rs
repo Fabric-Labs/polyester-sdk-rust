@@ -652,9 +652,13 @@ impl OrdersService {
         order_mutation_from_create(&resp)
     }
 
-    /// Resolve an order's executable size, price bound, and estimated fees
-    /// without submitting it. A preview is advisory; re-preview or submit
-    /// promptly when the market is moving.
+    /// Check whether an order intent is currently admissible without submitting
+    /// it.
+    ///
+    /// Returns admission status, optional typed rejection detail, and any
+    /// sizing / protected price-bound values resolved during evaluation. A
+    /// preview is advisory; account, market, and policy inputs may change, and
+    /// create always evaluates the intent again.
     pub async fn preview(&self, params: PreviewOrderParams) -> Result<PreviewOrderResult> {
         self.ctx.wait_for_catalogs().await?;
         let req = self.encode_preview_params(&params)?;
@@ -667,12 +671,11 @@ impl OrdersService {
         )
         .await?
         .into_owned();
+        // Base scale is only needed when the host resolved a base quantity.
         let base_scale = self.require_quantity_scale(&params.symbol, None)?;
-        let quote_scale = self.require_quote_quantity_scale(&params.symbol)?;
         preview_order_from_proto(
             &resp,
             base_scale,
-            quote_scale,
             &params.symbol,
             self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
         )
