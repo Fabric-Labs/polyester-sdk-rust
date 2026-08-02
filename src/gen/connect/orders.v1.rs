@@ -2008,6 +2008,7 @@ pub trait OrdersReadService: Send + Sync + 'static {
         >,
     > + Send;
     /// Retrieve a single order by order ID or client order ID, including related user trades and ledger transfers.
+    /// Recent accepted orders may wait briefly for read availability; retry UNAVAILABLE with the same lookup key.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
