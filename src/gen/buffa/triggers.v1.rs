@@ -5162,9 +5162,20 @@ pub struct ListTriggerEventsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub limit: u32,
+    /// Optional event category filter. When unspecified, returns all event
+    /// categories. Use EVENT_FIRED to enumerate child-order actions.
+    ///
+    /// Field 4: `event_type`
+    #[serde(
+        rename = "eventType",
+        alias = "event_type",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub event_type: ::buffa::EnumValue<TriggerEventType>,
     /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-    /// bound to the authenticated account, trigger, sub-account scope, and newest
-    /// first sort order.
+    /// bound to the authenticated account, trigger, sub-account scope, event
+    /// filter, and newest-first sort order.
     ///
     /// Field 5: `page_token`
     #[serde(
@@ -5184,6 +5195,7 @@ impl ::core::fmt::Debug for ListTriggerEventsRequest {
             .field("trigger_id", &self.trigger_id)
             .field("subaccount_id", &self.subaccount_id)
             .field("limit", &self.limit)
+            .field("event_type", &self.event_type)
             .field("page_token", &self.page_token)
             .finish()
     }
@@ -5231,6 +5243,12 @@ impl ::buffa::Message for ListTriggerEventsRequest {
         if self.limit != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
         }
+        {
+            let val = self.event_type.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         if !self.page_token.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.page_token) as u32;
         }
@@ -5252,6 +5270,12 @@ impl ::buffa::Message for ListTriggerEventsRequest {
         }
         if self.limit != 0u32 {
             ::buffa::types::put_uint32_field(3u32, self.limit, buf);
+        }
+        {
+            let val = self.event_type.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
         }
         if !self.page_token.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.page_token, buf);
@@ -5292,6 +5316,15 @@ impl ::buffa::Message for ListTriggerEventsRequest {
                 )?;
                 self.limit = ::buffa::types::decode_uint32(buf)?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.event_type = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -5310,6 +5343,7 @@ impl ::buffa::Message for ListTriggerEventsRequest {
         self.trigger_id = 0u64;
         self.subaccount_id = ::core::option::Option::None;
         self.limit = 0u32;
+        self.event_type = ::buffa::EnumValue::from(0);
         self.page_token.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -8531,8 +8565,8 @@ pub struct TwapDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub slice_count: i32,
-    /// Cumulative executed quantity scaled by the pair's base_quantity_scale from
-    /// GetSpotConfig.
+    /// Cumulative filled child-order base quantity scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig.
     ///
     /// Field 6: `executed_qty_scaled`
     #[serde(
@@ -8939,7 +8973,9 @@ pub const __LADDER_DETAILS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
     from_json: ::buffa::type_registry::any_from_json::<LadderDetails>,
     is_wkt: false,
 };
-/// Trigger represents a trigger with its full state.
+/// Trigger represents current trigger configuration, lifecycle state, and
+/// aggregate strategy progress. Use ListTriggerEvents to enumerate child-order
+/// actions and inspect append-only lifecycle history.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -9080,16 +9116,6 @@ pub struct Trigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub completed_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Child orders spawned by this trigger.
-    ///
-    /// Field 70: `child_order_ids`
-    #[serde(
-        rename = "childOrderIds",
-        alias = "child_order_ids",
-        with = "::buffa::json_helpers::proto_seq",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
-    )]
-    pub child_order_ids: ::buffa::alloc::vec::Vec<u64>,
     #[serde(flatten)]
     pub configuration: ::core::option::Option<__buffa::oneof::trigger::Configuration>,
     #[serde(flatten)]
@@ -9115,7 +9141,6 @@ impl ::core::fmt::Debug for Trigger {
             .field("updated_at", &self.updated_at)
             .field("armed_at", &self.armed_at)
             .field("completed_at", &self.completed_at)
-            .field("child_order_ids", &self.child_order_ids)
             .field("configuration", &self.configuration)
             .field("runtime_details", &self.runtime_details)
             .finish()
@@ -9272,12 +9297,6 @@ impl ::buffa::Message for Trigger {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if !self.child_order_ids.is_empty() {
-            let payload: u32 = self.child_order_ids.len() as u32
-                * ::buffa::types::FIXED64_ENCODED_LEN as u32;
-            size
-                += 2u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
-        }
         if let ::core::option::Option::Some(ref v) = self.runtime_details {
             match v {
                 __buffa::oneof::trigger::RuntimeDetails::Stop(x) => {
@@ -9422,14 +9441,6 @@ impl ::buffa::Message for Trigger {
         if self.completed_at.is_set() {
             ::buffa::types::put_len_delimited_header(64u32, __cache.consume_next(), buf);
             self.completed_at.write_to(__cache, buf);
-        }
-        if !self.child_order_ids.is_empty() {
-            let payload: u32 = self.child_order_ids.len() as u32
-                * ::buffa::types::FIXED64_ENCODED_LEN as u32;
-            ::buffa::types::put_len_delimited_header(70u32, payload, buf);
-            for &v in &self.child_order_ids {
-                ::buffa::types::encode_fixed64(v, buf);
-            }
         }
         if let ::core::option::Option::Some(ref v) = self.runtime_details {
             match v {
@@ -9704,37 +9715,6 @@ impl ::buffa::Message for Trigger {
                     ctx,
                 )?;
             }
-            70u32 => {
-                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
-                    let len = ::buffa::encoding::decode_varint(buf)?;
-                    let len = usize::try_from(len)
-                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
-                    if buf.remaining() < len {
-                        return ::core::result::Result::Err(
-                            ::buffa::DecodeError::UnexpectedEof,
-                        );
-                    }
-                    self.child_order_ids.reserve(len / 8usize);
-                    let mut limited = buf.take(len);
-                    while limited.has_remaining() {
-                        self.child_order_ids
-                            .push(::buffa::types::decode_fixed64(&mut limited)?);
-                    }
-                    let leftover = limited.remaining();
-                    if leftover > 0 {
-                        limited.advance(leftover);
-                    }
-                } else if tag.wire_type() == ::buffa::encoding::WireType::Fixed64 {
-                    self.child_order_ids.push(::buffa::types::decode_fixed64(buf)?);
-                } else {
-                    return ::core::result::Result::Err(
-                        ::buffa::encoding::wire_type_mismatch(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        ),
-                    );
-                }
-            }
             100u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -9840,7 +9820,6 @@ impl ::buffa::Message for Trigger {
         self.updated_at = ::buffa::MessageField::none();
         self.armed_at = ::buffa::MessageField::none();
         self.completed_at = ::buffa::MessageField::none();
-        self.child_order_ids.clear();
         self.runtime_details = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -9902,9 +9881,6 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 > = None;
                 let mut __f_completed_at: ::core::option::Option<
                     ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-                > = None;
-                let mut __f_child_order_ids: ::core::option::Option<
-                    ::buffa::alloc::vec::Vec<u64>,
                 > = None;
                 let mut __oneof_configuration: ::core::option::Option<
                     __buffa::oneof::trigger::Configuration,
@@ -10127,24 +10103,6 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                         >,
                                     >()?,
                             );
-                        }
-                        "childOrderIds" | "child_order_ids" => {
-                            __f_child_order_ids = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::vec::Vec<u64>;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::vec::Vec<u64>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_seq::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
                         }
                         "stopLoss" | "stop_loss" => {
                             let v: ::core::option::Option<ConditionalTrigger> = map
@@ -10409,9 +10367,6 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 }
                 if let ::core::option::Option::Some(v) = __f_completed_at {
                     __r.completed_at = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_child_order_ids {
-                    __r.child_order_ids = v;
                 }
                 __r.configuration = __oneof_configuration;
                 __r.runtime_details = __oneof_runtime_details;
@@ -17494,9 +17449,14 @@ pub mod __buffa {
             ///
             /// Field 3: `limit`
             pub limit: u32,
+            /// Optional event category filter. When unspecified, returns all event
+            /// categories. Use EVENT_FIRED to enumerate child-order actions.
+            ///
+            /// Field 4: `event_type`
+            pub event_type: ::buffa::EnumValue<super::super::TriggerEventType>,
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-            /// bound to the authenticated account, trigger, sub-account scope, and newest
-            /// first sort order.
+            /// bound to the authenticated account, trigger, sub-account scope, event
+            /// filter, and newest-first sort order.
             ///
             /// Field 5: `page_token`
             pub page_token: &'a str,
@@ -17556,6 +17516,15 @@ pub mod __buffa {
                         )?;
                         view.limit = ::buffa::types::decode_uint32(&mut cur)?;
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.event_type = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -17595,6 +17564,7 @@ pub mod __buffa {
                     trigger_id: self.trigger_id,
                     subaccount_id: self.subaccount_id,
                     limit: self.limit,
+                    event_type: self.event_type,
                     page_token: self.page_token.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -17618,6 +17588,12 @@ pub mod __buffa {
                 }
                 if self.limit != 0u32 {
                     size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+                }
+                {
+                    let val = self.event_type.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 if !self.page_token.is_empty() {
                     size
@@ -17644,6 +17620,12 @@ pub mod __buffa {
                 }
                 if self.limit != 0u32 {
                     ::buffa::types::put_uint32_field(3u32, self.limit, buf);
+                }
+                {
+                    let val = self.event_type.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
                 }
                 if !self.page_token.is_empty() {
                     ::buffa::types::put_string_field(5u32, &self.page_token, buf);
@@ -17689,6 +17671,11 @@ pub mod __buffa {
                             "limit",
                             &::buffa::json_helpers::ProtoJson(&self.limit),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.event_type,
+                ) {
+                    __map.serialize_entry("eventType", &self.event_type)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.page_token) {
                     __map.serialize_entry("pageToken", self.page_token)?;
@@ -17814,9 +17801,19 @@ pub mod __buffa {
             pub fn limit(&self) -> u32 {
                 self.0.reborrow().limit
             }
+            /// Optional event category filter. When unspecified, returns all event
+            /// categories. Use EVENT_FIRED to enumerate child-order actions.
+            ///
+            /// Field 4: `event_type`
+            #[must_use]
+            pub fn event_type(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::TriggerEventType> {
+                self.0.reborrow().event_type
+            }
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-            /// bound to the authenticated account, trigger, sub-account scope, and newest
-            /// first sort order.
+            /// bound to the authenticated account, trigger, sub-account scope, event
+            /// filter, and newest-first sort order.
             ///
             /// Field 5: `page_token`
             #[must_use]
@@ -22987,8 +22984,8 @@ pub mod __buffa {
             ///
             /// Field 5: `slice_count`
             pub slice_count: i32,
-            /// Cumulative executed quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig.
+            /// Cumulative filled child-order base quantity scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig.
             ///
             /// Field 6: `executed_qty_scaled`
             pub executed_qty_scaled: i64,
@@ -23355,8 +23352,8 @@ pub mod __buffa {
             pub fn slice_count(&self) -> i32 {
                 self.0.reborrow().slice_count
             }
-            /// Cumulative executed quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig.
+            /// Cumulative filled child-order base quantity scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig.
             ///
             /// Field 6: `executed_qty_scaled`
             #[must_use]
@@ -23805,7 +23802,9 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// Trigger represents a trigger with its full state.
+        /// Trigger represents current trigger configuration, lifecycle state, and
+        /// aggregate strategy progress. Use ListTriggerEvents to enumerate child-order
+        /// actions and inspect append-only lifecycle history.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerView<'a> {
             /// Trigger ID.
@@ -23876,10 +23875,6 @@ pub mod __buffa {
             pub completed_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Child orders spawned by this trigger.
-            ///
-            /// Field 70: `child_order_ids`
-            pub child_order_ids: ::buffa::RepeatedView<'a, u64>,
             pub configuration: ::core::option::Option<
                 super::super::__buffa::view::oneof::trigger::Configuration<'a>,
             >,
@@ -24095,30 +24090,6 @@ pub mod __buffa {
                                     )?,
                                 );
                             }
-                        }
-                    }
-                    70u32 => {
-                        if tag.wire_type()
-                            == ::buffa::encoding::WireType::LengthDelimited
-                        {
-                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
-                            view.child_order_ids.reserve(payload.len() / 8usize);
-                            let mut pcur: &[u8] = payload;
-                            while !pcur.is_empty() {
-                                view.child_order_ids
-                                    .push(::buffa::types::decode_fixed64(&mut pcur)?);
-                            }
-                        } else if tag.wire_type() == ::buffa::encoding::WireType::Fixed64
-                        {
-                            view.child_order_ids
-                                .push(::buffa::types::decode_fixed64(&mut cur)?);
-                        } else {
-                            return Err(
-                                ::buffa::encoding::wire_type_mismatch(
-                                    tag,
-                                    ::buffa::encoding::WireType::LengthDelimited,
-                                ),
-                            );
                         }
                     }
                     30u32 => {
@@ -24465,7 +24436,6 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
-                    child_order_ids: self.child_order_ids.to_vec(),
                     configuration: match self.configuration.as_ref() {
                         ::core::option::Option::Some(v) => {
                             ::core::option::Option::Some(
@@ -24713,13 +24683,6 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if !self.child_order_ids.is_empty() {
-                    let payload: u32 = self.child_order_ids.len() as u32
-                        * ::buffa::types::FIXED64_ENCODED_LEN as u32;
-                    size
-                        += 2u32 + ::buffa::encoding::varint_len(payload as u64) as u32
-                            + payload;
-                }
                 if let ::core::option::Option::Some(ref v) = self.runtime_details {
                     match v {
                         super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
@@ -24904,14 +24867,6 @@ pub mod __buffa {
                     );
                     self.completed_at.write_to(__cache, buf);
                 }
-                if !self.child_order_ids.is_empty() {
-                    let payload: u32 = self.child_order_ids.len() as u32
-                        * ::buffa::types::FIXED64_ENCODED_LEN as u32;
-                    ::buffa::types::put_len_delimited_header(70u32, payload, buf);
-                    for &v in &self.child_order_ids {
-                        ::buffa::types::encode_fixed64(v, buf);
-                    }
-                }
                 if let ::core::option::Option::Some(ref v) = self.runtime_details {
                     match v {
                         super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
@@ -25066,13 +25021,6 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("completedAt", __v)?;
                     }
-                }
-                if !self.child_order_ids.is_empty() {
-                    __map
-                        .serialize_entry(
-                            "childOrderIds",
-                            &::buffa::json_helpers::RepeatedJson(&self.child_order_ids),
-                        )?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.configuration {
                     match __ov {
@@ -25337,13 +25285,6 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().completed_at
-            }
-            /// Child orders spawned by this trigger.
-            ///
-            /// Field 70: `child_order_ids`
-            #[must_use]
-            pub fn child_order_ids(&self) -> &::buffa::RepeatedView<'_, u64> {
-                &self.0.reborrow().child_order_ids
             }
             /// Oneof `configuration`.
             #[must_use]

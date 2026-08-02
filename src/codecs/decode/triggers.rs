@@ -15,8 +15,8 @@ use crate::proto::triggers::v1::{
     CancelTriggerResponse, ConditionalTrigger, CreateTriggerResponse, GetTriggerResponse,
     LadderDistribution, ListTriggerEventsResponse, ListTriggersResponse, ModifyTriggerResponse,
     PauseTriggerResponse, ResumeTriggerResponse, Trigger as ProtoTrigger,
-    TriggerEvent as ProtoTriggerEvent, TriggerStatus, conditional_child_execution, trigger,
-    twap_trigger,
+    TriggerEvent as ProtoTriggerEvent, TriggerEventType, TriggerStatus, TriggerType,
+    conditional_child_execution, trigger, twap_trigger,
 };
 use crate::types::Price;
 use buffa::Enumeration;
@@ -367,12 +367,6 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         updated_at: clone_timestamp(msg.updated_at.as_option()),
         armed_at: clone_timestamp(msg.armed_at.as_option()),
         completed_at: clone_timestamp(msg.completed_at.as_option()),
-        child_order_ids: msg
-            .child_order_ids
-            .iter()
-            .copied()
-            .map(format_uint64_id)
-            .collect(),
         details,
     }
 }
@@ -449,22 +443,63 @@ pub fn trigger_mutation_from_modify(
     trigger_mutation(msg.trigger_id, msg.status)
 }
 
-fn enum_proto_name<E: Enumeration>(value: buffa::EnumValue<E>) -> String {
-    value
-        .as_known()
-        .map(|e| e.proto_name().to_owned())
-        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
+fn trigger_event_type_label(value: buffa::EnumValue<TriggerEventType>) -> String {
+    match value.as_known() {
+        Some(TriggerEventType::EventFired) => "fired".to_owned(),
+        Some(TriggerEventType::EventCanceled) => "canceled".to_owned(),
+        Some(TriggerEventType::EventUpdated) => "updated".to_owned(),
+        Some(TriggerEventType::EventUnspecified) => String::new(),
+        None => format!("UNKNOWN({})", value.to_i32()),
+    }
+}
+
+fn trigger_type_label(value: buffa::EnumValue<TriggerType>) -> String {
+    match value.as_known() {
+        Some(TriggerType::TriggerTypeUnspecified) => String::new(),
+        Some(known) => known
+            .proto_name()
+            .trim_start_matches("TRIGGER_TYPE_")
+            .to_ascii_lowercase(),
+        None => format!("UNKNOWN({})", value.to_i32()),
+    }
+}
+
+/// Parse a trigger event type filter label into a proto enum.
+pub fn trigger_event_type_from_label(label: &str) -> Result<TriggerEventType, String> {
+    match label.trim().to_ascii_lowercase().as_str() {
+        "fired" => Ok(TriggerEventType::EventFired),
+        "canceled" | "cancelled" => Ok(TriggerEventType::EventCanceled),
+        "updated" => Ok(TriggerEventType::EventUpdated),
+        other => Err(format!(
+            "invalid trigger event type {other:?}; expected one of: fired, canceled, updated"
+        )),
+    }
 }
 
 pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> TriggerEvent {
     TriggerEvent {
         trigger_id: format_uint64_id(msg.trigger_id),
-        event_type: enum_proto_name(msg.event_type),
+        subaccount_id: if msg.subaccount_id == 0 {
+            String::new()
+        } else {
+            format_uint64_id(msg.subaccount_id)
+        },
+        symbol_id: msg.symbol_id,
+        trigger_type: trigger_type_label(msg.trigger_type),
+        event_type: trigger_event_type_label(msg.event_type),
         ts_ns: if msg.ts_ns == 0 {
             String::new()
         } else {
             msg.ts_ns.to_string()
         },
+        child_seq: msg.child_seq,
+        child_order_id: if msg.child_order_id == 0 {
+            String::new()
+        } else {
+            format_uint64_id(msg.child_order_id)
+        },
+        fire_price: decode_price_ticks(msg.fire_price_ticks, None),
+        reason: msg.reason.clone(),
     }
 }
 
@@ -482,7 +517,7 @@ mod tests {
     use crate::proto::triggers::v1::{
         ConditionalChildExecution, ConditionalTrigger, GetTriggerResponse,
         ListTriggerEventsResponse, ListTriggersResponse, StopDetails, TriggerEventType,
-        TriggerLimitGtc,
+        TriggerLimitGtc, TriggerType,
     };
 
     #[test]
@@ -570,7 +605,7 @@ mod tests {
     }
 
     #[test]
-    fn trigger_from_proto_projects_twap_child_orders_and_executed_qty() {
+    fn trigger_from_proto_projects_twap_executed_qty() {
         use crate::proto::triggers::v1::{TwapDetails, TwapTrigger};
 
         let msg = ProtoTrigger {
@@ -580,7 +615,6 @@ mod tests {
             status: TriggerStatus::StatusRunning.into(),
             qty_scaled: 100_000_000,
             client_trigger_id: "twap-1".into(),
-            child_order_ids: vec![101, 202],
             configuration: Some(trigger::Configuration::Twap(Box::new(TwapTrigger {
                 side: Side::Buy.into(),
                 duration_ms: 60_000,
@@ -602,10 +636,6 @@ mod tests {
         assert_eq!(t.trigger_type, "twap");
         assert_eq!(t.side, "buy");
         assert_eq!(t.order_type, "market");
-        assert_eq!(
-            t.child_order_ids,
-            vec![format_uint64_id(101), format_uint64_id(202)]
-        );
         let Some(TriggerDetails::Twap(twap)) = t.details.as_ref() else {
             panic!("expected twap details");
         };
@@ -676,8 +706,15 @@ mod tests {
         let listed = trigger_events_list_from_proto(&ListTriggerEventsResponse {
             events: vec![ProtoTriggerEvent {
                 trigger_id: 1,
+                subaccount_id: 9,
+                symbol_id: 2,
+                trigger_type: TriggerType::TakeProfit.into(),
                 event_type: TriggerEventType::EventFired.into(),
                 ts_ns: 123,
+                child_seq: 3,
+                child_order_id: 77,
+                fire_price_ticks: 100,
+                reason: "hit".into(),
                 ..Default::default()
             }],
             next_page_token: "evt-page-2".into(),
@@ -685,6 +722,14 @@ mod tests {
         });
         assert_eq!(listed.events.len(), 1);
         assert_eq!(listed.next_page_token, "evt-page-2");
+        let event = &listed.events[0];
+        assert_eq!(event.event_type, "fired");
+        assert_eq!(event.trigger_type, "take_profit");
+        assert_eq!(event.subaccount_id, format_uint64_id(9));
+        assert_eq!(event.child_seq, 3);
+        assert_eq!(event.child_order_id, format_uint64_id(77));
+        assert_eq!(event.fire_price.as_ref().unwrap().as_ticks(), 100);
+        assert_eq!(event.reason, "hit");
     }
 
     #[test]
@@ -695,5 +740,18 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(event.event_type, "UNKNOWN(321)");
+    }
+
+    #[test]
+    fn trigger_event_type_from_label_validates() {
+        assert_eq!(
+            trigger_event_type_from_label("fired").unwrap(),
+            TriggerEventType::EventFired
+        );
+        assert_eq!(
+            trigger_event_type_from_label("canceled").unwrap(),
+            TriggerEventType::EventCanceled
+        );
+        assert!(trigger_event_type_from_label("nope").is_err());
     }
 }
