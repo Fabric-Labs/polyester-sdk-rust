@@ -422,6 +422,21 @@ mod tests {
     }
 
     #[test]
+    fn ed25519_keypair_debug_redacts_secret() {
+        let keypair = crate::models::Ed25519Keypair {
+            public_key_hex: "abcd".into(),
+            secret_key_hex: "super-secret-seed-hex".into(),
+            public_key: vec![1, 2, 3],
+            secret_key: b"super-secret-seed-bytes".to_vec(),
+        };
+        let rendered = format!("{keypair:?}");
+        assert!(rendered.contains("abcd"));
+        assert!(rendered.contains("[REDACTED]"));
+        assert!(!rendered.contains("super-secret-seed-hex"));
+        assert!(!rendered.contains("super-secret-seed-bytes"));
+    }
+
+    #[test]
     fn catalog_error_state_recovers_from_a_poisoned_mutex() {
         let client = Client::new(Config {
             hydrate_catalogs: false,

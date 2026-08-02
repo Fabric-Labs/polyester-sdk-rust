@@ -104,24 +104,29 @@ fn risk_leg_from_stop_loss(policy: &StopLossPolicy) -> Option<RiskLeg> {
     decode_risk_leg(policy.trigger_price_ticks, policy.child.as_option())
 }
 
-fn trailing_stop_from_policy(policy: &TrailingStopPolicy) -> TrailingStop {
+#[allow(deprecated)]
+fn trailing_stop_from_policy(policy: &TrailingStopPolicy) -> Option<TrailingStop> {
     let distance = match policy.trailing_distance.as_ref() {
-        Some(trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(v)) => {
+        Some(trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(v)) if *v > 0 => {
             TrailingDistance::Ticks(*v)
         }
-        Some(trailing_stop_policy::TrailingDistance::TrailingDistanceBps(v)) => {
+        Some(trailing_stop_policy::TrailingDistance::TrailingDistanceBps(v)) if *v > 0 => {
             TrailingDistance::Bps(*v)
         }
-        None => TrailingDistance::Ticks(0),
+        // Missing or non-positive distance is not a usable trailing stop; omit
+        // rather than fabricating Ticks(0).
+        _ => return None,
     };
     let max_slippage = match policy.max_slippage.as_ref() {
-        Some(trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)) => {
+        Some(trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)) if *v > 0 => {
             Some(MaxSlippage::Ticks(*v))
         }
-        Some(trailing_stop_policy::MaxSlippage::MaxSlippageBps(v)) => Some(MaxSlippage::Bps(*v)),
-        None => None,
+        Some(trailing_stop_policy::MaxSlippage::MaxSlippageBps(v)) if *v > 0 => {
+            Some(MaxSlippage::Bps(*v))
+        }
+        _ => None,
     };
-    TrailingStop {
+    Some(TrailingStop {
         distance,
         activation_price: if policy.activation_price_ticks > 0 {
             decode_price_ticks(policy.activation_price_ticks, None)
@@ -133,7 +138,7 @@ fn trailing_stop_from_policy(policy: &TrailingStopPolicy) -> TrailingStop {
         trigger_price_source: None,
         order_type: None,
         max_slippage,
-    }
+    })
 }
 
 fn attached_risk_from_proto(msg: &ProtoAttachedRisk) -> Option<AttachedRisk> {
@@ -144,7 +149,7 @@ fn attached_risk_from_proto(msg: &ProtoAttachedRisk) -> Option<AttachedRisk> {
     let trailing_stop = msg
         .trailing_stop
         .as_option()
-        .and_then(|leg| leg.policy.as_option().map(trailing_stop_from_policy));
+        .and_then(|leg| leg.policy.as_option().and_then(trailing_stop_from_policy));
     // Match TS: when trailing is present, stop-loss is suppressed.
     let stop_loss = if trailing_stop.is_some() {
         None
@@ -804,6 +809,32 @@ mod tests {
         assert_eq!(trailing.activation_price.as_ref().unwrap().as_ticks(), 5500);
         assert!(trailing.trigger_price_source.is_none());
         assert!(trailing.order_type.is_none());
+
+        // Missing trailing distance must omit the leg (not fabricate Ticks(0)).
+        let missing_distance = ProtoOrder {
+            order_id: 3,
+            symbol_id: 1,
+            attached_risk: ProtoAttachedRisk {
+                trailing_stop: AttachedRiskTrailingStop {
+                    policy: TrailingStopPolicy {
+                        activation_price_ticks: 5500,
+                        trailing_distance: None,
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        assert!(
+            order_from_proto(&missing_distance)
+                .attached_risk
+                .is_none()
+        );
 
         // A LIMIT stop-loss child projects order_type=limit with its limit price.
         let sl_msg = ProtoOrder {

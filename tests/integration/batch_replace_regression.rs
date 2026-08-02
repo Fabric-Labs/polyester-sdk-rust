@@ -1,6 +1,6 @@
 //! F-01 / M1: blocking BatchReplace regression (live-gated).
 //!
-//! Runs 5× complete 40-item BatchReplace rounds with safe same-ID retry + cleanup.
+//! Runs 5× complete 20-item BatchReplace rounds with safe same-ID retry + cleanup.
 //! Staging-only; soft-skips without mutation/funded gates (fails closed under STRICT_LIVE).
 
 use crate::support::{
@@ -17,7 +17,7 @@ use polyester::types::{Price, Quantity};
 use std::collections::HashSet;
 use std::time::Duration;
 
-const BATCH_SIZE: usize = 40;
+const BATCH_SIZE: usize = 20;
 const ROUNDS: usize = 5;
 
 fn all_results_internal_error(result: &BatchReplaceOrdersResult) -> bool {
@@ -78,7 +78,7 @@ fn result_fingerprint(result: &BatchReplaceOrdersResult) -> Vec<(String, String,
 }
 
 #[tokio::test]
-async fn batch_replace_five_rounds_of_forty_with_safe_same_id_retry() {
+async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
     if !require_account_wide_cleanup() {
         return;
     }

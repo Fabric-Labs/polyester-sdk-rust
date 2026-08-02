@@ -503,28 +503,57 @@ impl OrdersService {
         Ok(policy)
     }
 
+    #[allow(deprecated)]
     fn encode_trailing_stop(
         stop: &TrailingStop,
         symbol: Option<&str>,
     ) -> Result<TrailingStopPolicy> {
         // `trigger_price_source`/`order_type` were dropped from the trailing-stop
         // policy wire; the child is an implicit market execution.
+        if stop.trigger_price_source.is_some() {
+            return Err(Error::validation(
+                "attached risk always uses last trade; trigger_price_source cannot be supplied",
+            ));
+        }
+        if stop.order_type.is_some() {
+            return Err(Error::validation(
+                "attached trailing_stop child is always market; order_type cannot be supplied",
+            ));
+        }
         let mut proto = TrailingStopPolicy::default();
         if let Some(activation) = stop.activation_price.as_ref() {
             proto.activation_price_ticks = resolve_price_ticks(activation, symbol)?;
         }
         proto.trailing_distance = Some(match stop.distance {
             TrailingDistance::Ticks(v) => {
+                if v <= 0 {
+                    return Err(Error::validation(
+                        "trailing_distance_ticks must be positive",
+                    ));
+                }
                 trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(v)
             }
             TrailingDistance::Bps(v) => {
+                if v <= 0 {
+                    return Err(Error::validation("trailing_distance_bps must be positive"));
+                }
                 trailing_stop_policy::TrailingDistance::TrailingDistanceBps(v)
             }
         });
         if let Some(slip) = stop.max_slippage {
             proto.max_slippage = Some(match slip {
-                MaxSlippage::Ticks(v) => trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v),
-                MaxSlippage::Bps(v) => trailing_stop_policy::MaxSlippage::MaxSlippageBps(v),
+                MaxSlippage::Ticks(v) => {
+                    if v <= 0 {
+                        return Err(Error::validation("max_slippage_ticks must be positive"));
+                    }
+                    trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)
+                }
+                MaxSlippage::Bps(v) => {
+                    if v <= 0 {
+                        return Err(Error::validation("max_slippage_bps must be positive"));
+                    }
+                    trailing_stop_policy::MaxSlippage::MaxSlippageBps(v)
+                }
             });
         }
         Ok(proto)
@@ -1415,6 +1444,92 @@ mod tests {
             .unwrap_err();
         assert!(matches!(&err, Error::Validation(_)));
         assert!(err.to_string().contains("always uses last trade"));
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn attached_trailing_stop_validates_positive_fields_and_rejects_silent_compat() {
+        use crate::models::{
+            AttachedRisk, MaxSlippage, TrailingDistance, TrailingStop, TriggerPriceSourceKind,
+        };
+
+        let client = client();
+        let base = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+
+        let mut zero_distance = base.clone();
+        zero_distance.attached_risk = Some(AttachedRisk {
+            trailing_stop: Some(TrailingStop {
+                distance: TrailingDistance::Ticks(0),
+                activation_price: None,
+                trigger_price_source: None,
+                order_type: None,
+                max_slippage: None,
+            }),
+            ..Default::default()
+        });
+        let err = client
+            .orders
+            .encode_create_params(&zero_distance)
+            .unwrap_err();
+        assert!(err.to_string().contains("trailing_distance_ticks must be positive"));
+
+        let mut zero_slip = base.clone();
+        zero_slip.attached_risk = Some(AttachedRisk {
+            trailing_stop: Some(TrailingStop {
+                distance: TrailingDistance::Bps(25),
+                activation_price: None,
+                trigger_price_source: None,
+                order_type: None,
+                max_slippage: Some(MaxSlippage::Ticks(0)),
+            }),
+            ..Default::default()
+        });
+        let err = client.orders.encode_create_params(&zero_slip).unwrap_err();
+        assert!(err.to_string().contains("max_slippage_ticks must be positive"));
+
+        let mut with_source = base.clone();
+        with_source.attached_risk = Some(AttachedRisk {
+            trailing_stop: Some(TrailingStop {
+                distance: TrailingDistance::Bps(25),
+                activation_price: None,
+                trigger_price_source: Some(TriggerPriceSourceKind::IndexPrice),
+                order_type: None,
+                max_slippage: None,
+            }),
+            ..Default::default()
+        });
+        let err = client
+            .orders
+            .encode_create_params(&with_source)
+            .unwrap_err();
+        assert!(err.to_string().contains("always uses last trade"));
+
+        let mut with_order_type = base;
+        with_order_type.attached_risk = Some(AttachedRisk {
+            trailing_stop: Some(TrailingStop {
+                distance: TrailingDistance::Bps(25),
+                activation_price: None,
+                trigger_price_source: None,
+                order_type: Some(CreateOrderType::Limit),
+                max_slippage: None,
+            }),
+            ..Default::default()
+        });
+        let err = client
+            .orders
+            .encode_create_params(&with_order_type)
+            .unwrap_err();
+        assert!(err.to_string().contains("always market"));
     }
 
     #[test]

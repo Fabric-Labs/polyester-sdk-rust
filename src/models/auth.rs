@@ -1,5 +1,7 @@
 //! Auth-related SDK models.
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -52,10 +54,25 @@ pub struct AccountIdentity {
 }
 
 /// Locally generated Ed25519 keypair for API key creation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// [`Debug`] redacts secret material so accidental logging cannot leak the
+/// private key. Read `secret_key_hex` / `secret_key` explicitly when you need
+/// the secret.
+#[derive(Clone, PartialEq, Eq)]
 pub struct Ed25519Keypair {
     pub public_key_hex: String,
     pub secret_key_hex: String,
     pub public_key: Vec<u8>,
     pub secret_key: Vec<u8>,
+}
+
+impl fmt::Debug for Ed25519Keypair {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Ed25519Keypair")
+            .field("public_key_hex", &self.public_key_hex)
+            .field("secret_key_hex", &"[REDACTED]")
+            .field("public_key", &self.public_key)
+            .field("secret_key", &"[REDACTED]")
+            .finish()
+    }
 }

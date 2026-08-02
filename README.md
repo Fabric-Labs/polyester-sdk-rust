@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.26`, git tag `v0.1.0a26`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.27`, git tag `v0.1.0a27`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.26"
+polyester-sdk = "0.1.0-alpha.27"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -79,7 +79,7 @@ For a private git checkout instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a26" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a27" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -629,10 +629,11 @@ CI refreshes `sdk-capabilities.json` and the README capability table on pushes t
 `main` when they drift (not on pull-request CI).
 
 CI runs unit/lib and compile-fail UI tests only (`cargo test --lib --test ui`).
-Live integration tests under `tests/integration/` are **not** part of CI. They need
-`POLYESTER_API_KEY_ID` / `POLYESTER_API_PRIVATE_KEY` (and usually
-`POLYESTER_ACCOUNT_ID`). Without those env vars they soft-skip unless
-`POLYESTER_TEST_STRICT_LIVE=1` is set.
+Live integration tests under `tests/integration/` (and `a7_strict_live`, which shells out to
+them) are **not** part of CI and are **excluded from the crates.io package**. Run them from a
+git checkout of this repository. They need `POLYESTER_API_KEY_ID` /
+`POLYESTER_API_PRIVATE_KEY` (and usually `POLYESTER_ACCOUNT_ID`). Without those env vars they
+soft-skip unless `POLYESTER_TEST_STRICT_LIVE=1` is set.
 
 Optional tiers (same gates as Go/Python):
 
