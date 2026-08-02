@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a26
+
+Package version: `0.1.0-alpha.26`. Git tag: `v0.1.0a26`.
+
 ### Breaking
 - Trigger snapshots no longer expose `child_order_ids`. Child-order history is
   authoritative on trigger events: set `ListTriggerEventsRequest.event_type` to
