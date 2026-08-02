@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.1.0a26
+
+Package version: `0.1.0-alpha.26`. Git tag: `v0.1.0a26`.
+
+### Breaking
+- Trigger snapshots no longer expose `child_order_ids`. Child-order history is
+  authoritative on trigger events: set `ListTriggerEventsRequest.event_type` to
+  `EVENT_FIRED` and read `child_order_id` / `child_seq` from decoded events.
+- Decoded `TriggerEvent.event_type` labels are now `fired` / `canceled` /
+  `updated` (not proto names like `EVENT_FIRED`).
+
+### Added
+- `ListTriggerEventsRequest.event_type` is available on the generated request
+  (optional filter).
+- `TriggerEvent` thickens with `subaccount_id`, `symbol_id`, `trigger_type`,
+  `child_seq`, `child_order_id`, `fire_price`, and `reason`.
+
 ## 0.1.0a25
 
 Package version: `0.1.0-alpha.25`. Git tag: `v0.1.0a25`.
