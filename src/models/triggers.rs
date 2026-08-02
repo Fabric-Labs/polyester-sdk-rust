@@ -150,7 +150,6 @@ pub struct Trigger {
     pub updated_at: Option<Timestamp>,
     pub armed_at: Option<Timestamp>,
     pub completed_at: Option<Timestamp>,
-    pub child_order_ids: Vec<String>,
     pub details: Option<TriggerDetails>,
 }
 
@@ -171,8 +170,15 @@ pub struct TriggerMutationResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TriggerEvent {
     pub trigger_id: String,
+    pub subaccount_id: String,
+    pub symbol_id: u32,
+    pub trigger_type: String,
     pub event_type: String,
     pub ts_ns: String,
+    pub child_seq: i32,
+    pub child_order_id: String,
+    pub fire_price: Option<Price>,
+    pub reason: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
