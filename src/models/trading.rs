@@ -207,11 +207,26 @@ pub enum MaxSlippage {
 }
 
 /// Trailing-stop attached-risk leg.
+///
+/// Distance and optional max slippage must be positive. The child is always a
+/// market-IOC execution evaluated against last trade; supplying
+/// [`trigger_price_source`](Self::trigger_price_source) or
+/// [`order_type`](Self::order_type) is rejected.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrailingStop {
     pub distance: TrailingDistance,
     pub activation_price: Option<Price>,
+    /// Deprecated for attached trailing: any supplied value is rejected because
+    /// the wire contract always evaluates against last trade.
+    #[deprecated(
+        note = "attached trailing always uses last trade; supplying trigger_price_source is rejected"
+    )]
     pub trigger_price_source: Option<TriggerPriceSourceKind>,
+    /// Deprecated for attached trailing: any supplied value is rejected because
+    /// the child is always an implicit market execution.
+    #[deprecated(
+        note = "attached trailing child is always market; supplying order_type is rejected"
+    )]
     pub order_type: Option<CreateOrderType>,
     pub max_slippage: Option<MaxSlippage>,
 }

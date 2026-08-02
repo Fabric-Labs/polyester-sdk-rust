@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.1.0a27
+
+Package version: `0.1.0-alpha.27`. Git tag: `v0.1.0a27`.
+
+### Fixed
+- `Ed25519Keypair` `Debug` redacts `secret_key_hex` / `secret_key` (same posture as `Config`).
+- Attached `TrailingStop` encode rejects non-positive distance/max slippage and rejects
+  supplied `trigger_price_source` / `order_type` instead of silently ignoring them.
+- Decode omits attached trailing legs that lack a positive distance (no fabricated
+  `Ticks(0)` stop).
+
+### Docs
+- README / installation: live integration + `a7_strict_live` require a git checkout;
+  those paths are excluded from the crates.io package.
+
 ## 0.1.0a26
 
 Package version: `0.1.0-alpha.26`. Git tag: `v0.1.0a26`.
