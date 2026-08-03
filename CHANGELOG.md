@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.1.0a28
+
+Package version: `0.1.0-alpha.28`. Git tag: `v0.1.0a28`.
+
+### Docs
+- crates.io documentation URL points to the Rust SDK docs on polyester.ai
+  (`/docs/sdk/rust/get-started/overview`).
+
 ## 0.1.0a27
 
 Package version: `0.1.0-alpha.27`. Git tag: `v0.1.0a27`.
