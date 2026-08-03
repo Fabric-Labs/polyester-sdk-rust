@@ -175,6 +175,8 @@ pub trait WithdrawService: Send + Sync + 'static {
         >,
     > + Send;
     /// Create or return one wallet/JWT withdraw from Trading.
+    /// Own-account Trading to Funding accepts recent MFA; external, cross-owner,
+    /// and delegated movements require a fresh single-use step-up.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

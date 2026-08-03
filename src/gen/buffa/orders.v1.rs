@@ -15339,8 +15339,7 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub self_trade_prevention_mode: ::buffa::EnumValue<SelfTradePreventionMode>,
-    /// Fee asset selected for fills. This also determines the decode scale
-    /// for fee_scaled and referral_share_scaled on user trade rows.
+    /// Fee asset selected for fills.
     ///
     /// Field 10: `fee_asset`
     #[serde(
@@ -16219,20 +16218,16 @@ pub struct UserTrade {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub qty_scaled: i64,
-    /// Fee amount in the charged asset's scale. Use quote_quantity_scale when
-    /// fee_asset is QUOTE or UNSPECIFIED; use base_quantity_scale when fee_asset
-    /// is BASE.
+    /// Exact fee magnitude in fixed 18-decimal units of fee_asset.
     ///
-    /// Field 9: `fee_scaled`
+    /// Field 9: `fee_amount_e18`
     #[serde(
-        rename = "feeScaled",
-        alias = "fee_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+        rename = "feeAmountE18",
+        alias = "fee_amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub fee_scaled: i64,
-    /// Fee asset charged for this fill. This determines how to decode fee_scaled
-    /// and referral_share_scaled.
+    pub fee_amount_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// Fee asset charged or credited for this fill.
     ///
     /// Field 10: `fee_asset`
     #[serde(
@@ -16242,17 +16237,17 @@ pub struct UserTrade {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub fee_asset: ::buffa::EnumValue<FeeAsset>,
-    /// Referral share amount in the same denomination and scale as fee_scaled for
-    /// this fill.
+    /// Exact referral share magnitude in fixed 18-decimal units of fee_asset.
     ///
-    /// Field 12: `referral_share_scaled`
+    /// Field 12: `referral_share_amount_e18`
     #[serde(
-        rename = "referralShareScaled",
-        alias = "referral_share_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+        rename = "referralShareAmountE18",
+        alias = "referral_share_amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub referral_share_scaled: i64,
+    pub referral_share_amount_e18: ::buffa::MessageField<
+        super::super::polyester::r#type::v1::U128,
+    >,
     /// Execution timestamp in nanoseconds since epoch.
     ///
     /// Field 13: `ts_ns`
@@ -16263,6 +16258,16 @@ pub struct UserTrade {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_ns: u64,
+    /// True when the fee debits the participant. False indicates a rebate or no fee.
+    ///
+    /// Field 14: `fee_is_debit`
+    #[serde(
+        rename = "feeIsDebit",
+        alias = "fee_is_debit",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub fee_is_debit: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -16277,10 +16282,11 @@ impl ::core::fmt::Debug for UserTrade {
             .field("is_maker", &self.is_maker)
             .field("price_ticks", &self.price_ticks)
             .field("qty_scaled", &self.qty_scaled)
-            .field("fee_scaled", &self.fee_scaled)
+            .field("fee_amount_e18", &self.fee_amount_e18)
             .field("fee_asset", &self.fee_asset)
-            .field("referral_share_scaled", &self.referral_share_scaled)
+            .field("referral_share_amount_e18", &self.referral_share_amount_e18)
             .field("ts_ns", &self.ts_ns)
+            .field("fee_is_debit", &self.fee_is_debit)
             .finish()
     }
 }
@@ -16305,7 +16311,7 @@ impl ::buffa::Message for UserTrade {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -16333,8 +16339,13 @@ impl ::buffa::Message for UserTrade {
         if self.qty_scaled != 0i64 {
             size += 1u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
         }
-        if self.fee_scaled != 0i64 {
-            size += 1u32 + ::buffa::types::int64_encoded_len(self.fee_scaled) as u32;
+        if self.fee_amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.fee_amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
         }
         {
             let val = self.fee_asset.to_i32();
@@ -16342,21 +16353,26 @@ impl ::buffa::Message for UserTrade {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
-        if self.referral_share_scaled != 0i64 {
+        if self.referral_share_amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.referral_share_amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
             size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(self.referral_share_scaled)
-                        as u32;
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
         }
         if self.ts_ns != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+        }
+        if self.fee_is_debit {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -16385,8 +16401,9 @@ impl ::buffa::Message for UserTrade {
         if self.qty_scaled != 0i64 {
             ::buffa::types::put_int64_field(8u32, self.qty_scaled, buf);
         }
-        if self.fee_scaled != 0i64 {
-            ::buffa::types::put_int64_field(9u32, self.fee_scaled, buf);
+        if self.fee_amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(9u32, __cache.consume_next(), buf);
+            self.fee_amount_e18.write_to(__cache, buf);
         }
         {
             let val = self.fee_asset.to_i32();
@@ -16394,11 +16411,15 @@ impl ::buffa::Message for UserTrade {
                 ::buffa::types::put_int32_field(10u32, val, buf);
             }
         }
-        if self.referral_share_scaled != 0i64 {
-            ::buffa::types::put_int64_field(12u32, self.referral_share_scaled, buf);
+        if self.referral_share_amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(12u32, __cache.consume_next(), buf);
+            self.referral_share_amount_e18.write_to(__cache, buf);
         }
         if self.ts_ns != 0u64 {
             ::buffa::types::put_uint64_field(13u32, self.ts_ns, buf);
+        }
+        if self.fee_is_debit {
+            ::buffa::types::put_bool_field(14u32, self.fee_is_debit, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -16465,9 +16486,13 @@ impl ::buffa::Message for UserTrade {
             9u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.fee_scaled = ::buffa::types::decode_int64(buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.fee_amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             10u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -16481,9 +16506,13 @@ impl ::buffa::Message for UserTrade {
             12u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Varint,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.referral_share_scaled = ::buffa::types::decode_int64(buf)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.referral_share_amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             13u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -16491,6 +16520,13 @@ impl ::buffa::Message for UserTrade {
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fee_is_debit = ::buffa::types::decode_bool(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -16507,10 +16543,11 @@ impl ::buffa::Message for UserTrade {
         self.is_maker = false;
         self.price_ticks = 0i64;
         self.qty_scaled = 0i64;
-        self.fee_scaled = 0i64;
+        self.fee_amount_e18 = ::buffa::MessageField::none();
         self.fee_asset = ::buffa::EnumValue::from(0);
-        self.referral_share_scaled = 0i64;
+        self.referral_share_amount_e18 = ::buffa::MessageField::none();
         self.ts_ns = 0u64;
+        self.fee_is_debit = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -38868,8 +38905,7 @@ pub mod __buffa {
             pub self_trade_prevention_mode: ::buffa::EnumValue<
                 super::super::SelfTradePreventionMode,
             >,
-            /// Fee asset selected for fills. This also determines the decode scale
-            /// for fee_scaled and referral_share_scaled on user trade rows.
+            /// Fee asset selected for fills.
             ///
             /// Field 10: `fee_asset`
             pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
@@ -39962,8 +39998,7 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::SelfTradePreventionMode> {
                 self.0.reborrow().self_trade_prevention_mode
             }
-            /// Fee asset selected for fills. This also determines the decode scale
-            /// for fee_scaled and referral_share_scaled on user trade rows.
+            /// Fee asset selected for fills.
             ///
             /// Field 10: `fee_asset`
             #[must_use]
@@ -40178,26 +40213,34 @@ pub mod __buffa {
             ///
             /// Field 8: `qty_scaled`
             pub qty_scaled: i64,
-            /// Fee amount in the charged asset's scale. Use quote_quantity_scale when
-            /// fee_asset is QUOTE or UNSPECIFIED; use base_quantity_scale when fee_asset
-            /// is BASE.
+            /// Exact fee magnitude in fixed 18-decimal units of fee_asset.
             ///
-            /// Field 9: `fee_scaled`
-            pub fee_scaled: i64,
-            /// Fee asset charged for this fill. This determines how to decode fee_scaled
-            /// and referral_share_scaled.
+            /// Field 9: `fee_amount_e18`
+            pub fee_amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Fee asset charged or credited for this fill.
             ///
             /// Field 10: `fee_asset`
             pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
-            /// Referral share amount in the same denomination and scale as fee_scaled for
-            /// this fill.
+            /// Exact referral share magnitude in fixed 18-decimal units of fee_asset.
             ///
-            /// Field 12: `referral_share_scaled`
-            pub referral_share_scaled: i64,
+            /// Field 12: `referral_share_amount_e18`
+            pub referral_share_amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
             /// Execution timestamp in nanoseconds since epoch.
             ///
             /// Field 13: `ts_ns`
             pub ts_ns: u64,
+            /// True when the fee debits the participant. False indicates a rebate or no fee.
+            ///
+            /// Field 14: `fee_is_debit`
+            pub fee_is_debit: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UserTradeView<'a> {
@@ -40285,9 +40328,27 @@ pub mod __buffa {
                     9u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.fee_scaled = ::buffa::types::decode_int64(&mut cur)?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.fee_amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.fee_amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     10u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -40301,11 +40362,27 @@ pub mod __buffa {
                     12u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Varint,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.referral_share_scaled = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.referral_share_amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.referral_share_amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     13u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -40313,6 +40390,13 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fee_is_debit = ::buffa::types::decode_bool(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -40344,10 +40428,28 @@ pub mod __buffa {
                     is_maker: self.is_maker,
                     price_ticks: self.price_ticks,
                     qty_scaled: self.qty_scaled,
-                    fee_scaled: self.fee_scaled,
+                    fee_amount_e18: match self.fee_amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     fee_asset: self.fee_asset,
-                    referral_share_scaled: self.referral_share_scaled,
+                    referral_share_amount_e18: match self
+                        .referral_share_amount_e18
+                        .as_option()
+                    {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     ts_ns: self.ts_ns,
+                    fee_is_debit: self.fee_is_debit,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -40358,7 +40460,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for UserTradeView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -40394,10 +40496,13 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
                 }
-                if self.fee_scaled != 0i64 {
+                if self.fee_amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.fee_amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
                     size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.fee_scaled) as u32;
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
                 }
                 {
                     let val = self.fee_asset.to_i32();
@@ -40405,15 +40510,21 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
-                if self.referral_share_scaled != 0i64 {
+                if self.referral_share_amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self
+                        .referral_share_amount_e18
+                        .compute_size(__cache);
+                    __cache.set(__slot, inner_size);
                     size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.referral_share_scaled,
-                            ) as u32;
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
                 }
                 if self.ts_ns != 0u64 {
                     size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+                }
+                if self.fee_is_debit {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -40421,7 +40532,7 @@ pub mod __buffa {
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -40450,8 +40561,13 @@ pub mod __buffa {
                 if self.qty_scaled != 0i64 {
                     ::buffa::types::put_int64_field(8u32, self.qty_scaled, buf);
                 }
-                if self.fee_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(9u32, self.fee_scaled, buf);
+                if self.fee_amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.fee_amount_e18.write_to(__cache, buf);
                 }
                 {
                     let val = self.fee_asset.to_i32();
@@ -40459,15 +40575,19 @@ pub mod __buffa {
                         ::buffa::types::put_int32_field(10u32, val, buf);
                     }
                 }
-                if self.referral_share_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(
+                if self.referral_share_amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
                         12u32,
-                        self.referral_share_scaled,
+                        __cache.consume_next(),
                         buf,
                     );
+                    self.referral_share_amount_e18.write_to(__cache, buf);
                 }
                 if self.ts_ns != 0u64 {
                     ::buffa::types::put_uint64_field(13u32, self.ts_ns, buf);
+                }
+                if self.fee_is_debit {
+                    ::buffa::types::put_bool_field(14u32, self.fee_is_debit, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -40531,28 +40651,26 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.fee_scaled) {
-                    __map
-                        .serialize_entry(
-                            "feeScaled",
-                            &::buffa::json_helpers::ProtoJson(&self.fee_scaled),
-                        )?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .fee_amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("feeAmountE18", __v)?;
+                    }
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.fee_asset,
                 ) {
                     __map.serialize_entry("feeAsset", &self.fee_asset)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.referral_share_scaled,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "referralShareScaled",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.referral_share_scaled,
-                            ),
-                        )?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .referral_share_amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("referralShareAmountE18", __v)?;
+                    }
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.ts_ns) {
                     __map
@@ -40560,6 +40678,9 @@ pub mod __buffa {
                             "tsNs",
                             &::buffa::json_helpers::ProtoJson(&self.ts_ns),
                         )?;
+                }
+                if self.fee_is_debit {
+                    __map.serialize_entry("feeIsDebit", &self.fee_is_debit)?;
                 }
                 __map.end()
             }
@@ -40702,30 +40823,38 @@ pub mod __buffa {
             pub fn qty_scaled(&self) -> i64 {
                 self.0.reborrow().qty_scaled
             }
-            /// Fee amount in the charged asset's scale. Use quote_quantity_scale when
-            /// fee_asset is QUOTE or UNSPECIFIED; use base_quantity_scale when fee_asset
-            /// is BASE.
+            /// Exact fee magnitude in fixed 18-decimal units of fee_asset.
             ///
-            /// Field 9: `fee_scaled`
+            /// Field 9: `fee_amount_e18`
             #[must_use]
-            pub fn fee_scaled(&self) -> i64 {
-                self.0.reborrow().fee_scaled
+            pub fn fee_amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().fee_amount_e18
             }
-            /// Fee asset charged for this fill. This determines how to decode fee_scaled
-            /// and referral_share_scaled.
+            /// Fee asset charged or credited for this fill.
             ///
             /// Field 10: `fee_asset`
             #[must_use]
             pub fn fee_asset(&self) -> ::buffa::EnumValue<super::super::FeeAsset> {
                 self.0.reborrow().fee_asset
             }
-            /// Referral share amount in the same denomination and scale as fee_scaled for
-            /// this fill.
+            /// Exact referral share magnitude in fixed 18-decimal units of fee_asset.
             ///
-            /// Field 12: `referral_share_scaled`
+            /// Field 12: `referral_share_amount_e18`
             #[must_use]
-            pub fn referral_share_scaled(&self) -> i64 {
-                self.0.reborrow().referral_share_scaled
+            pub fn referral_share_amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().referral_share_amount_e18
             }
             /// Execution timestamp in nanoseconds since epoch.
             ///
@@ -40733,6 +40862,13 @@ pub mod __buffa {
             #[must_use]
             pub fn ts_ns(&self) -> u64 {
                 self.0.reborrow().ts_ns
+            }
+            /// True when the fee debits the participant. False indicates a rebate or no fee.
+            ///
+            /// Field 14: `fee_is_debit`
+            #[must_use]
+            pub fn fee_is_debit(&self) -> bool {
+                self.0.reborrow().fee_is_debit
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<UserTradeView<'static>>>
