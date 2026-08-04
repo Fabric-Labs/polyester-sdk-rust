@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.29`, git tag `v0.1.0a29`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.30`, git tag `v0.1.0a30`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.29"
+polyester-sdk = "0.1.0-alpha.30"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -79,7 +79,7 @@ For a private git checkout instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a29" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a30" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -343,6 +343,17 @@ instrument/domain matches. Transfers and trading withdraws use `AssetAmount`
 
 Your API key needs a policy that allows trading. Spot orders spend **trading**
 balance (see below).
+
+## User trade fees
+
+`UserTrade` fee fields are fixed **18-decimal** magnitudes of `fee_asset`
+(`fee_amount_e18`, `referral_share_amount_e18`), not catalog asset-scaled
+integers. Convert e18 → the fee asset's catalog scale before subtracting from a
+BUY fill's base quantity.
+
+Magnitudes are unsigned. Treat `fee_amount_e18` as a **debit** unless
+`fee_is_rebate` is true (then it is a **credit**). Proto3 omits false, so the
+rebate flag is sparse on the wire.
 
 ## Triggers
 

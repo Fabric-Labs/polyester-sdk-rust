@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.0a30
+
+Package version: `0.1.0-alpha.30`. Git tag: `v0.1.0a30`.
+
+### Docs
+- README documents `UserTrade` fee e18 fields and `fee_is_rebate` polarity.
+
 ## 0.1.0a29
 
 Package version: `0.1.0-alpha.29`. Git tag: `v0.1.0a29`.
