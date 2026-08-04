@@ -831,11 +831,7 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        assert!(
-            order_from_proto(&missing_distance)
-                .attached_risk
-                .is_none()
-        );
+        assert!(order_from_proto(&missing_distance).attached_risk.is_none());
 
         // A LIMIT stop-loss child projects order_type=limit with its limit price.
         let sl_msg = ProtoOrder {
