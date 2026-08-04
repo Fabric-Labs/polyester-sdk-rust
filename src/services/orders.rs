@@ -1481,7 +1481,10 @@ mod tests {
             .orders
             .encode_create_params(&zero_distance)
             .unwrap_err();
-        assert!(err.to_string().contains("trailing_distance_ticks must be positive"));
+        assert!(
+            err.to_string()
+                .contains("trailing_distance_ticks must be positive")
+        );
 
         let mut zero_slip = base.clone();
         zero_slip.attached_risk = Some(AttachedRisk {
@@ -1495,7 +1498,10 @@ mod tests {
             ..Default::default()
         });
         let err = client.orders.encode_create_params(&zero_slip).unwrap_err();
-        assert!(err.to_string().contains("max_slippage_ticks must be positive"));
+        assert!(
+            err.to_string()
+                .contains("max_slippage_ticks must be positive")
+        );
 
         let mut with_source = base.clone();
         with_source.attached_risk = Some(AttachedRisk {

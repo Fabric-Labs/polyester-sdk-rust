@@ -44,7 +44,8 @@ fn fee_amount_e18_to_asset_scaled(fee_e18: &str, asset_scale: u32) -> Result<i64
     }
     let diff = polyester::codecs::LEDGER_SCALE - asset_scale;
     if diff == 0 {
-        return i64::try_from(value).map_err(|_| format!("fee_amount_e18 {fee_e18:?} overflows i64"));
+        return i64::try_from(value)
+            .map_err(|_| format!("fee_amount_e18 {fee_e18:?} overflows i64"));
     }
     let divisor = 10u128
         .checked_pow(diff)
