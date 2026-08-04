@@ -32,6 +32,31 @@ async fn cancel_test_order(
     }
 }
 
+fn fee_amount_e18_to_asset_scaled(fee_e18: &str, asset_scale: u32) -> Result<i64, String> {
+    if fee_e18.is_empty() || fee_e18 == "0" {
+        return Ok(0);
+    }
+    let value = fee_e18
+        .parse::<u128>()
+        .map_err(|err| format!("invalid fee_amount_e18 {fee_e18:?}: {err}"))?;
+    if asset_scale > polyester::codecs::LEDGER_SCALE {
+        return Err(format!("invalid asset scale {asset_scale}"));
+    }
+    let diff = polyester::codecs::LEDGER_SCALE - asset_scale;
+    if diff == 0 {
+        return i64::try_from(value).map_err(|_| format!("fee_amount_e18 {fee_e18:?} overflows i64"));
+    }
+    let divisor = 10u128
+        .checked_pow(diff)
+        .ok_or_else(|| format!("scale diff {diff} overflows"))?;
+    if value % divisor != 0 {
+        return Err(format!(
+            "fee_amount_e18 {fee_e18:?} not exact at scale {asset_scale}"
+        ));
+    }
+    i64::try_from(value / divisor).map_err(|_| "fee at asset scale overflows i64".to_owned())
+}
+
 #[tokio::test]
 async fn market_buy_sell_roundtrip_carries_filled_qty() {
     if !require_mutation() {
@@ -220,10 +245,9 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         .iter()
         .filter(|trade| trade.fee_asset == "base")
         .map(|trade| {
-            trade
-                .fee_scaled
-                .parse::<i64>()
-                .expect("received-asset fee must be an i64")
+            let fee = fee_amount_e18_to_asset_scaled(&trade.fee_amount_e18, scale)
+                .expect("received-asset fee_amount_e18 must convert to asset scale");
+            if trade.fee_is_rebate { -fee } else { fee }
         })
         .try_fold(0_i64, i64::checked_add)
         .expect("received-asset fee sum overflow");
@@ -378,16 +402,33 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         panic!("reserved balance must reconcile: {err}");
     }
 
+    // Trading base can also lag settlement briefly after a filled cleanup SELL.
+    let mut base_after = None;
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    while std::time::Instant::now() < deadline {
+        let balances_after = client
+            .balances
+            .list(GetBalancesRequest::default())
+            .await
+            .expect("balances.list after");
+        let current = trading_balance_raw(&balances_after.balances, base_id);
+        if current == base_before {
+            base_after = Some(current);
+            break;
+        }
+        base_after = Some(current);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    assert_eq!(
+        base_after.expect("base balance poll"),
+        base_before,
+        "residual base position must return to before (exact scaled units)"
+    );
     let balances_after = client
         .balances
         .list(GetBalancesRequest::default())
         .await
         .expect("balances.list after");
-    let base_after = trading_balance_raw(&balances_after.balances, base_id);
-    assert_eq!(
-        base_after, base_before,
-        "residual base position must return to before (exact scaled units)"
-    );
     let base_reserved_after = reserved_balance_raw(&balances_after.balances, base_id);
     assert_eq!(
         base_reserved_after, base_reserved_before,

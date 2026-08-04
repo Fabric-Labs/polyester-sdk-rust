@@ -2379,9 +2379,19 @@ async fn l2_wait_for_order_trades_complete_polls_get_order_until_trade_sum_match
                     UserTrade {
                         symbol_id: 1,
                         qty_scaled: 40,
-                        fee_scaled: 1,
+                        fee_amount_e18: polyester::proto::polyester::r#type::v1::U128 {
+                            hi: 0,
+                            lo: 1,
+                            ..Default::default()
+                        }
+                        .into(),
                         fee_asset: polyester::proto::orders::v1::FeeAsset::Base.into(),
-                        referral_share_scaled: 1,
+                        referral_share_amount_e18: polyester::proto::polyester::r#type::v1::U128 {
+                            hi: 0,
+                            lo: 1,
+                            ..Default::default()
+                        }
+                        .into(),
                         ..Default::default()
                     },
                     UserTrade {
@@ -2428,8 +2438,9 @@ async fn l2_wait_for_order_trades_complete_polls_get_order_until_trade_sum_match
     assert_eq!(cum, 100);
     assert_eq!(sum, 100);
     assert_eq!(result.trades[0].fee_asset, "base");
-    assert_eq!(result.trades[0].fee_scaled, "1");
-    assert_eq!(result.trades[0].referral_share_scaled, "1");
+    assert_eq!(result.trades[0].fee_amount_e18, "1");
+    assert_eq!(result.trades[0].referral_share_amount_e18, "1");
+    assert!(!result.trades[0].fee_is_rebate);
 }
 
 #[tokio::test]

@@ -1914,10 +1914,11 @@ mod tests {
                     )
                     .unwrap(),
                 ),
-                fee_scaled: "0".into(),
+                fee_amount_e18: "0".into(),
                 fee_asset: "quote".into(),
-                referral_share_scaled: "0".into(),
+                referral_share_amount_e18: "0".into(),
                 ts_ns: String::new(),
+                fee_is_rebate: false,
             }],
         };
         assert!(order_trades_projection_complete(&complete));
