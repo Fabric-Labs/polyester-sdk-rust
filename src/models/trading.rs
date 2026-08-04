@@ -61,12 +61,17 @@ pub struct UserTrade {
     pub is_maker: bool,
     pub price: Option<Price>,
     pub qty: Option<Quantity>,
-    pub fee_scaled: String,
-    /// Asset used to pay the fee: `quote`, `base`, or an
+    /// Exact fee magnitude in fixed 18-decimal units of `fee_asset`.
+    pub fee_amount_e18: String,
+    /// Asset used to pay/credit the fee: `quote`, `base`, or an
     /// `UNKNOWN(<number>)` forward-compatible enum value.
     pub fee_asset: String,
-    pub referral_share_scaled: String,
+    /// Exact referral share magnitude in fixed 18-decimal units of `fee_asset`.
+    pub referral_share_amount_e18: String,
     pub ts_ns: String,
+    /// True when `fee_amount_e18` is a rebate credit instead of a fee debit.
+    /// Proto3 omits false, so sparse wire encoding only sets this for rebates.
+    pub fee_is_rebate: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

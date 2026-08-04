@@ -8,7 +8,7 @@ use super::money::{
     decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled,
     decode_qty_scaled_allow_zero,
 };
-use crate::codecs::scalars::format_uint64_id;
+use crate::codecs::scalars::{format_uint64_id, u128_to_str};
 use crate::errors::{Error, Result};
 use crate::models::{
     AttachedRisk, BatchCancelOrdersResult, BatchCancelResultItem, BatchCreateOrdersResult,
@@ -28,6 +28,7 @@ use crate::proto::orders::v1::{
     TrailingStopPolicy, UserTrade as ProtoUserTrade, batch_create_result_item, risk_execution,
     trailing_stop_policy,
 };
+use crate::proto::polyester::r#type::v1::U128;
 use buffa::Enumeration;
 
 pub fn order_from_proto(msg: &ProtoOrder) -> Order {
@@ -203,22 +204,22 @@ pub fn user_trade_from_proto(msg: &ProtoUserTrade) -> UserTrade {
         is_maker: msg.is_maker,
         price: decode_price_ticks(msg.price_ticks, None),
         qty: decode_qty_scaled(msg.qty_scaled, None, None, symbol_id_opt),
-        fee_scaled: if msg.fee_scaled == 0 {
-            String::new()
-        } else {
-            msg.fee_scaled.to_string()
-        },
+        fee_amount_e18: u128_field(msg.fee_amount_e18.as_option()),
         fee_asset: enum_value_fee_asset(msg.fee_asset),
-        referral_share_scaled: if msg.referral_share_scaled == 0 {
-            String::new()
-        } else {
-            msg.referral_share_scaled.to_string()
-        },
+        referral_share_amount_e18: u128_field(msg.referral_share_amount_e18.as_option()),
         ts_ns: if msg.ts_ns == 0 {
             String::new()
         } else {
             msg.ts_ns.to_string()
         },
+        fee_is_rebate: msg.fee_is_rebate,
+    }
+}
+
+fn u128_field(msg: Option<&U128>) -> String {
+    match msg {
+        Some(u) => u128_to_str(u.hi, u.lo),
+        None => "0".to_owned(),
     }
 }
 
@@ -922,9 +923,20 @@ mod tests {
                 match_id: 99,
                 order_id: 7,
                 side: Side::Buy.into(),
-                fee_scaled: 5,
+                fee_amount_e18: crate::proto::polyester::r#type::v1::U128 {
+                    hi: 0,
+                    lo: 5,
+                    ..Default::default()
+                }
+                .into(),
                 fee_asset: crate::proto::orders::v1::FeeAsset::Base.into(),
-                referral_share_scaled: 2,
+                referral_share_amount_e18: crate::proto::polyester::r#type::v1::U128 {
+                    hi: 0,
+                    lo: 2,
+                    ..Default::default()
+                }
+                .into(),
+                fee_is_rebate: true,
                 ..Default::default()
             }],
             ..Default::default()
@@ -933,9 +945,10 @@ mod tests {
         assert_eq!(result.order.as_ref().unwrap().order_id, format_uint64_id(7));
         assert_eq!(result.trades.len(), 1);
         assert_eq!(result.trades[0].match_id, "99");
-        assert_eq!(result.trades[0].fee_scaled, "5");
+        assert_eq!(result.trades[0].fee_amount_e18, "5");
         assert_eq!(result.trades[0].fee_asset, "base");
-        assert_eq!(result.trades[0].referral_share_scaled, "2");
+        assert_eq!(result.trades[0].referral_share_amount_e18, "2");
+        assert!(result.trades[0].fee_is_rebate);
     }
 
     #[test]
