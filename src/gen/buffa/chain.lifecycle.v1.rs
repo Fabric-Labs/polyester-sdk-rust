@@ -183,6 +183,12 @@ pub enum LifecycleReason {
     LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND = 203i32,
     /// Ledger settlement reported that this transfer id is already marked failed.
     LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED = 204i32,
+    /// A trading withdrawal was denied by the account's active transfer policy.
+    TRADING_WITHDRAW_POLICY_DENIED = 300i32,
+    /// A trading withdrawal was rejected before submission by its destination contract.
+    TRADING_WITHDRAW_CONTRACT_REVERTED = 301i32,
+    /// A trading withdrawal could not be submitted because execution failed.
+    TRADING_WITHDRAW_EXECUTION_FAILED = 302i32,
 }
 impl LifecycleReason {
     ///Idiomatic alias for [`Self::REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -215,6 +221,15 @@ impl LifecycleReason {
     ///Idiomatic alias for [`Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const LedgerMirrorTransferIdAlreadyFailed: Self = Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED;
+    ///Idiomatic alias for [`Self::TRADING_WITHDRAW_POLICY_DENIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TradingWithdrawPolicyDenied: Self = Self::TRADING_WITHDRAW_POLICY_DENIED;
+    ///Idiomatic alias for [`Self::TRADING_WITHDRAW_CONTRACT_REVERTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TradingWithdrawContractReverted: Self = Self::TRADING_WITHDRAW_CONTRACT_REVERTED;
+    ///Idiomatic alias for [`Self::TRADING_WITHDRAW_EXECUTION_FAILED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TradingWithdrawExecutionFailed: Self = Self::TRADING_WITHDRAW_EXECUTION_FAILED;
 }
 impl ::core::default::Default for LifecycleReason {
     fn default() -> Self {
@@ -336,6 +351,13 @@ impl ::buffa::Enumeration for LifecycleReason {
                     Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED,
                 )
             }
+            300i32 => ::core::option::Option::Some(Self::TRADING_WITHDRAW_POLICY_DENIED),
+            301i32 => {
+                ::core::option::Option::Some(Self::TRADING_WITHDRAW_CONTRACT_REVERTED)
+            }
+            302i32 => {
+                ::core::option::Option::Some(Self::TRADING_WITHDRAW_EXECUTION_FAILED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -359,6 +381,13 @@ impl ::buffa::Enumeration for LifecycleReason {
             }
             Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED => {
                 "LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED"
+            }
+            Self::TRADING_WITHDRAW_POLICY_DENIED => "TRADING_WITHDRAW_POLICY_DENIED",
+            Self::TRADING_WITHDRAW_CONTRACT_REVERTED => {
+                "TRADING_WITHDRAW_CONTRACT_REVERTED"
+            }
+            Self::TRADING_WITHDRAW_EXECUTION_FAILED => {
+                "TRADING_WITHDRAW_EXECUTION_FAILED"
             }
         }
     }
@@ -400,6 +429,15 @@ impl ::buffa::Enumeration for LifecycleReason {
                     Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED,
                 )
             }
+            "TRADING_WITHDRAW_POLICY_DENIED" => {
+                ::core::option::Option::Some(Self::TRADING_WITHDRAW_POLICY_DENIED)
+            }
+            "TRADING_WITHDRAW_CONTRACT_REVERTED" => {
+                ::core::option::Option::Some(Self::TRADING_WITHDRAW_CONTRACT_REVERTED)
+            }
+            "TRADING_WITHDRAW_EXECUTION_FAILED" => {
+                ::core::option::Option::Some(Self::TRADING_WITHDRAW_EXECUTION_FAILED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -415,6 +453,9 @@ impl ::buffa::Enumeration for LifecycleReason {
             Self::LEDGER_MIRROR_TRANSFER_EXISTS,
             Self::LEDGER_MIRROR_PENDING_TRANSFER_NOT_FOUND,
             Self::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED,
+            Self::TRADING_WITHDRAW_POLICY_DENIED,
+            Self::TRADING_WITHDRAW_CONTRACT_REVERTED,
+            Self::TRADING_WITHDRAW_EXECUTION_FAILED,
         ]
     }
 }

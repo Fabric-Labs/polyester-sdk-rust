@@ -36,6 +36,15 @@ fn lifecycle_reason_label(value: &buffa::EnumValue<LifecycleReason>) -> String {
         Some(LifecycleReason::LEDGER_MIRROR_TRANSFER_ID_ALREADY_FAILED) => {
             "ledger_mirror_transfer_id_already_failed".to_owned()
         }
+        Some(LifecycleReason::TRADING_WITHDRAW_POLICY_DENIED) => {
+            "trading_withdraw_policy_denied".to_owned()
+        }
+        Some(LifecycleReason::TRADING_WITHDRAW_CONTRACT_REVERTED) => {
+            "trading_withdraw_contract_reverted".to_owned()
+        }
+        Some(LifecycleReason::TRADING_WITHDRAW_EXECUTION_FAILED) => {
+            "trading_withdraw_execution_failed".to_owned()
+        }
         None => format!("unknown_reason_{}", value.to_i32()),
     }
 }
@@ -203,6 +212,36 @@ mod tests {
         assert_eq!(flow.latest_step, "unspecified");
         assert_eq!(flow.lifecycle_reason, "unknown_reason_2001");
         assert!(flow.zipper_reason.is_none());
+    }
+
+    #[test]
+    fn trading_withdraw_lifecycle_reasons() {
+        let cases = [
+            (
+                LifecycleReason::TRADING_WITHDRAW_POLICY_DENIED,
+                "trading_withdraw_policy_denied",
+            ),
+            (
+                LifecycleReason::TRADING_WITHDRAW_CONTRACT_REVERTED,
+                "trading_withdraw_contract_reverted",
+            ),
+            (
+                LifecycleReason::TRADING_WITHDRAW_EXECUTION_FAILED,
+                "trading_withdraw_execution_failed",
+            ),
+        ];
+        for (reason, expected) in cases {
+            let msg = FlowSummaryView {
+                flow_id: "flow-trading-withdraw".into(),
+                flow_kind: FlowKindEnum::KIND_WITHDRAW.into(),
+                current_step: FlowStep::FLOW_STEP_FAILED.into(),
+                is_terminal: true,
+                lifecycle_reason: reason.into(),
+                ..Default::default()
+            };
+            let flow = flow_summary_message_from_proto(&msg);
+            assert_eq!(flow.lifecycle_reason, expected);
+        }
     }
 
     #[test]
