@@ -146,6 +146,207 @@ impl ::buffa::Enumeration for TradingWithdrawAction {
         &[Self::ACTION_UNSPECIFIED, Self::TO_FUNDING, Self::TO_EXTERNAL_CHAIN]
     }
 }
+/// WithdrawDestinationValidationCode identifies the public outcome of an
+/// external-chain destination validation.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum WithdrawDestinationValidationCode {
+    /// No validation outcome was produced.
+    RESULT_UNSPECIFIED = 0i32,
+    /// The destination is valid and may be used for a withdraw.
+    VALID = 1i32,
+    /// The address is not valid for the selected destination chain.
+    INVALID_ADDRESS = 2i32,
+    /// The selected destination chain is not supported for withdraws.
+    UNSUPPORTED_CHAIN = 3i32,
+    /// The destination is a Polyester smart account and cannot be used for an
+    /// external-chain withdraw.
+    POLYESTER_SMART_ACCOUNT = 4i32,
+    /// The destination is a token contract and cannot receive withdrawals.
+    TOKEN_CONTRACT = 5i32,
+    /// The destination is blocked by Polyester's user-safety denylist.
+    DENYLISTED_ADDRESS = 6i32,
+}
+impl WithdrawDestinationValidationCode {
+    ///Idiomatic alias for [`Self::RESULT_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ResultUnspecified: Self = Self::RESULT_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::VALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Valid: Self = Self::VALID;
+    ///Idiomatic alias for [`Self::INVALID_ADDRESS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidAddress: Self = Self::INVALID_ADDRESS;
+    ///Idiomatic alias for [`Self::UNSUPPORTED_CHAIN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UnsupportedChain: Self = Self::UNSUPPORTED_CHAIN;
+    ///Idiomatic alias for [`Self::POLYESTER_SMART_ACCOUNT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolyesterSmartAccount: Self = Self::POLYESTER_SMART_ACCOUNT;
+    ///Idiomatic alias for [`Self::TOKEN_CONTRACT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TokenContract: Self = Self::TOKEN_CONTRACT;
+    ///Idiomatic alias for [`Self::DENYLISTED_ADDRESS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DenylistedAddress: Self = Self::DENYLISTED_ADDRESS;
+}
+impl ::core::default::Default for WithdrawDestinationValidationCode {
+    fn default() -> Self {
+        Self::RESULT_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for WithdrawDestinationValidationCode {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for WithdrawDestinationValidationCode {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = WithdrawDestinationValidationCode;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(WithdrawDestinationValidationCode)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<WithdrawDestinationValidationCode, E> {
+                <WithdrawDestinationValidationCode as ::buffa::Enumeration>::from_proto_name(
+                        v,
+                    )
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<WithdrawDestinationValidationCode, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <WithdrawDestinationValidationCode as ::buffa::Enumeration>::from_i32(
+                        v32,
+                    )
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<WithdrawDestinationValidationCode, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <WithdrawDestinationValidationCode as ::buffa::Enumeration>::from_i32(
+                        v32,
+                    )
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<WithdrawDestinationValidationCode, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for WithdrawDestinationValidationCode {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for WithdrawDestinationValidationCode {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::RESULT_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::VALID),
+            2i32 => ::core::option::Option::Some(Self::INVALID_ADDRESS),
+            3i32 => ::core::option::Option::Some(Self::UNSUPPORTED_CHAIN),
+            4i32 => ::core::option::Option::Some(Self::POLYESTER_SMART_ACCOUNT),
+            5i32 => ::core::option::Option::Some(Self::TOKEN_CONTRACT),
+            6i32 => ::core::option::Option::Some(Self::DENYLISTED_ADDRESS),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::RESULT_UNSPECIFIED => "RESULT_UNSPECIFIED",
+            Self::VALID => "VALID",
+            Self::INVALID_ADDRESS => "INVALID_ADDRESS",
+            Self::UNSUPPORTED_CHAIN => "UNSUPPORTED_CHAIN",
+            Self::POLYESTER_SMART_ACCOUNT => "POLYESTER_SMART_ACCOUNT",
+            Self::TOKEN_CONTRACT => "TOKEN_CONTRACT",
+            Self::DENYLISTED_ADDRESS => "DENYLISTED_ADDRESS",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "RESULT_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::RESULT_UNSPECIFIED)
+            }
+            "VALID" => ::core::option::Option::Some(Self::VALID),
+            "INVALID_ADDRESS" => ::core::option::Option::Some(Self::INVALID_ADDRESS),
+            "UNSUPPORTED_CHAIN" => ::core::option::Option::Some(Self::UNSUPPORTED_CHAIN),
+            "POLYESTER_SMART_ACCOUNT" => {
+                ::core::option::Option::Some(Self::POLYESTER_SMART_ACCOUNT)
+            }
+            "TOKEN_CONTRACT" => ::core::option::Option::Some(Self::TOKEN_CONTRACT),
+            "DENYLISTED_ADDRESS" => {
+                ::core::option::Option::Some(Self::DENYLISTED_ADDRESS)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::RESULT_UNSPECIFIED,
+            Self::VALID,
+            Self::INVALID_ADDRESS,
+            Self::UNSUPPORTED_CHAIN,
+            Self::POLYESTER_SMART_ACCOUNT,
+            Self::TOKEN_CONTRACT,
+            Self::DENYLISTED_ADDRESS,
+        ]
+    }
+}
 /// CreateTradingWithdrawResponse returns the accepted durable intent identifier
 /// for the withdraw lifecycle.
 #[derive(Clone, PartialEq, Default)]
@@ -1136,6 +1337,388 @@ pub const __CREATE_WALLET_TRADING_WITHDRAW_REQUEST_JSON_ANY: ::buffa::type_regis
     to_json: ::buffa::type_registry::any_to_json::<CreateWalletTradingWithdrawRequest>,
     from_json: ::buffa::type_registry::any_from_json::<
         CreateWalletTradingWithdrawRequest,
+    >,
+    is_wkt: false,
+};
+/// ValidateWithdrawDestinationRequest checks one external-chain
+/// destination for an authenticated caller without creating a withdraw.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ValidateWithdrawDestinationRequest {
+    /// External destination chain identifier.
+    ///
+    /// Field 1: `destination_chain_id`
+    #[serde(
+        rename = "destinationChainId",
+        alias = "destination_chain_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub destination_chain_id: u64,
+    /// Destination address to validate for destination_chain_id.
+    ///
+    /// Field 2: `destination_address`
+    #[serde(
+        rename = "destinationAddress",
+        alias = "destination_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub destination_address: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ValidateWithdrawDestinationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ValidateWithdrawDestinationRequest")
+            .field("destination_chain_id", &self.destination_chain_id)
+            .field("destination_address", &self.destination_address)
+            .finish()
+    }
+}
+impl ValidateWithdrawDestinationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.ValidateWithdrawDestinationRequest";
+}
+::buffa::impl_default_instance!(ValidateWithdrawDestinationRequest);
+impl ::buffa::MessageName for ValidateWithdrawDestinationRequest {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "ValidateWithdrawDestinationRequest";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.ValidateWithdrawDestinationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.ValidateWithdrawDestinationRequest";
+}
+impl ::buffa::Message for ValidateWithdrawDestinationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.destination_chain_id != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.destination_chain_id)
+                        as u32;
+        }
+        if !self.destination_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.destination_address)
+                        as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.destination_chain_id != 0u64 {
+            ::buffa::types::put_uint64_field(1u32, self.destination_chain_id, buf);
+        }
+        if !self.destination_address.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.destination_address, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.destination_chain_id = ::buffa::types::decode_uint64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.destination_address, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.destination_chain_id = 0u64;
+        self.destination_address.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ValidateWithdrawDestinationRequest {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.ValidateWithdrawDestinationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ValidateWithdrawDestinationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __VALIDATE_WITHDRAW_DESTINATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.ValidateWithdrawDestinationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ValidateWithdrawDestinationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ValidateWithdrawDestinationRequest,
+    >,
+    is_wkt: false,
+};
+/// ValidateWithdrawDestinationResponse returns a user-safe validation
+/// result without exposing internal denylist details.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ValidateWithdrawDestinationResponse {
+    /// Whether the destination may be used for a withdraw.
+    ///
+    /// Field 1: `valid`
+    #[serde(
+        rename = "valid",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub valid: bool,
+    /// Public validation outcome code.
+    ///
+    /// Field 2: `code`
+    #[serde(
+        rename = "code",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub code: ::buffa::EnumValue<WithdrawDestinationValidationCode>,
+    /// User-safe explanation of the validation outcome.
+    ///
+    /// Field 3: `message`
+    #[serde(
+        rename = "message",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub message: ::buffa::alloc::string::String,
+    /// Canonical destination address when valid. Empty when valid is false.
+    ///
+    /// Field 4: `canonical_destination_address`
+    #[serde(
+        rename = "canonicalDestinationAddress",
+        alias = "canonical_destination_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub canonical_destination_address: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ValidateWithdrawDestinationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ValidateWithdrawDestinationResponse")
+            .field("valid", &self.valid)
+            .field("code", &self.code)
+            .field("message", &self.message)
+            .field("canonical_destination_address", &self.canonical_destination_address)
+            .finish()
+    }
+}
+impl ValidateWithdrawDestinationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.ValidateWithdrawDestinationResponse";
+}
+::buffa::impl_default_instance!(ValidateWithdrawDestinationResponse);
+impl ::buffa::MessageName for ValidateWithdrawDestinationResponse {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "ValidateWithdrawDestinationResponse";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.ValidateWithdrawDestinationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.ValidateWithdrawDestinationResponse";
+}
+impl ::buffa::Message for ValidateWithdrawDestinationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.valid {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        {
+            let val = self.code.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.message.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.message) as u32;
+        }
+        if !self.canonical_destination_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(
+                        &self.canonical_destination_address,
+                    ) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.valid {
+            ::buffa::types::put_bool_field(1u32, self.valid, buf);
+        }
+        {
+            let val = self.code.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if !self.message.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.message, buf);
+        }
+        if !self.canonical_destination_address.is_empty() {
+            ::buffa::types::put_string_field(
+                4u32,
+                &self.canonical_destination_address,
+                buf,
+            );
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.valid = ::buffa::types::decode_bool(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.code = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.message, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    &mut self.canonical_destination_address,
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.valid = false;
+        self.code = ::buffa::EnumValue::from(0);
+        self.message.clear();
+        self.canonical_destination_address.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ValidateWithdrawDestinationResponse {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.ValidateWithdrawDestinationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ValidateWithdrawDestinationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __VALIDATE_WITHDRAW_DESTINATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.ValidateWithdrawDestinationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ValidateWithdrawDestinationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ValidateWithdrawDestinationResponse,
     >,
     is_wkt: false,
 };
@@ -3153,6 +3736,743 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// ValidateWithdrawDestinationRequest checks one external-chain
+        /// destination for an authenticated caller without creating a withdraw.
+        #[derive(Clone, Debug, Default)]
+        pub struct ValidateWithdrawDestinationRequestView<'a> {
+            /// External destination chain identifier.
+            ///
+            /// Field 1: `destination_chain_id`
+            pub destination_chain_id: u64,
+            /// Destination address to validate for destination_chain_id.
+            ///
+            /// Field 2: `destination_address`
+            pub destination_address: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for ValidateWithdrawDestinationRequestView<'a> {
+            type Owned = super::super::ValidateWithdrawDestinationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.destination_chain_id = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.destination_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ValidateWithdrawDestinationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ValidateWithdrawDestinationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ValidateWithdrawDestinationRequest {
+                    destination_chain_id: self.destination_chain_id,
+                    destination_address: self.destination_address.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ValidateWithdrawDestinationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.destination_chain_id != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.destination_chain_id,
+                            ) as u32;
+                }
+                if !self.destination_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.destination_address,
+                            ) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.destination_chain_id != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        1u32,
+                        self.destination_chain_id,
+                        buf,
+                    );
+                }
+                if !self.destination_address.is_empty() {
+                    ::buffa::types::put_string_field(
+                        2u32,
+                        &self.destination_address,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ValidateWithdrawDestinationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.destination_chain_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "destinationChainId",
+                            &::buffa::json_helpers::ProtoJson(&self.destination_chain_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.destination_address,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "destinationAddress",
+                            self.destination_address,
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ValidateWithdrawDestinationRequestView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "ValidateWithdrawDestinationRequest";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.ValidateWithdrawDestinationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.ValidateWithdrawDestinationRequest";
+        }
+        ::buffa::impl_default_view_instance!(ValidateWithdrawDestinationRequestView);
+        ::buffa::impl_view_reborrow!(ValidateWithdrawDestinationRequestView);
+        /** Self-contained, `'static` owned view of a `ValidateWithdrawDestinationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ValidateWithdrawDestinationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ValidateWithdrawDestinationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ValidateWithdrawDestinationRequestOwnedView(
+            ::buffa::OwnedView<ValidateWithdrawDestinationRequestView<'static>>,
+        );
+        impl ValidateWithdrawDestinationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ValidateWithdrawDestinationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ValidateWithdrawDestinationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ValidateWithdrawDestinationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ValidateWithdrawDestinationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ValidateWithdrawDestinationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ValidateWithdrawDestinationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ValidateWithdrawDestinationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// External destination chain identifier.
+            ///
+            /// Field 1: `destination_chain_id`
+            #[must_use]
+            pub fn destination_chain_id(&self) -> u64 {
+                self.0.reborrow().destination_chain_id
+            }
+            /// Destination address to validate for destination_chain_id.
+            ///
+            /// Field 2: `destination_address`
+            #[must_use]
+            pub fn destination_address(&self) -> &'_ str {
+                self.0.reborrow().destination_address
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ValidateWithdrawDestinationRequestView<'static>>,
+        > for ValidateWithdrawDestinationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    ValidateWithdrawDestinationRequestView<'static>,
+                >,
+            ) -> Self {
+                ValidateWithdrawDestinationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ValidateWithdrawDestinationRequestOwnedView>
+        for ::buffa::OwnedView<ValidateWithdrawDestinationRequestView<'static>> {
+            fn from(wrapper: ValidateWithdrawDestinationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ValidateWithdrawDestinationRequestView<'static>>,
+        > for ValidateWithdrawDestinationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ValidateWithdrawDestinationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::ValidateWithdrawDestinationRequest {
+            type View<'a> = ValidateWithdrawDestinationRequestView<'a>;
+            type ViewHandle = ValidateWithdrawDestinationRequestOwnedView;
+        }
+        impl ::serde::Serialize for ValidateWithdrawDestinationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ValidateWithdrawDestinationResponse returns a user-safe validation
+        /// result without exposing internal denylist details.
+        #[derive(Clone, Debug, Default)]
+        pub struct ValidateWithdrawDestinationResponseView<'a> {
+            /// Whether the destination may be used for a withdraw.
+            ///
+            /// Field 1: `valid`
+            pub valid: bool,
+            /// Public validation outcome code.
+            ///
+            /// Field 2: `code`
+            pub code: ::buffa::EnumValue<
+                super::super::WithdrawDestinationValidationCode,
+            >,
+            /// User-safe explanation of the validation outcome.
+            ///
+            /// Field 3: `message`
+            pub message: &'a str,
+            /// Canonical destination address when valid. Empty when valid is false.
+            ///
+            /// Field 4: `canonical_destination_address`
+            pub canonical_destination_address: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for ValidateWithdrawDestinationResponseView<'a> {
+            type Owned = super::super::ValidateWithdrawDestinationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.valid = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.code = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.message = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.canonical_destination_address = ::buffa::types::borrow_str(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ValidateWithdrawDestinationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ValidateWithdrawDestinationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ValidateWithdrawDestinationResponse {
+                    valid: self.valid,
+                    code: self.code,
+                    message: self.message.to_string(),
+                    canonical_destination_address: self
+                        .canonical_destination_address
+                        .to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for ValidateWithdrawDestinationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.valid {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                {
+                    let val = self.code.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.message.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.message) as u32;
+                }
+                if !self.canonical_destination_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.canonical_destination_address,
+                            ) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.valid {
+                    ::buffa::types::put_bool_field(1u32, self.valid, buf);
+                }
+                {
+                    let val = self.code.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if !self.message.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.message, buf);
+                }
+                if !self.canonical_destination_address.is_empty() {
+                    ::buffa::types::put_string_field(
+                        4u32,
+                        &self.canonical_destination_address,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ValidateWithdrawDestinationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if self.valid {
+                    __map.serialize_entry("valid", &self.valid)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.code) {
+                    __map.serialize_entry("code", &self.code)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.message) {
+                    __map.serialize_entry("message", self.message)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.canonical_destination_address,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "canonicalDestinationAddress",
+                            self.canonical_destination_address,
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ValidateWithdrawDestinationResponseView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "ValidateWithdrawDestinationResponse";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.ValidateWithdrawDestinationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.ValidateWithdrawDestinationResponse";
+        }
+        ::buffa::impl_default_view_instance!(ValidateWithdrawDestinationResponseView);
+        ::buffa::impl_view_reborrow!(ValidateWithdrawDestinationResponseView);
+        /** Self-contained, `'static` owned view of a `ValidateWithdrawDestinationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ValidateWithdrawDestinationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ValidateWithdrawDestinationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ValidateWithdrawDestinationResponseOwnedView(
+            ::buffa::OwnedView<ValidateWithdrawDestinationResponseView<'static>>,
+        );
+        impl ValidateWithdrawDestinationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ValidateWithdrawDestinationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ValidateWithdrawDestinationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ValidateWithdrawDestinationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ValidateWithdrawDestinationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ValidateWithdrawDestinationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ValidateWithdrawDestinationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ValidateWithdrawDestinationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Whether the destination may be used for a withdraw.
+            ///
+            /// Field 1: `valid`
+            #[must_use]
+            pub fn valid(&self) -> bool {
+                self.0.reborrow().valid
+            }
+            /// Public validation outcome code.
+            ///
+            /// Field 2: `code`
+            #[must_use]
+            pub fn code(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::WithdrawDestinationValidationCode> {
+                self.0.reborrow().code
+            }
+            /// User-safe explanation of the validation outcome.
+            ///
+            /// Field 3: `message`
+            #[must_use]
+            pub fn message(&self) -> &'_ str {
+                self.0.reborrow().message
+            }
+            /// Canonical destination address when valid. Empty when valid is false.
+            ///
+            /// Field 4: `canonical_destination_address`
+            #[must_use]
+            pub fn canonical_destination_address(&self) -> &'_ str {
+                self.0.reborrow().canonical_destination_address
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ValidateWithdrawDestinationResponseView<'static>>,
+        > for ValidateWithdrawDestinationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    ValidateWithdrawDestinationResponseView<'static>,
+                >,
+            ) -> Self {
+                ValidateWithdrawDestinationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ValidateWithdrawDestinationResponseOwnedView>
+        for ::buffa::OwnedView<ValidateWithdrawDestinationResponseView<'static>> {
+            fn from(wrapper: ValidateWithdrawDestinationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ValidateWithdrawDestinationResponseView<'static>>,
+        > for ValidateWithdrawDestinationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ValidateWithdrawDestinationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::ValidateWithdrawDestinationResponse {
+            type View<'a> = ValidateWithdrawDestinationResponseView<'a>;
+            type ViewHandle = ValidateWithdrawDestinationResponseOwnedView;
+        }
+        impl ::serde::Serialize for ValidateWithdrawDestinationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -3161,6 +4481,8 @@ pub mod __buffa {
         reg.register_json_any(super::__TRADING_WITHDRAW_INTENT_PAYLOAD_JSON_ANY);
         reg.register_json_any(super::__CREATE_TRADING_WITHDRAW_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_WALLET_TRADING_WITHDRAW_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__VALIDATE_WITHDRAW_DESTINATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__VALIDATE_WITHDRAW_DESTINATION_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -3183,5 +4505,13 @@ pub use self::__buffa::view::CreateTradingWithdrawRequestOwnedView;
 pub use self::__buffa::view::CreateWalletTradingWithdrawRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateWalletTradingWithdrawRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ValidateWithdrawDestinationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ValidateWithdrawDestinationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ValidateWithdrawDestinationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ValidateWithdrawDestinationResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;
