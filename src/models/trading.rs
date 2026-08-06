@@ -612,6 +612,15 @@ pub struct WithdrawIntentResult {
     pub flow_id: String,
 }
 
+/// User-safe outcome of [`crate::services::WithdrawService::validate_destination`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WithdrawDestinationValidation {
+    pub valid: bool,
+    pub code: String,
+    pub message: String,
+    pub canonical_destination_address: String,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ApiKeySummary {
     pub key_id: String,
