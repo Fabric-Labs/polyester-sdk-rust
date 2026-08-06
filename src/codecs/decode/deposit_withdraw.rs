@@ -4,7 +4,8 @@ use super::money::decode_asset_amount_u128;
 use crate::codecs::scalars::LEDGER_SCALE;
 use crate::errors::{Error, Result};
 use crate::models::{
-    DepositAddress, DepositAddressesList, InternalTransferResult, WithdrawIntentResult,
+    DepositAddress, DepositAddressesList, InternalTransferResult, WithdrawDestinationValidation,
+    WithdrawIntentResult,
 };
 use crate::proto::chain::deposit::v1::{
     CreateDepositAddressResponse, DepositAddress as ProtoDepositAddress,
@@ -12,9 +13,42 @@ use crate::proto::chain::deposit::v1::{
 };
 use crate::proto::chain::withdraw::v1::{
     CreateTradingWithdrawResponse, CreateWalletTradingWithdrawResponse,
+    ValidateWithdrawDestinationResponse, WithdrawDestinationValidationCode,
 };
 use crate::proto::transfer::v1::CreateInternalTransferResponse;
 use crate::types::QuantityDomain;
+
+fn withdraw_destination_validation_code_label(
+    value: &buffa::EnumValue<WithdrawDestinationValidationCode>,
+) -> String {
+    match value.as_known() {
+        Some(WithdrawDestinationValidationCode::RESULT_UNSPECIFIED) => "unspecified".to_owned(),
+        Some(WithdrawDestinationValidationCode::VALID) => "valid".to_owned(),
+        Some(WithdrawDestinationValidationCode::INVALID_ADDRESS) => "invalid_address".to_owned(),
+        Some(WithdrawDestinationValidationCode::UNSUPPORTED_CHAIN) => {
+            "unsupported_chain".to_owned()
+        }
+        Some(WithdrawDestinationValidationCode::POLYESTER_SMART_ACCOUNT) => {
+            "polyester_smart_account".to_owned()
+        }
+        Some(WithdrawDestinationValidationCode::TOKEN_CONTRACT) => "token_contract".to_owned(),
+        Some(WithdrawDestinationValidationCode::DENYLISTED_ADDRESS) => {
+            "denylisted_address".to_owned()
+        }
+        None => format!("unknown_code_{}", value.to_i32()),
+    }
+}
+
+pub fn withdraw_destination_validation_from_proto(
+    msg: &ValidateWithdrawDestinationResponse,
+) -> WithdrawDestinationValidation {
+    WithdrawDestinationValidation {
+        valid: msg.valid,
+        code: withdraw_destination_validation_code_label(&msg.code),
+        message: msg.message.clone(),
+        canonical_destination_address: msg.canonical_destination_address.clone(),
+    }
+}
 
 pub fn deposit_address_from_proto(msg: &ProtoDepositAddress) -> DepositAddress {
     DepositAddress {
@@ -168,6 +202,61 @@ mod tests {
         assert_eq!(
             withdraw_intent_from_proto(&msg).unwrap().intent_id,
             "intent-1"
+        );
+    }
+
+    #[test]
+    fn withdraw_destination_validation_maps_codes() {
+        let cases = [
+            (
+                WithdrawDestinationValidationCode::RESULT_UNSPECIFIED,
+                "unspecified",
+            ),
+            (WithdrawDestinationValidationCode::VALID, "valid"),
+            (
+                WithdrawDestinationValidationCode::INVALID_ADDRESS,
+                "invalid_address",
+            ),
+            (
+                WithdrawDestinationValidationCode::UNSUPPORTED_CHAIN,
+                "unsupported_chain",
+            ),
+            (
+                WithdrawDestinationValidationCode::POLYESTER_SMART_ACCOUNT,
+                "polyester_smart_account",
+            ),
+            (
+                WithdrawDestinationValidationCode::TOKEN_CONTRACT,
+                "token_contract",
+            ),
+            (
+                WithdrawDestinationValidationCode::DENYLISTED_ADDRESS,
+                "denylisted_address",
+            ),
+        ];
+        for (code, expected) in cases {
+            let msg = ValidateWithdrawDestinationResponse {
+                valid: code == WithdrawDestinationValidationCode::VALID,
+                code: code.into(),
+                message: "msg".into(),
+                canonical_destination_address: if code == WithdrawDestinationValidationCode::VALID {
+                    "0xabc".into()
+                } else {
+                    String::new()
+                },
+                ..Default::default()
+            };
+            let got = withdraw_destination_validation_from_proto(&msg);
+            assert_eq!(got.code, expected);
+            assert_eq!(got.message, "msg");
+        }
+        let unknown = ValidateWithdrawDestinationResponse {
+            code: buffa::EnumValue::from(99),
+            ..Default::default()
+        };
+        assert_eq!(
+            withdraw_destination_validation_from_proto(&unknown).code,
+            "unknown_code_99"
         );
     }
 
