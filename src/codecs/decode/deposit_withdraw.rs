@@ -239,9 +239,7 @@ mod tests {
                 valid: code == WithdrawDestinationValidationCode::VALID,
                 code: code.into(),
                 message: "msg".into(),
-                canonical_destination_address: if code
-                    == WithdrawDestinationValidationCode::VALID
-                {
+                canonical_destination_address: if code == WithdrawDestinationValidationCode::VALID {
                     "0xabc".into()
                 } else {
                     String::new()
