@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a32
+
+Package version: `0.1.0-alpha.32`. Git tag: `v0.1.0a32`.
+
 ### Added
 - `withdraw.validate_destination` wraps `ValidateWithdrawDestination` and maps
   validation codes to snake labels (`valid`, `invalid_address`,
