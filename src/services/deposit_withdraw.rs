@@ -3,8 +3,8 @@ use super::scope;
 use super::unary;
 use crate::codecs::decode::{
     create_deposit_address_from_proto, deposit_addresses_list_from_proto,
-    deposit_withdraw_config_from_proto, withdraw_intent_from_proto,
-    withdraw_intent_from_wallet_proto,
+    deposit_withdraw_config_from_proto, withdraw_destination_validation_from_proto,
+    withdraw_intent_from_proto, withdraw_intent_from_wallet_proto,
 };
 use crate::codecs::scalars::{LEDGER_SCALE, i128_to_u128, u128_to_proto};
 use crate::connect::chain::deposit::v1::DepositAddressServiceClient;
@@ -15,12 +15,12 @@ use crate::models::ZippedAssetSupplyBatch;
 use crate::models::{
     CreateApiKeyTradingWithdrawParams, CreateTradingWithdrawParams,
     CreateWalletTradingWithdrawParams, DepositAddress, DepositAddressesList, DepositWithdrawConfig,
-    WithdrawIntentResult,
+    WithdrawDestinationValidation, WithdrawIntentResult,
 };
 use crate::proto::chain::deposit::v1::{CreateDepositAddressRequest, ListDepositAddressesRequest};
 use crate::proto::chain::withdraw::v1::{
     CreateTradingWithdrawRequest, CreateWalletTradingWithdrawRequest, TradingWithdrawAction,
-    TradingWithdrawIntentPayload,
+    TradingWithdrawIntentPayload, ValidateWithdrawDestinationRequest,
 };
 use crate::proto::chain::zipper::v1::GetDepositWithdrawConfigRequest;
 use crate::types::{AssetAmount, QuantityDomain, resolve_asset_amount_scaled_with_input_scale};
@@ -330,6 +330,39 @@ impl WithdrawService {
     ) -> Result<WithdrawIntentResult> {
         let prepared = self.prepare_api_key_to_external_chain(params, destination_chain_id)?;
         self.submit_prepared(&prepared).await
+    }
+
+    /// Check one external-chain destination without creating a withdraw.
+    ///
+    /// Use for form feedback before Trading → external submission; create RPCs
+    /// remain authoritative.
+    pub async fn validate_destination(
+        &self,
+        destination_chain_id: u64,
+        destination_address: impl Into<String>,
+    ) -> Result<WithdrawDestinationValidation> {
+        if destination_chain_id == 0 {
+            return Err(Error::validation("destination_chain_id must be non-zero"));
+        }
+        let destination_address = destination_address.into();
+        if destination_address.trim().is_empty() {
+            return Err(Error::validation("destination_address is required"));
+        }
+        let req = ValidateWithdrawDestinationRequest {
+            destination_chain_id,
+            destination_address,
+            ..Default::default()
+        };
+        let client = self.connect_client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/chain.withdraw.v1.WithdrawService/ValidateWithdrawDestination",
+            req,
+            |req, opts| client.validate_withdraw_destination_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        Ok(withdraw_destination_validation_from_proto(&resp))
     }
 
     /// Withdraw from trading to funding. Amount must be an [`crate::types::AssetAmount`].
@@ -746,6 +779,29 @@ mod tests {
             .unwrap_err();
         assert!(matches!(err, Error::Validation(_)));
         assert!(err.to_string().contains("deadline_ts_sec"));
+    }
+
+    #[tokio::test]
+    async fn validate_destination_rejects_missing_inputs_before_transport() {
+        let client = crate::Client::new(crate::Config {
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .unwrap();
+        let chain_err = client
+            .withdraw
+            .validate_destination(0, "0xabc")
+            .await
+            .unwrap_err();
+        assert!(matches!(chain_err, Error::Validation(_)));
+        assert!(chain_err.to_string().contains("destination_chain_id"));
+        let address_err = client
+            .withdraw
+            .validate_destination(6, "  ")
+            .await
+            .unwrap_err();
+        assert!(matches!(address_err, Error::Validation(_)));
+        assert!(address_err.to_string().contains("destination_address"));
     }
 
     #[tokio::test]

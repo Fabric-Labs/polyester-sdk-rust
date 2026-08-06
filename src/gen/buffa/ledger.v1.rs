@@ -176,6 +176,8 @@ pub enum TransferCode {
     TRADING_WITHDRAW_RESERVE = 1062i32,
     /// Funding user-to-user transfer.
     FUNDING_USER_TRANSFER = 1063i32,
+    /// Non-refundable on-chain request fee retained when a submitted trading withdrawal fails.
+    TRADING_WITHDRAW_REQUEST_FEE = 1065i32,
 }
 impl TransferCode {
     ///Idiomatic alias for [`Self::TRANSFER_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -217,6 +219,9 @@ impl TransferCode {
     ///Idiomatic alias for [`Self::FUNDING_USER_TRANSFER`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const FundingUserTransfer: Self = Self::FUNDING_USER_TRANSFER;
+    ///Idiomatic alias for [`Self::TRADING_WITHDRAW_REQUEST_FEE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TradingWithdrawRequestFee: Self = Self::TRADING_WITHDRAW_REQUEST_FEE;
 }
 impl ::core::default::Default for TransferCode {
     fn default() -> Self {
@@ -325,6 +330,7 @@ impl ::buffa::Enumeration for TransferCode {
             1061i32 => ::core::option::Option::Some(Self::TRADING_TO_FUNDING),
             1062i32 => ::core::option::Option::Some(Self::TRADING_WITHDRAW_RESERVE),
             1063i32 => ::core::option::Option::Some(Self::FUNDING_USER_TRANSFER),
+            1065i32 => ::core::option::Option::Some(Self::TRADING_WITHDRAW_REQUEST_FEE),
             _ => ::core::option::Option::None,
         }
     }
@@ -346,6 +352,7 @@ impl ::buffa::Enumeration for TransferCode {
             Self::TRADING_TO_FUNDING => "TRADING_TO_FUNDING",
             Self::TRADING_WITHDRAW_RESERVE => "TRADING_WITHDRAW_RESERVE",
             Self::FUNDING_USER_TRANSFER => "FUNDING_USER_TRANSFER",
+            Self::TRADING_WITHDRAW_REQUEST_FEE => "TRADING_WITHDRAW_REQUEST_FEE",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -373,6 +380,9 @@ impl ::buffa::Enumeration for TransferCode {
             "FUNDING_USER_TRANSFER" => {
                 ::core::option::Option::Some(Self::FUNDING_USER_TRANSFER)
             }
+            "TRADING_WITHDRAW_REQUEST_FEE" => {
+                ::core::option::Option::Some(Self::TRADING_WITHDRAW_REQUEST_FEE)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -391,6 +401,7 @@ impl ::buffa::Enumeration for TransferCode {
             Self::TRADING_TO_FUNDING,
             Self::TRADING_WITHDRAW_RESERVE,
             Self::FUNDING_USER_TRANSFER,
+            Self::TRADING_WITHDRAW_REQUEST_FEE,
         ]
     }
 }
