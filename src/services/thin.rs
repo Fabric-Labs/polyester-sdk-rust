@@ -820,9 +820,12 @@ impl LifecycleService {
 
     pub async fn list_flows_by_tx(
         &self,
-        req: crate::proto::chain::lifecycle::v1::ListFlowsByTxRequest,
+        mut req: crate::proto::chain::lifecycle::v1::ListFlowsByTxRequest,
     ) -> crate::errors::Result<crate::models::LifecycleFlowsList> {
         use crate::codecs::decode::flows_by_tx_list_from_proto;
+        if req.limit == 0 {
+            req.limit = 50;
+        }
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -838,11 +841,18 @@ impl LifecycleService {
         Ok(flows_by_tx_list_from_proto(&resp))
     }
 
+    /// Return all matches in the requested page for a transaction lookup.
+    ///
+    /// A chain transaction can contain multiple bundled lifecycle flows.
+    /// Follow `next_page_token` or call [`Self::list_flows_by_tx`] to paginate.
     pub async fn get_flow_by_tx(
         &self,
-        req: crate::proto::chain::lifecycle::v1::ListFlowsByTxRequest,
-    ) -> crate::errors::Result<crate::models::LifecycleFlowSummary> {
+        mut req: crate::proto::chain::lifecycle::v1::ListFlowsByTxRequest,
+    ) -> crate::errors::Result<crate::models::LifecycleFlowsList> {
         use crate::codecs::decode::flow_from_get_by_tx_response;
+        if req.limit == 0 {
+            req.limit = 50;
+        }
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -855,7 +865,7 @@ impl LifecycleService {
             .await?
             .into_owned()
         };
-        flow_from_get_by_tx_response(&resp)
+        Ok(flow_from_get_by_tx_response(&resp))
     }
 
     /// Subscribe to open lifecycle flow summaries.
