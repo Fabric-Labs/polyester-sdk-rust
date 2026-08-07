@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Breaking
+- `Client::get_flow_by_tx` now returns `LifecycleFlowsList` instead of silently
+  returning only the first match. Zero-limit transaction lookups now default to
+  50; use `Client::list_flows_by_tx` with `next_page_token` for pagination.
+
 ## 0.1.0a32
 
 Package version: `0.1.0-alpha.32`. Git tag: `v0.1.0a32`.

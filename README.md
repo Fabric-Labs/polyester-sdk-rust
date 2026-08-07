@@ -706,6 +706,32 @@ Use the high-level `Client` service methods for authenticated calls. Generated
 clients under `polyester::connect` are low-level protocol bindings and do not
 apply Polyester API-key signatures by themselves.
 
+## Lifecycle transaction lookups
+
+One chain transaction can reference multiple lifecycle flows when operations
+are bundled. Transaction lookups therefore return a page, not one flow:
+
+```rust
+let mut request = ListFlowsByTxRequest {
+    tx_hash: tx_hash.to_owned(),
+    lookup_kind: TxLookupKind::TX_ANY.into(),
+    limit: 50,
+    ..Default::default()
+};
+let mut flow_ids = Vec::new();
+loop {
+    let page = client.list_flows_by_tx(request.clone()).await?;
+    flow_ids.extend(page.flows.into_iter().map(|flow| flow.intent_id));
+    if page.next_page_token.is_empty() {
+        break;
+    }
+    request.page_token = page.next_page_token;
+}
+```
+
+`Client::get_flow_by_tx` also returns the complete requested page. Use
+`Client::list_flows_by_tx` when following pagination.
+
 ## Examples
 
 Runnable cookbook examples live in the sibling repo
