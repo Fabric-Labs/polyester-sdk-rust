@@ -149,11 +149,12 @@ pub fn flow_from_get_response(msg: &GetFlowResponse) -> Result<LifecycleFlowSumm
         .ok_or_else(|| Error::transport("invalid GetFlow response: missing flow summary"))
 }
 
-pub fn flow_from_get_by_tx_response(msg: &ListFlowsByTxResponse) -> Result<LifecycleFlowSummary> {
-    msg.matches
-        .first()
-        .map(flow_tx_match_from_proto)
-        .ok_or_else(|| Error::transport("invalid GetFlowByTx response: no matching flow"))
+/// Decode every match from a transaction lookup response.
+///
+/// The legacy helper name is retained for compatibility, but transaction
+/// lookups are one-to-many and must not silently discard bundled flows.
+pub fn flow_from_get_by_tx_response(msg: &ListFlowsByTxResponse) -> LifecycleFlowsList {
+    flows_by_tx_list_from_proto(msg)
 }
 
 #[cfg(test)]
@@ -267,24 +268,33 @@ mod tests {
     }
 
     #[test]
-    fn flow_tx_match_preserves_owner_identity() {
+    fn flow_by_tx_response_preserves_all_matches_and_owner_identity() {
         let msg = ListFlowsByTxResponse {
-            matches: vec![FlowTxMatchView {
-                flow_id: "flow-tx".into(),
-                owner_account_id: 99,
-                smart_account_address: "0xsmart".into(),
-                ..Default::default()
-            }],
+            matches: vec![
+                FlowTxMatchView {
+                    flow_id: "flow-a".into(),
+                    owner_account_id: 99,
+                    smart_account_address: "0xsmart".into(),
+                    ..Default::default()
+                },
+                FlowTxMatchView {
+                    flow_id: "flow-b".into(),
+                    ..Default::default()
+                },
+            ],
+            next_page_token: "next".into(),
             ..Default::default()
         };
-        let flow = flow_from_get_by_tx_response(&msg).expect("matching flow");
-        assert_eq!(flow.owner_account_id, format_uint64_id(99));
-        assert_eq!(flow.smart_account_address, "0xsmart");
+        let result = flow_from_get_by_tx_response(&msg);
+        assert_eq!(result.flows.len(), 2);
+        assert_eq!(result.flows[0].owner_account_id, format_uint64_id(99));
+        assert_eq!(result.flows[0].smart_account_address, "0xsmart");
+        assert_eq!(result.flows[1].intent_id, "flow-b");
+        assert_eq!(result.next_page_token, "next");
     }
 
     #[test]
     fn singular_flow_responses_reject_missing_required_entities() {
         assert!(flow_from_get_response(&GetFlowResponse::default()).is_err());
-        assert!(flow_from_get_by_tx_response(&ListFlowsByTxResponse::default()).is_err());
     }
 }
