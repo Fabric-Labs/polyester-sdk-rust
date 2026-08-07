@@ -7,7 +7,4 @@
     unused_qualifications
 )]
 
-pub mod api;
-pub mod ratelimit;
-#[path = "type/mod.rs"]
-pub mod r#type;
+include!("../../../../gen/buffa/polyester.ratelimit.v1.rs");

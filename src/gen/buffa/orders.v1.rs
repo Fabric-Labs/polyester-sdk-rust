@@ -898,6 +898,8 @@ pub enum ErrorCode {
     ERROR_CODE_OVERLOADED = 67i32,
     /// The all-in quote budget cannot resolve one valid step-aligned base quantity.
     ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL = 68i32,
+    /// The account exhausted its current order-admission quota.
+    ERROR_CODE_RATE_LIMIT_EXCEEDED = 69i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1095,6 +1097,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MaxQuoteDebitTooSmall: Self = Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL;
+    ///Idiomatic alias for [`Self::ERROR_CODE_RATE_LIMIT_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RateLimitExceeded: Self = Self::ERROR_CODE_RATE_LIMIT_EXCEEDED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -1303,6 +1308,7 @@ impl ::buffa::Enumeration for ErrorCode {
             68i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL)
             }
+            69i32 => ::core::option::Option::Some(Self::ERROR_CODE_RATE_LIMIT_EXCEEDED),
             _ => ::core::option::Option::None,
         }
     }
@@ -1412,6 +1418,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL => {
                 "ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL"
             }
+            Self::ERROR_CODE_RATE_LIMIT_EXCEEDED => "ERROR_CODE_RATE_LIMIT_EXCEEDED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1623,6 +1630,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL)
             }
+            "ERROR_CODE_RATE_LIMIT_EXCEEDED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_RATE_LIMIT_EXCEEDED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1693,6 +1703,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_VALIDATION_ERROR,
             Self::ERROR_CODE_OVERLOADED,
             Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL,
+            Self::ERROR_CODE_RATE_LIMIT_EXCEEDED,
         ]
     }
 }
@@ -6002,6 +6013,17 @@ pub struct ErrorDetail {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub violations: ::buffa::alloc::vec::Vec<FieldViolation>,
+    /// Structured quota state. Present only for rate-limit rejections.
+    ///
+    /// Field 3: `rate_limit`
+    #[serde(
+        rename = "rateLimit",
+        alias = "rate_limit",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub rate_limit: ::buffa::MessageField<
+        super::super::polyester::ratelimit::v1::RateLimitDetail,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -6011,6 +6033,7 @@ impl ::core::fmt::Debug for ErrorDetail {
         f.debug_struct("ErrorDetail")
             .field("code", &self.code)
             .field("violations", &self.violations)
+            .field("rate_limit", &self.rate_limit)
             .finish()
     }
 }
@@ -6053,6 +6076,14 @@ impl ::buffa::Message for ErrorDetail {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.rate_limit.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.rate_limit.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -6072,6 +6103,10 @@ impl ::buffa::Message for ErrorDetail {
         for v in &self.violations {
             ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
+        }
+        if self.rate_limit.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.rate_limit.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6102,6 +6137,17 @@ impl ::buffa::Message for ErrorDetail {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.violations.push(elem);
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.rate_limit.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6112,6 +6158,7 @@ impl ::buffa::Message for ErrorDetail {
     fn clear(&mut self) {
         self.code = ::buffa::EnumValue::from(0);
         self.violations.clear();
+        self.rate_limit = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -11515,6 +11562,14 @@ pub struct BatchReplaceAdmissionItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub code: ::buffa::alloc::string::String,
+    /// Structured rejection details. Present for rate-limit guidance and other typed failures.
+    ///
+    /// Field 7: `error`
+    #[serde(
+        rename = "error",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub error: ::buffa::MessageField<ErrorDetail>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -11528,6 +11583,7 @@ impl ::core::fmt::Debug for BatchReplaceAdmissionItem {
             .field("replacement_order_id", &self.replacement_order_id)
             .field("client_order_id", &self.client_order_id)
             .field("code", &self.code)
+            .field("error", &self.error)
             .finish()
     }
 }
@@ -11552,7 +11608,7 @@ impl ::buffa::Message for BatchReplaceAdmissionItem {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -11579,12 +11635,20 @@ impl ::buffa::Message for BatchReplaceAdmissionItem {
         if !self.code.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
         }
+        if self.error.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.error.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -11609,6 +11673,10 @@ impl ::buffa::Message for BatchReplaceAdmissionItem {
         }
         if !self.code.is_empty() {
             ::buffa::types::put_string_field(6u32, &self.code, buf);
+        }
+        if self.error.is_set() {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            self.error.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -11667,6 +11735,17 @@ impl ::buffa::Message for BatchReplaceAdmissionItem {
                 )?;
                 ::buffa::types::merge_string(&mut self.code, buf)?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.error.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -11681,6 +11760,7 @@ impl ::buffa::Message for BatchReplaceAdmissionItem {
         self.replacement_order_id = 0u64;
         self.client_order_id.clear();
         self.code.clear();
+        self.error = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -12461,6 +12541,14 @@ pub struct BatchCancelResultItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub code: ::buffa::alloc::string::String,
+    /// Structured rejection details. Present for rate-limit guidance and other typed failures.
+    ///
+    /// Field 5: `error`
+    #[serde(
+        rename = "error",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub error: ::buffa::MessageField<ErrorDetail>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -12472,6 +12560,7 @@ impl ::core::fmt::Debug for BatchCancelResultItem {
             .field("order_id", &self.order_id)
             .field("client_order_id", &self.client_order_id)
             .field("code", &self.code)
+            .field("error", &self.error)
             .finish()
     }
 }
@@ -12496,7 +12585,7 @@ impl ::buffa::Message for BatchCancelResultItem {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -12514,12 +12603,20 @@ impl ::buffa::Message for BatchCancelResultItem {
         if !self.code.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
         }
+        if self.error.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.error.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -12535,6 +12632,10 @@ impl ::buffa::Message for BatchCancelResultItem {
         }
         if !self.code.is_empty() {
             ::buffa::types::put_string_field(4u32, &self.code, buf);
+        }
+        if self.error.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.error.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -12577,6 +12678,17 @@ impl ::buffa::Message for BatchCancelResultItem {
                 )?;
                 ::buffa::types::merge_string(&mut self.code, buf)?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.error.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -12589,6 +12701,7 @@ impl ::buffa::Message for BatchCancelResultItem {
         self.order_id = 0u64;
         self.client_order_id.clear();
         self.code.clear();
+        self.error = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -24930,6 +25043,14 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::FieldViolationView<'a>,
             >,
+            /// Structured quota state. Present only for rate-limit rejections.
+            ///
+            /// Field 3: `rate_limit`
+            pub rate_limit: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::ratelimit::v1::__buffa::view::RateLimitDetailView<
+                    'a,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ErrorDetailView<'a> {
@@ -24971,6 +25092,31 @@ pub mod __buffa {
                         view.code = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.rate_limit.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.rate_limit = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::ratelimit::v1::__buffa::view::RateLimitDetailView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -25022,6 +25168,14 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    rate_limit: match self.rate_limit.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::ratelimit::v1::RateLimitDetail,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -25045,6 +25199,14 @@ pub mod __buffa {
                 for v in &self.violations {
                     let __slot = __cache.reserve();
                     let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.rate_limit.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.rate_limit.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
@@ -25075,6 +25237,14 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
+                if self.rate_limit.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.rate_limit.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -25101,6 +25271,14 @@ pub mod __buffa {
                 }
                 if !self.violations.is_empty() {
                     __map.serialize_entry("violations", &*self.violations)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .rate_limit
+                        .as_option()
+                    {
+                        __map.serialize_entry("rateLimit", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -25214,6 +25392,19 @@ pub mod __buffa {
                 super::super::__buffa::view::FieldViolationView<'_>,
             > {
                 &self.0.reborrow().violations
+            }
+            /// Structured quota state. Present only for rate-limit rejections.
+            ///
+            /// Field 3: `rate_limit`
+            #[must_use]
+            pub fn rate_limit(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::ratelimit::v1::__buffa::view::RateLimitDetailView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().rate_limit
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ErrorDetailView<'static>>>
@@ -33451,6 +33642,12 @@ pub mod __buffa {
             ///
             /// Field 6: `code`
             pub code: &'a str,
+            /// Structured rejection details. Present for rate-limit guidance and other typed failures.
+            ///
+            /// Field 7: `error`
+            pub error: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ErrorDetailView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BatchReplaceAdmissionItemView<'a> {
@@ -33530,6 +33727,31 @@ pub mod __buffa {
                         )?;
                         view.code = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.error.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.error = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ErrorDetailView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -33565,6 +33787,14 @@ pub mod __buffa {
                     replacement_order_id: self.replacement_order_id,
                     client_order_id: self.client_order_id.to_string(),
                     code: self.code.to_string(),
+                    error: match self.error.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ErrorDetail,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -33575,7 +33805,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for BatchReplaceAdmissionItemView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -33605,13 +33835,21 @@ pub mod __buffa {
                 if !self.code.is_empty() {
                     size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
                 }
+                if self.error.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.error.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -33640,6 +33878,14 @@ pub mod __buffa {
                 }
                 if !self.code.is_empty() {
                     ::buffa::types::put_string_field(6u32, &self.code, buf);
+                }
+                if self.error.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.error.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -33693,6 +33939,11 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.code) {
                     __map.serialize_entry("code", self.code)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.error.as_option() {
+                        __map.serialize_entry("error", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -33837,6 +34088,17 @@ pub mod __buffa {
             #[must_use]
             pub fn code(&self) -> &'_ str {
                 self.0.reborrow().code
+            }
+            /// Structured rejection details. Present for rate-limit guidance and other typed failures.
+            ///
+            /// Field 7: `error`
+            #[must_use]
+            pub fn error(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ErrorDetailView<'_>,
+            > {
+                &self.0.reborrow().error
             }
         }
         impl ::core::convert::From<
@@ -35191,6 +35453,12 @@ pub mod __buffa {
             ///
             /// Field 4: `code`
             pub code: &'a str,
+            /// Structured rejection details. Present for rate-limit guidance and other typed failures.
+            ///
+            /// Field 5: `error`
+            pub error: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ErrorDetailView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BatchCancelResultItemView<'a> {
@@ -35252,6 +35520,31 @@ pub mod __buffa {
                         )?;
                         view.code = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.error.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.error = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ErrorDetailView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -35285,6 +35578,14 @@ pub mod __buffa {
                     order_id: self.order_id,
                     client_order_id: self.client_order_id.to_string(),
                     code: self.code.to_string(),
+                    error: match self.error.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ErrorDetail,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -35295,7 +35596,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for BatchCancelResultItemView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -35316,13 +35617,21 @@ pub mod __buffa {
                 if !self.code.is_empty() {
                     size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
                 }
+                if self.error.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.error.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -35338,6 +35647,14 @@ pub mod __buffa {
                 }
                 if !self.code.is_empty() {
                     ::buffa::types::put_string_field(4u32, &self.code, buf);
+                }
+                if self.error.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.error.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -35375,6 +35692,11 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.code) {
                     __map.serialize_entry("code", self.code)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.error.as_option() {
+                        __map.serialize_entry("error", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -35499,6 +35821,17 @@ pub mod __buffa {
             #[must_use]
             pub fn code(&self) -> &'_ str {
                 self.0.reborrow().code
+            }
+            /// Structured rejection details. Present for rate-limit guidance and other typed failures.
+            ///
+            /// Field 5: `error`
+            #[must_use]
+            pub fn error(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ErrorDetailView<'_>,
+            > {
+                &self.0.reborrow().error
             }
         }
         impl ::core::convert::From<

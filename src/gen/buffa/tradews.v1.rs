@@ -1788,6 +1788,14 @@ pub struct CommandReject {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub detail: ::buffa::alloc::string::String,
+    /// Structured error details, including retry guidance for rate-limit rejections.
+    ///
+    /// Field 3: `error`
+    #[serde(
+        rename = "error",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub error: ::buffa::MessageField<super::super::orders::v1::ErrorDetail>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1797,6 +1805,7 @@ impl ::core::fmt::Debug for CommandReject {
         f.debug_struct("CommandReject")
             .field("code", &self.code)
             .field("detail", &self.detail)
+            .field("error", &self.error)
             .finish()
     }
 }
@@ -1821,7 +1830,7 @@ impl ::buffa::Message for CommandReject {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -1831,12 +1840,20 @@ impl ::buffa::Message for CommandReject {
         if !self.detail.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.detail) as u32;
         }
+        if self.error.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.error.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -1846,6 +1863,10 @@ impl ::buffa::Message for CommandReject {
         }
         if !self.detail.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.detail, buf);
+        }
+        if self.error.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.error.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1874,6 +1895,17 @@ impl ::buffa::Message for CommandReject {
                 )?;
                 ::buffa::types::merge_string(&mut self.detail, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.error.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1884,6 +1916,7 @@ impl ::buffa::Message for CommandReject {
     fn clear(&mut self) {
         self.code.clear();
         self.detail.clear();
+        self.error = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4630,6 +4663,14 @@ pub mod __buffa {
             ///
             /// Field 2: `detail`
             pub detail: &'a str,
+            /// Structured error details, including retry guidance for rate-limit rejections.
+            ///
+            /// Field 3: `error`
+            pub error: ::buffa::MessageFieldView<
+                super::super::super::super::orders::v1::__buffa::view::ErrorDetailView<
+                    'a,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CommandRejectView<'a> {
@@ -4677,6 +4718,31 @@ pub mod __buffa {
                         )?;
                         view.detail = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.error.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.error = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::orders::v1::__buffa::view::ErrorDetailView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -4708,6 +4774,14 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::CommandReject {
                     code: self.code.to_string(),
                     detail: self.detail.to_string(),
+                    error: match self.error.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::orders::v1::ErrorDetail,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -4718,7 +4792,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for CommandRejectView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -4730,13 +4804,21 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.detail) as u32;
                 }
+                if self.error.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.error.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -4746,6 +4828,14 @@ pub mod __buffa {
                 }
                 if !self.detail.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.detail, buf);
+                }
+                if self.error.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.error.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -4773,6 +4863,11 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.detail) {
                     __map.serialize_entry("detail", self.detail)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.error.as_option() {
+                        __map.serialize_entry("error", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -4883,6 +4978,19 @@ pub mod __buffa {
             #[must_use]
             pub fn detail(&self) -> &'_ str {
                 self.0.reborrow().detail
+            }
+            /// Structured error details, including retry guidance for rate-limit rejections.
+            ///
+            /// Field 3: `error`
+            #[must_use]
+            pub fn error(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::orders::v1::__buffa::view::ErrorDetailView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().error
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<CommandRejectView<'static>>>
