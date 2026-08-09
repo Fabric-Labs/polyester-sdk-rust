@@ -5462,17 +5462,17 @@ pub struct TriggerEvent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub child_order_id: u64,
-    /// Price that caused the trigger to fire, in quote units scaled by 1e6. Zero
-    /// when not applicable.
+    /// Price that caused a conditional trigger to fire, in quote units scaled by
+    /// 1e6. Absent for time-scheduled triggers such as TWAP.
     ///
     /// Field 13: `fire_price_ticks`
     #[serde(
         rename = "firePriceTicks",
         alias = "fire_price_ticks",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
     )]
-    pub fire_price_ticks: i64,
+    pub fire_price_ticks: ::core::option::Option<i64>,
     /// Optional cancel reason.
     ///
     /// Field 20: `reason`
@@ -5508,6 +5508,15 @@ impl TriggerEvent {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerEvent";
+}
+impl TriggerEvent {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::fire_price_ticks`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_fire_price_ticks(mut self, value: i64) -> Self {
+        self.fire_price_ticks = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(TriggerEvent);
 impl ::buffa::MessageName for TriggerEvent {
@@ -5557,10 +5566,8 @@ impl ::buffa::Message for TriggerEvent {
         if self.child_order_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if self.fire_price_ticks != 0i64 {
-            size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(self.fire_price_ticks) as u32;
+        if let Some(v) = self.fire_price_ticks {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
         if !self.reason.is_empty() {
             size += 2u32 + ::buffa::types::string_encoded_len(&self.reason) as u32;
@@ -5605,8 +5612,8 @@ impl ::buffa::Message for TriggerEvent {
         if self.child_order_id != 0u64 {
             ::buffa::types::put_fixed64_field(12u32, self.child_order_id, buf);
         }
-        if self.fire_price_ticks != 0i64 {
-            ::buffa::types::put_int64_field(13u32, self.fire_price_ticks, buf);
+        if let Some(v) = self.fire_price_ticks {
+            ::buffa::types::put_int64_field(13u32, v, buf);
         }
         if !self.reason.is_empty() {
             ::buffa::types::put_string_field(20u32, &self.reason, buf);
@@ -5689,7 +5696,9 @@ impl ::buffa::Message for TriggerEvent {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.fire_price_ticks = ::buffa::types::decode_int64(buf)?;
+                self.fire_price_ticks = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
             }
             20u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -5714,7 +5723,7 @@ impl ::buffa::Message for TriggerEvent {
         self.ts_ns = 0u64;
         self.child_seq = 0i32;
         self.child_order_id = 0u64;
-        self.fire_price_ticks = 0i64;
+        self.fire_price_ticks = ::core::option::Option::None;
         self.reason.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -17892,11 +17901,11 @@ pub mod __buffa {
             ///
             /// Field 12: `child_order_id`
             pub child_order_id: u64,
-            /// Price that caused the trigger to fire, in quote units scaled by 1e6. Zero
-            /// when not applicable.
+            /// Price that caused a conditional trigger to fire, in quote units scaled by
+            /// 1e6. Absent for time-scheduled triggers such as TWAP.
             ///
             /// Field 13: `fire_price_ticks`
-            pub fire_price_ticks: i64,
+            pub fire_price_ticks: ::core::option::Option<i64>,
             /// Optional cancel reason.
             ///
             /// Field 20: `reason`
@@ -17999,7 +18008,9 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.fire_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                        view.fire_price_ticks = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
                     }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -18095,11 +18106,8 @@ pub mod __buffa {
                 if self.child_order_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if self.fire_price_ticks != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(self.fire_price_ticks)
-                                as u32;
+                if let Some(v) = self.fire_price_ticks {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
                 if !self.reason.is_empty() {
                     size
@@ -18147,8 +18155,8 @@ pub mod __buffa {
                 if self.child_order_id != 0u64 {
                     ::buffa::types::put_fixed64_field(12u32, self.child_order_id, buf);
                 }
-                if self.fire_price_ticks != 0i64 {
-                    ::buffa::types::put_int64_field(13u32, self.fire_price_ticks, buf);
+                if let Some(v) = self.fire_price_ticks {
+                    ::buffa::types::put_int64_field(13u32, v, buf);
                 }
                 if !self.reason.is_empty() {
                     ::buffa::types::put_string_field(20u32, &self.reason, buf);
@@ -18226,11 +18234,11 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.child_order_id),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.fire_price_ticks) {
+                if let ::core::option::Option::Some(__v) = self.fire_price_ticks {
                     __map
                         .serialize_entry(
                             "firePriceTicks",
-                            &::buffa::json_helpers::ProtoJson(&self.fire_price_ticks),
+                            &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.reason) {
@@ -18388,12 +18396,12 @@ pub mod __buffa {
             pub fn child_order_id(&self) -> u64 {
                 self.0.reborrow().child_order_id
             }
-            /// Price that caused the trigger to fire, in quote units scaled by 1e6. Zero
-            /// when not applicable.
+            /// Price that caused a conditional trigger to fire, in quote units scaled by
+            /// 1e6. Absent for time-scheduled triggers such as TWAP.
             ///
             /// Field 13: `fire_price_ticks`
             #[must_use]
-            pub fn fire_price_ticks(&self) -> i64 {
+            pub fn fire_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().fire_price_ticks
             }
             /// Optional cancel reason.

@@ -1936,7 +1936,7 @@ pub const ORDERS_READ_SERVICE_GET_BATCH_REPLACE_STATUS_SPEC: ::connectrpc::Spec 
 #[allow(clippy::type_complexity)]
 pub trait OrdersReadService: Send + Sync + 'static {
     /// Retrieve non-terminal orders for an account.
-    /// Supports optional subaccount, symbol, and side filters with cursor pagination.
+    /// Supports optional subaccount, trigger, symbol, and side filters with cursor pagination.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -1960,7 +1960,7 @@ pub trait OrdersReadService: Send + Sync + 'static {
         >,
     > + Send;
     /// Retrieve terminal order history for an account.
-    /// Supports optional subaccount, symbol, side, status, and time-range filters with cursor pagination.
+    /// Supports optional subaccount, trigger, symbol, side, status, and time-range filters with cursor pagination.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
