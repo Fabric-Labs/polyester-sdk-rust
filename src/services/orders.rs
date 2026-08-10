@@ -76,12 +76,17 @@ impl OrdersService {
     }
 
     pub async fn list_open_with(&self, opts: ListOpenOrdersOpts) -> Result<OrdersList> {
+        let trigger_id = match opts.trigger_id.as_deref() {
+            Some(raw) if !raw.trim().is_empty() => Some(id_to_u64(raw, "trigger_id")?),
+            _ => None,
+        };
         let req = GetOpenOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
             page_token: opts.page_token.unwrap_or_default(),
             limit: opts.limit,
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
+            trigger_id,
             ..Default::default()
         };
         let client = self.read_client();
@@ -130,6 +135,10 @@ impl OrdersService {
                 })?;
             symbol_ids.push(resolved);
         }
+        let trigger_id = match opts.trigger_id.as_deref() {
+            Some(raw) if !raw.trim().is_empty() => Some(id_to_u64(raw, "trigger_id")?),
+            _ => None,
+        };
         let req = GetOrderHistoryRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_id: symbol_ids,
@@ -137,6 +146,7 @@ impl OrdersService {
             limit: opts.limit,
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
+            trigger_id,
             ..Default::default()
         };
         let client = self.read_client();

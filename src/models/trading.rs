@@ -400,6 +400,8 @@ pub struct ListOpenOrdersOpts {
     pub limit: Option<u32>,
     pub include_attached_risk: bool,
     pub include_attached_risk_state: bool,
+    /// When set, only child orders created by this trigger are returned.
+    pub trigger_id: Option<String>,
 }
 
 /// Options for [`crate::services::OrdersService::list_history_with`].
@@ -412,6 +414,8 @@ pub struct ListOrderHistoryOpts {
     pub limit: Option<u32>,
     pub include_attached_risk: bool,
     pub include_attached_risk_state: bool,
+    /// When set, only child orders created by this trigger are returned.
+    pub trigger_id: Option<String>,
 }
 
 /// Options for [`crate::services::OrdersService::get_with`].

@@ -17094,6 +17094,17 @@ pub struct GetOpenOrdersRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub include_attached_risk_state: ::core::option::Option<bool>,
+    /// Optional trigger identifier. When set, returns only child orders created by
+    /// that trigger.
+    ///
+    /// Field 14: `trigger_id`
+    #[serde(
+        rename = "triggerId",
+        alias = "trigger_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub trigger_id: ::core::option::Option<u64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -17108,6 +17119,7 @@ impl ::core::fmt::Debug for GetOpenOrdersRequest {
             .field("page_token", &self.page_token)
             .field("include_attached_risk", &self.include_attached_risk)
             .field("include_attached_risk_state", &self.include_attached_risk_state)
+            .field("trigger_id", &self.trigger_id)
             .finish()
     }
 }
@@ -17145,6 +17157,13 @@ impl GetOpenOrdersRequest {
     ///Sets [`Self::include_attached_risk_state`] to `Some(value)`, consuming and returning `self`.
     pub fn with_include_attached_risk_state(mut self, value: bool) -> Self {
         self.include_attached_risk_state = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::trigger_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_trigger_id(mut self, value: u64) -> Self {
+        self.trigger_id = Some(value);
         self
     }
 }
@@ -17196,6 +17215,9 @@ impl ::buffa::Message for GetOpenOrdersRequest {
         if self.include_attached_risk_state.is_some() {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
+        if self.trigger_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -17237,6 +17259,9 @@ impl ::buffa::Message for GetOpenOrdersRequest {
         }
         if let Some(v) = self.include_attached_risk_state {
             ::buffa::types::put_bool_field(13u32, v, buf);
+        }
+        if let Some(v) = self.trigger_id {
+            ::buffa::types::put_fixed64_field(14u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -17332,6 +17357,15 @@ impl ::buffa::Message for GetOpenOrdersRequest {
                     ::buffa::types::decode_bool(buf)?,
                 );
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.trigger_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -17347,6 +17381,7 @@ impl ::buffa::Message for GetOpenOrdersRequest {
         self.page_token.clear();
         self.include_attached_risk = ::core::option::Option::None;
         self.include_attached_risk_state = ::core::option::Option::None;
+        self.trigger_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -17643,6 +17678,17 @@ pub struct GetOrderHistoryRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub include_attached_risk_state: ::core::option::Option<bool>,
+    /// Optional trigger identifier. When set, returns only child orders created by
+    /// that trigger.
+    ///
+    /// Field 16: `trigger_id`
+    #[serde(
+        rename = "triggerId",
+        alias = "trigger_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub trigger_id: ::core::option::Option<u64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -17660,6 +17706,7 @@ impl ::core::fmt::Debug for GetOrderHistoryRequest {
             .field("page_token", &self.page_token)
             .field("include_attached_risk", &self.include_attached_risk)
             .field("include_attached_risk_state", &self.include_attached_risk_state)
+            .field("trigger_id", &self.trigger_id)
             .finish()
     }
 }
@@ -17711,6 +17758,13 @@ impl GetOrderHistoryRequest {
     ///Sets [`Self::include_attached_risk_state`] to `Some(value)`, consuming and returning `self`.
     pub fn with_include_attached_risk_state(mut self, value: bool) -> Self {
         self.include_attached_risk_state = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::trigger_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_trigger_id(mut self, value: u64) -> Self {
+        self.trigger_id = Some(value);
         self
     }
 }
@@ -17774,6 +17828,9 @@ impl ::buffa::Message for GetOrderHistoryRequest {
         if self.include_attached_risk_state.is_some() {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
+        if self.trigger_id.is_some() {
+            size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -17827,6 +17884,9 @@ impl ::buffa::Message for GetOrderHistoryRequest {
         }
         if let Some(v) = self.include_attached_risk_state {
             ::buffa::types::put_bool_field(15u32, v, buf);
+        }
+        if let Some(v) = self.trigger_id {
+            ::buffa::types::put_fixed64_field(16u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -17949,6 +18009,15 @@ impl ::buffa::Message for GetOrderHistoryRequest {
                     ::buffa::types::decode_bool(buf)?,
                 );
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.trigger_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -17967,6 +18036,7 @@ impl ::buffa::Message for GetOrderHistoryRequest {
         self.page_token.clear();
         self.include_attached_risk = ::core::option::Option::None;
         self.include_attached_risk_state = ::core::option::Option::None;
+        self.trigger_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -41828,6 +41898,11 @@ pub mod __buffa {
             ///
             /// Field 13: `include_attached_risk_state`
             pub include_attached_risk_state: ::core::option::Option<bool>,
+            /// Optional trigger identifier. When set, returns only child orders created by
+            /// that trigger.
+            ///
+            /// Field 14: `trigger_id`
+            pub trigger_id: ::core::option::Option<u64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetOpenOrdersRequestView<'a> {
@@ -41911,6 +41986,15 @@ pub mod __buffa {
                             ::buffa::types::decode_bool(&mut cur)?,
                         );
                     }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.trigger_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
                     2u32 => {
                         if tag.wire_type()
                             == ::buffa::encoding::WireType::LengthDelimited
@@ -41972,6 +42056,7 @@ pub mod __buffa {
                     page_token: self.page_token.to_string(),
                     include_attached_risk: self.include_attached_risk,
                     include_attached_risk_state: self.include_attached_risk_state,
+                    trigger_id: self.trigger_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -42020,6 +42105,9 @@ pub mod __buffa {
                 if self.include_attached_risk_state.is_some() {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
+                if self.trigger_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -42062,6 +42150,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.include_attached_risk_state {
                     ::buffa::types::put_bool_field(13u32, v, buf);
+                }
+                if let Some(v) = self.trigger_id {
+                    ::buffa::types::put_fixed64_field(14u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -42118,6 +42209,13 @@ pub mod __buffa {
                     .include_attached_risk_state
                 {
                     __map.serialize_entry("includeAttachedRiskState", &__v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.trigger_id {
+                    __map
+                        .serialize_entry(
+                            "triggerId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -42265,6 +42363,14 @@ pub mod __buffa {
             #[must_use]
             pub fn include_attached_risk_state(&self) -> ::core::option::Option<bool> {
                 self.0.reborrow().include_attached_risk_state
+            }
+            /// Optional trigger identifier. When set, returns only child orders created by
+            /// that trigger.
+            ///
+            /// Field 14: `trigger_id`
+            #[must_use]
+            pub fn trigger_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().trigger_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetOpenOrdersRequestView<'static>>>
@@ -42673,6 +42779,11 @@ pub mod __buffa {
             ///
             /// Field 15: `include_attached_risk_state`
             pub include_attached_risk_state: ::core::option::Option<bool>,
+            /// Optional trigger identifier. When set, returns only child orders created by
+            /// that trigger.
+            ///
+            /// Field 16: `trigger_id`
+            pub trigger_id: ::core::option::Option<u64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetOrderHistoryRequestView<'a> {
@@ -42781,6 +42892,15 @@ pub mod __buffa {
                             ::buffa::types::decode_bool(&mut cur)?,
                         );
                     }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.trigger_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
                     2u32 => {
                         if tag.wire_type()
                             == ::buffa::encoding::WireType::LengthDelimited
@@ -42845,6 +42965,7 @@ pub mod __buffa {
                     page_token: self.page_token.to_string(),
                     include_attached_risk: self.include_attached_risk,
                     include_attached_risk_state: self.include_attached_risk_state,
+                    trigger_id: self.trigger_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -42905,6 +43026,9 @@ pub mod __buffa {
                 if self.include_attached_risk_state.is_some() {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
+                if self.trigger_id.is_some() {
+                    size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -42959,6 +43083,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.include_attached_risk_state {
                     ::buffa::types::put_bool_field(15u32, v, buf);
+                }
+                if let Some(v) = self.trigger_id {
+                    ::buffa::types::put_fixed64_field(16u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -43032,6 +43159,13 @@ pub mod __buffa {
                     .include_attached_risk_state
                 {
                     __map.serialize_entry("includeAttachedRiskState", &__v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.trigger_id {
+                    __map
+                        .serialize_entry(
+                            "triggerId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -43200,6 +43334,14 @@ pub mod __buffa {
             #[must_use]
             pub fn include_attached_risk_state(&self) -> ::core::option::Option<bool> {
                 self.0.reborrow().include_attached_risk_state
+            }
+            /// Optional trigger identifier. When set, returns only child orders created by
+            /// that trigger.
+            ///
+            /// Field 16: `trigger_id`
+            #[must_use]
+            pub fn trigger_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().trigger_id
             }
         }
         impl ::core::convert::From<

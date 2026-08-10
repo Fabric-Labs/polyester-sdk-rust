@@ -498,7 +498,9 @@ pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> TriggerEvent {
         } else {
             format_uint64_id(msg.child_order_id)
         },
-        fire_price: decode_price_ticks(msg.fire_price_ticks, None),
+        fire_price: msg
+            .fire_price_ticks
+            .and_then(|ticks| decode_price_ticks(ticks, None)),
         reason: msg.reason.clone(),
     }
 }
@@ -713,7 +715,7 @@ mod tests {
                 ts_ns: 123,
                 child_seq: 3,
                 child_order_id: 77,
-                fire_price_ticks: 100,
+                fire_price_ticks: Some(100),
                 reason: "hit".into(),
                 ..Default::default()
             }],
@@ -730,6 +732,19 @@ mod tests {
         assert_eq!(event.child_order_id, format_uint64_id(77));
         assert_eq!(event.fire_price.as_ref().unwrap().as_ticks(), 100);
         assert_eq!(event.reason, "hit");
+    }
+
+    #[test]
+    fn trigger_event_absent_fire_price_is_none() {
+        let event = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 1,
+            trigger_type: TriggerType::Twap.into(),
+            event_type: TriggerEventType::EventFired.into(),
+            child_seq: 1,
+            fire_price_ticks: None,
+            ..Default::default()
+        });
+        assert!(event.fire_price.is_none());
     }
 
     #[test]
