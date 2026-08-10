@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Breaking
+- Generated `TriggerEvent.fire_price_ticks` is now optional (absent for
+  time-scheduled TWAP slice fires). Decoded `TriggerEvent.fire_price` is `None`
+  when the wire field is unset.
+
+### Added
+- `ListOpenOrdersOpts.trigger_id` and `ListOrderHistoryOpts.trigger_id` filter
+  child orders created by a standalone trigger (TWAP/ladder slice children and
+  their execution prices).
+
 ## 0.1.0a33
 
 Package version: `0.1.0-alpha.33`. Git tag: `v0.1.0a33`.

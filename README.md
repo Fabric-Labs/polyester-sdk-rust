@@ -369,6 +369,11 @@ list). Response `status` uses the same labels (British spelling `cancelled`).
 returns policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
 Identify orders with `OrderKey::OrderId` or `OrderKey::ClientOrderId` (exclusive oneOf).
 
+`ListOpenOrdersOpts.trigger_id` / `ListOrderHistoryOpts.trigger_id` filter
+child orders created by a standalone trigger (TWAP/ladder slices).
+Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
+(`fire_price_ticks` is optional on the wire).
+
 ## Qty / price rules
 
 Public order/trigger write paths take **`Price` / `Quantity` wrappers only**:
