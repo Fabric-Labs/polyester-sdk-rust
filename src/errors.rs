@@ -6,7 +6,10 @@ use buffa::{Enumeration, Message};
 use connectrpc::{ConnectError, ErrorCode, ErrorDetail};
 use thiserror::Error;
 
+use crate::models::RateLimitDetail;
 use crate::proto::auth::v1::AuthErrorDetail;
+use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail};
+use crate::proto::polyester::ratelimit::v1::RateLimitDetail as ProtoRateLimitDetail;
 use crate::user_agent::{cloudflare_1010_message, is_cloudflare_browser_ban};
 
 /// Root result alias for the SDK.
@@ -41,6 +44,9 @@ pub enum Error {
     RateLimit {
         message: String,
         retry_after: Option<f64>,
+        /// Structured `polyester.ratelimit.v1.RateLimitDetail` when attached.
+        /// Boxed so `Error` stays small enough for Clippy's `result_large_err`.
+        detail: Option<Box<RateLimitDetail>>,
     },
     #[error("{0}")]
     Server(String),
@@ -161,16 +167,74 @@ impl Error {
     }
 }
 
+fn decode_detail_bytes(detail: &ErrorDetail) -> Option<Vec<u8>> {
+    let value = detail.value.as_ref()?;
+    STANDARD_NO_PAD
+        .decode(value)
+        .or_else(|_| STANDARD.decode(value))
+        .ok()
+}
+
 fn decode_auth_error_detail(detail: &ErrorDetail) -> Option<AuthErrorDetail> {
     if !detail.type_url.ends_with("auth.v1.AuthErrorDetail") {
         return None;
     }
-    let value = detail.value.as_ref()?;
-    let bytes = STANDARD_NO_PAD
-        .decode(value)
-        .or_else(|_| STANDARD.decode(value))
-        .ok()?;
-    AuthErrorDetail::decode_from_slice(&bytes).ok()
+    AuthErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
+}
+
+fn decode_order_error_detail(detail: &ErrorDetail) -> Option<OrderErrorDetail> {
+    if !detail.type_url.ends_with("orders.v1.ErrorDetail") {
+        return None;
+    }
+    OrderErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
+}
+
+fn decode_rate_limit_detail(detail: &ErrorDetail) -> Option<ProtoRateLimitDetail> {
+    if !detail
+        .type_url
+        .ends_with("polyester.ratelimit.v1.RateLimitDetail")
+    {
+        return None;
+    }
+    ProtoRateLimitDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
+}
+
+fn enum_label<T: Enumeration>(value: &buffa::EnumValue<T>, unknown_prefix: &str) -> String {
+    match value.as_known() {
+        Some(known) => known.proto_name().to_owned(),
+        None => format!("{unknown_prefix}({})", value.to_i32()),
+    }
+}
+
+fn rate_limit_detail_from_proto_local(msg: &ProtoRateLimitDetail) -> RateLimitDetail {
+    // Kept local to avoid a codecs::decode ↔ errors import cycle.
+    RateLimitDetail {
+        reason: enum_label(&msg.reason, "UNKNOWN_FAILURE_REASON"),
+        limit: msg.limit,
+        remaining: msg.remaining,
+        retry_after_ms: msg.retry_after_ms,
+        policy_version: msg.policy_version,
+        operation_id: msg.operation_id.clone(),
+        policy_class: enum_label(&msg.policy_class, "UNKNOWN_POLICY_CLASS"),
+        scope: enum_label(&msg.scope, "UNKNOWN_LIMITER_SCOPE"),
+        refill_model: enum_label(&msg.refill_model, "UNKNOWN_REFILL_MODEL"),
+    }
+}
+
+fn rate_limit_error(
+    message: String,
+    detail: Option<RateLimitDetail>,
+    header_retry: Option<f64>,
+) -> Error {
+    let retry_after = detail
+        .as_ref()
+        .and_then(RateLimitDetail::retry_after_seconds)
+        .or(header_retry);
+    Error::RateLimit {
+        message,
+        retry_after,
+        detail: detail.map(Box::new),
+    }
 }
 
 fn parse_nonnegative_f64(value: &http::HeaderValue) -> Option<f64> {
@@ -202,6 +266,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
             message
         }
     };
+    let header_retry = retry_after_seconds(&err);
     for detail in &err.details {
         if let Some(auth_detail) = decode_auth_error_detail(detail) {
             let code = auth_detail
@@ -220,19 +285,36 @@ pub fn map_connect_error(err: ConnectError) -> Error {
                 metadata: Vec::new(),
             };
         }
+        if let Some(rl) = decode_rate_limit_detail(detail) {
+            return rate_limit_error(
+                fallback_message.clone(),
+                Some(rate_limit_detail_from_proto_local(&rl)),
+                header_retry,
+            );
+        }
+        if let Some(order_detail) = decode_order_error_detail(detail) {
+            let is_rate_limit = order_detail.rate_limit.is_set()
+                || matches!(
+                    order_detail.code.as_known(),
+                    Some(OrderErrorCode::RateLimitExceeded)
+                );
+            if is_rate_limit {
+                let detail = order_detail
+                    .rate_limit
+                    .as_option()
+                    .map(rate_limit_detail_from_proto_local);
+                return rate_limit_error(fallback_message.clone(), detail, header_retry);
+            }
+        }
     }
     let code = err.code;
-    let retry_after = retry_after_seconds(&err);
     let message = fallback_message;
     if is_cloudflare_browser_ban(&message) {
         return Error::Transport(cloudflare_1010_message());
     }
     match code {
         ErrorCode::Unauthenticated | ErrorCode::PermissionDenied => Error::Auth(message),
-        ErrorCode::ResourceExhausted => Error::RateLimit {
-            message,
-            retry_after,
-        },
+        ErrorCode::ResourceExhausted => rate_limit_error(message, None, header_retry),
         ErrorCode::Unavailable | ErrorCode::Internal => Error::Server(message),
         ErrorCode::DeadlineExceeded => Error::Transport(message),
         ErrorCode::Unimplemented => {
@@ -308,9 +390,70 @@ mod tests {
             Error::RateLimit {
                 message,
                 retry_after,
+                detail,
             } => {
                 assert_eq!(message, "resource_exhausted: request rate exceeded");
                 assert_eq!(retry_after, Some(2.5));
+                assert!(detail.is_none());
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn map_connect_error_surfaces_nested_rate_limit_detail() {
+        use crate::proto::orders::v1::{
+            ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail,
+        };
+        use crate::proto::polyester::ratelimit::v1::{
+            FailureReason, LimiterScope, PolicyClass, RateLimitDetail as ProtoRateLimitDetail,
+            RefillModel,
+        };
+
+        let mut headers = http::HeaderMap::new();
+        headers.insert("retry-after", http::HeaderValue::from_static("9"));
+        let detail_msg = OrderErrorDetail {
+            code: OrderErrorCode::RateLimitExceeded.into(),
+            rate_limit: ProtoRateLimitDetail {
+                reason: FailureReason::QUOTA_EXCEEDED.into(),
+                limit: Some(100),
+                remaining: Some(0),
+                retry_after_ms: Some(2500),
+                policy_version: Some(3),
+                operation_id: "orders.create".into(),
+                policy_class: PolicyClass::TRADING_PLACE.into(),
+                scope: LimiterScope::API_KEY.into(),
+                refill_model: RefillModel::CONTINUOUS.into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let mapped = map_connect_error(
+            ConnectError::new(ErrorCode::ResourceExhausted, "slow down")
+                .with_headers(headers)
+                .with_detail(ErrorDetail::from_message(
+                    "orders.v1.ErrorDetail",
+                    &detail_msg,
+                )),
+        );
+        match mapped {
+            Error::RateLimit {
+                retry_after,
+                detail,
+                ..
+            } => {
+                assert_eq!(retry_after, Some(2.5));
+                let detail = detail.expect("detail");
+                assert_eq!(detail.reason, "QUOTA_EXCEEDED");
+                assert_eq!(detail.limit, Some(100));
+                assert_eq!(detail.remaining, Some(0));
+                assert_eq!(detail.retry_after_ms, Some(2500));
+                assert_eq!(detail.policy_version, Some(3));
+                assert_eq!(detail.operation_id, "orders.create");
+                assert_eq!(detail.policy_class, "TRADING_PLACE");
+                assert_eq!(detail.scope, "API_KEY");
+                assert_eq!(detail.refill_model, "CONTINUOUS");
             }
             other => panic!("unexpected error: {other:?}"),
         }
@@ -338,6 +481,7 @@ mod tests {
         let limited = Error::RateLimit {
             message: "slow down".into(),
             retry_after: Some(1.0),
+            detail: None,
         };
         assert!(limited.is_retryable());
         assert!(!limited.mutation_outcome_unknown());

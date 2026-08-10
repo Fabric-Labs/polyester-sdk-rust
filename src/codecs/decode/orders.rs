@@ -292,6 +292,10 @@ fn order_error_detail_from_proto(msg: &ErrorDetail) -> OrderErrorDetail {
                 message: v.message.clone(),
             })
             .collect(),
+        rate_limit: msg
+            .rate_limit
+            .as_option()
+            .map(crate::codecs::decode::rate_limit_detail_from_proto),
     }
 }
 
@@ -412,6 +416,7 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                 order_id: String::new(),
                 client_order_id: item.client_order_id.clone(),
                 code: String::new(),
+                rate_limit: None,
             };
             match item.outcome.as_ref() {
                 Some(batch_create_result_item::Outcome::Accepted(value)) => {
@@ -430,6 +435,11 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                             None => format!("UNKNOWN_ERROR_CODE({})", err.code.to_i32()),
                         })
                         .unwrap_or_else(|| "ERROR_CODE_UNSPECIFIED".to_owned());
+                    out.rate_limit = value.error.as_option().and_then(|err| {
+                        err.rate_limit
+                            .as_option()
+                            .map(crate::codecs::decode::rate_limit_detail_from_proto)
+                    });
                 }
                 None => {
                     return Err(Error::response_contract(
@@ -487,6 +497,11 @@ pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> Result<BatchC
             order_id: format_uint64_id(item.order_id),
             client_order_id: item.client_order_id.clone(),
             code: item.code.clone(),
+            rate_limit: item.error.as_option().and_then(|err| {
+                err.rate_limit
+                    .as_option()
+                    .map(crate::codecs::decode::rate_limit_detail_from_proto)
+            }),
         });
     }
     if accepted != msg.accepted_count
@@ -548,6 +563,11 @@ pub fn batch_replace_from_proto(
             replacement_order_id: format_uint64_id(item.replacement_order_id),
             client_order_id: item.client_order_id.clone(),
             code: item.code.clone(),
+            rate_limit: item.error.as_option().and_then(|err| {
+                err.rate_limit
+                    .as_option()
+                    .map(crate::codecs::decode::rate_limit_detail_from_proto)
+            }),
         });
     }
     if accepted != msg.accepted_count
@@ -1043,6 +1063,7 @@ mod tests {
         assert_eq!(preview.admissible, Some(false));
         let rejection = preview.rejection.expect("rejection");
         assert_eq!(rejection.code, "BAD_QTY");
+        assert!(rejection.rate_limit.is_none());
         assert_eq!(rejection.violations.len(), 1);
         assert_eq!(rejection.violations[0].field_path, "order.base_qty_scaled");
         assert_eq!(

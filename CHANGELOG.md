@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.1.0a35
+
+Package version: `0.1.0-alpha.35`. Git tag: `v0.1.0a35`.
+
+### Breaking
+- `Error::RateLimit` gains a `detail: Option<Box<RateLimitDetail>>` field.
+  Update exhaustively matched destructuring sites.
+
+### Added
+- Public `RateLimitDetail` model for `polyester.ratelimit.v1` quota rejection
+  payloads (`reason`, presence-aware `limit` / `remaining` / `retry_after_ms` /
+  `policy_version`, plus `operation_id`, `policy_class`, `scope`, `refill_model`).
+- Connect `ResourceExhausted` mapping populates `Error::RateLimit.detail` from
+  top-level `RateLimitDetail` or nested `orders.v1.ErrorDetail.rate_limit`.
+  `retry_after` prefers `detail.retry_after_ms`, then `Retry-After` /
+  `Retry-After-Ms` / `grpc-retry-pushback-ms` headers.
+- Preview / batch create / batch replace / batch cancel rejections surface
+  `rate_limit` on `OrderErrorDetail` and batch result items when present.
+
 ## 0.1.0a34
 
 Package version: `0.1.0-alpha.34`. Git tag: `v0.1.0a34`.

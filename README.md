@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.34`, git tag `v0.1.0a34`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.35`, git tag `v0.1.0a35`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.34"
+polyester-sdk = "0.1.0-alpha.35"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -79,7 +79,7 @@ For a private git checkout instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a34" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a35" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -469,6 +469,13 @@ for bal in balances.balances {
 Classify failures with `Error::is_retryable()` and respect `Error::retry_after()`. For mutations,
 `Error::mutation_outcome_unknown()` means the first request may have committed: reconcile state
 before retrying and reuse the same logical request identity.
+
+Connect `ResourceExhausted` maps to `Error::RateLimit { detail, .. }`. When the server attaches
+`polyester.ratelimit.v1.RateLimitDetail` (top-level Connect detail or nested under
+`orders.v1.ErrorDetail.rate_limit`), `detail` carries `policy_class`, `scope`, `operation_id`, and
+presence-aware quota fields. `retry_after` prefers `detail.retry_after_ms`, then `Retry-After` /
+`Retry-After-Ms` / `grpc-retry-pushback-ms` headers. Preview and batch rejections expose the same
+payload on `OrderErrorDetail.rate_limit` / batch item `rate_limit`.
 
 Order mutations that take a `request_id` (`modify`, `batch_create`, `batch_cancel`,
 `batch_replace`, `cancel_all` / `cancel_all_with`, `cancel_all_after`) **generate one when

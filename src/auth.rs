@@ -86,6 +86,7 @@ fn signing_capacity_error(wait_ms: u64) -> Error {
     Error::RateLimit {
         message: "signing timestamp capacity exhausted; retry after clock advances".to_owned(),
         retry_after: Some(wait_ms.max(1) as f64 / 1_000.0),
+        detail: None,
     }
 }
 

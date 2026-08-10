@@ -102,6 +102,7 @@ pub struct BatchCreateResultItem {
     pub order_id: String,
     pub client_order_id: String,
     pub code: String,
+    pub rate_limit: Option<super::RateLimitDetail>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,6 +133,7 @@ pub struct BatchCancelResultItem {
     pub order_id: String,
     pub client_order_id: String,
     pub code: String,
+    pub rate_limit: Option<super::RateLimitDetail>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -330,6 +332,7 @@ pub struct BatchReplaceAdmissionItem {
     pub client_order_id: String,
     pub replacement_order_id: String,
     pub code: String,
+    pub rate_limit: Option<super::RateLimitDetail>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -545,6 +548,8 @@ pub struct OrderErrorDetail {
     /// `UNKNOWN_ERROR_CODE(<n>)` for open-enum forward compatibility.
     pub code: String,
     pub violations: Vec<OrderFieldViolation>,
+    /// Structured quota rejection when `ErrorDetail.rate_limit` is present.
+    pub rate_limit: Option<super::RateLimitDetail>,
 }
 
 /// Advisory admission result for [`crate::services::OrdersService::preview`].
