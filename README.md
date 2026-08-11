@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.35`, git tag `v0.1.0a35`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.36`, git tag `v0.1.0a36`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.35"
+polyester-sdk = "0.1.0-alpha.36"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -79,7 +79,7 @@ For a private git checkout instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a35" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a36" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -225,12 +225,30 @@ let client = polyester::Client::from_env()?;
 client.wait_for_catalogs().await?;
 ```
 
+Hydrated pair rows also expose deterministic constraints through
+`client.catalogs.pair_constraints_for_symbol(symbol)`. Order and trigger
+encoders preflight catalog tick size, quantity step, minimum quantity, and
+minimum notional when quantity and price make it computable. This is an early
+validation aid only; server preview/admission remains authoritative for
+balances, permissions, risk, and live market state.
+
+Non-empty symbol filters are catalog validated. An unknown symbol fails with
+`Error::Validation` and is never sent as an empty/unfiltered request. Optional
+list limits preserve the endpoint default when omitted; `Some(0)` is rejected
+where the endpoint requires a positive cap.
+
 If a client is constructed before entering a Tokio runtime,
 `wait_for_catalogs()` starts hydration on the current runtime. Scaled bot inputs
 must carry their source scale. `AssetAmount::from_scaled(..., None, ...)` is
 accepted for composition only and fails closed on transfer/withdraw encoding
 unless the request's `amount_scale` / `quantity_scale` is explicit. Prefer
 `from_decimal_str` / `from_decimal`, or pass `Some(scale)` to `from_scaled`.
+
+Successful private subscriptions are returned only after token exchange,
+websocket connection, and channel subscription complete. Missing credentials
+fail immediately with `Error::Auth`. Response fields named `*_ts_ns` are
+validated as nanoseconds; millisecond-shaped values fail with
+`Error::ResponseContract` instead of being silently mislabeled.
 
 ## Create and cancel orders
 

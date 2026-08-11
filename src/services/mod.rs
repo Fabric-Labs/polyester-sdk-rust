@@ -38,6 +38,16 @@ use tokio::sync::OnceCell;
 
 use crate::realtime::Client as RealtimeClient;
 
+/// Preserve an omitted endpoint default while rejecting an explicit zero cap.
+fn positive_limit(limit: Option<u32>, endpoint: &str) -> Result<Option<u32>> {
+    match limit {
+        Some(0) => Err(Error::validation(format!(
+            "{endpoint} limit must be positive when explicitly supplied"
+        ))),
+        other => Ok(other),
+    }
+}
+
 /// Shared dependencies for service constructors.
 #[derive(Clone)]
 pub struct ServiceContext {
@@ -84,5 +94,19 @@ impl ServiceContext {
                 "catalogs are not ready; await client.wait_for_catalogs() before placing orders",
             ))
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn positive_limits_preserve_omission_and_reject_explicit_zero() {
+        assert_eq!(positive_limit(None, "list").unwrap(), None);
+        assert_eq!(positive_limit(Some(1), "list").unwrap(), Some(1));
+        let err = positive_limit(Some(0), "list").unwrap_err();
+        assert!(matches!(err, Error::Validation(_)));
+        assert!(err.to_string().contains("positive"));
     }
 }

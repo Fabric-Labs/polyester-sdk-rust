@@ -111,9 +111,10 @@ impl MarketDataService {
         let symbol_id =
             self.resolve_symbol_id(opts.symbol.as_deref(), opts.symbol_id, "get_trades")?;
         let quantity_scale = self.require_quantity_scale(symbol_id, "get_trades")?;
+        let limit = super::positive_limit(opts.limit, "get_trades")?;
         let req = GetTradesRequest {
             symbol_id,
-            limit: opts.limit.unwrap_or(0),
+            limit: limit.unwrap_or(0),
             start_time: Self::timestamp_field(opts.start),
             end_time: Self::timestamp_field(opts.end),
             page_token: opts.page_token.unwrap_or_default(),
@@ -122,7 +123,7 @@ impl MarketDataService {
         let resp = unary::await_public(self.client().get_trades(req))
             .await?
             .into_owned();
-        Ok(market_trades_from_proto(&resp, quantity_scale))
+        market_trades_from_proto(&resp, quantity_scale)
     }
 
     /// Candle series for a symbol, ordered newest-first by `ts_sec`.
@@ -200,10 +201,11 @@ impl MarketDataService {
         };
         let timeframe = parse_timeframe(timeframe_label)?;
         let volume_scale = self.require_quantity_scale(symbol_id, "get_candles")?;
+        let limit = super::positive_limit(opts.limit, "get_candles")?;
         let req = GetCandlesRequest {
             symbol_id,
             timeframe: timeframe.into(),
-            limit: opts.limit.unwrap_or(0),
+            limit: limit.unwrap_or(0),
             start_time: Self::timestamp_field(opts.start),
             end_time: Self::timestamp_field(opts.end),
             include_incomplete: opts.include_incomplete,
@@ -352,9 +354,21 @@ impl MarketOverviewService {
         opts: impl Into<ListMarketOverviewOptions>,
     ) -> Result<MarketOverviewList> {
         let opts = opts.into();
+        if opts
+            .symbols
+            .as_deref()
+            .is_some_and(|symbols| symbols.iter().any(|value| !value.trim().is_empty()))
+        {
+            self.ctx.wait_for_catalogs().await?;
+        }
+        let symbols = self
+            .ctx
+            .catalogs
+            .resolve_symbol_filters(opts.symbols.as_deref())?;
+        let limit = super::positive_limit(opts.limit, "market_overview")?;
         let req = ListMarketOverviewRequest {
-            symbols: opts.symbols.unwrap_or_default(),
-            limit: opts.limit.unwrap_or_default(),
+            symbols,
+            limit: limit.unwrap_or_default(),
             include_sparklines: opts.include_sparklines,
             ..Default::default()
         };
@@ -392,8 +406,22 @@ impl MarketOverviewService {
         use std::sync::{Arc, Mutex};
         use tokio::sync::mpsc;
 
-        let limit = opts.limit.filter(|n| *n > 0).unwrap_or(50);
-        let symbols = opts.symbols.clone();
+        if opts
+            .symbols
+            .as_deref()
+            .is_some_and(|symbols| symbols.iter().any(|value| !value.trim().is_empty()))
+        {
+            self.ctx.wait_for_catalogs().await?;
+        }
+        let limit =
+            super::positive_limit(opts.limit, "market_overview subscription")?.unwrap_or(50);
+        let symbols = {
+            let resolved = self
+                .ctx
+                .catalogs
+                .resolve_symbol_filters(opts.symbols.as_deref())?;
+            (!resolved.is_empty()).then_some(resolved)
+        };
         let include_sparklines = opts.include_sparklines;
         let channel = "public:spot:market_overview:updates:proto".to_owned();
 

@@ -14,6 +14,41 @@ pub const MAX_PROTOCOL_SCALE: u32 = 36;
 pub const INT64_MAX: i128 = i64::MAX as i128;
 pub const INT64_MIN: i128 = i64::MIN as i128;
 pub const UINT64_MAX: u128 = u64::MAX as u128;
+const MIN_MILLISECOND_SHAPED_TS_NS: u64 = 1_000_000_000_000;
+const MAX_MILLISECOND_SHAPED_TS_NS: u64 = 999_999_999_999_999;
+
+/// A response timestamp validated as nanoseconds rather than milliseconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TsNs(u64);
+
+impl TsNs {
+    /// Validate a wire `*_ts_ns` value.
+    ///
+    /// Zero remains the protobuf "not set" sentinel. Plausible Unix-millisecond
+    /// values are rejected because accepting them would
+    /// silently mislabel milliseconds as nanoseconds.
+    pub fn from_wire(value: u64, context: &str) -> Result<Self> {
+        if (MIN_MILLISECOND_SHAPED_TS_NS..=MAX_MILLISECOND_SHAPED_TS_NS).contains(&value) {
+            return Err(Error::response_contract(
+                context,
+                format!("ts_ns value {value} is millisecond-shaped; nanoseconds required"),
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+
+    pub fn optional_string(self) -> String {
+        if self.0 == 0 {
+            String::new()
+        } else {
+            self.0.to_string()
+        }
+    }
+}
 
 /// Validate a caller/catalog scale before padding or allocation.
 pub fn validate_protocol_scale(scale: u32) -> Result<()> {
@@ -470,5 +505,13 @@ mod tests {
     fn id_to_u64_rejects_invalid() {
         assert!(id_to_u64("", "id").is_err());
         assert!(id_to_u64("not a trigger id", "id").is_err());
+    }
+
+    #[test]
+    fn ts_ns_rejects_millisecond_shaped_values() {
+        let err = TsNs::from_wire(1_700_000_000_000, "trade").unwrap_err();
+        assert!(matches!(err, Error::ResponseContract { .. }));
+        assert!(TsNs::from_wire(1_700_000_000_000_000_000, "trade").is_ok());
+        assert_eq!(TsNs::from_wire(0, "trade").unwrap().optional_string(), "");
     }
 }

@@ -80,10 +80,11 @@ impl OrdersService {
             Some(raw) if !raw.trim().is_empty() => Some(id_to_u64(raw, "trigger_id")?),
             _ => None,
         };
+        let limit = super::positive_limit(opts.limit, "list_open_orders")?;
         let req = GetOpenOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
             page_token: opts.page_token.unwrap_or_default(),
-            limit: opts.limit,
+            limit,
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
             trigger_id,
@@ -98,7 +99,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(orders_list_from_open(&resp))
+        orders_list_from_open(&resp)
     }
 
     pub async fn list_history(
@@ -115,6 +116,14 @@ impl OrdersService {
     }
 
     pub async fn list_history_with(&self, opts: ListOrderHistoryOpts) -> Result<OrdersList> {
+        if opts.symbol_id.is_none()
+            && opts
+                .symbol
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+        {
+            self.ctx.wait_for_catalogs().await?;
+        }
         let mut symbol_ids = Vec::new();
         if let Some(sid) = opts.symbol_id {
             if sid == 0 {
@@ -123,14 +132,18 @@ impl OrdersService {
                 ));
             }
             symbol_ids.push(sid);
-        } else if let Some(ref symbol) = opts.symbol {
+        } else if let Some(symbol) = self
+            .ctx
+            .catalogs
+            .resolve_symbol_filter(opts.symbol.as_deref())?
+        {
             let resolved = self
                 .ctx
                 .catalogs
-                .symbol_id_for_symbol(symbol)
+                .symbol_id_for_symbol(&symbol)
                 .ok_or_else(|| {
                     Error::validation(format!(
-                        "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
+                        "catalog symbol {symbol} disappeared during resolution"
                     ))
                 })?;
             symbol_ids.push(resolved);
@@ -139,11 +152,12 @@ impl OrdersService {
             Some(raw) if !raw.trim().is_empty() => Some(id_to_u64(raw, "trigger_id")?),
             _ => None,
         };
+        let limit = super::positive_limit(opts.limit, "list_order_history")?;
         let req = GetOrderHistoryRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_id: symbol_ids,
             page_token: opts.page_token.unwrap_or_default(),
-            limit: opts.limit,
+            limit,
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
             trigger_id,
@@ -158,7 +172,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(orders_list_from_history(&resp))
+        orders_list_from_history(&resp)
     }
 
     pub async fn get(&self, key: OrderKey, subaccount_id: Option<u64>) -> Result<GetOrderResult> {
@@ -189,7 +203,7 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(get_order_from_proto(&resp))
+        get_order_from_proto(&resp)
     }
 
     /// Poll [`Self::get`] until the order is terminal and projected trade
@@ -445,7 +459,26 @@ impl OrdersService {
         });
         if let Some(risk) = params.attached_risk.as_ref() {
             *intent.attached_risk.get_or_insert_default() =
-                Self::encode_attached_risk(risk, Some(&params.symbol))?;
+                self.encode_attached_risk(risk, Some(&params.symbol))?;
+        }
+        let qty = match intent.sizing.as_ref() {
+            Some(order_intent::Sizing::BaseQtyScaled(value)) => Some(*value),
+            _ => None,
+        };
+        let price = match intent.execution.as_ref() {
+            Some(order_intent::Execution::LimitGtc(value)) => Some(value.price_ticks),
+            Some(order_intent::Execution::LimitIoc(value)) => Some(value.price_ticks),
+            Some(order_intent::Execution::LimitFok(value)) => Some(value.price_ticks),
+            _ => None,
+        };
+        self.ctx
+            .catalogs
+            .preflight_order_values(&params.symbol, qty, price)?;
+        if let Some(order_intent::Sizing::MaxQuoteDebitScaled(value)) = intent.sizing.as_ref() {
+            let scale = self.require_quote_quantity_scale(&params.symbol)?;
+            self.ctx
+                .catalogs
+                .preflight_quote_budget(&params.symbol, *value, scale)?;
         }
         Ok(intent)
     }
@@ -463,7 +496,7 @@ impl OrdersService {
     /// Map the flat public [`RiskLeg`] (`order_type`/`limit_price`) onto a child
     /// [`RiskExecution`] variant.
     #[allow(deprecated)]
-    fn encode_risk_child(leg: &RiskLeg, symbol: Option<&str>) -> Result<RiskExecution> {
+    fn encode_risk_child(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<RiskExecution> {
         if leg.trigger_price_source.is_some() {
             return Err(Error::validation(
                 "attached risk always uses last trade; trigger_price_source cannot be supplied",
@@ -479,7 +512,7 @@ impl OrdersService {
             }
             (CreateOrderType::Limit, Some(price)) => {
                 risk_execution::Execution::LimitGtc(Box::new(RiskLimitGtc {
-                    price_ticks: resolve_price_ticks(price, symbol)?,
+                    price_ticks: self.resolve_constraint_price(price, symbol)?,
                     ..Default::default()
                 }))
             }
@@ -495,26 +528,27 @@ impl OrdersService {
         })
     }
 
-    fn encode_take_profit(leg: &RiskLeg, symbol: Option<&str>) -> Result<TakeProfitPolicy> {
+    fn encode_take_profit(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<TakeProfitPolicy> {
         let mut policy = TakeProfitPolicy {
-            trigger_price_ticks: resolve_price_ticks(&leg.trigger_price, symbol)?,
+            trigger_price_ticks: self.resolve_constraint_price(&leg.trigger_price, symbol)?,
             ..Default::default()
         };
-        *policy.child.get_or_insert_default() = Self::encode_risk_child(leg, symbol)?;
+        *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol)?;
         Ok(policy)
     }
 
-    fn encode_stop_loss(leg: &RiskLeg, symbol: Option<&str>) -> Result<StopLossPolicy> {
+    fn encode_stop_loss(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<StopLossPolicy> {
         let mut policy = StopLossPolicy {
-            trigger_price_ticks: resolve_price_ticks(&leg.trigger_price, symbol)?,
+            trigger_price_ticks: self.resolve_constraint_price(&leg.trigger_price, symbol)?,
             ..Default::default()
         };
-        *policy.child.get_or_insert_default() = Self::encode_risk_child(leg, symbol)?;
+        *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol)?;
         Ok(policy)
     }
 
     #[allow(deprecated)]
     fn encode_trailing_stop(
+        &self,
         stop: &TrailingStop,
         symbol: Option<&str>,
     ) -> Result<TrailingStopPolicy> {
@@ -532,7 +566,7 @@ impl OrdersService {
         }
         let mut proto = TrailingStopPolicy::default();
         if let Some(activation) = stop.activation_price.as_ref() {
-            proto.activation_price_ticks = resolve_price_ticks(activation, symbol)?;
+            proto.activation_price_ticks = self.resolve_constraint_price(activation, symbol)?;
         }
         proto.trailing_distance = Some(match stop.distance {
             TrailingDistance::Ticks(v) => {
@@ -569,7 +603,11 @@ impl OrdersService {
         Ok(proto)
     }
 
-    fn encode_attached_risk(risk: &AttachedRisk, symbol: Option<&str>) -> Result<RiskPolicy> {
+    fn encode_attached_risk(
+        &self,
+        risk: &AttachedRisk,
+        symbol: Option<&str>,
+    ) -> Result<RiskPolicy> {
         if risk.stop_loss.is_some() && risk.trailing_stop.is_some() {
             return Err(Error::validation(
                 "attached_risk allows at most one of stop_loss or trailing_stop",
@@ -585,18 +623,28 @@ impl OrdersService {
             ..Default::default()
         };
         if let Some(tp) = risk.take_profit.as_ref() {
-            *proto.take_profit.get_or_insert_default() = Self::encode_take_profit(tp, symbol)?;
+            *proto.take_profit.get_or_insert_default() = self.encode_take_profit(tp, symbol)?;
         }
         if let Some(sl) = risk.stop_loss.as_ref() {
             proto.stop_leg = Some(risk_policy::StopLeg::StopLoss(Box::new(
-                Self::encode_stop_loss(sl, symbol)?,
+                self.encode_stop_loss(sl, symbol)?,
             )));
         } else if let Some(ts) = risk.trailing_stop.as_ref() {
             proto.stop_leg = Some(risk_policy::StopLeg::TrailingStop(Box::new(
-                Self::encode_trailing_stop(ts, symbol)?,
+                self.encode_trailing_stop(ts, symbol)?,
             )));
         }
         Ok(proto)
+    }
+
+    fn resolve_constraint_price(&self, price: &Price, symbol: Option<&str>) -> Result<i64> {
+        let ticks = resolve_price_ticks(price, symbol)?;
+        if let Some(symbol) = symbol {
+            self.ctx
+                .catalogs
+                .preflight_order_values(symbol, None, Some(ticks))?;
+        }
+        Ok(ticks)
     }
 
     /// Generate a cryptographically random mutation request id (`prefix-<12 hex chars>`).
@@ -664,7 +712,7 @@ impl OrdersService {
         }
         if let Some(risk) = params.new_attached_risk.as_ref() {
             *req.new_attached_risk.get_or_insert_default() =
-                Self::encode_attached_risk(risk, Some(&params.symbol))?;
+                self.encode_attached_risk(risk, Some(&params.symbol))?;
         }
         if let Some(behavior) = params.behavior.as_deref() {
             req.behavior = Self::modify_behavior(behavior)?.into();
@@ -672,6 +720,11 @@ impl OrdersService {
         if let Some(ncid) = optional_client_order_id(params.new_client_order_id.as_deref())? {
             req.new_client_order_id = ncid;
         }
+        self.ctx.catalogs.preflight_order_values(
+            &params.symbol,
+            req.new_qty_scaled,
+            req.new_price_ticks,
+        )?;
         Ok(req)
     }
 
@@ -879,11 +932,16 @@ impl OrdersService {
             }
             if let Some(risk) = item.new_attached_risk.as_ref() {
                 *proto.new_attached_risk.get_or_insert_default() =
-                    Self::encode_attached_risk(risk, Some(symbol))?;
+                    self.encode_attached_risk(risk, Some(symbol))?;
             }
             if let Some(ncid) = optional_client_order_id(item.new_client_order_id.as_deref())? {
                 proto.new_client_order_id = ncid;
             }
+            self.ctx.catalogs.preflight_order_values(
+                symbol,
+                proto.new_qty_scaled,
+                proto.new_price_ticks,
+            )?;
             proto_items.push(proto);
         }
         let req = BatchReplaceOrdersRequest {
@@ -939,10 +997,14 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         request_id: Option<String>,
     ) -> Result<CancelAllAfterResult> {
+        if symbol.is_some_and(|value| !value.trim().is_empty()) {
+            self.ctx.wait_for_catalogs().await?;
+        }
+        let symbol = self.ctx.catalogs.resolve_symbol_filter(symbol)?;
         let req = CancelAllAfterRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
             timeout_sec,
-            symbol: symbol.unwrap_or("").to_owned(),
+            symbol: symbol.unwrap_or_default(),
             request_id: Self::coalesce_request_id(request_id, "cancel-after")?,
             ..Default::default()
         };
@@ -1066,9 +1128,20 @@ impl OrdersService {
     /// A `request_id` is generated when omitted or blank. Provide a stable non-empty value when
     /// retrying the same logical bulk cancellation.
     pub async fn cancel_all_with(&self, opts: CancelAllOpts) -> Result<CancelAllOrdersResult> {
+        if opts
+            .symbol
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            self.ctx.wait_for_catalogs().await?;
+        }
+        let symbol = self
+            .ctx
+            .catalogs
+            .resolve_symbol_filter(opts.symbol.as_deref())?;
         let mut req = CancelAllOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
-            symbol: opts.symbol.unwrap_or_default(),
+            symbol: symbol.unwrap_or_default(),
             dry_run: opts.dry_run,
             request_id: Self::coalesce_request_id(opts.request_id, "cancel-all")?,
             ..Default::default()
@@ -1188,6 +1261,7 @@ impl TradesService {
         subaccount_id: Option<u64>,
         limit: Option<u32>,
     ) -> Result<UserTradesList> {
+        let limit = super::positive_limit(limit, "list_user_trades")?;
         let req = GetUserTradesRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
             limit,
@@ -1205,7 +1279,7 @@ impl TradesService {
         )
         .await?
         .into_owned();
-        Ok(user_trades_list_from_proto(&resp))
+        user_trades_list_from_proto(&resp)
     }
 
     /// Subscribe to private user trade updates (requires `realtime` feature).

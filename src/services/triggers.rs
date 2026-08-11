@@ -58,11 +58,23 @@ impl TriggersService {
 
     pub async fn list_with(&self, opts: ListTriggersOpts) -> Result<TriggersList> {
         use crate::codecs::decode::trigger_status_from_label;
+        if opts
+            .symbol
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            self.ctx.wait_for_catalogs().await?;
+        }
+        let symbol = self
+            .ctx
+            .catalogs
+            .resolve_symbol_filter(opts.symbol.as_deref())?;
+        let limit = super::positive_limit(opts.limit, "list_triggers")?.unwrap_or(50);
         let mut req = ListTriggersRequest {
-            limit: if opts.limit == 0 { 50 } else { opts.limit },
+            limit,
             ..Default::default()
         };
-        if let Some(symbol) = opts.symbol {
+        if let Some(symbol) = symbol {
             req.symbol = symbol;
         }
         if let Some(token) = opts.page_token {
@@ -121,6 +133,9 @@ impl TriggersService {
             Some(&params.symbol),
             self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
         )?;
+        self.ctx
+            .catalogs
+            .preflight_order_values(&params.symbol, Some(qty), None)?;
         let mut intent = TriggerIntent {
             symbol: params.symbol.clone(),
             qty_scaled: qty,
@@ -151,7 +166,7 @@ impl TriggersService {
                     .trigger_price
                     .as_ref()
                     .ok_or_else(|| Error::validation("stop/take-profit requires trigger_price"))
-                    .and_then(|price| resolve_price_ticks(price, Some(&params.symbol)))?;
+                    .and_then(|price| self.resolve_catalog_price(price, &params.symbol))?;
                 if trigger_price_ticks <= 0 {
                     return Err(Error::validation("trigger_price must be positive"));
                 }
@@ -160,7 +175,7 @@ impl TriggersService {
                     side: side.into(),
                     ..Default::default()
                 };
-                *cond.child.get_or_insert_default() = Self::encode_conditional_child(params)?;
+                *cond.child.get_or_insert_default() = self.encode_conditional_child(params)?;
                 if matches!(params.trigger_type, CreateTriggerType::StopLoss) {
                     trigger_intent::Strategy::StopLoss(Box::new(cond))
                 } else {
@@ -211,7 +226,7 @@ impl TriggersService {
                 }
                 if let Some(price) = params.activation_price.as_ref() {
                     trailing.activation_price_ticks =
-                        resolve_price_ticks(price, Some(&params.symbol))?;
+                        self.resolve_catalog_price(price, &params.symbol)?;
                 }
                 if let Some(ticks) = params.max_slippage_ticks {
                     if ticks <= 0 {
@@ -255,7 +270,7 @@ impl TriggersService {
                             Error::validation("twap limit slices require limit_price")
                         })?;
                         twap_trigger::Execution::LimitGtc(Box::new(TwapLimitGtc {
-                            price_ticks: resolve_price_ticks(price, Some(&params.symbol))?,
+                            price_ticks: self.resolve_catalog_price(price, &params.symbol)?,
                             ..Default::default()
                         }))
                     }
@@ -275,12 +290,12 @@ impl TriggersService {
                     .ladder_price_min
                     .as_ref()
                     .ok_or_else(|| Error::validation("ladder requires ladder_price_min"))
-                    .and_then(|price| resolve_price_ticks(price, Some(&params.symbol)))?;
+                    .and_then(|price| self.resolve_catalog_price(price, &params.symbol))?;
                 let price_max_ticks = params
                     .ladder_price_max
                     .as_ref()
                     .ok_or_else(|| Error::validation("ladder requires ladder_price_max"))
-                    .and_then(|price| resolve_price_ticks(price, Some(&params.symbol)))?;
+                    .and_then(|price| self.resolve_catalog_price(price, &params.symbol))?;
                 let levels = params
                     .ladder_levels
                     .filter(|value| *value > 0)
@@ -301,6 +316,19 @@ impl TriggersService {
                 trigger_intent::Strategy::Ladder(Box::new(ladder))
             }
         });
+        if matches!(
+            params.trigger_type,
+            CreateTriggerType::StopLoss | CreateTriggerType::TakeProfit | CreateTriggerType::Twap
+        ) && matches!(params.order_type, CreateOrderType::Limit)
+            && let Some(price) = params.limit_price.as_ref()
+        {
+            let price_ticks = self.resolve_catalog_price(price, &params.symbol)?;
+            self.ctx.catalogs.preflight_order_values(
+                &params.symbol,
+                Some(qty),
+                Some(price_ticks),
+            )?;
+        }
 
         let mut req = CreateTriggerRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
@@ -310,9 +338,20 @@ impl TriggersService {
         Ok(req)
     }
 
+    fn resolve_catalog_price(&self, price: &crate::Price, symbol: &str) -> Result<i64> {
+        let ticks = resolve_price_ticks(price, Some(symbol))?;
+        self.ctx
+            .catalogs
+            .preflight_order_values(symbol, None, Some(ticks))?;
+        Ok(ticks)
+    }
+
     /// Map flat (`order_type`, `time_in_force`, `limit_price`, `post_only`) params
     /// onto a stop-loss / take-profit child execution variant.
-    fn encode_conditional_child(params: &CreateTriggerParams) -> Result<ConditionalChildExecution> {
+    fn encode_conditional_child(
+        &self,
+        params: &CreateTriggerParams,
+    ) -> Result<ConditionalChildExecution> {
         let execution = match params.order_type {
             CreateOrderType::Market => {
                 if params.post_only {
@@ -327,7 +366,7 @@ impl TriggersService {
                     .limit_price
                     .as_ref()
                     .ok_or_else(|| Error::validation("limit trigger requires limit_price"))?;
-                let price_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
+                let price_ticks = self.resolve_catalog_price(price, &params.symbol)?;
                 match params.time_in_force {
                     Some(CreateTimeInForce::Ioc) => {
                         if params.post_only {
@@ -581,7 +620,7 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(trigger_events_list_from_proto(&resp))
+        trigger_events_list_from_proto(&resp)
     }
 
     /// Subscribe to private trigger updates (requires `realtime` feature).

@@ -2,6 +2,7 @@
 
 use super::enums::enum_value_side;
 use super::money::{decode_price_ticks, decode_qty_scaled};
+use crate::codecs::scalars::TsNs;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
     Trigger, TriggerDetails, TriggerEvent, TriggerEventsList, TriggerLadderDetails,
@@ -476,8 +477,8 @@ pub fn trigger_event_type_from_label(label: &str) -> Result<TriggerEventType, St
     }
 }
 
-pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> TriggerEvent {
-    TriggerEvent {
+pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> crate::errors::Result<TriggerEvent> {
+    Ok(TriggerEvent {
         trigger_id: format_uint64_id(msg.trigger_id),
         subaccount_id: if msg.subaccount_id == 0 {
             String::new()
@@ -487,11 +488,7 @@ pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> TriggerEvent {
         symbol_id: msg.symbol_id,
         trigger_type: trigger_type_label(msg.trigger_type),
         event_type: trigger_event_type_label(msg.event_type),
-        ts_ns: if msg.ts_ns == 0 {
-            String::new()
-        } else {
-            msg.ts_ns.to_string()
-        },
+        ts_ns: TsNs::from_wire(msg.ts_ns, "TriggerEvent.ts_ns")?.optional_string(),
         child_seq: msg.child_seq,
         child_order_id: if msg.child_order_id == 0 {
             String::new()
@@ -502,14 +499,20 @@ pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> TriggerEvent {
             .fire_price_ticks
             .and_then(|ticks| decode_price_ticks(ticks, None)),
         reason: msg.reason.clone(),
-    }
+    })
 }
 
-pub fn trigger_events_list_from_proto(msg: &ListTriggerEventsResponse) -> TriggerEventsList {
-    TriggerEventsList {
-        events: msg.events.iter().map(trigger_event_from_proto).collect(),
+pub fn trigger_events_list_from_proto(
+    msg: &ListTriggerEventsResponse,
+) -> crate::errors::Result<TriggerEventsList> {
+    Ok(TriggerEventsList {
+        events: msg
+            .events
+            .iter()
+            .map(trigger_event_from_proto)
+            .collect::<crate::errors::Result<Vec<_>>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -721,7 +724,8 @@ mod tests {
             }],
             next_page_token: "evt-page-2".into(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(listed.events.len(), 1);
         assert_eq!(listed.next_page_token, "evt-page-2");
         let event = &listed.events[0];
@@ -743,7 +747,8 @@ mod tests {
             child_seq: 1,
             fire_price_ticks: None,
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert!(event.fire_price.is_none());
     }
 
@@ -753,7 +758,8 @@ mod tests {
             trigger_id: 1,
             event_type: buffa::EnumValue::Unknown(321),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(event.event_type, "UNKNOWN(321)");
     }
 
@@ -768,5 +774,16 @@ mod tests {
             TriggerEventType::EventCanceled
         );
         assert!(trigger_event_type_from_label("nope").is_err());
+    }
+
+    #[test]
+    fn trigger_event_rejects_millisecond_shaped_ts_ns() {
+        let err = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 1,
+            ts_ns: 1_700_000_000_000,
+            ..Default::default()
+        })
+        .unwrap_err();
+        assert!(matches!(err, crate::Error::ResponseContract { .. }));
     }
 }

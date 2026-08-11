@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use super::common::api_data_from_proto;
 use super::money::{decode_price_ticks, decode_qty_scaled};
-use crate::codecs::scalars::{format_price_ticks, format_qty_scaled};
+use crate::codecs::scalars::{TsNs, format_price_ticks, format_qty_scaled};
 use crate::errors::{Error, Result};
 use crate::models::{Candle, CandlesResult, MarketTrade, MarketTradesResult, SpotConfig};
 use crate::proto::marketdata::v1::{
@@ -63,14 +63,14 @@ fn enum_value_timeframe(value: buffa::EnumValue<Timeframe>) -> String {
         .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
-pub fn market_trade_from_proto(msg: &ProtoMarketTrade, quantity_scale: u32) -> MarketTrade {
+pub fn market_trade_from_proto(msg: &ProtoMarketTrade, quantity_scale: u32) -> Result<MarketTrade> {
     let symbol_id = msg.symbol_id;
     let symbol_id_opt = if symbol_id == 0 {
         None
     } else {
         Some(symbol_id)
     };
-    MarketTrade {
+    Ok(MarketTrade {
         symbol_id,
         match_id: if msg.match_id == 0 {
             String::new()
@@ -79,31 +79,27 @@ pub fn market_trade_from_proto(msg: &ProtoMarketTrade, quantity_scale: u32) -> M
         },
         price: decode_price_ticks(msg.price_ticks, None),
         qty: decode_qty_scaled(msg.qty_scaled, Some(quantity_scale), None, symbol_id_opt),
-        ts_ns: if msg.ts_ns == 0 {
-            String::new()
-        } else {
-            msg.ts_ns.to_string()
-        },
+        ts_ns: TsNs::from_wire(msg.ts_ns, "MarketTrade.ts_ns")?.optional_string(),
         side: if msg.is_buy {
             "buy".to_owned()
         } else {
             "sell".to_owned()
         },
-    }
+    })
 }
 
 pub fn market_trades_from_proto(
     msg: &GetTradesResponse,
     quantity_scale: u32,
-) -> MarketTradesResult {
-    MarketTradesResult {
+) -> Result<MarketTradesResult> {
+    Ok(MarketTradesResult {
         trades: msg
             .trades
             .iter()
             .map(|trade| market_trade_from_proto(trade, quantity_scale))
-            .collect(),
+            .collect::<Result<Vec<_>>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 pub fn candle_point_from_proto(
@@ -207,13 +203,13 @@ mod tests {
                 is_buy: true,
                 price_ticks: 1_500_000,
                 qty_scaled: 100,
-                ts_ns: 42,
+                ts_ns: 1_700_000_000_000_000_000,
                 ..Default::default()
             }],
             next_page_token: "page-2".into(),
             ..Default::default()
         };
-        let list = market_trades_from_proto(&msg, 6);
+        let list = market_trades_from_proto(&msg, 6).unwrap();
         assert_eq!(list.trades.len(), 1);
         assert_eq!(list.next_page_token, "page-2");
         let t = &list.trades[0];
@@ -223,7 +219,18 @@ mod tests {
         assert_eq!(t.price.as_ref().unwrap().as_ticks(), 1_500_000);
         assert_eq!(t.qty.as_ref().unwrap().as_scaled(), 100);
         assert_eq!(t.qty.as_ref().unwrap().format(None).unwrap(), "0.0001");
-        assert_eq!(t.ts_ns, "42");
+        assert_eq!(t.ts_ns, "1700000000000000000");
+    }
+
+    #[test]
+    fn market_trade_rejects_millisecond_shaped_ts_ns() {
+        let msg = ProtoMarketTrade {
+            symbol_id: 1,
+            ts_ns: 1_700_000_000_000,
+            ..Default::default()
+        };
+        let err = market_trade_from_proto(&msg, 8).unwrap_err();
+        assert!(matches!(err, Error::ResponseContract { .. }));
     }
 
     #[test]

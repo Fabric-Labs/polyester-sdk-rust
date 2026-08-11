@@ -49,12 +49,12 @@ fn decode_proto<M: Message + Default>(payload: &[u8]) -> Result<M> {
 
 pub fn order_from_bytes(payload: &[u8]) -> Result<Order> {
     let msg = decode_proto::<ProtoOrder>(payload)?;
-    Ok(order_from_proto(&msg))
+    order_from_proto(&msg)
 }
 
 pub fn user_trade_from_bytes(payload: &[u8]) -> Result<UserTrade> {
     let msg = decode_proto::<ProtoUserTrade>(payload)?;
-    Ok(user_trade_from_proto(&msg))
+    user_trade_from_proto(&msg)
 }
 
 pub fn asset_balance_from_bytes(payload: &[u8]) -> Result<AssetBalance> {
@@ -74,7 +74,7 @@ pub fn trigger_from_bytes(payload: &[u8]) -> Result<Trigger> {
 
 pub fn trigger_event_from_bytes(payload: &[u8]) -> Result<TriggerEvent> {
     let msg = decode_proto::<ProtoTriggerEvent>(payload)?;
-    Ok(trigger_event_from_proto(&msg))
+    trigger_event_from_proto(&msg)
 }
 
 pub fn market_trade_from_bytes(
@@ -82,7 +82,7 @@ pub fn market_trade_from_bytes(
 ) -> impl Fn(&[u8]) -> Result<MarketTrade> + Send + Sync + 'static {
     move |payload: &[u8]| {
         let msg = decode_proto::<ProtoMarketTrade>(payload)?;
-        Ok(market_trade_from_proto(&msg, quantity_scale))
+        market_trade_from_proto(&msg, quantity_scale)
     }
 }
 

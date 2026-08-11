@@ -8,7 +8,7 @@ use super::money::{
     decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled,
     decode_qty_scaled_allow_zero,
 };
-use crate::codecs::scalars::{format_uint64_id, u128_to_str};
+use crate::codecs::scalars::{TsNs, format_uint64_id, u128_to_str};
 use crate::errors::{Error, Result};
 use crate::models::{
     AttachedRisk, BatchCancelOrdersResult, BatchCancelResultItem, BatchCreateOrdersResult,
@@ -31,14 +31,14 @@ use crate::proto::orders::v1::{
 use crate::proto::polyester::r#type::v1::U128;
 use buffa::Enumeration;
 
-pub fn order_from_proto(msg: &ProtoOrder) -> Order {
+pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
     let symbol_id = msg.symbol_id;
     let symbol_id_opt = if symbol_id == 0 {
         None
     } else {
         Some(symbol_id)
     };
-    Order {
+    Ok(Order {
         order_id: format_uint64_id(msg.order_id),
         symbol_id,
         client_order_id: msg.client_order_id.clone(),
@@ -51,11 +51,7 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Order {
         leaves_qty: decode_qty_scaled_allow_zero(msg.leaves_qty_scaled, None, None, symbol_id_opt),
         price: decode_price_ticks(msg.price_ticks, None),
         avg_px: decode_price_ticks(msg.avg_price_ticks, None),
-        created_ts_ns: if msg.created_ts_ns == 0 {
-            String::new()
-        } else {
-            msg.created_ts_ns.to_string()
-        },
+        created_ts_ns: TsNs::from_wire(msg.created_ts_ns, "Order.created_ts_ns")?.optional_string(),
         version: msg.version,
         post_only: msg.post_only,
         fee_asset: enum_value_fee_asset(msg.fee_asset),
@@ -64,7 +60,7 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Order {
             .attached_risk
             .as_option()
             .and_then(attached_risk_from_proto),
-    }
+    })
 }
 
 /// Project an attached take-profit/stop-loss policy onto the flat public
@@ -170,29 +166,32 @@ fn attached_risk_from_proto(msg: &ProtoAttachedRisk) -> Option<AttachedRisk> {
     })
 }
 
-pub fn orders_list_from_open(msg: &GetOpenOrdersResponse) -> OrdersList {
+pub fn orders_list_from_open(msg: &GetOpenOrdersResponse) -> Result<OrdersList> {
     orders_list(&msg.orders, &msg.next_page_token)
 }
 
-pub fn orders_list_from_history(msg: &GetOrderHistoryResponse) -> OrdersList {
+pub fn orders_list_from_history(msg: &GetOrderHistoryResponse) -> Result<OrdersList> {
     orders_list(&msg.orders, &msg.next_page_token)
 }
 
-fn orders_list(orders: &[ProtoOrder], next_page_token: &str) -> OrdersList {
-    OrdersList {
-        orders: orders.iter().map(order_from_proto).collect(),
+fn orders_list(orders: &[ProtoOrder], next_page_token: &str) -> Result<OrdersList> {
+    Ok(OrdersList {
+        orders: orders
+            .iter()
+            .map(order_from_proto)
+            .collect::<Result<Vec<_>>>()?,
         next_page_token: next_page_token.to_owned(),
-    }
+    })
 }
 
-pub fn user_trade_from_proto(msg: &ProtoUserTrade) -> UserTrade {
+pub fn user_trade_from_proto(msg: &ProtoUserTrade) -> Result<UserTrade> {
     let symbol_id = msg.symbol_id;
     let symbol_id_opt = if symbol_id == 0 {
         None
     } else {
         Some(symbol_id)
     };
-    UserTrade {
+    Ok(UserTrade {
         symbol_id,
         match_id: if msg.match_id == 0 {
             String::new()
@@ -207,13 +206,9 @@ pub fn user_trade_from_proto(msg: &ProtoUserTrade) -> UserTrade {
         fee_amount_e18: u128_field(msg.fee_amount_e18.as_option()),
         fee_asset: enum_value_fee_asset(msg.fee_asset),
         referral_share_amount_e18: u128_field(msg.referral_share_amount_e18.as_option()),
-        ts_ns: if msg.ts_ns == 0 {
-            String::new()
-        } else {
-            msg.ts_ns.to_string()
-        },
+        ts_ns: TsNs::from_wire(msg.ts_ns, "UserTrade.ts_ns")?.optional_string(),
         fee_is_rebate: msg.fee_is_rebate,
-    }
+    })
 }
 
 fn u128_field(msg: Option<&U128>) -> String {
@@ -223,17 +218,25 @@ fn u128_field(msg: Option<&U128>) -> String {
     }
 }
 
-pub fn user_trades_list_from_proto(msg: &GetUserTradesResponse) -> UserTradesList {
-    UserTradesList {
-        trades: msg.trades.iter().map(user_trade_from_proto).collect(),
+pub fn user_trades_list_from_proto(msg: &GetUserTradesResponse) -> Result<UserTradesList> {
+    Ok(UserTradesList {
+        trades: msg
+            .trades
+            .iter()
+            .map(user_trade_from_proto)
+            .collect::<Result<Vec<_>>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
-pub fn get_order_from_proto(msg: &GetOrderResponse) -> GetOrderResult {
-    let order = msg.order.as_option().map(order_from_proto);
-    let trades = msg.trades.iter().map(user_trade_from_proto).collect();
-    GetOrderResult { order, trades }
+pub fn get_order_from_proto(msg: &GetOrderResponse) -> Result<GetOrderResult> {
+    let order = msg.order.as_option().map(order_from_proto).transpose()?;
+    let trades = msg
+        .trades
+        .iter()
+        .map(user_trade_from_proto)
+        .collect::<Result<Vec<_>>>()?;
+    Ok(GetOrderResult { order, trades })
 }
 
 /// `CreateOrderResponse` acknowledges admission only and no longer carries a
@@ -587,13 +590,15 @@ pub fn batch_replace_from_proto(
             ),
         ));
     }
+    let accepted_ts_ns =
+        TsNs::from_wire(msg.accepted_ts_ns, "BatchReplaceOrders.accepted_ts_ns")?.get();
     Ok(BatchReplaceOrdersResult {
         batch_request_id: format_uint64_id(msg.batch_request_id),
         status: status.to_owned(),
         results,
         accepted_count: msg.accepted_count,
         rejected_count: msg.rejected_count,
-        accepted_ts_ns: msg.accepted_ts_ns,
+        accepted_ts_ns,
     })
 }
 
@@ -631,6 +636,8 @@ pub fn batch_replace_status_from_proto(
             "working" | "terminal" => admitted += 1,
             _ => unreachable!("known batch replace phase"),
         }
+        let updated_ts_ns =
+            TsNs::from_wire(item.updated_ts_ns, "BatchReplaceStatusItem.updated_ts_ns")?.get();
         items.push(BatchReplaceStatusItem {
             item_index: item.item_index,
             phase: phase.to_owned(),
@@ -638,7 +645,7 @@ pub fn batch_replace_status_from_proto(
             replacement_order_id: format_uint64_id(item.replacement_order_id),
             order_status: enum_value_order_status(item.order_status).to_owned(),
             code: item.code.clone(),
-            updated_ts_ns: item.updated_ts_ns,
+            updated_ts_ns,
         });
     }
     if admitted != msg.accepted_count
@@ -658,14 +665,18 @@ pub fn batch_replace_status_from_proto(
             ),
         ));
     }
+    let accepted_ts_ns =
+        TsNs::from_wire(msg.accepted_ts_ns, "BatchReplaceStatus.accepted_ts_ns")?.get();
+    let updated_ts_ns =
+        TsNs::from_wire(msg.updated_ts_ns, "BatchReplaceStatus.updated_ts_ns")?.get();
     Ok(BatchReplaceStatusResult {
         batch_request_id: format_uint64_id(msg.batch_request_id),
         admission_status: admission_status.to_owned(),
         items,
         accepted_count: msg.accepted_count,
         rejected_count: msg.rejected_count,
-        accepted_ts_ns: msg.accepted_ts_ns,
-        updated_ts_ns: msg.updated_ts_ns,
+        accepted_ts_ns,
+        updated_ts_ns,
     })
 }
 
@@ -713,11 +724,8 @@ pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> Result<Cance
     Ok(CancelAllAfterResult {
         status: msg.status.clone(),
         effective_timeout_sec: msg.effective_timeout_sec,
-        expires_at_ts_ns: if msg.expires_at_ts_ns == 0 {
-            String::new()
-        } else {
-            msg.expires_at_ts_ns.to_string()
-        },
+        expires_at_ts_ns: TsNs::from_wire(msg.expires_at_ts_ns, "CancelAllAfter.expires_at_ts_ns")?
+            .optional_string(),
     })
 }
 
@@ -744,11 +752,11 @@ mod tests {
             leaves_qty_scaled: 90,
             price_ticks: 5000,
             avg_price_ticks: 4990,
-            created_ts_ns: 1_700_000_000_000,
+            created_ts_ns: 1_700_000_000_000_000_000,
             post_only: true,
             ..Default::default()
         };
-        let order = order_from_proto(&msg);
+        let order = order_from_proto(&msg).unwrap();
         assert_eq!(order.order_id, format_uint64_id(42));
         assert_eq!(order.side, "buy");
         assert_eq!(order.status, "working");
@@ -759,8 +767,25 @@ mod tests {
         assert_eq!(order.orig_qty.as_ref().unwrap().as_scaled(), 100);
         let mut msg2 = msg;
         msg2.version = 7;
-        let order2 = order_from_proto(&msg2);
+        let order2 = order_from_proto(&msg2).unwrap();
         assert_eq!(order2.version, 7);
+    }
+
+    #[test]
+    fn order_and_trade_decoders_reject_millisecond_shaped_ts_ns() {
+        let order_err = order_from_proto(&ProtoOrder {
+            created_ts_ns: 1_700_000_000_000,
+            ..Default::default()
+        })
+        .unwrap_err();
+        assert!(matches!(order_err, Error::ResponseContract { .. }));
+
+        let trade_err = user_trade_from_proto(&ProtoUserTrade {
+            ts_ns: 1_700_000_000_000,
+            ..Default::default()
+        })
+        .unwrap_err();
+        assert!(matches!(trade_err, Error::ResponseContract { .. }));
     }
 
     #[test]
@@ -811,7 +836,7 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        let order = order_from_proto(&msg);
+        let order = order_from_proto(&msg).unwrap();
         let risk = order.attached_risk.expect("attached_risk");
         assert!(risk.oco);
         let tp = risk.take_profit.expect("take_profit");
@@ -851,7 +876,12 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        assert!(order_from_proto(&missing_distance).attached_risk.is_none());
+        assert!(
+            order_from_proto(&missing_distance)
+                .unwrap()
+                .attached_risk
+                .is_none()
+        );
 
         // A LIMIT stop-loss child projects order_type=limit with its limit price.
         let sl_msg = ProtoOrder {
@@ -883,6 +913,7 @@ mod tests {
             ..Default::default()
         };
         let sl = order_from_proto(&sl_msg)
+            .unwrap()
             .attached_risk
             .expect("attached_risk")
             .stop_loss
@@ -902,7 +933,7 @@ mod tests {
             leaves_qty_scaled: 0,
             ..Default::default()
         };
-        let order = order_from_proto(&msg);
+        let order = order_from_proto(&msg).unwrap();
         assert_eq!(order.cum_qty.as_ref().map(|q| q.as_scaled()), Some(100));
         assert_eq!(order.leaves_qty.as_ref().map(|q| q.as_scaled()), Some(0));
     }
@@ -919,7 +950,7 @@ mod tests {
             next_page_token: "tok".into(),
             ..Default::default()
         };
-        let result = orders_list_from_open(&msg);
+        let result = orders_list_from_open(&msg).unwrap();
         assert_eq!(result.orders.len(), 1);
         assert_eq!(result.next_page_token, "tok");
         assert_eq!(result.orders[0].side, "sell");
@@ -957,7 +988,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let result = get_order_from_proto(&msg);
+        let result = get_order_from_proto(&msg).unwrap();
         assert_eq!(result.order.as_ref().unwrap().order_id, format_uint64_id(7));
         assert_eq!(result.trades.len(), 1);
         assert_eq!(result.trades[0].match_id, "99");

@@ -608,6 +608,15 @@ mod tests {
     }
 
     #[test]
+    fn malformed_private_key_error_does_not_disclose_secret() {
+        let malformed = "do-not-echo-this-private-key";
+        let err = Credentials::new("ak_test", malformed).unwrap_err();
+        let rendered = err.to_string();
+        assert!(matches!(err, Error::Auth(_)));
+        assert!(!rendered.contains(malformed));
+    }
+
+    #[test]
     fn request_url_joins_base_and_procedure() {
         assert_eq!(
             request_url(

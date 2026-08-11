@@ -768,6 +768,17 @@ mod tests {
         assert!(!is_private_channel("public:spot:market:trades:1:proto"));
     }
 
+    #[tokio::test]
+    async fn unauthenticated_private_subscribe_fails_before_network_io() {
+        let client = Client::new("not a websocket URL", "", None, None);
+        let err = match client.subscribe_raw("private:spot:orders:acct:proto").await {
+            Err(err) => err,
+            Ok(_) => panic!("private subscribe without credentials must fail"),
+        };
+        assert!(matches!(err, Error::Auth(_)));
+        assert!(err.to_string().contains("without API-key credentials"));
+    }
+
     #[test]
     fn rwlock_helpers_recover_from_poison() {
         let lock = RwLock::new(7u32);

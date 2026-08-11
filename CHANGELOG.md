@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.1.0a36
+
+Package version: `0.1.0-alpha.36`. Git tag: `v0.1.0a36`.
+
+### Added
+- Fail-closed catalog-backed symbol filters for market overview and raw symbol paths.
+- Positive-limit validation that preserves omitted defaults.
+- Catalog pair-constraint accessors and deterministic order/trigger preflight.
+- Shared `ts_ns` response-contract validation that rejects millisecond-shaped values.
+- Focused regression tests for F001/F004/F006/F007/F018–F020/F027/F008/F031.
+
+### Fixed
+- Unknown non-empty symbol filters no longer degrade into unfiltered requests.
+- Zero-valued optional catalog minimums are treated as unset so live catalogs hydrate.
+
 ## 0.1.0a35
 
 Package version: `0.1.0-alpha.35`. Git tag: `v0.1.0a35`.
