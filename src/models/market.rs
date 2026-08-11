@@ -79,6 +79,7 @@ pub struct MarketOverviewEntry {
     pub symbol_id: u32,
     pub symbol: String,
     pub last_price: Option<Price>,
+    pub index_price: Option<Price>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

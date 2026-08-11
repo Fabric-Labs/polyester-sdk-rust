@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.36`, git tag `v0.1.0a36`). Proprietary license
+**Status:** Alpha (`0.1.0-alpha.37`, git tag `v0.1.0a37`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.88+
@@ -69,7 +69,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.36"
+polyester-sdk = "0.1.0-alpha.37"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -79,7 +79,7 @@ For a private git checkout instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a36" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a37" }
 ```
 
 The repository is currently private, so GitHub access and authenticated Git credentials are
@@ -131,11 +131,9 @@ async fn main() -> Result<()> {
         })
         .await?;
     for market in overview.markets {
-        let ticks = market
-            .last_price
-            .as_ref()
-            .map(|p| p.as_ticks());
-        println!("{} {:?}", market.symbol, ticks);
+        let last = market.last_price.as_ref().map(|p| p.as_ticks());
+        let index = market.index_price.as_ref().map(|p| p.as_ticks());
+        println!("{} {:?} {:?}", market.symbol, last, index);
     }
 
     let open_orders = client.orders.list_open(None).await?;

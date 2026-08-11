@@ -1158,6 +1158,17 @@ pub struct MarketOverview {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub sparklines: ::buffa::alloc::vec::Vec<Sparkline>,
+    /// Current multi-venue index price in quote units scaled by 1e6.
+    /// Zero when no fresh, valid index price is available.
+    ///
+    /// Field 16: `index_price_ticks`
+    #[serde(
+        rename = "indexPriceTicks",
+        alias = "index_price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub index_price_ticks: i64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1180,6 +1191,7 @@ impl ::core::fmt::Debug for MarketOverview {
             .field("best_ask_ticks", &self.best_ask_ticks)
             .field("best_ask_qty_scaled", &self.best_ask_qty_scaled)
             .field("sparklines", &self.sparklines)
+            .field("index_price_ticks", &self.index_price_ticks)
             .finish()
     }
 }
@@ -1272,6 +1284,11 @@ impl ::buffa::Message for MarketOverview {
         if self.listed_ts_ns != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.listed_ts_ns) as u32;
         }
+        if self.index_price_ticks != 0i64 {
+            size
+                += 2u32
+                    + ::buffa::types::int64_encoded_len(self.index_price_ticks) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1327,6 +1344,9 @@ impl ::buffa::Message for MarketOverview {
         }
         if self.listed_ts_ns != 0u64 {
             ::buffa::types::put_uint64_field(15u32, self.listed_ts_ns, buf);
+        }
+        if self.index_price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(16u32, self.index_price_ticks, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1448,6 +1468,13 @@ impl ::buffa::Message for MarketOverview {
                 )?;
                 self.listed_ts_ns = ::buffa::types::decode_uint64(buf)?;
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.index_price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1471,6 +1498,7 @@ impl ::buffa::Message for MarketOverview {
         self.sparklines.clear();
         self.volume_24h_quote_scaled = 0i64;
         self.listed_ts_ns = 0u64;
+        self.index_price_ticks = 0i64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2855,6 +2883,11 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::SparklineView<'a>,
             >,
+            /// Current multi-venue index price in quote units scaled by 1e6.
+            /// Zero when no fresh, valid index price is available.
+            ///
+            /// Field 16: `index_price_ticks`
+            pub index_price_ticks: i64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for MarketOverviewView<'a> {
@@ -2994,6 +3027,13 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.index_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
                     13u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -3057,6 +3097,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    index_price_ticks: self.index_price_ticks,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -3163,6 +3204,12 @@ pub mod __buffa {
                             + ::buffa::types::uint64_encoded_len(self.listed_ts_ns)
                                 as u32;
                 }
+                if self.index_price_ticks != 0i64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::int64_encoded_len(self.index_price_ticks)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -3239,6 +3286,9 @@ pub mod __buffa {
                 }
                 if self.listed_ts_ns != 0u64 {
                     ::buffa::types::put_uint64_field(15u32, self.listed_ts_ns, buf);
+                }
+                if self.index_price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(16u32, self.index_price_ticks, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -3369,6 +3419,15 @@ pub mod __buffa {
                 }
                 if !self.sparklines.is_empty() {
                     __map.serialize_entry("sparklines", &*self.sparklines)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.index_price_ticks,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "indexPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.index_price_ticks),
+                        )?;
                 }
                 __map.end()
             }
@@ -3580,6 +3639,14 @@ pub mod __buffa {
                 super::super::__buffa::view::SparklineView<'_>,
             > {
                 &self.0.reborrow().sparklines
+            }
+            /// Current multi-venue index price in quote units scaled by 1e6.
+            /// Zero when no fresh, valid index price is available.
+            ///
+            /// Field 16: `index_price_ticks`
+            #[must_use]
+            pub fn index_price_ticks(&self) -> i64 {
+                self.0.reborrow().index_price_ticks
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<MarketOverviewView<'static>>>
