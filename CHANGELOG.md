@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Changed
+- SDK boundary cleanup: raw `symbol`/`symbols` filters on market overview,
+  triggers list, and cancel-all / cancel-all-after are forwarded (trim /
+  empty-omit) without catalog fail-closed validation or catalog waits solely
+  for that validation. Symbol→`symbol_id` conversion paths still wait/resolve.
+- Removed client-side pair-constraint preflight (tick/step/min qty/min
+  notional, attached-risk tick checks, quote-budget minima). Catalogs still
+  provide scales/IDs for encoding; optional zero catalog minima no longer
+  affect hydration because those fields are ignored by the SDK.
+- `TsNs::from_wire` no longer rejects millisecond-shaped timestamps.
+- Pagination: `positive_limit` (reject explicit `Some(0)`) is kept only for
+  ListOpen-style optional limits. Zero-means-default proto `limit` fields
+  accept `0` as the server default again.
+
 ## 0.1.0a37
 
 Package version: `0.1.0-alpha.37`. Git tag: `v0.1.0a37`.

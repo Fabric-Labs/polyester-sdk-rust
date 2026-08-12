@@ -5,10 +5,7 @@
 //! mutated; use [`Manager::patch_zipper_supply`] from
 //! `subscribe_zipped_asset_supply(true)`.
 
-use crate::codecs::scalars::{
-    MAX_PROTOCOL_SCALE, PRICE_TICK_SCALE, decimal_to_scaled_str, parse_price_ticks_str,
-    parse_qty_scaled_str, validate_protocol_scale,
-};
+use crate::codecs::scalars::{MAX_PROTOCOL_SCALE, validate_protocol_scale};
 use crate::errors::{Error, Result};
 use crate::models::{DepositWithdrawConfig, ZippedAssetSupplyUpdate};
 use crate::realtime::{read_unpoisoned, write_unpoisoned};
@@ -71,7 +68,6 @@ struct Inner {
     symbol_to_base_scale: HashMap<String, u32>,
     id_to_quote_scale: HashMap<u32, u32>,
     symbol_to_quote_scale: HashMap<String, u32>,
-    symbol_to_constraints: HashMap<String, PairConstraints>,
     asset_to_ledger_id: HashMap<String, u32>,
     asset_to_qty_scale: HashMap<String, u32>,
     zipped_id_to_scale: HashMap<u32, u32>,
@@ -89,100 +85,8 @@ struct SpotSnapshot {
     symbol_to_base_scale: HashMap<String, u32>,
     id_to_quote_scale: HashMap<u32, u32>,
     symbol_to_quote_scale: HashMap<String, u32>,
-    symbol_to_constraints: HashMap<String, PairConstraints>,
     orderbook_buckets: HashMap<String, Vec<String>>,
     spot_config: Value,
-}
-
-/// Deterministic trading constraints parsed from one validated spot-catalog row.
-///
-/// These checks complement server-side preview/admission; they do not replace
-/// balance, risk, permission, or live-market validation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PairConstraints {
-    pub symbol_id: u32,
-    pub base_quantity_scale: u32,
-    pub quote_quantity_scale: Option<u32>,
-    pub tick_size_ticks: Option<i64>,
-    pub step_size_scaled: Option<i64>,
-    pub min_qty_scaled: Option<i64>,
-    pub min_notional_quote_scaled: Option<i128>,
-}
-
-fn nonempty_string<'a>(market: &'a Value, snake: &str, camel: &str) -> Option<&'a str> {
-    market
-        .get(snake)
-        .or_else(|| market.get(camel))
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-}
-
-fn parse_pair_constraints(
-    market: &Value,
-    symbol: &str,
-    symbol_id: u32,
-    base_scale: u32,
-    quote_scale: Option<u32>,
-) -> Result<PairConstraints> {
-    let tick_size_ticks = nonempty_string(market, "tick_size", "tickSize")
-        .map(|raw| {
-            let value = parse_price_ticks_str(raw, "catalog tick_size")?;
-            if value == 0 {
-                return Err(Error::validation("catalog tick_size must be positive"));
-            }
-            Ok(value)
-        })
-        .transpose()?;
-    let step_size_scaled = nonempty_string(market, "step_size", "stepSize")
-        .map(|raw| parse_qty_scaled_str(raw, base_scale, "catalog step_size"))
-        .transpose()?;
-    let min_qty_scaled = nonempty_string(market, "min_qty_base", "minQtyBase")
-        .map(|raw| {
-            if decimal_to_scaled_str(raw, base_scale, "catalog min_qty_base")? == 0 {
-                return Ok(None);
-            }
-            parse_qty_scaled_str(raw, base_scale, "catalog min_qty_base").map(Some)
-        })
-        .transpose()?
-        .flatten();
-    let min_notional_quote_scaled =
-        nonempty_string(market, "min_notional_quote", "minNotionalQuote")
-            .map(|raw| {
-                let scale = quote_scale.ok_or_else(|| {
-                    Error::validation(format!(
-                        "catalog {symbol} has min_notional_quote but no quote_quantity_scale"
-                    ))
-                })?;
-                let value = decimal_to_scaled_str(raw, scale, "catalog min_notional_quote")?;
-                if value == 0 {
-                    return Ok(None);
-                }
-                if value < 0 {
-                    return Err(Error::validation(
-                        "catalog min_notional_quote must be positive",
-                    ));
-                }
-                Ok(Some(value))
-            })
-            .transpose()?
-            .flatten();
-    if let (Some(min_qty), Some(step)) = (min_qty_scaled, step_size_scaled)
-        && min_qty % step != 0
-    {
-        return Err(Error::validation(format!(
-            "catalog {symbol} min_qty_base must be aligned to step_size"
-        )));
-    }
-    Ok(PairConstraints {
-        symbol_id,
-        base_quantity_scale: base_scale,
-        quote_quantity_scale: quote_scale,
-        tick_size_ticks,
-        step_size_scaled,
-        min_qty_scaled,
-        min_notional_quote_scaled,
-    })
 }
 
 #[derive(Default)]
@@ -247,9 +151,9 @@ fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
                 .insert(symbol.to_owned(), quote_scale);
             snap.id_to_quote_scale.insert(symbol_id, quote_scale);
         }
-        let constraints = parse_pair_constraints(m, symbol, symbol_id, scale, quote_scale)?;
-        snap.symbol_to_constraints
-            .insert(symbol.to_owned(), constraints);
+        // Optional catalog minima/tick/step fields are ignored here. Venue
+        // admission owns those checks; zero-valued optional minima must not
+        // block hydration of otherwise valid spot rows.
         id_to_symbol.insert(symbol_id, symbol.to_owned());
         let buckets = m
             .get("orderbook_price_buckets")
@@ -406,144 +310,26 @@ impl Manager {
             .copied()
     }
 
-    /// Resolve an optional raw symbol filter against the hydrated catalog.
+    /// Normalize an optional raw symbol filter for wire fields that accept
+    /// symbol strings.
     ///
-    /// Empty/whitespace filters remain omitted. Any unknown non-empty symbol
-    /// fails closed so it cannot accidentally become an unfiltered request.
-    pub fn resolve_symbol_filter(&self, symbol: Option<&str>) -> Result<Option<String>> {
-        let Some(symbol) = symbol.map(str::trim).filter(|value| !value.is_empty()) else {
-            return Ok(None);
-        };
-        if self.symbol_id_for_symbol(symbol).is_none() {
-            return Err(Error::validation(format!(
-                "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
-            )));
-        }
-        Ok(Some(symbol.to_owned()))
+    /// Empty/whitespace filters remain omitted. Unknown symbols are forwarded
+    /// unchanged; the venue owns acceptance. Paths that need `symbol_id`
+    /// conversion should resolve via [`Self::symbol_id_for_symbol`] instead.
+    pub fn normalize_raw_symbol_filter(symbol: Option<&str>) -> Option<String> {
+        symbol
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_owned())
     }
 
-    /// Validate and normalize a list of raw symbol filters.
-    pub fn resolve_symbol_filters(&self, symbols: Option<&[String]>) -> Result<Vec<String>> {
-        let mut resolved = Vec::new();
-        for symbol in symbols.unwrap_or_default() {
-            if let Some(symbol) = self.resolve_symbol_filter(Some(symbol))? {
-                resolved.push(symbol);
-            }
-        }
-        Ok(resolved)
-    }
-
-    /// Return validated deterministic constraints for `symbol`.
-    pub fn pair_constraints_for_symbol(&self, symbol: &str) -> Option<PairConstraints> {
-        read_unpoisoned(&self.inner)
-            .symbol_to_constraints
-            .get(symbol)
-            .cloned()
-    }
-
-    /// Preflight deterministic price/quantity/minimum constraints.
-    ///
-    /// Minimum notional is checked only when both base quantity and price are
-    /// available. Stateful venue admission remains authoritative.
-    pub fn preflight_order_values(
-        &self,
-        symbol: &str,
-        qty_scaled: Option<i64>,
-        price_ticks: Option<i64>,
-    ) -> Result<()> {
-        let constraints = self.pair_constraints_for_symbol(symbol).ok_or_else(|| {
-            Error::validation(format!(
-                "constraints for {symbol:?} are unavailable; await client.wait_for_catalogs()"
-            ))
-        })?;
-        if let Some(price) = price_ticks {
-            if price <= 0 {
-                return Err(Error::validation("price must be positive"));
-            }
-            if let Some(tick) = constraints.tick_size_ticks
-                && price % tick != 0
-            {
-                return Err(Error::validation(format!(
-                    "price for {symbol} must be aligned to catalog tick_size"
-                )));
-            }
-        }
-        if let Some(qty) = qty_scaled {
-            if qty <= 0 {
-                return Err(Error::validation("quantity must be positive"));
-            }
-            if let Some(step) = constraints.step_size_scaled
-                && qty % step != 0
-            {
-                return Err(Error::validation(format!(
-                    "quantity for {symbol} must be aligned to catalog step_size"
-                )));
-            }
-            if let Some(min_qty) = constraints.min_qty_scaled
-                && qty < min_qty
-            {
-                return Err(Error::validation(format!(
-                    "quantity for {symbol} is below catalog min_qty_base"
-                )));
-            }
-        }
-        if let (Some(qty), Some(price), Some(min_notional), Some(quote_scale)) = (
-            qty_scaled,
-            price_ticks,
-            constraints.min_notional_quote_scaled,
-            constraints.quote_quantity_scale,
-        ) {
-            let quote_factor = 10_i128
-                .checked_pow(quote_scale)
-                .ok_or_else(|| Error::validation("quote scale factor overflow"))?;
-            let base_factor = 10_i128
-                .checked_pow(constraints.base_quantity_scale)
-                .ok_or_else(|| Error::validation("base scale factor overflow"))?;
-            let price_factor = 10_i128
-                .checked_pow(PRICE_TICK_SCALE)
-                .ok_or_else(|| Error::validation("price scale factor overflow"))?;
-            let actual = i128::from(price)
-                .checked_mul(i128::from(qty))
-                .and_then(|value| value.checked_mul(quote_factor))
-                .ok_or_else(|| Error::validation("order notional preflight overflow"))?;
-            let minimum = min_notional
-                .checked_mul(price_factor)
-                .and_then(|value| value.checked_mul(base_factor))
-                .ok_or_else(|| Error::validation("minimum notional preflight overflow"))?;
-            if actual < minimum {
-                return Err(Error::validation(format!(
-                    "order for {symbol} is below catalog min_notional_quote"
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    /// Check a quote-debit budget against a computable catalog minimum.
-    pub fn preflight_quote_budget(&self, symbol: &str, scaled: i64, scale: u32) -> Result<()> {
-        let constraints = self.pair_constraints_for_symbol(symbol).ok_or_else(|| {
-            Error::validation(format!(
-                "constraints for {symbol:?} are unavailable; await client.wait_for_catalogs()"
-            ))
-        })?;
-        if scaled <= 0 {
-            return Err(Error::validation("quote budget must be positive"));
-        }
-        if let Some(expected) = constraints.quote_quantity_scale
-            && scale != expected
-        {
-            return Err(Error::validation(format!(
-                "quote budget scale mismatch for {symbol}: got {scale}, expected {expected}"
-            )));
-        }
-        if let Some(minimum) = constraints.min_notional_quote_scaled
-            && i128::from(scaled) < minimum
-        {
-            return Err(Error::validation(format!(
-                "quote budget for {symbol} is below catalog min_notional_quote"
-            )));
-        }
-        Ok(())
+    /// Normalize a list of raw symbol filters (trim; omit empty entries).
+    pub fn normalize_raw_symbol_filters(symbols: Option<&[String]>) -> Vec<String> {
+        symbols
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|symbol| Self::normalize_raw_symbol_filter(Some(symbol)))
+            .collect()
     }
 
     /// Returns the pair base quantity scale, or `None` when unknown/unhydrated.
@@ -656,7 +442,6 @@ fn apply_spot(inner: &mut Inner, snap: SpotSnapshot) {
     inner.symbol_to_base_scale = snap.symbol_to_base_scale;
     inner.id_to_quote_scale = snap.id_to_quote_scale;
     inner.symbol_to_quote_scale = snap.symbol_to_quote_scale;
-    inner.symbol_to_constraints = snap.symbol_to_constraints;
     inner.orderbook_buckets = snap.orderbook_buckets;
     inner.spot_config = Some(snap.spot_config);
 }
@@ -887,79 +672,29 @@ mod tests {
     }
 
     #[test]
-    fn symbol_filters_fail_closed_and_preserve_omission() {
-        let mgr = Manager::new();
-        mgr.hydrate_spot_config_json(json!({
-            "pairs": [{
-                "symbol": "BTC-USDT",
-                "symbol_id": 1,
-                "base_quantity_scale": 8
-            }]
-        }))
-        .unwrap();
-        assert_eq!(mgr.resolve_symbol_filter(None).unwrap(), None);
-        assert_eq!(mgr.resolve_symbol_filter(Some("  ")).unwrap(), None);
+    fn raw_symbol_filters_trim_and_forward_unknown() {
+        assert_eq!(Manager::normalize_raw_symbol_filter(None), None);
+        assert_eq!(Manager::normalize_raw_symbol_filter(Some("  ")), None);
         assert_eq!(
-            mgr.resolve_symbol_filter(Some(" BTC-USDT ")).unwrap(),
+            Manager::normalize_raw_symbol_filter(Some(" BTC-USDT ")),
             Some("BTC-USDT".into())
         );
-        let err = mgr.resolve_symbol_filter(Some("NOPE-USDT")).unwrap_err();
-        assert!(matches!(err, Error::Validation(_)));
-        assert!(err.to_string().contains("unknown symbol"));
-    }
-
-    #[test]
-    fn pair_constraints_are_exposed_and_preflight_is_deterministic() {
-        let mgr = Manager::new();
-        mgr.hydrate_spot_config_json(json!({
-            "pairs": [{
-                "symbol": "BTC-USDT",
-                "symbol_id": 1,
-                "base_quantity_scale": 3,
-                "quote_quantity_scale": 2,
-                "tick_size": "0.01",
-                "step_size": "0.01",
-                "min_qty_base": "0.02",
-                "min_notional_quote": "10"
-            }]
-        }))
-        .unwrap();
-        let constraints = mgr.pair_constraints_for_symbol("BTC-USDT").unwrap();
-        assert_eq!(constraints.tick_size_ticks, Some(10_000));
-        assert_eq!(constraints.step_size_scaled, Some(10));
-        assert_eq!(constraints.min_qty_scaled, Some(20));
-        assert_eq!(constraints.min_notional_quote_scaled, Some(1_000));
-
-        mgr.preflight_order_values("BTC-USDT", Some(2_000), Some(5_000_000))
-            .unwrap();
-        assert!(
-            mgr.preflight_order_values("BTC-USDT", Some(2_001), Some(5_000_000))
-                .unwrap_err()
-                .to_string()
-                .contains("step_size")
+        assert_eq!(
+            Manager::normalize_raw_symbol_filter(Some("NOPE-USDT")),
+            Some("NOPE-USDT".into())
         );
-        assert!(
-            mgr.preflight_order_values("BTC-USDT", Some(10), Some(5_000_000))
-                .unwrap_err()
-                .to_string()
-                .contains("min_qty")
-        );
-        assert!(
-            mgr.preflight_order_values("BTC-USDT", Some(2_000), Some(5_000_001))
-                .unwrap_err()
-                .to_string()
-                .contains("tick_size")
-        );
-        assert!(
-            mgr.preflight_order_values("BTC-USDT", Some(20), Some(5_000_000))
-                .unwrap_err()
-                .to_string()
-                .contains("min_notional")
+        assert_eq!(
+            Manager::normalize_raw_symbol_filters(Some(&[
+                "  ".into(),
+                " ETH-USDT ".into(),
+                "NOPE-USDT".into(),
+            ])),
+            vec!["ETH-USDT".to_owned(), "NOPE-USDT".to_owned()]
         );
     }
 
     #[test]
-    fn zero_optional_pair_constraints_are_treated_as_unset() {
+    fn zero_optional_catalog_minima_do_not_block_hydration() {
         let mgr = Manager::new();
         mgr.hydrate_spot_config_json(json!({
             "pairs": [{
@@ -974,37 +709,9 @@ mod tests {
             }]
         }))
         .unwrap();
-        let constraints = mgr.pair_constraints_for_symbol("BTC-USDT").unwrap();
-        assert_eq!(constraints.tick_size_ticks, Some(10_000));
-        assert_eq!(constraints.step_size_scaled, Some(10));
-        assert_eq!(constraints.min_qty_scaled, None);
-        assert_eq!(constraints.min_notional_quote_scaled, None);
-    }
-
-    #[test]
-    fn malformed_constraints_do_not_replace_existing_snapshot() {
-        let mgr = Manager::new();
-        mgr.hydrate_spot_config_json(json!({
-            "pairs": [{
-                "symbol": "BTC-USDT",
-                "symbol_id": 1,
-                "base_quantity_scale": 8
-            }]
-        }))
-        .unwrap();
-        let err = mgr
-            .hydrate_spot_config_json(json!({
-                "pairs": [{
-                    "symbol": "ETH-USDT",
-                    "symbol_id": 2,
-                    "base_quantity_scale": 6,
-                    "tick_size": "-0.01"
-                }]
-            }))
-            .unwrap_err();
-        assert!(err.to_string().contains("tick_size"));
         assert_eq!(mgr.symbol_id_for_symbol("BTC-USDT"), Some(1));
-        assert_eq!(mgr.symbol_id_for_symbol("ETH-USDT"), None);
+        assert_eq!(mgr.base_quantity_scale_for_symbol("BTC-USDT"), Some(3));
+        assert_eq!(mgr.quote_quantity_scale_for_symbol("BTC-USDT"), Some(2));
     }
 
     #[test]

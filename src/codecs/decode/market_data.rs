@@ -223,14 +223,14 @@ mod tests {
     }
 
     #[test]
-    fn market_trade_rejects_millisecond_shaped_ts_ns() {
+    fn market_trade_accepts_millisecond_shaped_ts_ns() {
         let msg = ProtoMarketTrade {
             symbol_id: 1,
             ts_ns: 1_700_000_000_000,
             ..Default::default()
         };
-        let err = market_trade_from_proto(&msg, 8).unwrap_err();
-        assert!(matches!(err, Error::ResponseContract { .. }));
+        let trade = market_trade_from_proto(&msg, 8).unwrap();
+        assert_eq!(trade.ts_ns, "1700000000000");
     }
 
     #[test]

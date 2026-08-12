@@ -132,10 +132,8 @@ impl OrdersService {
                 ));
             }
             symbol_ids.push(sid);
-        } else if let Some(symbol) = self
-            .ctx
-            .catalogs
-            .resolve_symbol_filter(opts.symbol.as_deref())?
+        } else if let Some(symbol) =
+            crate::catalogs::Manager::normalize_raw_symbol_filter(opts.symbol.as_deref())
         {
             let resolved = self
                 .ctx
@@ -143,7 +141,7 @@ impl OrdersService {
                 .symbol_id_for_symbol(&symbol)
                 .ok_or_else(|| {
                     Error::validation(format!(
-                        "catalog symbol {symbol} disappeared during resolution"
+                        "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
                     ))
                 })?;
             symbol_ids.push(resolved);
@@ -152,12 +150,12 @@ impl OrdersService {
             Some(raw) if !raw.trim().is_empty() => Some(id_to_u64(raw, "trigger_id")?),
             _ => None,
         };
-        let limit = super::positive_limit(opts.limit, "list_order_history")?;
         let req = GetOrderHistoryRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_id: symbol_ids,
             page_token: opts.page_token.unwrap_or_default(),
-            limit,
+            // Option wire field: None omits; Some(0) means server default.
+            limit: opts.limit,
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
             trigger_id,
@@ -461,25 +459,6 @@ impl OrdersService {
             *intent.attached_risk.get_or_insert_default() =
                 self.encode_attached_risk(risk, Some(&params.symbol))?;
         }
-        let qty = match intent.sizing.as_ref() {
-            Some(order_intent::Sizing::BaseQtyScaled(value)) => Some(*value),
-            _ => None,
-        };
-        let price = match intent.execution.as_ref() {
-            Some(order_intent::Execution::LimitGtc(value)) => Some(value.price_ticks),
-            Some(order_intent::Execution::LimitIoc(value)) => Some(value.price_ticks),
-            Some(order_intent::Execution::LimitFok(value)) => Some(value.price_ticks),
-            _ => None,
-        };
-        self.ctx
-            .catalogs
-            .preflight_order_values(&params.symbol, qty, price)?;
-        if let Some(order_intent::Sizing::MaxQuoteDebitScaled(value)) = intent.sizing.as_ref() {
-            let scale = self.require_quote_quantity_scale(&params.symbol)?;
-            self.ctx
-                .catalogs
-                .preflight_quote_budget(&params.symbol, *value, scale)?;
-        }
         Ok(intent)
     }
 
@@ -638,13 +617,7 @@ impl OrdersService {
     }
 
     fn resolve_constraint_price(&self, price: &Price, symbol: Option<&str>) -> Result<i64> {
-        let ticks = resolve_price_ticks(price, symbol)?;
-        if let Some(symbol) = symbol {
-            self.ctx
-                .catalogs
-                .preflight_order_values(symbol, None, Some(ticks))?;
-        }
-        Ok(ticks)
+        resolve_price_ticks(price, symbol)
     }
 
     /// Generate a cryptographically random mutation request id (`prefix-<12 hex chars>`).
@@ -720,11 +693,6 @@ impl OrdersService {
         if let Some(ncid) = optional_client_order_id(params.new_client_order_id.as_deref())? {
             req.new_client_order_id = ncid;
         }
-        self.ctx.catalogs.preflight_order_values(
-            &params.symbol,
-            req.new_qty_scaled,
-            req.new_price_ticks,
-        )?;
         Ok(req)
     }
 
@@ -937,11 +905,6 @@ impl OrdersService {
             if let Some(ncid) = optional_client_order_id(item.new_client_order_id.as_deref())? {
                 proto.new_client_order_id = ncid;
             }
-            self.ctx.catalogs.preflight_order_values(
-                symbol,
-                proto.new_qty_scaled,
-                proto.new_price_ticks,
-            )?;
             proto_items.push(proto);
         }
         let req = BatchReplaceOrdersRequest {
@@ -997,14 +960,11 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         request_id: Option<String>,
     ) -> Result<CancelAllAfterResult> {
-        if symbol.is_some_and(|value| !value.trim().is_empty()) {
-            self.ctx.wait_for_catalogs().await?;
-        }
-        let symbol = self.ctx.catalogs.resolve_symbol_filter(symbol)?;
         let req = CancelAllAfterRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
             timeout_sec,
-            symbol: symbol.unwrap_or_default(),
+            symbol: crate::catalogs::Manager::normalize_raw_symbol_filter(symbol)
+                .unwrap_or_default(),
             request_id: Self::coalesce_request_id(request_id, "cancel-after")?,
             ..Default::default()
         };
@@ -1128,20 +1088,10 @@ impl OrdersService {
     /// A `request_id` is generated when omitted or blank. Provide a stable non-empty value when
     /// retrying the same logical bulk cancellation.
     pub async fn cancel_all_with(&self, opts: CancelAllOpts) -> Result<CancelAllOrdersResult> {
-        if opts
-            .symbol
-            .as_deref()
-            .is_some_and(|value| !value.trim().is_empty())
-        {
-            self.ctx.wait_for_catalogs().await?;
-        }
-        let symbol = self
-            .ctx
-            .catalogs
-            .resolve_symbol_filter(opts.symbol.as_deref())?;
         let mut req = CancelAllOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
-            symbol: symbol.unwrap_or_default(),
+            symbol: crate::catalogs::Manager::normalize_raw_symbol_filter(opts.symbol.as_deref())
+                .unwrap_or_default(),
             dry_run: opts.dry_run,
             request_id: Self::coalesce_request_id(opts.request_id, "cancel-all")?,
             ..Default::default()
@@ -1261,9 +1211,9 @@ impl TradesService {
         subaccount_id: Option<u64>,
         limit: Option<u32>,
     ) -> Result<UserTradesList> {
-        let limit = super::positive_limit(limit, "list_user_trades")?;
         let req = GetUserTradesRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            // Option wire field: None omits; Some(0) means server default.
             limit,
             ..Default::default()
         };

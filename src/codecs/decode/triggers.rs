@@ -777,13 +777,13 @@ mod tests {
     }
 
     #[test]
-    fn trigger_event_rejects_millisecond_shaped_ts_ns() {
-        let err = trigger_event_from_proto(&ProtoTriggerEvent {
+    fn trigger_event_accepts_millisecond_shaped_ts_ns() {
+        let event = trigger_event_from_proto(&ProtoTriggerEvent {
             trigger_id: 1,
             ts_ns: 1_700_000_000_000,
             ..Default::default()
         })
-        .unwrap_err();
-        assert!(matches!(err, crate::Error::ResponseContract { .. }));
+        .unwrap();
+        assert_eq!(event.ts_ns, "1700000000000");
     }
 }

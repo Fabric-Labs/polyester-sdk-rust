@@ -223,17 +223,16 @@ let client = polyester::Client::from_env()?;
 client.wait_for_catalogs().await?;
 ```
 
-Hydrated pair rows also expose deterministic constraints through
-`client.catalogs.pair_constraints_for_symbol(symbol)`. Order and trigger
-encoders preflight catalog tick size, quantity step, minimum quantity, and
-minimum notional when quantity and price make it computable. This is an early
-validation aid only; server preview/admission remains authoritative for
-balances, permissions, risk, and live market state.
+Catalogs supply scales and symbol IDs for encoding. Tick/step/minimum
+quantity and notional checks are venue-owned (preview/admission); the SDK does
+not preflight those pair constraints client-side.
 
-Non-empty symbol filters are catalog validated. An unknown symbol fails with
-`Error::Validation` and is never sent as an empty/unfiltered request. Optional
-list limits preserve the endpoint default when omitted; `Some(0)` is rejected
-where the endpoint requires a positive cap.
+Raw `symbol` / `symbols` filters on market overview, triggers list, and
+cancel-all paths are forwarded after trim/empty-omit. Unknown symbols are not
+rejected by the SDK on those endpoints. Paths that convert a symbol string into
+a wire `symbol_id` still wait for catalogs and fail closed when the symbol is
+unknown. Optional ListOpen limits reject an explicit `Some(0)`; other
+zero-means-default proto limits pass `0` through as the server default.
 
 If a client is constructed before entering a Tokio runtime,
 `wait_for_catalogs()` starts hydration on the current runtime. Scaled bot inputs
@@ -244,9 +243,8 @@ unless the request's `amount_scale` / `quantity_scale` is explicit. Prefer
 
 Successful private subscriptions are returned only after token exchange,
 websocket connection, and channel subscription complete. Missing credentials
-fail immediately with `Error::Auth`. Response fields named `*_ts_ns` are
-validated as nanoseconds; millisecond-shaped values fail with
-`Error::ResponseContract` instead of being silently mislabeled.
+fail immediately with `Error::Auth`. Response `*_ts_ns` fields are forwarded as
+received (including millisecond-shaped values if a producer emits them).
 
 ## Create and cancel orders
 

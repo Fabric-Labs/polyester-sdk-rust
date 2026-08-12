@@ -38,7 +38,10 @@ use tokio::sync::OnceCell;
 
 use crate::realtime::Client as RealtimeClient;
 
-/// Preserve an omitted endpoint default while rejecting an explicit zero cap.
+/// Reject an explicit zero on optional ListOpen-style limits (`Option` wire
+/// fields where omission means server default and `Some(0)` is invalid).
+///
+/// Plain `u32` / zero-means-default endpoints should pass `0` through instead.
 fn positive_limit(limit: Option<u32>, endpoint: &str) -> Result<Option<u32>> {
     match limit {
         Some(0) => Err(Error::validation(format!(
@@ -103,9 +106,12 @@ mod tests {
 
     #[test]
     fn positive_limits_preserve_omission_and_reject_explicit_zero() {
-        assert_eq!(positive_limit(None, "list").unwrap(), None);
-        assert_eq!(positive_limit(Some(1), "list").unwrap(), Some(1));
-        let err = positive_limit(Some(0), "list").unwrap_err();
+        assert_eq!(positive_limit(None, "list_open_orders").unwrap(), None);
+        assert_eq!(
+            positive_limit(Some(1), "list_open_orders").unwrap(),
+            Some(1)
+        );
+        let err = positive_limit(Some(0), "list_open_orders").unwrap_err();
         assert!(matches!(err, Error::Validation(_)));
         assert!(err.to_string().contains("positive"));
     }

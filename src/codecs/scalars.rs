@@ -14,26 +14,16 @@ pub const MAX_PROTOCOL_SCALE: u32 = 36;
 pub const INT64_MAX: i128 = i64::MAX as i128;
 pub const INT64_MIN: i128 = i64::MIN as i128;
 pub const UINT64_MAX: u128 = u64::MAX as u128;
-const MIN_MILLISECOND_SHAPED_TS_NS: u64 = 1_000_000_000_000;
-const MAX_MILLISECOND_SHAPED_TS_NS: u64 = 999_999_999_999_999;
-
-/// A response timestamp validated as nanoseconds rather than milliseconds.
+/// A response timestamp carried as wire `*_ts_ns`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TsNs(u64);
 
 impl TsNs {
-    /// Validate a wire `*_ts_ns` value.
+    /// Accept a wire `*_ts_ns` value.
     ///
-    /// Zero remains the protobuf "not set" sentinel. Plausible Unix-millisecond
-    /// values are rejected because accepting them would
-    /// silently mislabel milliseconds as nanoseconds.
-    pub fn from_wire(value: u64, context: &str) -> Result<Self> {
-        if (MIN_MILLISECOND_SHAPED_TS_NS..=MAX_MILLISECOND_SHAPED_TS_NS).contains(&value) {
-            return Err(Error::response_contract(
-                context,
-                format!("ts_ns value {value} is millisecond-shaped; nanoseconds required"),
-            ));
-        }
+    /// Zero remains the protobuf "not set" sentinel. Shape validation (for
+    /// example millisecond vs nanosecond) is left to the producing service.
+    pub fn from_wire(value: u64, _context: &str) -> Result<Self> {
         Ok(Self(value))
     }
 
@@ -508,10 +498,19 @@ mod tests {
     }
 
     #[test]
-    fn ts_ns_rejects_millisecond_shaped_values() {
-        let err = TsNs::from_wire(1_700_000_000_000, "trade").unwrap_err();
-        assert!(matches!(err, Error::ResponseContract { .. }));
-        assert!(TsNs::from_wire(1_700_000_000_000_000_000, "trade").is_ok());
+    fn ts_ns_accepts_millisecond_shaped_and_nanosecond_values() {
+        assert_eq!(
+            TsNs::from_wire(1_700_000_000_000, "trade")
+                .unwrap()
+                .optional_string(),
+            "1700000000000"
+        );
+        assert_eq!(
+            TsNs::from_wire(1_700_000_000_000_000_000, "trade")
+                .unwrap()
+                .get(),
+            1_700_000_000_000_000_000
+        );
         assert_eq!(TsNs::from_wire(0, "trade").unwrap().optional_string(), "");
     }
 }

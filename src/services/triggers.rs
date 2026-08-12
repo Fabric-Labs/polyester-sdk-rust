@@ -58,23 +58,14 @@ impl TriggersService {
 
     pub async fn list_with(&self, opts: ListTriggersOpts) -> Result<TriggersList> {
         use crate::codecs::decode::trigger_status_from_label;
-        if opts
-            .symbol
-            .as_deref()
-            .is_some_and(|value| !value.trim().is_empty())
-        {
-            self.ctx.wait_for_catalogs().await?;
-        }
-        let symbol = self
-            .ctx
-            .catalogs
-            .resolve_symbol_filter(opts.symbol.as_deref())?;
-        let limit = super::positive_limit(opts.limit, "list_triggers")?.unwrap_or(50);
         let mut req = ListTriggersRequest {
-            limit,
+            // Proto u32: 0 means omit / server default.
+            limit: opts.limit.unwrap_or(0),
             ..Default::default()
         };
-        if let Some(symbol) = symbol {
+        if let Some(symbol) =
+            crate::catalogs::Manager::normalize_raw_symbol_filter(opts.symbol.as_deref())
+        {
             req.symbol = symbol;
         }
         if let Some(token) = opts.page_token {
@@ -133,9 +124,6 @@ impl TriggersService {
             Some(&params.symbol),
             self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
         )?;
-        self.ctx
-            .catalogs
-            .preflight_order_values(&params.symbol, Some(qty), None)?;
         let mut intent = TriggerIntent {
             symbol: params.symbol.clone(),
             qty_scaled: qty,
@@ -316,20 +304,6 @@ impl TriggersService {
                 trigger_intent::Strategy::Ladder(Box::new(ladder))
             }
         });
-        if matches!(
-            params.trigger_type,
-            CreateTriggerType::StopLoss | CreateTriggerType::TakeProfit | CreateTriggerType::Twap
-        ) && matches!(params.order_type, CreateOrderType::Limit)
-            && let Some(price) = params.limit_price.as_ref()
-        {
-            let price_ticks = self.resolve_catalog_price(price, &params.symbol)?;
-            self.ctx.catalogs.preflight_order_values(
-                &params.symbol,
-                Some(qty),
-                Some(price_ticks),
-            )?;
-        }
-
         let mut req = CreateTriggerRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
             ..Default::default()
@@ -339,11 +313,7 @@ impl TriggersService {
     }
 
     fn resolve_catalog_price(&self, price: &crate::Price, symbol: &str) -> Result<i64> {
-        let ticks = resolve_price_ticks(price, Some(symbol))?;
-        self.ctx
-            .catalogs
-            .preflight_order_values(symbol, None, Some(ticks))?;
-        Ok(ticks)
+        resolve_price_ticks(price, Some(symbol))
     }
 
     /// Map flat (`order_type`, `time_in_force`, `limit_price`, `post_only`) params

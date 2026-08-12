@@ -76,7 +76,7 @@ pub struct ListTriggersOpts {
     pub symbol: Option<String>,
     /// Status filter labels (`created`, `armed`, …). Unknown values are rejected.
     pub status: Vec<String>,
-    /// Omitted uses the endpoint default; an explicit zero is rejected.
+    /// Omitted or `Some(0)` uses the server default.
     pub limit: Option<u32>,
     pub page_token: Option<String>,
     pub subaccount_id: Option<u64>,

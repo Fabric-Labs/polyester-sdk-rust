@@ -29,11 +29,6 @@
 //! - Bots: `Price::from_ticks(1_500_000)` / `Quantity::from_scaled(…)`
 //!
 //! Floats and bare integers are rejected.
-//!
-//! Hydrated catalogs also enforce deterministic tick/step/minimum constraints
-//! before order and trigger transport. Unknown non-empty symbol filters fail
-//! closed, and millisecond-shaped values in `*_ts_ns` responses are rejected
-//! as [`Error::ResponseContract`] violations.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(clippy::module_inception)]

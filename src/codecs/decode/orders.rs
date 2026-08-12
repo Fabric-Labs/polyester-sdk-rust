@@ -772,20 +772,20 @@ mod tests {
     }
 
     #[test]
-    fn order_and_trade_decoders_reject_millisecond_shaped_ts_ns() {
-        let order_err = order_from_proto(&ProtoOrder {
+    fn order_and_trade_decoders_accept_millisecond_shaped_ts_ns() {
+        let order = order_from_proto(&ProtoOrder {
             created_ts_ns: 1_700_000_000_000,
             ..Default::default()
         })
-        .unwrap_err();
-        assert!(matches!(order_err, Error::ResponseContract { .. }));
+        .unwrap();
+        assert_eq!(order.created_ts_ns, "1700000000000");
 
-        let trade_err = user_trade_from_proto(&ProtoUserTrade {
+        let trade = user_trade_from_proto(&ProtoUserTrade {
             ts_ns: 1_700_000_000_000,
             ..Default::default()
         })
-        .unwrap_err();
-        assert!(matches!(trade_err, Error::ResponseContract { .. }));
+        .unwrap();
+        assert_eq!(trade.ts_ns, "1700000000000");
     }
 
     #[test]
