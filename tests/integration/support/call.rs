@@ -37,7 +37,8 @@ pub fn jwt_session_only(err: &Error) -> bool {
         || msg.contains("bearer")
         || msg.contains("interactive session")
         || msg.contains("permission denied")
-        || msg.contains("permission_denied");
+        || msg.contains("permission_denied")
+        || msg.contains("api keys cannot");
     match err {
         Error::Auth(_) => sessionish,
         Error::Api { code, .. } => {

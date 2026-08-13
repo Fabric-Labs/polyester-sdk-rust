@@ -89,6 +89,18 @@ thin_service!(
     TransfersService,
     crate::connect::ledger::read::v1::LedgerReadServiceClient<crate::transport::SharedTransport>
 );
+thin_service!(
+    VipService,
+    crate::connect::vip::v1::VipServiceClient<crate::transport::SharedTransport>
+);
+thin_service!(
+    FeeService,
+    crate::connect::fees::v1::FeeServiceClient<crate::transport::SharedTransport>
+);
+thin_service!(
+    RateLimitService,
+    crate::connect::ratelimit::v1::RateLimitServiceClient<crate::transport::SharedTransport>
+);
 
 impl HeatmapService {
     /// Historical orderbook heatmap (Go `HeatmapService.Get` → `ApiData`).
@@ -1872,6 +1884,110 @@ impl WhiteboardService {
             .into_owned()
         };
         Ok(api_data_from_proto(&resp))
+    }
+}
+
+impl VipService {
+    pub async fn list_vip_tiers(&self) -> crate::errors::Result<crate::models::VIPTiersList> {
+        use crate::codecs::decode::vip_tiers_list_from_proto;
+        use crate::proto::vip::v1::ListVIPTiersRequest;
+        let req = ListVIPTiersRequest {
+            ..Default::default()
+        };
+        let client = self.connect_client();
+        // "/vip.v1.VIPService/ListVIPTiers"
+        let resp = super::unary::await_public(client.list_vip_tiers(req))
+            .await?
+            .into_owned();
+        Ok(vip_tiers_list_from_proto(&resp))
+    }
+
+    pub async fn get_vip_status(&self) -> crate::errors::Result<crate::models::VIPStatus> {
+        use super::unary;
+        use crate::codecs::decode::vip_status_from_proto;
+        use crate::proto::vip::v1::GetVIPStatusRequest;
+        let req = GetVIPStatusRequest {
+            ..Default::default()
+        };
+        let client = self.connect_client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/vip.v1.VIPService/GetVIPStatus",
+            req,
+            |req, opts| client.get_vip_status_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        Ok(vip_status_from_proto(&resp))
+    }
+}
+
+impl FeeService {
+    pub async fn get_spot_fee_rates(
+        &self,
+        subaccount_id: Option<u64>,
+        symbol_id: Vec<u32>,
+    ) -> crate::errors::Result<crate::models::SpotFeeRatesList> {
+        use super::scope;
+        use super::unary;
+        use crate::codecs::decode::spot_fee_rates_list_from_proto;
+        use crate::proto::fees::v1::GetSpotFeeRatesRequest;
+        let req = GetSpotFeeRatesRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            symbol_id,
+            ..Default::default()
+        };
+        let client = self.connect_client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/fees.v1.FeeService/GetSpotFeeRates",
+            req,
+            |req, opts| client.get_spot_fee_rates_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        Ok(spot_fee_rates_list_from_proto(&resp))
+    }
+}
+
+impl RateLimitService {
+    pub async fn get_rate_limit_config(
+        &self,
+    ) -> crate::errors::Result<crate::models::RateLimitConfig> {
+        use crate::codecs::decode::rate_limit_config_from_proto;
+        use crate::proto::ratelimit::v1::GetRateLimitConfigRequest;
+        let req = GetRateLimitConfigRequest {
+            ..Default::default()
+        };
+        let client = self.connect_client();
+        let resp = super::unary::await_public(client.get_rate_limit_config(req))
+            .await?
+            .into_owned();
+        Ok(rate_limit_config_from_proto(&resp))
+    }
+
+    pub async fn get_trading_rate_limits(
+        &self,
+        subaccount_id: Option<u64>,
+    ) -> crate::errors::Result<crate::models::TradingRateLimits> {
+        use super::scope;
+        use super::unary;
+        use crate::codecs::decode::trading_rate_limits_from_proto;
+        use crate::proto::ratelimit::v1::GetTradingRateLimitsRequest;
+        let req = GetTradingRateLimitsRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            ..Default::default()
+        };
+        let client = self.connect_client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/ratelimit.v1.RateLimitService/GetTradingRateLimits",
+            req,
+            |req, opts| client.get_trading_rate_limits_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        Ok(trading_rate_limits_from_proto(&resp))
     }
 }
 

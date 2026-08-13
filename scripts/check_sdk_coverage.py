@@ -664,6 +664,21 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
         "any_services": ["chain.guard.v1.GuardSignerService"],
     },
     {
+        "id": "vip",
+        "label": "VIP tiers + status",
+        "any_services": ["vip.v1.VIPService"],
+    },
+    {
+        "id": "spot_fees",
+        "label": "Spot fee rates",
+        "any_services": ["fees.v1.FeeService"],
+    },
+    {
+        "id": "trading_rate_limits",
+        "label": "Trading rate limits",
+        "any_services": ["ratelimit.v1.RateLimitService"],
+    },
+    {
         "id": "balances",
         "label": "Balances, holds, equity history",
         "any_services": ["ledger.read.v1.LedgerReadService"],

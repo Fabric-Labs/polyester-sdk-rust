@@ -48,6 +48,7 @@ mod support;
 mod transfers;
 mod triggers;
 mod triggers_mutation;
+mod vip_fees_ratelimit;
 
 use support::load_dotenv;
 

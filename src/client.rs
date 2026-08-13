@@ -5,11 +5,11 @@ use crate::catalogs::Manager as CatalogManager;
 use crate::errors::{Error, Result};
 use crate::services::{
     AddressBookService, ApiKeysService, AuthService, BalancesService, ChainAnalyticsService,
-    DepositService, GuardSignerService, HeatmapService, InternalTransfersService, LayoutService,
-    LifecycleService, MarketDataService, MarketOverviewService, OrderbookService, OrdersService,
-    PoliciesService, PolychartService, ServiceContext, SocialVerificationService,
-    SubAccountsService, TradesService, TransfersService, TriggersService, WhiteboardService,
-    WithdrawService, ZipperService,
+    DepositService, FeeService, GuardSignerService, HeatmapService, InternalTransfersService,
+    LayoutService, LifecycleService, MarketDataService, MarketOverviewService, OrderbookService,
+    OrdersService, PoliciesService, PolychartService, RateLimitService, ServiceContext,
+    SocialVerificationService, SubAccountsService, TradesService, TransfersService,
+    TriggersService, VipService, WhiteboardService, WithdrawService, ZipperService,
 };
 use crate::transport::{
     Config as TransportConfig, DEFAULT_API_URL, DEFAULT_WS_URL, Factory, WireFormat,
@@ -102,6 +102,9 @@ pub struct Client {
     pub polychart: PolychartService,
     pub layout: LayoutService,
     pub guard_signer: GuardSignerService,
+    pub vip: VipService,
+    pub fees: FeeService,
+    pub rate_limits: RateLimitService,
     pub withdraw: WithdrawService,
     catalog_ready: Arc<OnceCell<Result<()>>>,
     catalog_hydrate_lock: Arc<tokio::sync::Mutex<()>>,
@@ -179,6 +182,9 @@ impl Client {
             polychart: PolychartService::new(ctx.clone()),
             layout: LayoutService::new(ctx.clone()),
             guard_signer: GuardSignerService::new(ctx.clone()),
+            vip: VipService::new(ctx.clone()),
+            fees: FeeService::new(ctx.clone()),
+            rate_limits: RateLimitService::new(ctx.clone()),
             withdraw: WithdrawService::new(ctx),
             catalog_ready,
             catalog_hydrate_lock,
@@ -269,6 +275,9 @@ impl Client {
             polychart: PolychartService::new(ctx.clone()),
             layout: LayoutService::new(ctx.clone()),
             guard_signer: GuardSignerService::new(ctx.clone()),
+            vip: VipService::new(ctx.clone()),
+            fees: FeeService::new(ctx.clone()),
+            rate_limits: RateLimitService::new(ctx.clone()),
             withdraw: WithdrawService::new(ctx),
             catalog_ready,
             catalog_hydrate_lock,
@@ -495,6 +504,9 @@ mod tests {
             &client.sub_accounts,
             &client.deposit,
             &client.withdraw,
+            &client.vip,
+            &client.fees,
+            &client.rate_limits,
         );
     }
 

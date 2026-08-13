@@ -10,6 +10,7 @@
 pub mod auth;
 pub mod chain;
 pub mod collab;
+pub mod fees;
 pub mod layout;
 pub mod ledger;
 pub mod marketdata;
@@ -17,5 +18,7 @@ pub mod marketoverview;
 pub mod orderbook;
 pub mod orders;
 pub mod polychart;
+pub mod ratelimit;
 pub mod transfer;
 pub mod triggers;
+pub mod vip;
