@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added
+- Address-book writes on `AddressBookService`: `create_entry`, `update_entry`,
+  `delete_entry`, `copy_entry`, `create_tag`, `update_tag`, and `delete_tag`.
+  Create and update accept atomic `new_tags` (created and attached in the same
+  protected request). When `tag_ids` is also selected on update, the result is
+  those ids plus the new tags; otherwise existing tags are preserved and
+  `new_tags` are appended.
+- `AddressBookEntry.tags` so create/update responses can prove attached tags.
+- `errors::auth_codes::INTERNAL_ERROR` for `AUTH_INTERNAL_ERROR`.
+
+### Changed
+- Twitter social-verification `start` forwards a leading `@` on the handle
+  (server CEL now accepts it).
+
 ## 0.1.0a38
 
 Package version: `0.1.0-alpha.38`. Git tag: `v0.1.0a38`.

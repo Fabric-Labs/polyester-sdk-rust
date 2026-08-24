@@ -658,6 +658,171 @@ impl AddressBookService {
         };
         Ok(api_data_from_proto(&resp))
     }
+
+    /// Build an update request that selects `new_tags` via FieldMask.
+    ///
+    /// When `tag_ids` is not selected, currently attached tags are preserved
+    /// and these tags are created and appended in the same protected update.
+    pub fn update_entry_request_with_new_tags(
+        address_book_entry_id: u64,
+        new_tags: Vec<crate::proto::auth::v1::AddressBookTagInput>,
+        expected_revision: u64,
+    ) -> crate::proto::auth::v1::UpdateAddressBookEntryRequest {
+        use crate::proto::auth::v1::{AddressBookEntryUpdateSpec, UpdateAddressBookEntryRequest};
+        use buffa_types::google::protobuf::FieldMask;
+
+        UpdateAddressBookEntryRequest {
+            address_book_entry_id,
+            expected_revision,
+            entry: AddressBookEntryUpdateSpec {
+                new_tags,
+                ..Default::default()
+            }
+            .into(),
+            update_mask: FieldMask {
+                paths: vec!["new_tags".into()],
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        }
+    }
+
+    pub async fn create_entry(
+        &self,
+        req: crate::proto::auth::v1::CreateAddressBookEntryRequest,
+    ) -> crate::errors::Result<crate::models::AddressBookEntry> {
+        use crate::codecs::decode::entry_from_create_proto;
+        let client = self.connect_client();
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.AddressBookService/CreateAddressBookEntry",
+                req,
+                |req, opts| client.create_address_book_entry_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        entry_from_create_proto(&resp)
+    }
+
+    pub async fn update_entry(
+        &self,
+        req: crate::proto::auth::v1::UpdateAddressBookEntryRequest,
+    ) -> crate::errors::Result<crate::models::AddressBookEntry> {
+        use crate::codecs::decode::entry_from_update_proto;
+        let client = self.connect_client();
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.AddressBookService/UpdateAddressBookEntry",
+                req,
+                |req, opts| client.update_address_book_entry_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        entry_from_update_proto(&resp)
+    }
+
+    pub async fn delete_entry(
+        &self,
+        req: crate::proto::auth::v1::DeleteAddressBookEntryRequest,
+    ) -> crate::errors::Result<()> {
+        let client = self.connect_client();
+        {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.AddressBookService/DeleteAddressBookEntry",
+                req,
+                |req, opts| client.delete_address_book_entry_with_options(req, opts),
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
+    pub async fn copy_entry(
+        &self,
+        req: crate::proto::auth::v1::CopyAddressBookEntryRequest,
+    ) -> crate::errors::Result<crate::models::AddressBookEntry> {
+        use crate::codecs::decode::entry_from_copy_proto;
+        let client = self.connect_client();
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.AddressBookService/CopyAddressBookEntry",
+                req,
+                |req, opts| client.copy_address_book_entry_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        entry_from_copy_proto(&resp)
+    }
+
+    pub async fn create_tag(
+        &self,
+        req: crate::proto::auth::v1::CreateAddressBookTagRequest,
+    ) -> crate::errors::Result<crate::models::AddressBookTag> {
+        use crate::codecs::decode::tag_from_create_proto;
+        let client = self.connect_client();
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.AddressBookService/CreateAddressBookTag",
+                req,
+                |req, opts| client.create_address_book_tag_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        tag_from_create_proto(&resp)
+    }
+
+    pub async fn update_tag(
+        &self,
+        req: crate::proto::auth::v1::UpdateAddressBookTagRequest,
+    ) -> crate::errors::Result<crate::models::AddressBookTag> {
+        use crate::codecs::decode::tag_from_update_proto;
+        let client = self.connect_client();
+        let resp = {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.AddressBookService/UpdateAddressBookTag",
+                req,
+                |req, opts| client.update_address_book_tag_with_options(req, opts),
+            )
+            .await?
+            .into_owned()
+        };
+        tag_from_update_proto(&resp)
+    }
+
+    pub async fn delete_tag(
+        &self,
+        req: crate::proto::auth::v1::DeleteAddressBookTagRequest,
+    ) -> crate::errors::Result<()> {
+        let client = self.connect_client();
+        {
+            use super::unary;
+            unary::await_auth(
+                &self.ctx.factory,
+                "/auth.v1.AddressBookService/DeleteAddressBookTag",
+                req,
+                |req, opts| client.delete_address_book_tag_with_options(req, opts),
+            )
+            .await?;
+        }
+        Ok(())
+    }
 }
 
 impl TransfersService {
@@ -1052,13 +1217,7 @@ impl SocialVerificationService {
         handle: &str,
     ) -> crate::errors::Result<crate::models::ApiData> {
         use crate::codecs::decode::api_data_from_proto;
-        use crate::proto::auth::v1::StartSocialVerificationRequest;
-        let req = StartSocialVerificationRequest {
-            provider: social_provider_enum(provider).into(),
-            method: social_method_enum(method).into(),
-            handle: handle.to_owned(),
-            ..Default::default()
-        };
+        let req = start_social_request(provider, method, handle);
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -1119,6 +1278,20 @@ impl SocialVerificationService {
             .into_owned()
         };
         Ok(api_data_from_proto(&resp))
+    }
+}
+
+fn start_social_request(
+    provider: &str,
+    method: &str,
+    handle: &str,
+) -> crate::proto::auth::v1::StartSocialVerificationRequest {
+    use crate::proto::auth::v1::StartSocialVerificationRequest;
+    StartSocialVerificationRequest {
+        provider: social_provider_enum(provider).into(),
+        method: social_method_enum(method).into(),
+        handle: handle.to_owned(),
+        ..Default::default()
     }
 }
 
@@ -2018,6 +2191,74 @@ mod tests {
         let err = internal_transfer_amount_e18(&amount, None, 7)
             .expect_err("missing scale must not silently mean e18");
         assert!(err.to_string().contains("amount scale is required"));
+    }
+
+    #[test]
+    fn address_book_create_and_update_requests_carry_new_tags() {
+        use crate::proto::auth::v1::{
+            AddressBookEntryUpdateSpec, AddressBookTagInput, CreateAddressBookEntryRequest,
+            UpdateAddressBookEntryRequest,
+        };
+        use crate::services::AddressBookService;
+        use buffa_types::google::protobuf::FieldMask;
+
+        let create = CreateAddressBookEntryRequest {
+            label: "vault".into(),
+            new_tags: vec![AddressBookTagInput {
+                name: "hot".into(),
+                color: "#ff00aa".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert_eq!(create.new_tags.len(), 1);
+        assert_eq!(create.new_tags[0].name, "hot");
+
+        let update = UpdateAddressBookEntryRequest {
+            address_book_entry_id: 7,
+            expected_revision: 2,
+            entry: AddressBookEntryUpdateSpec {
+                new_tags: vec![AddressBookTagInput {
+                    name: "cold".into(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+            .into(),
+            update_mask: FieldMask {
+                paths: vec!["new_tags".into()],
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        assert_eq!(update.update_mask.as_option().unwrap().paths, ["new_tags"]);
+        assert_eq!(update.entry.as_option().unwrap().new_tags[0].name, "cold");
+        assert!(update.entry.as_option().unwrap().tag_ids.is_empty());
+
+        let helper = AddressBookService::update_entry_request_with_new_tags(
+            7,
+            vec![AddressBookTagInput {
+                name: "cold".into(),
+                ..Default::default()
+            }],
+            2,
+        );
+        assert_eq!(helper.address_book_entry_id, 7);
+        assert_eq!(helper.expected_revision, 2);
+        assert_eq!(helper.update_mask.as_option().unwrap().paths, ["new_tags"]);
+        assert_eq!(helper.entry.as_option().unwrap().new_tags[0].name, "cold");
+        assert!(helper.entry.as_option().unwrap().tag_ids.is_empty());
+    }
+
+    #[test]
+    fn social_start_preserves_leading_at_on_handle() {
+        let req = super::start_social_request("twitter", "profile", "@alice");
+        assert_eq!(req.handle, "@alice");
+        assert_eq!(
+            req.provider.as_known(),
+            Some(crate::proto::auth::v1::SocialProvider::TWITTER)
+        );
     }
 
     #[tokio::test]

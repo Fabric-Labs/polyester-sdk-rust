@@ -650,7 +650,7 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
     },
     {
         "id": "address_book",
-        "label": "Address book (list/view/subscribe)",
+        "label": "Address book (list/view/create/update/subscribe)",
         "any_services": ["auth.v1.AddressBookService"],
     },
     {

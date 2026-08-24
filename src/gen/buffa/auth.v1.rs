@@ -25544,6 +25544,18 @@ pub struct AddressBookEntryUpdateSpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub tag_ids: ::buffa::alloc::vec::Vec<u64>,
+    /// New tags to create and attach in the same protected update. When tag_ids
+    /// is also selected, the resulting set is tag_ids plus these tags. Otherwise,
+    /// currently attached tags are preserved and these tags are appended.
+    ///
+    /// Field 4: `new_tags`
+    #[serde(
+        rename = "newTags",
+        alias = "new_tags",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub new_tags: ::buffa::alloc::vec::Vec<AddressBookTagInput>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -25554,6 +25566,7 @@ impl ::core::fmt::Debug for AddressBookEntryUpdateSpec {
             .field("label", &self.label)
             .field("note", &self.note)
             .field("tag_ids", &self.tag_ids)
+            .field("new_tags", &self.new_tags)
             .finish()
     }
 }
@@ -25578,7 +25591,7 @@ impl ::buffa::Message for AddressBookEntryUpdateSpec {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -25594,12 +25607,20 @@ impl ::buffa::Message for AddressBookEntryUpdateSpec {
             size
                 += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
         }
+        for v in &self.new_tags {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -25617,6 +25638,10 @@ impl ::buffa::Message for AddressBookEntryUpdateSpec {
             for &v in &self.tag_ids {
                 ::buffa::types::encode_fixed64(v, buf);
             }
+        }
+        for v in &self.new_tags {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -25675,6 +25700,15 @@ impl ::buffa::Message for AddressBookEntryUpdateSpec {
                     );
                 }
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.new_tags.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -25686,6 +25720,7 @@ impl ::buffa::Message for AddressBookEntryUpdateSpec {
         self.label.clear();
         self.note.clear();
         self.tag_ids.clear();
+        self.new_tags.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -35122,6 +35157,8 @@ pub enum AuthErrorCode {
     AUTH_MFA_ELEVATION_REQUIRED = 38i32,
     /// At least one active MFA factor must remain enrolled.
     AUTH_MFA_LAST_FACTOR_REQUIRED = 39i32,
+    /// An unexpected internal failure prevented the auth mutation from completing.
+    AUTH_INTERNAL_ERROR = 40i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -35241,6 +35278,9 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_MFA_LAST_FACTOR_REQUIRED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthMfaLastFactorRequired: Self = Self::AUTH_MFA_LAST_FACTOR_REQUIRED;
+    ///Idiomatic alias for [`Self::AUTH_INTERNAL_ERROR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthInternalError: Self = Self::AUTH_INTERNAL_ERROR;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -35385,6 +35425,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             37i32 => ::core::option::Option::Some(Self::AUTH_REVISION_CONFLICT),
             38i32 => ::core::option::Option::Some(Self::AUTH_MFA_ELEVATION_REQUIRED),
             39i32 => ::core::option::Option::Some(Self::AUTH_MFA_LAST_FACTOR_REQUIRED),
+            40i32 => ::core::option::Option::Some(Self::AUTH_INTERNAL_ERROR),
             _ => ::core::option::Option::None,
         }
     }
@@ -35440,6 +35481,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_REVISION_CONFLICT => "AUTH_REVISION_CONFLICT",
             Self::AUTH_MFA_ELEVATION_REQUIRED => "AUTH_MFA_ELEVATION_REQUIRED",
             Self::AUTH_MFA_LAST_FACTOR_REQUIRED => "AUTH_MFA_LAST_FACTOR_REQUIRED",
+            Self::AUTH_INTERNAL_ERROR => "AUTH_INTERNAL_ERROR",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -35559,6 +35601,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_MFA_LAST_FACTOR_REQUIRED" => {
                 ::core::option::Option::Some(Self::AUTH_MFA_LAST_FACTOR_REQUIRED)
             }
+            "AUTH_INTERNAL_ERROR" => {
+                ::core::option::Option::Some(Self::AUTH_INTERNAL_ERROR)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -35603,6 +35648,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_REVISION_CONFLICT,
             Self::AUTH_MFA_ELEVATION_REQUIRED,
             Self::AUTH_MFA_LAST_FACTOR_REQUIRED,
+            Self::AUTH_INTERNAL_ERROR,
         ]
     }
 }
@@ -83328,6 +83374,15 @@ pub mod __buffa {
             ///
             /// Field 3: `tag_ids`
             pub tag_ids: ::buffa::RepeatedView<'a, u64>,
+            /// New tags to create and attach in the same protected update. When tag_ids
+            /// is also selected, the resulting set is tag_ids plus these tags. Otherwise,
+            /// currently attached tags are preserved and these tags are appended.
+            ///
+            /// Field 4: `new_tags`
+            pub new_tags: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::AddressBookTagInputView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AddressBookEntryUpdateSpecView<'a> {
@@ -83398,6 +83453,21 @@ pub mod __buffa {
                             );
                         }
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.new_tags
+                            .push(
+                                <super::super::__buffa::view::AddressBookTagInputView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -83430,6 +83500,11 @@ pub mod __buffa {
                     label: self.label.to_string(),
                     note: self.note.to_string(),
                     tag_ids: self.tag_ids.to_vec(),
+                    new_tags: self
+                        .new_tags
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -83440,7 +83515,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for AddressBookEntryUpdateSpecView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -83458,13 +83533,21 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
                             + payload;
                 }
+                for v in &self.new_tags {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -83482,6 +83565,14 @@ pub mod __buffa {
                     for &v in &self.tag_ids {
                         ::buffa::types::encode_fixed64(v, buf);
                     }
+                }
+                for v in &self.new_tags {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -83516,6 +83607,9 @@ pub mod __buffa {
                             "tagIds",
                             &::buffa::json_helpers::RepeatedJson(&self.tag_ids),
                         )?;
+                }
+                if !self.new_tags.is_empty() {
+                    __map.serialize_entry("newTags", &*self.new_tags)?;
                 }
                 __map.end()
             }
@@ -83637,6 +83731,20 @@ pub mod __buffa {
             #[must_use]
             pub fn tag_ids(&self) -> &::buffa::RepeatedView<'_, u64> {
                 &self.0.reborrow().tag_ids
+            }
+            /// New tags to create and attach in the same protected update. When tag_ids
+            /// is also selected, the resulting set is tag_ids plus these tags. Otherwise,
+            /// currently attached tags are preserved and these tags are appended.
+            ///
+            /// Field 4: `new_tags`
+            #[must_use]
+            pub fn new_tags(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::AddressBookTagInputView<'_>,
+            > {
+                &self.0.reborrow().new_tags
             }
         }
         impl ::core::convert::From<

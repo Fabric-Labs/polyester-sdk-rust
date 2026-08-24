@@ -7,6 +7,8 @@ pub struct AddressBookEntry {
     pub address_book_entry_id: String,
     pub label: String,
     pub kind: String,
+    /// Tags currently attached to this entry.
+    pub tags: Vec<AddressBookTag>,
     /// Monotonic resource revision for conditional updates.
     pub revision: u64,
 }

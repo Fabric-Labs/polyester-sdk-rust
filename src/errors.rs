@@ -76,6 +76,7 @@ pub mod auth_codes {
     pub const STEP_UP_REQUIRED: &str = "AUTH_STEP_UP_REQUIRED";
     pub const MFA_ELEVATION_REQUIRED: &str = "AUTH_MFA_ELEVATION_REQUIRED";
     pub const MFA_LAST_FACTOR_REQUIRED: &str = "AUTH_MFA_LAST_FACTOR_REQUIRED";
+    pub const INTERNAL_ERROR: &str = "AUTH_INTERNAL_ERROR";
 }
 
 impl Error {
@@ -492,6 +493,19 @@ mod tests {
         assert!(contract.mutation_outcome_unknown());
 
         assert!(!Error::validation("bad price").is_retryable());
+    }
+
+    #[test]
+    fn map_connect_error_surfaces_auth_internal_error() {
+        let mapped = map_auth(AuthErrorCode::AUTH_INTERNAL_ERROR, "auth backend failed");
+        assert_eq!(mapped.auth_error_code(), Some(auth_codes::INTERNAL_ERROR));
+        match mapped {
+            Error::Api { message, code, .. } => {
+                assert_eq!(code, "AUTH_INTERNAL_ERROR");
+                assert_eq!(message, "auth backend failed");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 
     #[test]

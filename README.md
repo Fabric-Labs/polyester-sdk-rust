@@ -27,7 +27,7 @@ on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Conne
 | Profile (identity subscribe) | Yes |
 | API keys (list/get/subscribe/local keypair generation) | Yes |
 | Subaccounts (list/get/members/invites/activity/subscribe) | Yes |
-| Address book (list/view/subscribe) | Yes |
+| Address book (list/view/create/update/subscribe) | Yes |
 | Policies (realtime subscribe) | Yes |
 | Guard signer | Yes |
 | VIP tiers + status | Yes |
@@ -57,6 +57,13 @@ browser client for wallet login and session MFA).
 Full cross-language comparison:
 [SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
 <!-- sdk-capabilities:end -->
+
+`client.address_book` now wraps create/update/delete/copy for entries and tags.
+Create and update accept atomic `new_tags`: new tags are created and attached in
+the same protected request. When `tag_ids` is also selected on update, the
+result is those ids plus the new tags; otherwise currently attached tags are
+preserved and `new_tags` are appended. Twitter social-verification `start`
+forwards the handle as-is, including an optional leading `@`.
 
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
 still applies. In particular, whiteboard/social-verification and some

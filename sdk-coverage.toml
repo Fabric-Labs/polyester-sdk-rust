@@ -65,31 +65,3 @@ reason = "Subaccount mutations and invite/member writes are JWT/session-only."
 [[allowlist]]
 procedure = "/auth.v1.SubaccountService/RespondSubaccountInvite"
 reason = "Subaccount mutations and invite/member writes are JWT/session-only."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/CreateAddressBookEntry"
-reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/UpdateAddressBookEntry"
-reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/DeleteAddressBookEntry"
-reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/CopyAddressBookEntry"
-reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/CreateAddressBookTag"
-reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/UpdateAddressBookTag"
-reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."
-
-[[allowlist]]
-procedure = "/auth.v1.AddressBookService/DeleteAddressBookTag"
-reason = "Address-book entry/tag mutations are JWT/session-only; list/view/subscribe remain."

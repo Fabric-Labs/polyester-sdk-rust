@@ -29,6 +29,7 @@ fn entry_from_proto(msg: &ProtoAddressBookEntry) -> AddressBookEntry {
         address_book_entry_id: format_uint64_id(msg.address_book_entry_id),
         label: msg.label.clone(),
         kind: enum_proto_name(&msg.kind),
+        tags: msg.tags.iter().map(tag_from_proto).collect(),
         revision: msg.revision,
     }
 }
@@ -173,7 +174,46 @@ mod tests {
         assert_eq!(result.entries[0].label, "vault");
         assert!(!result.entries[0].kind.is_empty());
         assert_eq!(result.entries[0].revision, 5);
+        assert!(result.entries[0].tags.is_empty());
         assert_eq!(result.next_page_token, "t");
+    }
+
+    fn proto_entry_with_tag() -> ProtoAddressBookEntry {
+        ProtoAddressBookEntry {
+            address_book_entry_id: 9,
+            label: "tagged".into(),
+            kind: AddressBookEntryKind::EXTERNAL_CHAIN.into(),
+            revision: 3,
+            tags: vec![ProtoAddressBookTag {
+                tag_id: 11,
+                name: "hot".into(),
+                color: "#ff00aa".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn create_and_update_responses_include_tags() {
+        let create = CreateAddressBookEntryResponse {
+            entry: proto_entry_with_tag().into(),
+            ..Default::default()
+        };
+        let created = entry_from_create_proto(&create).expect("create entry");
+        assert_eq!(created.address_book_entry_id, format_uint64_id(9));
+        assert_eq!(created.tags.len(), 1);
+        assert_eq!(created.tags[0].tag_id, format_uint64_id(11));
+        assert_eq!(created.tags[0].name, "hot");
+        assert_eq!(created.tags[0].color, "#ff00aa");
+
+        let update = UpdateAddressBookEntryResponse {
+            entry: proto_entry_with_tag().into(),
+            ..Default::default()
+        };
+        let updated = entry_from_update_proto(&update).expect("update entry");
+        assert_eq!(updated.tags.len(), 1);
+        assert_eq!(updated.tags[0].name, "hot");
     }
 
     #[test]
