@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a39
+
+Package version: `0.1.0-alpha.39`. Git tag: `v0.1.0a39`.
+
 ### Added
 - Address-book writes on `AddressBookService`: `create_entry`, `update_entry`,
   `delete_entry`, `copy_entry`, `create_tag`, `update_tag`, and `delete_tag`.
