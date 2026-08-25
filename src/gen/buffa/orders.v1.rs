@@ -834,6 +834,8 @@ pub enum ErrorCode {
     ERROR_CODE_POST_ONLY_LIMIT_ONLY = 32i32,
     /// Batch size exceeds the maximum allowed.
     ERROR_CODE_BATCH_TOO_LARGE = 33i32,
+    /// Sub-account policy maximum number of open orders has been reached.
+    ERROR_CODE_POLICY_MAX_OPEN_ORDERS = 34i32,
     /// Modify request in AMEND_ONLY mode requires replace semantics.
     ERROR_CODE_MODIFICATION_REQUIRES_REPLACE = 35i32,
     /// Idempotency key was reused with a different payload.
@@ -900,6 +902,12 @@ pub enum ErrorCode {
     ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL = 68i32,
     /// The account exhausted its current order-admission quota.
     ERROR_CODE_RATE_LIMIT_EXCEEDED = 69i32,
+    /// Caller has a sub-account role that does not allow reading spot data.
+    ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN = 70i32,
+    /// Sub-account policy does not allow reading spot data.
+    ERROR_CODE_POLICY_SPOT_READ_DENY = 71i32,
+    /// API key policy does not allow reading spot data.
+    ERROR_CODE_API_KEY_SPOT_READ_DENY = 72i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1004,6 +1012,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_BATCH_TOO_LARGE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const BatchTooLarge: Self = Self::ERROR_CODE_BATCH_TOO_LARGE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicyMaxOpenOrders: Self = Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS;
     ///Idiomatic alias for [`Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ModificationRequiresReplace: Self = Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE;
@@ -1100,6 +1111,15 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_RATE_LIMIT_EXCEEDED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const RateLimitExceeded: Self = Self::ERROR_CODE_RATE_LIMIT_EXCEEDED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SubaccountReadForbidden: Self = Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN;
+    ///Idiomatic alias for [`Self::ERROR_CODE_POLICY_SPOT_READ_DENY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicySpotReadDeny: Self = Self::ERROR_CODE_POLICY_SPOT_READ_DENY;
+    ///Idiomatic alias for [`Self::ERROR_CODE_API_KEY_SPOT_READ_DENY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ApiKeySpotReadDeny: Self = Self::ERROR_CODE_API_KEY_SPOT_READ_DENY;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -1245,6 +1265,9 @@ impl ::buffa::Enumeration for ErrorCode {
             31i32 => ::core::option::Option::Some(Self::ERROR_CODE_MIN_QTY),
             32i32 => ::core::option::Option::Some(Self::ERROR_CODE_POST_ONLY_LIMIT_ONLY),
             33i32 => ::core::option::Option::Some(Self::ERROR_CODE_BATCH_TOO_LARGE),
+            34i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS)
+            }
             35i32 => {
                 ::core::option::Option::Some(
                     Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE,
@@ -1309,6 +1332,13 @@ impl ::buffa::Enumeration for ErrorCode {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL)
             }
             69i32 => ::core::option::Option::Some(Self::ERROR_CODE_RATE_LIMIT_EXCEEDED),
+            70i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN)
+            }
+            71i32 => ::core::option::Option::Some(Self::ERROR_CODE_POLICY_SPOT_READ_DENY),
+            72i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_SPOT_READ_DENY)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1363,6 +1393,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_MIN_QTY => "ERROR_CODE_MIN_QTY",
             Self::ERROR_CODE_POST_ONLY_LIMIT_ONLY => "ERROR_CODE_POST_ONLY_LIMIT_ONLY",
             Self::ERROR_CODE_BATCH_TOO_LARGE => "ERROR_CODE_BATCH_TOO_LARGE",
+            Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS => {
+                "ERROR_CODE_POLICY_MAX_OPEN_ORDERS"
+            }
             Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE => {
                 "ERROR_CODE_MODIFICATION_REQUIRES_REPLACE"
             }
@@ -1419,6 +1452,13 @@ impl ::buffa::Enumeration for ErrorCode {
                 "ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL"
             }
             Self::ERROR_CODE_RATE_LIMIT_EXCEEDED => "ERROR_CODE_RATE_LIMIT_EXCEEDED",
+            Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN => {
+                "ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN"
+            }
+            Self::ERROR_CODE_POLICY_SPOT_READ_DENY => "ERROR_CODE_POLICY_SPOT_READ_DENY",
+            Self::ERROR_CODE_API_KEY_SPOT_READ_DENY => {
+                "ERROR_CODE_API_KEY_SPOT_READ_DENY"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1529,6 +1569,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_BATCH_TOO_LARGE" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_BATCH_TOO_LARGE)
             }
+            "ERROR_CODE_POLICY_MAX_OPEN_ORDERS" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS)
+            }
             "ERROR_CODE_MODIFICATION_REQUIRES_REPLACE" => {
                 ::core::option::Option::Some(
                     Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE,
@@ -1633,6 +1676,15 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_RATE_LIMIT_EXCEEDED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_RATE_LIMIT_EXCEEDED)
             }
+            "ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN)
+            }
+            "ERROR_CODE_POLICY_SPOT_READ_DENY" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_POLICY_SPOT_READ_DENY)
+            }
+            "ERROR_CODE_API_KEY_SPOT_READ_DENY" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_SPOT_READ_DENY)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1672,6 +1724,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_MIN_QTY,
             Self::ERROR_CODE_POST_ONLY_LIMIT_ONLY,
             Self::ERROR_CODE_BATCH_TOO_LARGE,
+            Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS,
             Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE,
             Self::ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE,
             Self::ERROR_CODE_MARKET_PRICE_UNAVAILABLE,
@@ -1704,6 +1757,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_OVERLOADED,
             Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL,
             Self::ERROR_CODE_RATE_LIMIT_EXCEEDED,
+            Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN,
+            Self::ERROR_CODE_POLICY_SPOT_READ_DENY,
+            Self::ERROR_CODE_API_KEY_SPOT_READ_DENY,
         ]
     }
 }
@@ -10120,6 +10176,17 @@ pub struct ModifyOrderRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub new_client_order_id: ::buffa::alloc::string::String,
+    /// Trading symbol numeric identifier. Required so API-key market policy can
+    /// be enforced before forwarding; AAS verifies it against the target order.
+    ///
+    /// Field 10: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
     #[serde(flatten)]
     pub key: ::core::option::Option<__buffa::oneof::modify_order_request::Key>,
     #[serde(skip)]
@@ -10136,6 +10203,7 @@ impl ::core::fmt::Debug for ModifyOrderRequest {
             .field("new_attached_risk", &self.new_attached_risk)
             .field("behavior", &self.behavior)
             .field("new_client_order_id", &self.new_client_order_id)
+            .field("symbol_id", &self.symbol_id)
             .field("key", &self.key)
             .finish()
     }
@@ -10230,6 +10298,9 @@ impl ::buffa::Message for ModifyOrderRequest {
                     + ::buffa::types::string_encoded_len(&self.new_client_order_id)
                         as u32;
         }
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -10274,6 +10345,9 @@ impl ::buffa::Message for ModifyOrderRequest {
         }
         if !self.new_client_order_id.is_empty() {
             ::buffa::types::put_string_field(9u32, &self.new_client_order_id, buf);
+        }
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(10u32, self.symbol_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -10371,6 +10445,13 @@ impl ::buffa::Message for ModifyOrderRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.new_client_order_id, buf)?;
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -10387,6 +10468,7 @@ impl ::buffa::Message for ModifyOrderRequest {
         self.new_attached_risk = ::buffa::MessageField::none();
         self.behavior = ::buffa::EnumValue::from(0);
         self.new_client_order_id.clear();
+        self.symbol_id = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -10435,6 +10517,7 @@ impl<'de> serde::Deserialize<'de> for ModifyOrderRequest {
                 let mut __f_new_client_order_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
+                let mut __f_symbol_id: ::core::option::Option<u32> = None;
                 let mut __oneof_key: ::core::option::Option<
                     __buffa::oneof::modify_order_request::Key,
                 > = None;
@@ -10553,6 +10636,21 @@ impl<'de> serde::Deserialize<'de> for ModifyOrderRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
+                        "symbolId" | "symbol_id" => {
+                            __f_symbol_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u32;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u32, D::Error> {
+                                        ::buffa::json_helpers::uint32::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
                         "orderId" | "order_id" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
@@ -10631,6 +10729,9 @@ impl<'de> serde::Deserialize<'de> for ModifyOrderRequest {
                 }
                 if let ::core::option::Option::Some(v) = __f_new_client_order_id {
                     __r.new_client_order_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_symbol_id {
+                    __r.symbol_id = v;
                 }
                 __r.key = __oneof_key;
                 Ok(__r)
@@ -31992,6 +32093,11 @@ pub mod __buffa {
             ///
             /// Field 9: `new_client_order_id`
             pub new_client_order_id: &'a str,
+            /// Trading symbol numeric identifier. Required so API-key market policy can
+            /// be enforced before forwarding; AAS verifies it against the target order.
+            ///
+            /// Field 10: `symbol_id`
+            pub symbol_id: u32,
             pub key: ::core::option::Option<
                 super::super::__buffa::view::oneof::modify_order_request::Key<'a>,
             >,
@@ -32103,6 +32209,13 @@ pub mod __buffa {
                         )?;
                         view.new_client_order_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -32168,6 +32281,7 @@ pub mod __buffa {
                     },
                     behavior: self.behavior,
                     new_client_order_id: self.new_client_order_id.to_string(),
+                    symbol_id: self.symbol_id,
                     key: self
                         .key
                         .as_ref()
@@ -32251,6 +32365,11 @@ pub mod __buffa {
                                 &self.new_client_order_id,
                             ) as u32;
                 }
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -32308,6 +32427,9 @@ pub mod __buffa {
                         &self.new_client_order_id,
                         buf,
                     );
+                }
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(10u32, self.symbol_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -32371,6 +32493,13 @@ pub mod __buffa {
                     self.new_client_order_id,
                 ) {
                     __map.serialize_entry("newClientOrderId", self.new_client_order_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.key {
                     match __ov {
@@ -32541,6 +32670,14 @@ pub mod __buffa {
             #[must_use]
             pub fn new_client_order_id(&self) -> &'_ str {
                 self.0.reborrow().new_client_order_id
+            }
+            /// Trading symbol numeric identifier. Required so API-key market policy can
+            /// be enforced before forwarding; AAS verifies it against the target order.
+            ///
+            /// Field 10: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
             }
             /// Oneof `key`.
             #[must_use]

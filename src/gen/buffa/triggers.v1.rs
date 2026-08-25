@@ -388,6 +388,8 @@ pub enum TriggerEventType {
     EVENT_CANCELED = 2i32,
     /// Trigger configuration or lifecycle state was updated.
     EVENT_UPDATED = 3i32,
+    /// Trigger became terminal after its next child order could not be admitted.
+    EVENT_FAILED = 4i32,
 }
 impl TriggerEventType {
     ///Idiomatic alias for [`Self::EVENT_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -402,6 +404,9 @@ impl TriggerEventType {
     ///Idiomatic alias for [`Self::EVENT_UPDATED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const EventUpdated: Self = Self::EVENT_UPDATED;
+    ///Idiomatic alias for [`Self::EVENT_FAILED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const EventFailed: Self = Self::EVENT_FAILED;
 }
 impl ::core::default::Default for TriggerEventType {
     fn default() -> Self {
@@ -503,6 +508,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             1i32 => ::core::option::Option::Some(Self::EVENT_FIRED),
             2i32 => ::core::option::Option::Some(Self::EVENT_CANCELED),
             3i32 => ::core::option::Option::Some(Self::EVENT_UPDATED),
+            4i32 => ::core::option::Option::Some(Self::EVENT_FAILED),
             _ => ::core::option::Option::None,
         }
     }
@@ -515,6 +521,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             Self::EVENT_FIRED => "EVENT_FIRED",
             Self::EVENT_CANCELED => "EVENT_CANCELED",
             Self::EVENT_UPDATED => "EVENT_UPDATED",
+            Self::EVENT_FAILED => "EVENT_FAILED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -523,6 +530,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             "EVENT_FIRED" => ::core::option::Option::Some(Self::EVENT_FIRED),
             "EVENT_CANCELED" => ::core::option::Option::Some(Self::EVENT_CANCELED),
             "EVENT_UPDATED" => ::core::option::Option::Some(Self::EVENT_UPDATED),
+            "EVENT_FAILED" => ::core::option::Option::Some(Self::EVENT_FAILED),
             _ => ::core::option::Option::None,
         }
     }
@@ -532,6 +540,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             Self::EVENT_FIRED,
             Self::EVENT_CANCELED,
             Self::EVENT_UPDATED,
+            Self::EVENT_FAILED,
         ]
     }
 }
@@ -5473,7 +5482,7 @@ pub struct TriggerEvent {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub fire_price_ticks: ::core::option::Option<i64>,
-    /// Optional cancel reason.
+    /// Cancel or failure reason.
     ///
     /// Field 20: `reason`
     #[serde(
@@ -6335,6 +6344,17 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
+    /// Trading symbol numeric identifier. Required for API-key market policy;
+    /// AAS verifies it against the stored trigger.
+    ///
+    /// Field 3: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
     /// Patch fields for safe price, trailing-distance, and slippage edits.
     /// For stop/take-profit:
     /// Updated trigger price in quote units scaled by 1e6.
@@ -6384,6 +6404,7 @@ impl ::core::fmt::Debug for ModifyTriggerRequest {
         f.debug_struct("ModifyTriggerRequest")
             .field("trigger_id", &self.trigger_id)
             .field("subaccount_id", &self.subaccount_id)
+            .field("symbol_id", &self.symbol_id)
             .field("trigger_price_ticks", &self.trigger_price_ticks)
             .field("limit_price_ticks", &self.limit_price_ticks)
             .field("activation_price_ticks", &self.activation_price_ticks)
@@ -6453,6 +6474,9 @@ impl ::buffa::Message for ModifyTriggerRequest {
         if self.subaccount_id.is_some() {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
         if let Some(v) = self.trigger_price_ticks {
             size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
@@ -6505,6 +6529,9 @@ impl ::buffa::Message for ModifyTriggerRequest {
         }
         if let Some(v) = self.subaccount_id {
             ::buffa::types::put_fixed64_field(2u32, v, buf);
+        }
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.symbol_id, buf);
         }
         if let Some(v) = self.trigger_price_ticks {
             ::buffa::types::put_int64_field(10u32, v, buf);
@@ -6571,6 +6598,13 @@ impl ::buffa::Message for ModifyTriggerRequest {
                 self.subaccount_id = ::core::option::Option::Some(
                     ::buffa::types::decode_fixed64(buf)?,
                 );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
             }
             10u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -6653,6 +6687,7 @@ impl ::buffa::Message for ModifyTriggerRequest {
     fn clear(&mut self) {
         self.trigger_id = 0u64;
         self.subaccount_id = ::core::option::Option::None;
+        self.symbol_id = 0u32;
         self.trigger_price_ticks = ::core::option::Option::None;
         self.limit_price_ticks = ::core::option::Option::None;
         self.trailing_distance = ::core::option::Option::None;
@@ -6689,6 +6724,7 @@ impl<'de> serde::Deserialize<'de> for ModifyTriggerRequest {
                 let mut __f_subaccount_id: ::core::option::Option<
                     ::core::option::Option<u64>,
                 > = None;
+                let mut __f_symbol_id: ::core::option::Option<u32> = None;
                 let mut __f_trigger_price_ticks: ::core::option::Option<
                     ::core::option::Option<i64>,
                 > = None;
@@ -6734,6 +6770,21 @@ impl<'de> serde::Deserialize<'de> for ModifyTriggerRequest {
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::opt_uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "symbolId" | "symbol_id" => {
+                            __f_symbol_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u32;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u32, D::Error> {
+                                        ::buffa::json_helpers::uint32::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -6924,6 +6975,9 @@ impl<'de> serde::Deserialize<'de> for ModifyTriggerRequest {
                 }
                 if let ::core::option::Option::Some(v) = __f_subaccount_id {
                     __r.subaccount_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_symbol_id {
+                    __r.symbol_id = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_trigger_price_ticks {
                     __r.trigger_price_ticks = v;
@@ -7599,6 +7653,17 @@ pub struct ResumeTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
+    /// Trading symbol numeric identifier. Required for API-key market policy;
+    /// AAS verifies it against the stored trigger.
+    ///
+    /// Field 3: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7608,6 +7673,7 @@ impl ::core::fmt::Debug for ResumeTriggerRequest {
         f.debug_struct("ResumeTriggerRequest")
             .field("trigger_id", &self.trigger_id)
             .field("subaccount_id", &self.subaccount_id)
+            .field("symbol_id", &self.symbol_id)
             .finish()
     }
 }
@@ -7651,6 +7717,9 @@ impl ::buffa::Message for ResumeTriggerRequest {
         if self.subaccount_id.is_some() {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7666,6 +7735,9 @@ impl ::buffa::Message for ResumeTriggerRequest {
         }
         if let Some(v) = self.subaccount_id {
             ::buffa::types::put_fixed64_field(2u32, v, buf);
+        }
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.symbol_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7696,6 +7768,13 @@ impl ::buffa::Message for ResumeTriggerRequest {
                     ::buffa::types::decode_fixed64(buf)?,
                 );
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7706,6 +7785,7 @@ impl ::buffa::Message for ResumeTriggerRequest {
     fn clear(&mut self) {
         self.trigger_id = 0u64;
         self.subaccount_id = ::core::option::Option::None;
+        self.symbol_id = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -17906,7 +17986,7 @@ pub mod __buffa {
             ///
             /// Field 13: `fire_price_ticks`
             pub fire_price_ticks: ::core::option::Option<i64>,
-            /// Optional cancel reason.
+            /// Cancel or failure reason.
             ///
             /// Field 20: `reason`
             pub reason: &'a str,
@@ -18404,7 +18484,7 @@ pub mod __buffa {
             pub fn fire_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().fire_price_ticks
             }
-            /// Optional cancel reason.
+            /// Cancel or failure reason.
             ///
             /// Field 20: `reason`
             #[must_use]
@@ -19520,6 +19600,11 @@ pub mod __buffa {
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
+            /// Trading symbol numeric identifier. Required for API-key market policy;
+            /// AAS verifies it against the stored trigger.
+            ///
+            /// Field 3: `symbol_id`
+            pub symbol_id: u32,
             /// Patch fields for safe price, trailing-distance, and slippage edits.
             /// For stop/take-profit:
             /// Updated trigger price in quote units scaled by 1e6.
@@ -19588,6 +19673,13 @@ pub mod __buffa {
                         view.subaccount_id = Some(
                             ::buffa::types::decode_fixed64(&mut cur)?,
                         );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     10u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -19691,6 +19783,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::ModifyTriggerRequest {
                     trigger_id: self.trigger_id,
                     subaccount_id: self.subaccount_id,
+                    symbol_id: self.symbol_id,
                     trigger_price_ticks: self.trigger_price_ticks,
                     limit_price_ticks: self.limit_price_ticks,
                     activation_price_ticks: self.activation_price_ticks,
@@ -19752,6 +19845,11 @@ pub mod __buffa {
                 if self.subaccount_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
                 if let Some(v) = self.trigger_price_ticks {
                     size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
@@ -19805,6 +19903,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.subaccount_id {
                     ::buffa::types::put_fixed64_field(2u32, v, buf);
+                }
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.symbol_id, buf);
                 }
                 if let Some(v) = self.trigger_price_ticks {
                     ::buffa::types::put_int64_field(10u32, v, buf);
@@ -19876,6 +19977,13 @@ pub mod __buffa {
                         .serialize_entry(
                             "subaccountId",
                             &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
                         )?;
                 }
                 if let ::core::option::Option::Some(__v) = self.trigger_price_ticks {
@@ -20052,6 +20160,14 @@ pub mod __buffa {
             #[must_use]
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
+            }
+            /// Trading symbol numeric identifier. Required for API-key market policy;
+            /// AAS verifies it against the stored trigger.
+            ///
+            /// Field 3: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
             }
             /// Patch fields for safe price, trailing-distance, and slippage edits.
             /// For stop/take-profit:
@@ -21270,6 +21386,11 @@ pub mod __buffa {
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
+            /// Trading symbol numeric identifier. Required for API-key market policy;
+            /// AAS verifies it against the stored trigger.
+            ///
+            /// Field 3: `symbol_id`
+            pub symbol_id: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ResumeTriggerRequestView<'a> {
@@ -21319,6 +21440,13 @@ pub mod __buffa {
                             ::buffa::types::decode_fixed64(&mut cur)?,
                         );
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -21350,6 +21478,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::ResumeTriggerRequest {
                     trigger_id: self.trigger_id,
                     subaccount_id: self.subaccount_id,
+                    symbol_id: self.symbol_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -21370,6 +21499,11 @@ pub mod __buffa {
                 if self.subaccount_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -21386,6 +21520,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.subaccount_id {
                     ::buffa::types::put_fixed64_field(2u32, v, buf);
+                }
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.symbol_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -21420,6 +21557,13 @@ pub mod __buffa {
                         .serialize_entry(
                             "subaccountId",
                             &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
                         )?;
                 }
                 __map.end()
@@ -21531,6 +21675,14 @@ pub mod __buffa {
             #[must_use]
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
+            }
+            /// Trading symbol numeric identifier. Required for API-key market policy;
+            /// AAS verifies it against the stored trigger.
+            ///
+            /// Field 3: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ResumeTriggerRequestView<'static>>>
