@@ -228,7 +228,7 @@ pub struct ApiKey {
     )]
     pub subaccount_id: ::core::option::Option<u64>,
     /// Optional API policy attached to this key (opaque ID).
-    /// Empty means "no per-key policy", so only the sub-account policy (and roles) apply.
+    /// Empty means no policy is attached and the key has no permissions.
     ///
     /// Field 8: `policy_id`
     #[serde(
@@ -2503,32 +2503,30 @@ pub const __UPDATE_API_KEY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum PolicyAction {
-    /// No policy action selected. Requests must choose one or more explicit actions.
+    /// No policy action selected. An empty API-key action list grants no access;
+    /// sub-account policies retain their mandatory read-only actions.
     UNSPECIFIED = 0i32,
-    /// Allow placing/modifying/cancelling spot orders.
+    /// Allow placing and modifying spot orders and triggers, including reading
+    /// spot orders and trades. Cancellation and pausing remain available as
+    /// safety actions.
     TRADE_SPOT = 1i32,
-    /// Allow placing/modifying/cancelling perpetual futures orders.
-    TRADE_PERP = 2i32,
-    /// Allow internal transfers between sub-accounts or linked Polyester accounts.
+    /// Allow internal transfers between sub-accounts or linked Polyester accounts,
+    /// including reading internal transfer history.
     INTERNAL_TRANSFER = 3i32,
-    /// Allow external withdrawals to whitelisted addresses.
+    /// Allow value to leave Trading through external withdrawals. Destination
+    /// authorization is enforced separately from this policy.
     EXTERNAL_WITHDRAW = 4i32,
-    /// Allow reading balances, positions and equity for a sub-account or API key.
+    /// Allow reading balances and equity for a sub-account or API key.
     READ_BALANCES = 5i32,
-    /// Allow reading spot orders/trades/positions (no write).
+    /// Allow reading spot orders and trades (no write).
     READ_SPOT = 6i32,
-    /// Allow reading perp orders/trades/positions (no write).
-    READ_PERP = 7i32,
     /// Allow reading internal transfer history.
     READ_INTERNAL_TRANSFERS = 8i32,
-    /// Allow reading external withdrawal history.
-    READ_EXTERNAL_WITHDRAWALS = 9i32,
-    /// Allow listing destination books, address book entries, recents, and mirrored whitelist state.
-    READ_TRANSFER_CONTROLS = 11i32,
-    /// Allow creating, updating, deleting, and copying saved destination entries.
+    /// Allow reading saved, recent, and whitelisted address-book destinations.
+    READ_ADDRESS_BOOK = 11i32,
+    /// Allow creating, updating, deleting, and copying saved destination entries,
+    /// including reading the address book.
     MANAGE_ADDRESS_BOOK = 12i32,
-    /// Allow mutating internal-transfer whitelist rows and requesting withdraw whitelist changes.
-    MANAGE_TRANSFER_WHITELISTS = 13i32,
 }
 impl PolicyAction {
     ///Idiomatic alias for [`Self::UNSPECIFIED`]; `Debug` prints the variant name.
@@ -2537,9 +2535,6 @@ impl PolicyAction {
     ///Idiomatic alias for [`Self::TRADE_SPOT`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TradeSpot: Self = Self::TRADE_SPOT;
-    ///Idiomatic alias for [`Self::TRADE_PERP`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const TradePerp: Self = Self::TRADE_PERP;
     ///Idiomatic alias for [`Self::INTERNAL_TRANSFER`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const InternalTransfer: Self = Self::INTERNAL_TRANSFER;
@@ -2552,24 +2547,15 @@ impl PolicyAction {
     ///Idiomatic alias for [`Self::READ_SPOT`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ReadSpot: Self = Self::READ_SPOT;
-    ///Idiomatic alias for [`Self::READ_PERP`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const ReadPerp: Self = Self::READ_PERP;
     ///Idiomatic alias for [`Self::READ_INTERNAL_TRANSFERS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ReadInternalTransfers: Self = Self::READ_INTERNAL_TRANSFERS;
-    ///Idiomatic alias for [`Self::READ_EXTERNAL_WITHDRAWALS`]; `Debug` prints the variant name.
+    ///Idiomatic alias for [`Self::READ_ADDRESS_BOOK`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const ReadExternalWithdrawals: Self = Self::READ_EXTERNAL_WITHDRAWALS;
-    ///Idiomatic alias for [`Self::READ_TRANSFER_CONTROLS`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const ReadTransferControls: Self = Self::READ_TRANSFER_CONTROLS;
+    pub const ReadAddressBook: Self = Self::READ_ADDRESS_BOOK;
     ///Idiomatic alias for [`Self::MANAGE_ADDRESS_BOOK`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ManageAddressBook: Self = Self::MANAGE_ADDRESS_BOOK;
-    ///Idiomatic alias for [`Self::MANAGE_TRANSFER_WHITELISTS`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const ManageTransferWhitelists: Self = Self::MANAGE_TRANSFER_WHITELISTS;
 }
 impl ::core::default::Default for PolicyAction {
     fn default() -> Self {
@@ -2667,17 +2653,13 @@ impl ::buffa::Enumeration for PolicyAction {
         match value {
             0i32 => ::core::option::Option::Some(Self::UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::TRADE_SPOT),
-            2i32 => ::core::option::Option::Some(Self::TRADE_PERP),
             3i32 => ::core::option::Option::Some(Self::INTERNAL_TRANSFER),
             4i32 => ::core::option::Option::Some(Self::EXTERNAL_WITHDRAW),
             5i32 => ::core::option::Option::Some(Self::READ_BALANCES),
             6i32 => ::core::option::Option::Some(Self::READ_SPOT),
-            7i32 => ::core::option::Option::Some(Self::READ_PERP),
             8i32 => ::core::option::Option::Some(Self::READ_INTERNAL_TRANSFERS),
-            9i32 => ::core::option::Option::Some(Self::READ_EXTERNAL_WITHDRAWALS),
-            11i32 => ::core::option::Option::Some(Self::READ_TRANSFER_CONTROLS),
+            11i32 => ::core::option::Option::Some(Self::READ_ADDRESS_BOOK),
             12i32 => ::core::option::Option::Some(Self::MANAGE_ADDRESS_BOOK),
-            13i32 => ::core::option::Option::Some(Self::MANAGE_TRANSFER_WHITELISTS),
             _ => ::core::option::Option::None,
         }
     }
@@ -2688,43 +2670,29 @@ impl ::buffa::Enumeration for PolicyAction {
         match self {
             Self::UNSPECIFIED => "UNSPECIFIED",
             Self::TRADE_SPOT => "TRADE_SPOT",
-            Self::TRADE_PERP => "TRADE_PERP",
             Self::INTERNAL_TRANSFER => "INTERNAL_TRANSFER",
             Self::EXTERNAL_WITHDRAW => "EXTERNAL_WITHDRAW",
             Self::READ_BALANCES => "READ_BALANCES",
             Self::READ_SPOT => "READ_SPOT",
-            Self::READ_PERP => "READ_PERP",
             Self::READ_INTERNAL_TRANSFERS => "READ_INTERNAL_TRANSFERS",
-            Self::READ_EXTERNAL_WITHDRAWALS => "READ_EXTERNAL_WITHDRAWALS",
-            Self::READ_TRANSFER_CONTROLS => "READ_TRANSFER_CONTROLS",
+            Self::READ_ADDRESS_BOOK => "READ_ADDRESS_BOOK",
             Self::MANAGE_ADDRESS_BOOK => "MANAGE_ADDRESS_BOOK",
-            Self::MANAGE_TRANSFER_WHITELISTS => "MANAGE_TRANSFER_WHITELISTS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
         match name {
             "UNSPECIFIED" => ::core::option::Option::Some(Self::UNSPECIFIED),
             "TRADE_SPOT" => ::core::option::Option::Some(Self::TRADE_SPOT),
-            "TRADE_PERP" => ::core::option::Option::Some(Self::TRADE_PERP),
             "INTERNAL_TRANSFER" => ::core::option::Option::Some(Self::INTERNAL_TRANSFER),
             "EXTERNAL_WITHDRAW" => ::core::option::Option::Some(Self::EXTERNAL_WITHDRAW),
             "READ_BALANCES" => ::core::option::Option::Some(Self::READ_BALANCES),
             "READ_SPOT" => ::core::option::Option::Some(Self::READ_SPOT),
-            "READ_PERP" => ::core::option::Option::Some(Self::READ_PERP),
             "READ_INTERNAL_TRANSFERS" => {
                 ::core::option::Option::Some(Self::READ_INTERNAL_TRANSFERS)
             }
-            "READ_EXTERNAL_WITHDRAWALS" => {
-                ::core::option::Option::Some(Self::READ_EXTERNAL_WITHDRAWALS)
-            }
-            "READ_TRANSFER_CONTROLS" => {
-                ::core::option::Option::Some(Self::READ_TRANSFER_CONTROLS)
-            }
+            "READ_ADDRESS_BOOK" => ::core::option::Option::Some(Self::READ_ADDRESS_BOOK),
             "MANAGE_ADDRESS_BOOK" => {
                 ::core::option::Option::Some(Self::MANAGE_ADDRESS_BOOK)
-            }
-            "MANAGE_TRANSFER_WHITELISTS" => {
-                ::core::option::Option::Some(Self::MANAGE_TRANSFER_WHITELISTS)
             }
             _ => ::core::option::Option::None,
         }
@@ -2733,21 +2701,17 @@ impl ::buffa::Enumeration for PolicyAction {
         &[
             Self::UNSPECIFIED,
             Self::TRADE_SPOT,
-            Self::TRADE_PERP,
             Self::INTERNAL_TRANSFER,
             Self::EXTERNAL_WITHDRAW,
             Self::READ_BALANCES,
             Self::READ_SPOT,
-            Self::READ_PERP,
             Self::READ_INTERNAL_TRANSFERS,
-            Self::READ_EXTERNAL_WITHDRAWALS,
-            Self::READ_TRANSFER_CONTROLS,
+            Self::READ_ADDRESS_BOOK,
             Self::MANAGE_ADDRESS_BOOK,
-            Self::MANAGE_TRANSFER_WHITELISTS,
         ]
     }
 }
-/// MarketScope describes how a policy applies to spot markets or perp contracts.
+/// MarketScope describes how a policy applies to spot markets.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -2854,15 +2818,15 @@ pub mod market_scope {
     use super::*;
     /// Value is the market-level scope:
     /// - ALL: no market-level restriction; new listings are automatically allowed.
-    /// - ALLOWLIST: only the listed markets or contracts are allowed.
+    /// - ALLOWLIST: only the listed markets are allowed.
     #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
     #[repr(i32)]
     pub enum Value {
         /// No scope selected. Create and update requests treat this as ALL.
         UNSPECIFIED = 0i32,
-        /// Allow all current and future markets or contracts for this policy.
+        /// Allow all current and future markets for this policy.
         ALL = 1i32,
-        /// Allow only the markets or contracts listed on this policy.
+        /// Allow only the markets listed on this policy.
         ALLOWLIST = 2i32,
     }
     impl Value {
@@ -2999,27 +2963,154 @@ pub mod market_scope {
         }
     }
 }
-/// SpotMarketRule describes an allowed spot market for a sub-account policy.
+/// SpotMarketSelector identifies an allowed spot market in policy mutations.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SpotMarketSelector {
+    /// Stable numeric pair ID from GetSpotConfig.
+    ///
+    /// Field 1: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SpotMarketSelector {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SpotMarketSelector").field("symbol_id", &self.symbol_id).finish()
+    }
+}
+impl SpotMarketSelector {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SpotMarketSelector";
+}
+::buffa::impl_default_instance!(SpotMarketSelector);
+impl ::buffa::MessageName for SpotMarketSelector {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "SpotMarketSelector";
+    const FULL_NAME: &'static str = "auth.v1.SpotMarketSelector";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SpotMarketSelector";
+}
+impl ::buffa::Message for SpotMarketSelector {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.symbol_id = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SpotMarketSelector {
+    const PROTO_FQN: &'static str = "auth.v1.SpotMarketSelector";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SpotMarketSelector {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SPOT_MARKET_SELECTOR_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.SpotMarketSelector",
+    to_json: ::buffa::type_registry::any_to_json::<SpotMarketSelector>,
+    from_json: ::buffa::type_registry::any_from_json::<SpotMarketSelector>,
+    is_wkt: false,
+};
+/// SpotMarketRule describes an allowed spot market in policy views.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct SpotMarketRule {
-    /// Spot market symbol, e.g. "BTC-USDT".
+    /// Stable numeric pair ID.
     ///
-    /// Field 1: `symbol`
+    /// Field 1: `symbol_id`
     #[serde(
-        rename = "symbol",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
-    pub symbol: ::buffa::alloc::string::String,
+    pub symbol_id: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for SpotMarketRule {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("SpotMarketRule").field("symbol", &self.symbol).finish()
+        f.debug_struct("SpotMarketRule").field("symbol_id", &self.symbol_id).finish()
     }
 }
 impl SpotMarketRule {
@@ -3047,8 +3138,8 @@ impl ::buffa::Message for SpotMarketRule {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.symbol.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -3060,8 +3151,8 @@ impl ::buffa::Message for SpotMarketRule {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.symbol.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.symbol, buf);
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3079,9 +3170,9 @@ impl ::buffa::Message for SpotMarketRule {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.symbol, buf)?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -3091,7 +3182,7 @@ impl ::buffa::Message for SpotMarketRule {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.symbol.clear();
+        self.symbol_id = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3122,161 +3213,6 @@ pub const __SPOT_MARKET_RULE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     type_url: "type.googleapis.com/auth.v1.SpotMarketRule",
     to_json: ::buffa::type_registry::any_to_json::<SpotMarketRule>,
     from_json: ::buffa::type_registry::any_from_json::<SpotMarketRule>,
-    is_wkt: false,
-};
-/// PerpMarketRule describes an allowed perp contract and optional max leverage.
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct PerpMarketRule {
-    /// Perp contract symbol, e.g. "BTCUSDT".
-    ///
-    /// Field 1: `symbol`
-    #[serde(
-        rename = "symbol",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub symbol: ::buffa::alloc::string::String,
-    /// Optional maximum leverage multiplier. Supported non-zero values are 1, 3,
-    /// 5, 10, 20, 50, and 100. A value of 0 means no explicit per-contract cap;
-    /// global_perp_leverage_x and product defaults still apply.
-    ///
-    /// Field 2: `max_leverage_x`
-    #[serde(
-        rename = "maxLeverageX",
-        alias = "max_leverage_x",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub max_leverage_x: u32,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for PerpMarketRule {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("PerpMarketRule")
-            .field("symbol", &self.symbol)
-            .field("max_leverage_x", &self.max_leverage_x)
-            .finish()
-    }
-}
-impl PerpMarketRule {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.PerpMarketRule";
-}
-::buffa::impl_default_instance!(PerpMarketRule);
-impl ::buffa::MessageName for PerpMarketRule {
-    const PACKAGE: &'static str = "auth.v1";
-    const NAME: &'static str = "PerpMarketRule";
-    const FULL_NAME: &'static str = "auth.v1.PerpMarketRule";
-    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.PerpMarketRule";
-}
-impl ::buffa::Message for PerpMarketRule {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// The result is a `u32`; the protobuf specification requires all
-    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
-    /// compliant message will never overflow this type.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u32;
-        if !self.symbol.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
-        }
-        if self.max_leverage_x != 0u32 {
-            size
-                += 1u32 + ::buffa::types::uint32_encoded_len(self.max_leverage_x) as u32;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u32;
-        size
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::bytes::BufMut,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.symbol.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.symbol, buf);
-        }
-        if self.max_leverage_x != 0u32 {
-            ::buffa::types::put_uint32_field(2u32, self.max_leverage_x, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.symbol, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_leverage_x = ::buffa::types::decode_uint32(buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.symbol.clear();
-        self.max_leverage_x = 0u32;
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for PerpMarketRule {
-    const PROTO_FQN: &'static str = "auth.v1.PerpMarketRule";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for PerpMarketRule {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __PERP_MARKET_RULE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/auth.v1.PerpMarketRule",
-    to_json: ::buffa::type_registry::any_to_json::<PerpMarketRule>,
-    from_json: ::buffa::type_registry::any_from_json::<PerpMarketRule>,
     is_wkt: false,
 };
 /// SubaccountPolicyView is the public view of a sub-account policy.
@@ -3321,16 +3257,6 @@ pub struct SubaccountPolicyView {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub spot_markets: ::buffa::alloc::vec::Vec<SpotMarketRule>,
-    /// Allowed perp contracts for this sub-account, with optional per-contract caps.
-    ///
-    /// Field 5: `perp_markets`
-    #[serde(
-        rename = "perpMarkets",
-        alias = "perp_markets",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub perp_markets: ::buffa::alloc::vec::Vec<PerpMarketRule>,
     /// Market-level scope for spot markets. When ALL, spot_markets is returned
     /// for display only and is not enforced.
     ///
@@ -3342,19 +3268,8 @@ pub struct SubaccountPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub spot_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// Market-level scope for perp contracts. When ALL, perp_markets is returned
-    /// for display only and is not enforced.
-    ///
-    /// Field 7: `perp_market_scope`
-    #[serde(
-        rename = "perpMarketScope",
-        alias = "perp_market_scope",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub perp_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// High-level actions enabled for the sub-account. Up to 64 unique explicit
-    /// actions may be returned.
+    /// Effective high-level actions enabled for the sub-account. Mandatory
+    /// read-only actions are always included.
     ///
     /// Field 8: `actions`
     #[serde(
@@ -3385,22 +3300,8 @@ pub struct SubaccountPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub source_template_id: u64,
-    /// --- Global risk limits (sub-account scope) ---
-    ///
-    /// Maximum total notional exposure (across all positions) allowed for this
-    /// sub-account, expressed in a canonical quote unit (e.g. micro-USDT).
-    /// A value of 0 means "no explicit cap".
-    ///
-    /// Field 12: `global_notional_cap`
-    #[serde(
-        rename = "globalNotionalCap",
-        alias = "global_notional_cap",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub global_notional_cap: u64,
     /// Maximum notional size allowed for any single order on this sub-account,
-    /// expressed in the same canonical quote unit as global_notional_cap.
+    /// expressed in canonical quote microunits (one unit is 0.000001 USDT).
     /// A value of 0 means "no explicit cap".
     ///
     /// Field 13: `max_order_notional`
@@ -3422,84 +3323,11 @@ pub struct SubaccountPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub max_open_orders: u32,
-    /// Maximum number of open perp positions allowed on this sub-account.
-    /// A value of 0 means "no explicit cap".
-    ///
-    /// Field 15: `max_open_positions`
-    #[serde(
-        rename = "maxOpenPositions",
-        alias = "max_open_positions",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub max_open_positions: u32,
-    /// Optional global leverage cap across all perp contracts, expressed as a
-    /// maximum leverage multiple. Supported non-zero values are 1, 3, 5, 10, 20,
-    /// 50, and 100. A value of 0 means "no explicit global cap"; per-contract
-    /// caps still apply.
-    ///
-    /// Field 16: `global_perp_leverage_x`
-    #[serde(
-        rename = "globalPerpLeverageX",
-        alias = "global_perp_leverage_x",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub global_perp_leverage_x: u32,
-    /// --- Capital movement limits (sub-account scope) ---
-    ///
-    /// Maximum total notional this sub-account can transfer out internally per
-    /// day, expressed in the canonical quote unit (for example, micro-USDT). A
-    /// value of 0 means "no explicit cap".
-    ///
-    /// Field 17: `daily_internal_transfer_out_limit`
-    #[serde(
-        rename = "dailyInternalTransferOutLimit",
-        alias = "daily_internal_transfer_out_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_internal_transfer_out_limit: u64,
-    /// Maximum total notional this sub-account can withdraw per day, expressed in
-    /// the canonical quote unit (for example, micro-USDT). A value of 0 means "no
-    /// explicit cap".
-    ///
-    /// Field 18: `daily_withdraw_limit`
-    #[serde(
-        rename = "dailyWithdrawLimit",
-        alias = "daily_withdraw_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_withdraw_limit: u64,
-    /// When true, internal transfers from this sub-account may only target other
-    /// sub-accounts owned by the same root account. When false, transfers to
-    /// other owners are allowed (subject to other policy checks).
-    ///
-    /// Field 19: `internal_transfers_own_only`
-    #[serde(
-        rename = "internalTransfersOwnOnly",
-        alias = "internal_transfers_own_only",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub internal_transfers_own_only: bool,
-    /// When true, external withdrawals from this sub-account must target an
-    /// approved withdrawal destination.
-    ///
-    /// Field 22: `enforce_withdraw_whitelist`
-    #[serde(
-        rename = "enforceWithdrawWhitelist",
-        alias = "enforce_withdraw_whitelist",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub enforce_withdraw_whitelist: bool,
     /// --- Safety / kill-switch controls ---
     ///
-    /// When true, trading on this sub-account is halted: new orders are rejected
-    /// regardless of other settings. Existing positions may still be closed by
-    /// product safety controls.
+    /// When true, new orders and exposure-increasing order or trigger changes are
+    /// rejected regardless of other settings. Existing orders and triggers may
+    /// still be canceled or paused.
     ///
     /// Field 23: `trading_halted`
     #[serde(
@@ -3509,41 +3337,6 @@ pub struct SubaccountPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub trading_halted: bool,
-    /// When true, this sub-account is in liquidation-only mode: new exposure
-    /// cannot be opened, but reduce-only / close-out actions are allowed.
-    ///
-    /// Field 24: `liquidation_only`
-    #[serde(
-        rename = "liquidationOnly",
-        alias = "liquidation_only",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub liquidation_only: bool,
-    /// Maximum allowed realized loss for this sub-account over a rolling day
-    /// before safety controls may halt activity, expressed in the canonical quote
-    /// unit (for example, micro-USDT). A value of 0 means "no explicit limit".
-    ///
-    /// Field 25: `daily_loss_limit`
-    #[serde(
-        rename = "dailyLossLimit",
-        alias = "daily_loss_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_loss_limit: u64,
-    /// Maximum allowed drawdown from peak equity in basis points (1/100 of a
-    /// percent) before safety controls may halt activity. A value of 0 means "no
-    /// explicit limit".
-    ///
-    /// Field 26: `intraday_drawdown_limit_bps`
-    #[serde(
-        rename = "intradayDrawdownLimitBps",
-        alias = "intraday_drawdown_limit_bps",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub intraday_drawdown_limit_bps: u32,
     /// --- Governance / lifecycle metadata ---
     ///
     /// When true, this policy is write-protected and requires an elevated approval
@@ -3614,28 +3407,13 @@ impl ::core::fmt::Debug for SubaccountPolicyView {
             .field("name", &self.name)
             .field("description", &self.description)
             .field("spot_markets", &self.spot_markets)
-            .field("perp_markets", &self.perp_markets)
             .field("spot_market_scope", &self.spot_market_scope)
-            .field("perp_market_scope", &self.perp_market_scope)
             .field("actions", &self.actions)
             .field("is_template", &self.is_template)
             .field("source_template_id", &self.source_template_id)
-            .field("global_notional_cap", &self.global_notional_cap)
             .field("max_order_notional", &self.max_order_notional)
             .field("max_open_orders", &self.max_open_orders)
-            .field("max_open_positions", &self.max_open_positions)
-            .field("global_perp_leverage_x", &self.global_perp_leverage_x)
-            .field(
-                "daily_internal_transfer_out_limit",
-                &self.daily_internal_transfer_out_limit,
-            )
-            .field("daily_withdraw_limit", &self.daily_withdraw_limit)
-            .field("internal_transfers_own_only", &self.internal_transfers_own_only)
-            .field("enforce_withdraw_whitelist", &self.enforce_withdraw_whitelist)
             .field("trading_halted", &self.trading_halted)
-            .field("liquidation_only", &self.liquidation_only)
-            .field("daily_loss_limit", &self.daily_loss_limit)
-            .field("intraday_drawdown_limit_bps", &self.intraday_drawdown_limit_bps)
             .field("locked", &self.locked)
             .field("review_at", &self.review_at)
             .field("expires_at", &self.expires_at)
@@ -3687,22 +3465,8 @@ impl ::buffa::Message for SubaccountPolicyView {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        for v in &self.perp_markets {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
-        }
         {
             let val = self.spot_market_scope.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -3722,12 +3486,6 @@ impl ::buffa::Message for SubaccountPolicyView {
         if self.source_template_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if self.global_notional_cap != 0u64 {
-            size
-                += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.global_notional_cap)
-                        as u32;
-        }
         if self.max_order_notional != 0u64 {
             size
                 += 1u32
@@ -3737,33 +3495,6 @@ impl ::buffa::Message for SubaccountPolicyView {
             size
                 += 1u32
                     + ::buffa::types::uint32_encoded_len(self.max_open_orders) as u32;
-        }
-        if self.max_open_positions != 0u32 {
-            size
-                += 1u32
-                    + ::buffa::types::uint32_encoded_len(self.max_open_positions) as u32;
-        }
-        if self.global_perp_leverage_x != 0u32 {
-            size
-                += 2u32
-                    + ::buffa::types::uint32_encoded_len(self.global_perp_leverage_x)
-                        as u32;
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(
-                        self.daily_internal_transfer_out_limit,
-                    ) as u32;
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(self.daily_withdraw_limit)
-                        as u32;
-        }
-        if self.internal_transfers_own_only {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
         if self.created_at.is_set() {
             let __slot = __cache.reserve();
@@ -3781,26 +3512,8 @@ impl ::buffa::Message for SubaccountPolicyView {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if self.enforce_withdraw_whitelist {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
         if self.trading_halted {
             size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.liquidation_only {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.daily_loss_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(self.daily_loss_limit) as u32;
-        }
-        if self.intraday_drawdown_limit_bps != 0u32 {
-            size
-                += 2u32
-                    + ::buffa::types::uint32_encoded_len(
-                        self.intraday_drawdown_limit_bps,
-                    ) as u32;
         }
         if self.locked {
             size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
@@ -3847,20 +3560,10 @@ impl ::buffa::Message for SubaccountPolicyView {
             ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
         }
-        for v in &self.perp_markets {
-            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
-            v.write_to(__cache, buf);
-        }
         {
             let val = self.spot_market_scope.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(6u32, val, buf);
-            }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(7u32, val, buf);
             }
         }
         if !self.actions.is_empty() {
@@ -3880,33 +3583,11 @@ impl ::buffa::Message for SubaccountPolicyView {
         if self.source_template_id != 0u64 {
             ::buffa::types::put_fixed64_field(11u32, self.source_template_id, buf);
         }
-        if self.global_notional_cap != 0u64 {
-            ::buffa::types::put_uint64_field(12u32, self.global_notional_cap, buf);
-        }
         if self.max_order_notional != 0u64 {
             ::buffa::types::put_uint64_field(13u32, self.max_order_notional, buf);
         }
         if self.max_open_orders != 0u32 {
             ::buffa::types::put_uint32_field(14u32, self.max_open_orders, buf);
-        }
-        if self.max_open_positions != 0u32 {
-            ::buffa::types::put_uint32_field(15u32, self.max_open_positions, buf);
-        }
-        if self.global_perp_leverage_x != 0u32 {
-            ::buffa::types::put_uint32_field(16u32, self.global_perp_leverage_x, buf);
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            ::buffa::types::put_uint64_field(
-                17u32,
-                self.daily_internal_transfer_out_limit,
-                buf,
-            );
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            ::buffa::types::put_uint64_field(18u32, self.daily_withdraw_limit, buf);
-        }
-        if self.internal_transfers_own_only {
-            ::buffa::types::put_bool_field(19u32, self.internal_transfers_own_only, buf);
         }
         if self.created_at.is_set() {
             ::buffa::types::put_len_delimited_header(20u32, __cache.consume_next(), buf);
@@ -3916,24 +3597,8 @@ impl ::buffa::Message for SubaccountPolicyView {
             ::buffa::types::put_len_delimited_header(21u32, __cache.consume_next(), buf);
             self.updated_at.write_to(__cache, buf);
         }
-        if self.enforce_withdraw_whitelist {
-            ::buffa::types::put_bool_field(22u32, self.enforce_withdraw_whitelist, buf);
-        }
         if self.trading_halted {
             ::buffa::types::put_bool_field(23u32, self.trading_halted, buf);
-        }
-        if self.liquidation_only {
-            ::buffa::types::put_bool_field(24u32, self.liquidation_only, buf);
-        }
-        if self.daily_loss_limit != 0u64 {
-            ::buffa::types::put_uint64_field(25u32, self.daily_loss_limit, buf);
-        }
-        if self.intraday_drawdown_limit_bps != 0u32 {
-            ::buffa::types::put_uint32_field(
-                26u32,
-                self.intraday_drawdown_limit_bps,
-                buf,
-            );
         }
         if self.locked {
             ::buffa::types::put_bool_field(27u32, self.locked, buf);
@@ -3992,30 +3657,12 @@ impl ::buffa::Message for SubaccountPolicyView {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.spot_markets.push(elem);
             }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.perp_markets.push(elem);
-            }
             6u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.spot_market_scope = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.perp_market_scope = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -4071,13 +3718,6 @@ impl ::buffa::Message for SubaccountPolicyView {
                 )?;
                 self.source_template_id = ::buffa::types::decode_fixed64(buf)?;
             }
-            12u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.global_notional_cap = ::buffa::types::decode_uint64(buf)?;
-            }
             13u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -4091,43 +3731,6 @@ impl ::buffa::Message for SubaccountPolicyView {
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.max_open_orders = ::buffa::types::decode_uint32(buf)?;
-            }
-            15u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_open_positions = ::buffa::types::decode_uint32(buf)?;
-            }
-            16u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.global_perp_leverage_x = ::buffa::types::decode_uint32(buf)?;
-            }
-            17u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                    buf,
-                )?;
-            }
-            18u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_withdraw_limit = ::buffa::types::decode_uint64(buf)?;
-            }
-            19u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.internal_transfers_own_only = ::buffa::types::decode_bool(buf)?;
             }
             20u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -4151,40 +3754,12 @@ impl ::buffa::Message for SubaccountPolicyView {
                     ctx,
                 )?;
             }
-            22u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.enforce_withdraw_whitelist = ::buffa::types::decode_bool(buf)?;
-            }
             23u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.trading_halted = ::buffa::types::decode_bool(buf)?;
-            }
-            24u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.liquidation_only = ::buffa::types::decode_bool(buf)?;
-            }
-            25u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_loss_limit = ::buffa::types::decode_uint64(buf)?;
-            }
-            26u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.intraday_drawdown_limit_bps = ::buffa::types::decode_uint32(buf)?;
             }
             27u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -4234,27 +3809,15 @@ impl ::buffa::Message for SubaccountPolicyView {
         self.name.clear();
         self.description.clear();
         self.spot_markets.clear();
-        self.perp_markets.clear();
         self.spot_market_scope = ::buffa::EnumValue::from(0);
-        self.perp_market_scope = ::buffa::EnumValue::from(0);
         self.actions.clear();
         self.is_template = false;
         self.source_template_id = 0u64;
-        self.global_notional_cap = 0u64;
         self.max_order_notional = 0u64;
         self.max_open_orders = 0u32;
-        self.max_open_positions = 0u32;
-        self.global_perp_leverage_x = 0u32;
-        self.daily_internal_transfer_out_limit = 0u64;
-        self.daily_withdraw_limit = 0u64;
-        self.internal_transfers_own_only = false;
         self.created_at = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
-        self.enforce_withdraw_whitelist = false;
         self.trading_halted = false;
-        self.liquidation_only = false;
-        self.daily_loss_limit = 0u64;
-        self.intraday_drawdown_limit_bps = 0u32;
         self.locked = false;
         self.review_at = ::buffa::MessageField::none();
         self.expires_at = ::buffa::MessageField::none();
@@ -4903,17 +4466,7 @@ pub struct SubaccountPolicySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub spot_markets: ::buffa::alloc::vec::Vec<SpotMarketRule>,
-    /// Allowed perp markets and optional per-contract leverage caps.
-    ///
-    /// Field 4: `perp_markets`
-    #[serde(
-        rename = "perpMarkets",
-        alias = "perp_markets",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub perp_markets: ::buffa::alloc::vec::Vec<PerpMarketRule>,
+    pub spot_markets: ::buffa::alloc::vec::Vec<SpotMarketSelector>,
     /// Market-level scope for spot markets. When unspecified, defaults to ALL.
     ///
     /// Field 5: `spot_market_scope`
@@ -4924,18 +4477,9 @@ pub struct SubaccountPolicySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub spot_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-    ///
-    /// Field 6: `perp_market_scope`
-    #[serde(
-        rename = "perpMarketScope",
-        alias = "perp_market_scope",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub perp_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// High-level actions enabled for the sub-account policy. Up to 64 unique
-    /// explicit actions are allowed.
+    /// High-level actions enabled for the sub-account policy. Mandatory read-only
+    /// actions are included when omitted. Up to 64 unique explicit actions are
+    /// allowed.
     ///
     /// Field 7: `actions`
     #[serde(
@@ -4944,21 +4488,9 @@ pub struct SubaccountPolicySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub actions: ::buffa::alloc::vec::Vec<::buffa::EnumValue<PolicyAction>>,
-    /// Maximum total notional exposure across all positions for this sub-account,
-    /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-    /// 0 means no explicit cap.
-    ///
-    /// Field 12: `global_notional_cap`
-    #[serde(
-        rename = "globalNotionalCap",
-        alias = "global_notional_cap",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub global_notional_cap: u64,
     /// Maximum notional size for any single order on this sub-account, expressed
-    /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-    /// no explicit cap.
+    /// in canonical quote microunits (one unit is 0.000001 USDT). A value of 0
+    /// means no explicit cap.
     ///
     /// Field 13: `max_order_notional`
     #[serde(
@@ -4979,76 +4511,9 @@ pub struct SubaccountPolicySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub max_open_orders: u32,
-    /// Maximum number of open perp positions allowed on this sub-account. A value
-    /// of 0 means no explicit cap.
-    ///
-    /// Field 15: `max_open_positions`
-    #[serde(
-        rename = "maxOpenPositions",
-        alias = "max_open_positions",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub max_open_positions: u32,
-    /// Optional global leverage cap across all perp contracts. Supported non-zero
-    /// values are 1, 3, 5, 10, 20, 50, and 100. A value of 0 means no explicit cap.
-    ///
-    /// Field 16: `global_perp_leverage_x`
-    #[serde(
-        rename = "globalPerpLeverageX",
-        alias = "global_perp_leverage_x",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub global_perp_leverage_x: u32,
-    /// Maximum total notional this sub-account can transfer out internally per
-    /// rolling day, expressed in the canonical quote unit (for example,
-    /// micro-USDT). A value of 0 means no explicit cap.
-    ///
-    /// Field 17: `daily_internal_transfer_out_limit`
-    #[serde(
-        rename = "dailyInternalTransferOutLimit",
-        alias = "daily_internal_transfer_out_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_internal_transfer_out_limit: u64,
-    /// Maximum total notional this sub-account can withdraw per rolling day,
-    /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-    /// 0 means no explicit cap.
-    ///
-    /// Field 18: `daily_withdraw_limit`
-    #[serde(
-        rename = "dailyWithdrawLimit",
-        alias = "daily_withdraw_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_withdraw_limit: u64,
-    /// When true, internal transfers from this sub-account may only target other
-    /// sub-accounts owned by the same root account.
-    ///
-    /// Field 19: `internal_transfers_own_only`
-    #[serde(
-        rename = "internalTransfersOwnOnly",
-        alias = "internal_transfers_own_only",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub internal_transfers_own_only: bool,
-    /// When true, external withdrawals from this sub-account must target an
-    /// approved withdrawal destination.
-    ///
-    /// Field 20: `enforce_withdraw_whitelist`
-    #[serde(
-        rename = "enforceWithdrawWhitelist",
-        alias = "enforce_withdraw_whitelist",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub enforce_withdraw_whitelist: bool,
-    /// When true, new orders for this sub-account are rejected regardless of other
-    /// policy settings.
+    /// When true, new orders and exposure-increasing order or trigger changes are
+    /// rejected regardless of other settings. Existing orders and triggers may
+    /// still be canceled or paused.
     ///
     /// Field 21: `trading_halted`
     #[serde(
@@ -5058,39 +4523,6 @@ pub struct SubaccountPolicySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub trading_halted: bool,
-    /// When true, this sub-account may only reduce or close existing exposure.
-    ///
-    /// Field 22: `liquidation_only`
-    #[serde(
-        rename = "liquidationOnly",
-        alias = "liquidation_only",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub liquidation_only: bool,
-    /// Maximum realized loss over a rolling day before safety controls may halt
-    /// activity, expressed in the canonical quote unit (for example, micro-USDT).
-    /// A value of 0 means no explicit limit.
-    ///
-    /// Field 23: `daily_loss_limit`
-    #[serde(
-        rename = "dailyLossLimit",
-        alias = "daily_loss_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_loss_limit: u64,
-    /// Maximum drawdown from peak equity in basis points. One basis point is
-    /// 1/100 of one percent. A value of 0 means no explicit limit.
-    ///
-    /// Field 24: `intraday_drawdown_limit_bps`
-    #[serde(
-        rename = "intradayDrawdownLimitBps",
-        alias = "intraday_drawdown_limit_bps",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub intraday_drawdown_limit_bps: u32,
     /// When true, the policy is write-protected and requires an elevated mutation path.
     ///
     /// Field 25: `locked`
@@ -5128,26 +4560,11 @@ impl ::core::fmt::Debug for SubaccountPolicySpec {
             .field("name", &self.name)
             .field("description", &self.description)
             .field("spot_markets", &self.spot_markets)
-            .field("perp_markets", &self.perp_markets)
             .field("spot_market_scope", &self.spot_market_scope)
-            .field("perp_market_scope", &self.perp_market_scope)
             .field("actions", &self.actions)
-            .field("global_notional_cap", &self.global_notional_cap)
             .field("max_order_notional", &self.max_order_notional)
             .field("max_open_orders", &self.max_open_orders)
-            .field("max_open_positions", &self.max_open_positions)
-            .field("global_perp_leverage_x", &self.global_perp_leverage_x)
-            .field(
-                "daily_internal_transfer_out_limit",
-                &self.daily_internal_transfer_out_limit,
-            )
-            .field("daily_withdraw_limit", &self.daily_withdraw_limit)
-            .field("internal_transfers_own_only", &self.internal_transfers_own_only)
-            .field("enforce_withdraw_whitelist", &self.enforce_withdraw_whitelist)
             .field("trading_halted", &self.trading_halted)
-            .field("liquidation_only", &self.liquidation_only)
-            .field("daily_loss_limit", &self.daily_loss_limit)
-            .field("intraday_drawdown_limit_bps", &self.intraday_drawdown_limit_bps)
             .field("locked", &self.locked)
             .field("review_at", &self.review_at)
             .field("expires_at", &self.expires_at)
@@ -5193,22 +4610,8 @@ impl ::buffa::Message for SubaccountPolicySpec {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        for v in &self.perp_markets {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
-        }
         {
             let val = self.spot_market_scope.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -5222,12 +4625,6 @@ impl ::buffa::Message for SubaccountPolicySpec {
             size
                 += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
         }
-        if self.global_notional_cap != 0u64 {
-            size
-                += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.global_notional_cap)
-                        as u32;
-        }
         if self.max_order_notional != 0u64 {
             size
                 += 1u32
@@ -5238,53 +4635,8 @@ impl ::buffa::Message for SubaccountPolicySpec {
                 += 1u32
                     + ::buffa::types::uint32_encoded_len(self.max_open_orders) as u32;
         }
-        if self.max_open_positions != 0u32 {
-            size
-                += 1u32
-                    + ::buffa::types::uint32_encoded_len(self.max_open_positions) as u32;
-        }
-        if self.global_perp_leverage_x != 0u32 {
-            size
-                += 2u32
-                    + ::buffa::types::uint32_encoded_len(self.global_perp_leverage_x)
-                        as u32;
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(
-                        self.daily_internal_transfer_out_limit,
-                    ) as u32;
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(self.daily_withdraw_limit)
-                        as u32;
-        }
-        if self.internal_transfers_own_only {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.enforce_withdraw_whitelist {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
         if self.trading_halted {
             size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.liquidation_only {
-            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.daily_loss_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(self.daily_loss_limit) as u32;
-        }
-        if self.intraday_drawdown_limit_bps != 0u32 {
-            size
-                += 2u32
-                    + ::buffa::types::uint32_encoded_len(
-                        self.intraday_drawdown_limit_bps,
-                    ) as u32;
         }
         if self.locked {
             size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
@@ -5325,20 +4677,10 @@ impl ::buffa::Message for SubaccountPolicySpec {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
         }
-        for v in &self.perp_markets {
-            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
-            v.write_to(__cache, buf);
-        }
         {
             let val = self.spot_market_scope.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(5u32, val, buf);
-            }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(6u32, val, buf);
             }
         }
         if !self.actions.is_empty() {
@@ -5352,52 +4694,14 @@ impl ::buffa::Message for SubaccountPolicySpec {
                 ::buffa::types::encode_int32(v.to_i32(), buf);
             }
         }
-        if self.global_notional_cap != 0u64 {
-            ::buffa::types::put_uint64_field(12u32, self.global_notional_cap, buf);
-        }
         if self.max_order_notional != 0u64 {
             ::buffa::types::put_uint64_field(13u32, self.max_order_notional, buf);
         }
         if self.max_open_orders != 0u32 {
             ::buffa::types::put_uint32_field(14u32, self.max_open_orders, buf);
         }
-        if self.max_open_positions != 0u32 {
-            ::buffa::types::put_uint32_field(15u32, self.max_open_positions, buf);
-        }
-        if self.global_perp_leverage_x != 0u32 {
-            ::buffa::types::put_uint32_field(16u32, self.global_perp_leverage_x, buf);
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            ::buffa::types::put_uint64_field(
-                17u32,
-                self.daily_internal_transfer_out_limit,
-                buf,
-            );
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            ::buffa::types::put_uint64_field(18u32, self.daily_withdraw_limit, buf);
-        }
-        if self.internal_transfers_own_only {
-            ::buffa::types::put_bool_field(19u32, self.internal_transfers_own_only, buf);
-        }
-        if self.enforce_withdraw_whitelist {
-            ::buffa::types::put_bool_field(20u32, self.enforce_withdraw_whitelist, buf);
-        }
         if self.trading_halted {
             ::buffa::types::put_bool_field(21u32, self.trading_halted, buf);
-        }
-        if self.liquidation_only {
-            ::buffa::types::put_bool_field(22u32, self.liquidation_only, buf);
-        }
-        if self.daily_loss_limit != 0u64 {
-            ::buffa::types::put_uint64_field(23u32, self.daily_loss_limit, buf);
-        }
-        if self.intraday_drawdown_limit_bps != 0u32 {
-            ::buffa::types::put_uint32_field(
-                24u32,
-                self.intraday_drawdown_limit_bps,
-                buf,
-            );
         }
         if self.locked {
             ::buffa::types::put_bool_field(25u32, self.locked, buf);
@@ -5446,30 +4750,12 @@ impl ::buffa::Message for SubaccountPolicySpec {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.spot_markets.push(elem);
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.perp_markets.push(elem);
-            }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.spot_market_scope = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.perp_market_scope = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -5511,13 +4797,6 @@ impl ::buffa::Message for SubaccountPolicySpec {
                     );
                 }
             }
-            12u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.global_notional_cap = ::buffa::types::decode_uint64(buf)?;
-            }
             13u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -5532,77 +4811,12 @@ impl ::buffa::Message for SubaccountPolicySpec {
                 )?;
                 self.max_open_orders = ::buffa::types::decode_uint32(buf)?;
             }
-            15u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_open_positions = ::buffa::types::decode_uint32(buf)?;
-            }
-            16u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.global_perp_leverage_x = ::buffa::types::decode_uint32(buf)?;
-            }
-            17u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                    buf,
-                )?;
-            }
-            18u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_withdraw_limit = ::buffa::types::decode_uint64(buf)?;
-            }
-            19u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.internal_transfers_own_only = ::buffa::types::decode_bool(buf)?;
-            }
-            20u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.enforce_withdraw_whitelist = ::buffa::types::decode_bool(buf)?;
-            }
             21u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.trading_halted = ::buffa::types::decode_bool(buf)?;
-            }
-            22u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.liquidation_only = ::buffa::types::decode_bool(buf)?;
-            }
-            23u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_loss_limit = ::buffa::types::decode_uint64(buf)?;
-            }
-            24u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.intraday_drawdown_limit_bps = ::buffa::types::decode_uint32(buf)?;
             }
             25u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -5644,23 +4858,11 @@ impl ::buffa::Message for SubaccountPolicySpec {
         self.name.clear();
         self.description.clear();
         self.spot_markets.clear();
-        self.perp_markets.clear();
         self.spot_market_scope = ::buffa::EnumValue::from(0);
-        self.perp_market_scope = ::buffa::EnumValue::from(0);
         self.actions.clear();
-        self.global_notional_cap = 0u64;
         self.max_order_notional = 0u64;
         self.max_open_orders = 0u32;
-        self.max_open_positions = 0u32;
-        self.global_perp_leverage_x = 0u32;
-        self.daily_internal_transfer_out_limit = 0u64;
-        self.daily_withdraw_limit = 0u64;
-        self.internal_transfers_own_only = false;
-        self.enforce_withdraw_whitelist = false;
         self.trading_halted = false;
-        self.liquidation_only = false;
-        self.daily_loss_limit = 0u64;
-        self.intraday_drawdown_limit_bps = 0u32;
         self.locked = false;
         self.review_at = ::buffa::MessageField::none();
         self.expires_at = ::buffa::MessageField::none();
@@ -6613,8 +5815,8 @@ pub struct SetSubaccountPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub subaccount_id: u64,
-    /// Policy template to attach (opaque ID). A value of 0 clears the policy
-    /// and reverts to the platform default for this sub-account.
+    /// Policy template to attach (opaque ID). A value of 0 clears the explicit
+    /// binding and restores the system Read Only policy.
     ///
     /// Field 2: `policy_id`
     #[serde(
@@ -6854,8 +6056,8 @@ pub const __SET_SUBACCOUNT_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
     from_json: ::buffa::type_registry::any_from_json::<SetSubaccountPolicyResponse>,
     is_wkt: false,
 };
-/// ApiPolicyView is the public view of an API key policy template. API key
-/// policy limits are additional caps and cannot exceed the sub-account policy.
+/// ApiPolicyView is the public view of an API key policy template. Its action
+/// and spot-market floor cannot exceed an attached sub-account policy.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -6897,16 +6099,6 @@ pub struct ApiPolicyView {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub spot_markets: ::buffa::alloc::vec::Vec<SpotMarketRule>,
-    /// Allowed perp contracts for this API key policy, with optional per-contract caps.
-    ///
-    /// Field 5: `perp_markets`
-    #[serde(
-        rename = "perpMarkets",
-        alias = "perp_markets",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub perp_markets: ::buffa::alloc::vec::Vec<PerpMarketRule>,
     /// High-level actions enabled for this API key. Up to 64 unique explicit
     /// actions may be returned.
     ///
@@ -6920,6 +6112,8 @@ pub struct ApiPolicyView {
     /// Market-level scope for spot markets. When ALL, spot_markets is returned
     /// for display only and is not enforced.
     ///
+    /// --- Template / lifecycle metadata ---
+    ///
     /// Field 7: `spot_market_scope`
     #[serde(
         rename = "spotMarketScope",
@@ -6928,59 +6122,6 @@ pub struct ApiPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub spot_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// Market-level scope for perp contracts. When ALL, perp_markets is returned
-    /// for display only and is not enforced.
-    ///
-    /// Field 8: `perp_market_scope`
-    #[serde(
-        rename = "perpMarketScope",
-        alias = "perp_market_scope",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub perp_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// --- Global risk limits (API key scope) ---
-    ///
-    /// Maximum notional size allowed for any single order via this key, expressed
-    /// in a canonical quote unit (e.g. micro-USDT). A value of 0 means "no
-    /// explicit additional cap" beyond the sub-account policy.
-    ///
-    /// Field 13: `max_order_notional`
-    #[serde(
-        rename = "maxOrderNotional",
-        alias = "max_order_notional",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub max_order_notional: u64,
-    /// --- Capital movement limits (API key scope) ---
-    ///
-    /// Maximum total notional this API key can transfer out internally per day,
-    /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-    /// 0 means no additional cap beyond the sub-account policy.
-    ///
-    /// Field 17: `daily_internal_transfer_out_limit`
-    #[serde(
-        rename = "dailyInternalTransferOutLimit",
-        alias = "daily_internal_transfer_out_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_internal_transfer_out_limit: u64,
-    /// Maximum total notional this API key can withdraw per day, expressed in the
-    /// canonical quote unit (for example, micro-USDT). A value of 0 means no
-    /// additional cap beyond the sub-account policy.
-    ///
-    /// Field 18: `daily_withdraw_limit`
-    #[serde(
-        rename = "dailyWithdrawLimit",
-        alias = "daily_withdraw_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_withdraw_limit: u64,
-    /// --- Template / lifecycle metadata ---
-    ///
     /// When true, this policy is intended to be reused as a template across
     /// multiple API keys. When false, it represents a single-key instance.
     ///
@@ -7041,16 +6182,8 @@ impl ::core::fmt::Debug for ApiPolicyView {
             .field("name", &self.name)
             .field("description", &self.description)
             .field("spot_markets", &self.spot_markets)
-            .field("perp_markets", &self.perp_markets)
             .field("actions", &self.actions)
             .field("spot_market_scope", &self.spot_market_scope)
-            .field("perp_market_scope", &self.perp_market_scope)
-            .field("max_order_notional", &self.max_order_notional)
-            .field(
-                "daily_internal_transfer_out_limit",
-                &self.daily_internal_transfer_out_limit,
-            )
-            .field("daily_withdraw_limit", &self.daily_withdraw_limit)
             .field("is_template", &self.is_template)
             .field("source_template_id", &self.source_template_id)
             .field("created_at", &self.created_at)
@@ -7101,14 +6234,6 @@ impl ::buffa::Message for ApiPolicyView {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        for v in &self.perp_markets {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
-        }
         if !self.actions.is_empty() {
             let payload: u32 = self
                 .actions
@@ -7123,30 +6248,6 @@ impl ::buffa::Message for ApiPolicyView {
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        if self.max_order_notional != 0u64 {
-            size
-                += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.max_order_notional) as u32;
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(
-                        self.daily_internal_transfer_out_limit,
-                    ) as u32;
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(self.daily_withdraw_limit)
-                        as u32;
         }
         if self.is_template {
             size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
@@ -7196,10 +6297,6 @@ impl ::buffa::Message for ApiPolicyView {
             ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
         }
-        for v in &self.perp_markets {
-            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
-            v.write_to(__cache, buf);
-        }
         if !self.actions.is_empty() {
             let payload: u32 = self
                 .actions
@@ -7216,25 +6313,6 @@ impl ::buffa::Message for ApiPolicyView {
             if val != 0 {
                 ::buffa::types::put_int32_field(7u32, val, buf);
             }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(8u32, val, buf);
-            }
-        }
-        if self.max_order_notional != 0u64 {
-            ::buffa::types::put_uint64_field(13u32, self.max_order_notional, buf);
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            ::buffa::types::put_uint64_field(
-                17u32,
-                self.daily_internal_transfer_out_limit,
-                buf,
-            );
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            ::buffa::types::put_uint64_field(18u32, self.daily_withdraw_limit, buf);
         }
         if self.is_template {
             ::buffa::types::put_bool_field(19u32, self.is_template, buf);
@@ -7296,15 +6374,6 @@ impl ::buffa::Message for ApiPolicyView {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.spot_markets.push(elem);
             }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.perp_markets.push(elem);
-            }
             6u32 => {
                 if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
                     let len = ::buffa::encoding::decode_varint(buf)?;
@@ -7351,38 +6420,6 @@ impl ::buffa::Message for ApiPolicyView {
                 self.spot_market_scope = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
-            }
-            8u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.perp_market_scope = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            13u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_order_notional = ::buffa::types::decode_uint64(buf)?;
-            }
-            17u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                    buf,
-                )?;
-            }
-            18u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_withdraw_limit = ::buffa::types::decode_uint64(buf)?;
             }
             19u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -7439,13 +6476,8 @@ impl ::buffa::Message for ApiPolicyView {
         self.name.clear();
         self.description.clear();
         self.spot_markets.clear();
-        self.perp_markets.clear();
         self.actions.clear();
         self.spot_market_scope = ::buffa::EnumValue::from(0);
-        self.perp_market_scope = ::buffa::EnumValue::from(0);
-        self.max_order_notional = 0u64;
-        self.daily_internal_transfer_out_limit = 0u64;
-        self.daily_withdraw_limit = 0u64;
         self.is_template = false;
         self.source_template_id = 0u64;
         self.created_at = ::buffa::MessageField::none();
@@ -8097,17 +7129,7 @@ pub struct ApiPolicySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub spot_markets: ::buffa::alloc::vec::Vec<SpotMarketRule>,
-    /// Allowed perp markets and optional per-contract leverage caps.
-    ///
-    /// Field 4: `perp_markets`
-    #[serde(
-        rename = "perpMarkets",
-        alias = "perp_markets",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub perp_markets: ::buffa::alloc::vec::Vec<PerpMarketRule>,
+    pub spot_markets: ::buffa::alloc::vec::Vec<SpotMarketSelector>,
     /// Market-level scope for spot markets. When unspecified, defaults to ALL.
     ///
     /// Field 5: `spot_market_scope`
@@ -8118,18 +7140,8 @@ pub struct ApiPolicySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub spot_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-    ///
-    /// Field 6: `perp_market_scope`
-    #[serde(
-        rename = "perpMarketScope",
-        alias = "perp_market_scope",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub perp_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// High-level actions enabled for the API key policy. Up to 64 unique explicit
-    /// actions are allowed.
+    /// High-level actions enabled for the API key policy. An empty list grants no
+    /// access. Up to 64 unique explicit actions are allowed.
     ///
     /// Field 7: `actions`
     #[serde(
@@ -8138,42 +7150,6 @@ pub struct ApiPolicySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub actions: ::buffa::alloc::vec::Vec<::buffa::EnumValue<PolicyAction>>,
-    /// Maximum notional size for any single order submitted with this API key,
-    /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-    /// 0 means no additional cap beyond the sub-account policy.
-    ///
-    /// Field 13: `max_order_notional`
-    #[serde(
-        rename = "maxOrderNotional",
-        alias = "max_order_notional",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub max_order_notional: u64,
-    /// Maximum total notional this API key can transfer out internally per rolling
-    /// day, expressed in the canonical quote unit (for example, micro-USDT). A
-    /// value of 0 means no additional cap beyond the sub-account policy.
-    ///
-    /// Field 17: `daily_internal_transfer_out_limit`
-    #[serde(
-        rename = "dailyInternalTransferOutLimit",
-        alias = "daily_internal_transfer_out_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_internal_transfer_out_limit: u64,
-    /// Maximum total notional this API key can withdraw per rolling day, expressed
-    /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-    /// no additional cap beyond the sub-account policy.
-    ///
-    /// Field 18: `daily_withdraw_limit`
-    #[serde(
-        rename = "dailyWithdrawLimit",
-        alias = "daily_withdraw_limit",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub daily_withdraw_limit: u64,
     /// Whether this policy should be treated as a reusable template.
     ///
     /// Field 19: `is_template`
@@ -8194,16 +7170,8 @@ impl ::core::fmt::Debug for ApiPolicySpec {
             .field("name", &self.name)
             .field("description", &self.description)
             .field("spot_markets", &self.spot_markets)
-            .field("perp_markets", &self.perp_markets)
             .field("spot_market_scope", &self.spot_market_scope)
-            .field("perp_market_scope", &self.perp_market_scope)
             .field("actions", &self.actions)
-            .field("max_order_notional", &self.max_order_notional)
-            .field(
-                "daily_internal_transfer_out_limit",
-                &self.daily_internal_transfer_out_limit,
-            )
-            .field("daily_withdraw_limit", &self.daily_withdraw_limit)
             .field("is_template", &self.is_template)
             .finish()
     }
@@ -8247,22 +7215,8 @@ impl ::buffa::Message for ApiPolicySpec {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        for v in &self.perp_markets {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
-        }
         {
             let val = self.spot_market_scope.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
@@ -8275,24 +7229,6 @@ impl ::buffa::Message for ApiPolicySpec {
                 .sum::<u32>();
             size
                 += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
-        }
-        if self.max_order_notional != 0u64 {
-            size
-                += 1u32
-                    + ::buffa::types::uint64_encoded_len(self.max_order_notional) as u32;
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(
-                        self.daily_internal_transfer_out_limit,
-                    ) as u32;
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            size
-                += 2u32
-                    + ::buffa::types::uint64_encoded_len(self.daily_withdraw_limit)
-                        as u32;
         }
         if self.is_template {
             size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
@@ -8317,20 +7253,10 @@ impl ::buffa::Message for ApiPolicySpec {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
         }
-        for v in &self.perp_markets {
-            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
-            v.write_to(__cache, buf);
-        }
         {
             let val = self.spot_market_scope.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(5u32, val, buf);
-            }
-        }
-        {
-            let val = self.perp_market_scope.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(6u32, val, buf);
             }
         }
         if !self.actions.is_empty() {
@@ -8343,19 +7269,6 @@ impl ::buffa::Message for ApiPolicySpec {
             for v in &self.actions {
                 ::buffa::types::encode_int32(v.to_i32(), buf);
             }
-        }
-        if self.max_order_notional != 0u64 {
-            ::buffa::types::put_uint64_field(13u32, self.max_order_notional, buf);
-        }
-        if self.daily_internal_transfer_out_limit != 0u64 {
-            ::buffa::types::put_uint64_field(
-                17u32,
-                self.daily_internal_transfer_out_limit,
-                buf,
-            );
-        }
-        if self.daily_withdraw_limit != 0u64 {
-            ::buffa::types::put_uint64_field(18u32, self.daily_withdraw_limit, buf);
         }
         if self.is_template {
             ::buffa::types::put_bool_field(19u32, self.is_template, buf);
@@ -8396,30 +7309,12 @@ impl ::buffa::Message for ApiPolicySpec {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.spot_markets.push(elem);
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.perp_markets.push(elem);
-            }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.spot_market_scope = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.perp_market_scope = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -8461,29 +7356,6 @@ impl ::buffa::Message for ApiPolicySpec {
                     );
                 }
             }
-            13u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.max_order_notional = ::buffa::types::decode_uint64(buf)?;
-            }
-            17u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                    buf,
-                )?;
-            }
-            18u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.daily_withdraw_limit = ::buffa::types::decode_uint64(buf)?;
-            }
             19u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -8502,13 +7374,8 @@ impl ::buffa::Message for ApiPolicySpec {
         self.name.clear();
         self.description.clear();
         self.spot_markets.clear();
-        self.perp_markets.clear();
         self.spot_market_scope = ::buffa::EnumValue::from(0);
-        self.perp_market_scope = ::buffa::EnumValue::from(0);
         self.actions.clear();
-        self.max_order_notional = 0u64;
-        self.daily_internal_transfer_out_limit = 0u64;
-        self.daily_withdraw_limit = 0u64;
         self.is_template = false;
         self.__buffa_unknown_fields.clear();
     }
@@ -9446,9 +8313,8 @@ pub struct SetApiKeyPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub key_id: ::buffa::alloc::string::String,
-    /// Policy template to attach (opaque ID). A value of 0 clears the policy
-    /// and reverts to no per-key policy. The sub-account policy and role remain
-    /// the permission ceiling.
+    /// Policy template to attach (opaque ID). A value of 0 clears the binding.
+    /// An API key without an attached policy has no permissions.
     ///
     /// Field 2: `policy_id`
     #[serde(
@@ -41496,7 +40362,7 @@ pub mod __buffa {
             /// Field 7: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
             /// Optional API policy attached to this key (opaque ID).
-            /// Empty means "no per-key policy", so only the sub-account policy (and roles) apply.
+            /// Empty means no policy is attached and the key has no permissions.
             ///
             /// Field 8: `policy_id`
             pub policy_id: ::core::option::Option<u64>,
@@ -42253,7 +41119,7 @@ pub mod __buffa {
                 self.0.reborrow().subaccount_id
             }
             /// Optional API policy attached to this key (opaque ID).
-            /// Empty means "no per-key policy", so only the sub-account policy (and roles) apply.
+            /// Empty means no policy is attached and the key has no permissions.
             ///
             /// Field 8: `policy_id`
             #[must_use]
@@ -46011,7 +44877,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// MarketScope describes how a policy applies to spot markets or perp contracts.
+        /// MarketScope describes how a policy applies to spot markets.
         #[derive(Clone, Debug, Default)]
         pub struct MarketScopeView<'a> {
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -46247,13 +45113,285 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// SpotMarketRule describes an allowed spot market for a sub-account policy.
+        /// SpotMarketSelector identifies an allowed spot market in policy mutations.
+        #[derive(Clone, Debug, Default)]
+        pub struct SpotMarketSelectorView<'a> {
+            /// Stable numeric pair ID from GetSpotConfig.
+            ///
+            /// Field 1: `symbol_id`
+            pub symbol_id: u32,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SpotMarketSelectorView<'a> {
+            type Owned = super::super::SpotMarketSelector;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SpotMarketSelector,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SpotMarketSelector,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SpotMarketSelector {
+                    symbol_id: self.symbol_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SpotMarketSelectorView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SpotMarketSelectorView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SpotMarketSelectorView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "SpotMarketSelector";
+            const FULL_NAME: &'static str = "auth.v1.SpotMarketSelector";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SpotMarketSelector";
+        }
+        ::buffa::impl_default_view_instance!(SpotMarketSelectorView);
+        ::buffa::impl_view_reborrow!(SpotMarketSelectorView);
+        /** Self-contained, `'static` owned view of a `SpotMarketSelector` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SpotMarketSelectorView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SpotMarketSelectorView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SpotMarketSelectorOwnedView(
+            ::buffa::OwnedView<SpotMarketSelectorView<'static>>,
+        );
+        impl SpotMarketSelectorOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SpotMarketSelectorOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SpotMarketSelectorOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SpotMarketSelector,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SpotMarketSelectorOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`SpotMarketSelectorView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SpotMarketSelectorView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SpotMarketSelector,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable numeric pair ID from GetSpotConfig.
+            ///
+            /// Field 1: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<SpotMarketSelectorView<'static>>>
+        for SpotMarketSelectorOwnedView {
+            fn from(inner: ::buffa::OwnedView<SpotMarketSelectorView<'static>>) -> Self {
+                SpotMarketSelectorOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SpotMarketSelectorOwnedView>
+        for ::buffa::OwnedView<SpotMarketSelectorView<'static>> {
+            fn from(wrapper: SpotMarketSelectorOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<SpotMarketSelectorView<'static>>>
+        for SpotMarketSelectorOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<SpotMarketSelectorView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SpotMarketSelector {
+            type View<'a> = SpotMarketSelectorView<'a>;
+            type ViewHandle = SpotMarketSelectorOwnedView;
+        }
+        impl ::serde::Serialize for SpotMarketSelectorOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// SpotMarketRule describes an allowed spot market in policy views.
         #[derive(Clone, Debug, Default)]
         pub struct SpotMarketRuleView<'a> {
-            /// Spot market symbol, e.g. "BTC-USDT".
+            /// Stable numeric pair ID.
             ///
-            /// Field 1: `symbol`
-            pub symbol: &'a str,
+            /// Field 1: `symbol_id`
+            pub symbol_id: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SpotMarketRuleView<'a> {
@@ -46290,9 +45428,9 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -46323,7 +45461,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::SpotMarketRule {
-                    symbol: self.symbol.to_string(),
+                    symbol_id: self.symbol_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -46338,10 +45476,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.symbol.is_empty() {
+                if self.symbol_id != 0u32 {
                     size
                         += 1u32
-                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -46354,8 +45492,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.symbol.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.symbol, buf);
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -46378,8 +45516,12 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
-                    __map.serialize_entry("symbol", self.symbol)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
                 }
                 __map.end()
             }
@@ -46477,12 +45619,12 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Spot market symbol, e.g. "BTC-USDT".
+            /// Stable numeric pair ID.
             ///
-            /// Field 1: `symbol`
+            /// Field 1: `symbol_id`
             #[must_use]
-            pub fn symbol(&self) -> &'_ str {
-                self.0.reborrow().symbol
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SpotMarketRuleView<'static>>>
@@ -46515,313 +45657,6 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// PerpMarketRule describes an allowed perp contract and optional max leverage.
-        #[derive(Clone, Debug, Default)]
-        pub struct PerpMarketRuleView<'a> {
-            /// Perp contract symbol, e.g. "BTCUSDT".
-            ///
-            /// Field 1: `symbol`
-            pub symbol: &'a str,
-            /// Optional maximum leverage multiplier. Supported non-zero values are 1, 3,
-            /// 5, 10, 20, 50, and 100. A value of 0 means no explicit per-contract cap;
-            /// global_perp_leverage_x and product defaults still apply.
-            ///
-            /// Field 2: `max_leverage_x`
-            pub max_leverage_x: u32,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for PerpMarketRuleView<'a> {
-            type Owned = super::super::PerpMarketRule;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_leverage_x = ::buffa::types::decode_uint32(&mut cur)?;
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::PerpMarketRule,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::PerpMarketRule,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::PerpMarketRule {
-                    symbol: self.symbol.to_string(),
-                    max_leverage_x: self.max_leverage_x,
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for PerpMarketRuleView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u32;
-                if !self.symbol.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
-                }
-                if self.max_leverage_x != 0u32 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.max_leverage_x)
-                                as u32;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u32;
-                size
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::bytes::BufMut,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if !self.symbol.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.symbol, buf);
-                }
-                if self.max_leverage_x != 0u32 {
-                    ::buffa::types::put_uint32_field(2u32, self.max_leverage_x, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for PerpMarketRuleView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
-                    __map.serialize_entry("symbol", self.symbol)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.max_leverage_x) {
-                    __map
-                        .serialize_entry(
-                            "maxLeverageX",
-                            &::buffa::json_helpers::ProtoJson(&self.max_leverage_x),
-                        )?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for PerpMarketRuleView<'a> {
-            const PACKAGE: &'static str = "auth.v1";
-            const NAME: &'static str = "PerpMarketRule";
-            const FULL_NAME: &'static str = "auth.v1.PerpMarketRule";
-            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.PerpMarketRule";
-        }
-        ::buffa::impl_default_view_instance!(PerpMarketRuleView);
-        ::buffa::impl_view_reborrow!(PerpMarketRuleView);
-        /** Self-contained, `'static` owned view of a `PerpMarketRule` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`PerpMarketRuleView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PerpMarketRuleView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct PerpMarketRuleOwnedView(
-            ::buffa::OwnedView<PerpMarketRuleView<'static>>,
-        );
-        impl PerpMarketRuleOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    PerpMarketRuleOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    PerpMarketRuleOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::PerpMarketRule,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    PerpMarketRuleOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`PerpMarketRuleView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &PerpMarketRuleView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// # Errors
-            ///
-            /// Returns an error if re-materializing preserved unknown fields
-            /// fails (e.g. the unknown-field limit is exceeded).
-            pub fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::PerpMarketRule,
-                ::buffa::DecodeError,
-            > {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Perp contract symbol, e.g. "BTCUSDT".
-            ///
-            /// Field 1: `symbol`
-            #[must_use]
-            pub fn symbol(&self) -> &'_ str {
-                self.0.reborrow().symbol
-            }
-            /// Optional maximum leverage multiplier. Supported non-zero values are 1, 3,
-            /// 5, 10, 20, 50, and 100. A value of 0 means no explicit per-contract cap;
-            /// global_perp_leverage_x and product defaults still apply.
-            ///
-            /// Field 2: `max_leverage_x`
-            #[must_use]
-            pub fn max_leverage_x(&self) -> u32 {
-                self.0.reborrow().max_leverage_x
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<PerpMarketRuleView<'static>>>
-        for PerpMarketRuleOwnedView {
-            fn from(inner: ::buffa::OwnedView<PerpMarketRuleView<'static>>) -> Self {
-                PerpMarketRuleOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<PerpMarketRuleOwnedView>
-        for ::buffa::OwnedView<PerpMarketRuleView<'static>> {
-            fn from(wrapper: PerpMarketRuleOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<::buffa::OwnedView<PerpMarketRuleView<'static>>>
-        for PerpMarketRuleOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<PerpMarketRuleView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::PerpMarketRule {
-            type View<'a> = PerpMarketRuleView<'a>;
-            type ViewHandle = PerpMarketRuleOwnedView;
-        }
-        impl ::serde::Serialize for PerpMarketRuleOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
         /// SubaccountPolicyView is the public view of a sub-account policy.
         #[derive(Clone, Debug, Default)]
         pub struct SubaccountPolicyViewView<'a> {
@@ -46844,25 +45679,13 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::SpotMarketRuleView<'a>,
             >,
-            /// Allowed perp contracts for this sub-account, with optional per-contract caps.
-            ///
-            /// Field 5: `perp_markets`
-            pub perp_markets: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::PerpMarketRuleView<'a>,
-            >,
             /// Market-level scope for spot markets. When ALL, spot_markets is returned
             /// for display only and is not enforced.
             ///
             /// Field 6: `spot_market_scope`
             pub spot_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// Market-level scope for perp contracts. When ALL, perp_markets is returned
-            /// for display only and is not enforced.
-            ///
-            /// Field 7: `perp_market_scope`
-            pub perp_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// High-level actions enabled for the sub-account. Up to 64 unique explicit
-            /// actions may be returned.
+            /// Effective high-level actions enabled for the sub-account. Mandatory
+            /// read-only actions are always included.
             ///
             /// Field 8: `actions`
             pub actions: ::buffa::RepeatedView<
@@ -46879,16 +45702,8 @@ pub mod __buffa {
             ///
             /// Field 11: `source_template_id`
             pub source_template_id: u64,
-            /// --- Global risk limits (sub-account scope) ---
-            ///
-            /// Maximum total notional exposure (across all positions) allowed for this
-            /// sub-account, expressed in a canonical quote unit (e.g. micro-USDT).
-            /// A value of 0 means "no explicit cap".
-            ///
-            /// Field 12: `global_notional_cap`
-            pub global_notional_cap: u64,
             /// Maximum notional size allowed for any single order on this sub-account,
-            /// expressed in the same canonical quote unit as global_notional_cap.
+            /// expressed in canonical quote microunits (one unit is 0.000001 USDT).
             /// A value of 0 means "no explicit cap".
             ///
             /// Field 13: `max_order_notional`
@@ -46898,68 +45713,14 @@ pub mod __buffa {
             ///
             /// Field 14: `max_open_orders`
             pub max_open_orders: u32,
-            /// Maximum number of open perp positions allowed on this sub-account.
-            /// A value of 0 means "no explicit cap".
-            ///
-            /// Field 15: `max_open_positions`
-            pub max_open_positions: u32,
-            /// Optional global leverage cap across all perp contracts, expressed as a
-            /// maximum leverage multiple. Supported non-zero values are 1, 3, 5, 10, 20,
-            /// 50, and 100. A value of 0 means "no explicit global cap"; per-contract
-            /// caps still apply.
-            ///
-            /// Field 16: `global_perp_leverage_x`
-            pub global_perp_leverage_x: u32,
-            /// --- Capital movement limits (sub-account scope) ---
-            ///
-            /// Maximum total notional this sub-account can transfer out internally per
-            /// day, expressed in the canonical quote unit (for example, micro-USDT). A
-            /// value of 0 means "no explicit cap".
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            pub daily_internal_transfer_out_limit: u64,
-            /// Maximum total notional this sub-account can withdraw per day, expressed in
-            /// the canonical quote unit (for example, micro-USDT). A value of 0 means "no
-            /// explicit cap".
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            pub daily_withdraw_limit: u64,
-            /// When true, internal transfers from this sub-account may only target other
-            /// sub-accounts owned by the same root account. When false, transfers to
-            /// other owners are allowed (subject to other policy checks).
-            ///
-            /// Field 19: `internal_transfers_own_only`
-            pub internal_transfers_own_only: bool,
-            /// When true, external withdrawals from this sub-account must target an
-            /// approved withdrawal destination.
-            ///
-            /// Field 22: `enforce_withdraw_whitelist`
-            pub enforce_withdraw_whitelist: bool,
             /// --- Safety / kill-switch controls ---
             ///
-            /// When true, trading on this sub-account is halted: new orders are rejected
-            /// regardless of other settings. Existing positions may still be closed by
-            /// product safety controls.
+            /// When true, new orders and exposure-increasing order or trigger changes are
+            /// rejected regardless of other settings. Existing orders and triggers may
+            /// still be canceled or paused.
             ///
             /// Field 23: `trading_halted`
             pub trading_halted: bool,
-            /// When true, this sub-account is in liquidation-only mode: new exposure
-            /// cannot be opened, but reduce-only / close-out actions are allowed.
-            ///
-            /// Field 24: `liquidation_only`
-            pub liquidation_only: bool,
-            /// Maximum allowed realized loss for this sub-account over a rolling day
-            /// before safety controls may halt activity, expressed in the canonical quote
-            /// unit (for example, micro-USDT). A value of 0 means "no explicit limit".
-            ///
-            /// Field 25: `daily_loss_limit`
-            pub daily_loss_limit: u64,
-            /// Maximum allowed drawdown from peak equity in basis points (1/100 of a
-            /// percent) before safety controls may halt activity. A value of 0 means "no
-            /// explicit limit".
-            ///
-            /// Field 26: `intraday_drawdown_limit_bps`
-            pub intraday_drawdown_limit_bps: u32,
             /// --- Governance / lifecycle metadata ---
             ///
             /// When true, this policy is write-protected and requires an elevated approval
@@ -47060,15 +45821,6 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.perp_market_scope = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
                     10u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -47082,15 +45834,6 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Fixed64,
                         )?;
                         view.source_template_id = ::buffa::types::decode_fixed64(
-                            &mut cur,
-                        )?;
-                    }
-                    12u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.global_notional_cap = ::buffa::types::decode_uint64(
                             &mut cur,
                         )?;
                     }
@@ -47110,89 +45853,12 @@ pub mod __buffa {
                         )?;
                         view.max_open_orders = ::buffa::types::decode_uint32(&mut cur)?;
                     }
-                    15u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_open_positions = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
-                    }
-                    16u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.global_perp_leverage_x = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
-                    }
-                    17u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    18u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_withdraw_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    19u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.internal_transfers_own_only = ::buffa::types::decode_bool(
-                            &mut cur,
-                        )?;
-                    }
-                    22u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.enforce_withdraw_whitelist = ::buffa::types::decode_bool(
-                            &mut cur,
-                        )?;
-                    }
                     23u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.trading_halted = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    24u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.liquidation_only = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    25u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_loss_limit = ::buffa::types::decode_uint64(&mut cur)?;
-                    }
-                    26u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.intraday_drawdown_limit_bps = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
                     }
                     27u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -47323,21 +45989,6 @@ pub mod __buffa {
                                 )?,
                             );
                     }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        view.perp_markets
-                            .push(
-                                <super::super::__buffa::view::PerpMarketRuleView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
                     8u32 => {
                         if tag.wire_type()
                             == ::buffa::encoding::WireType::LengthDelimited
@@ -47408,30 +46059,13 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    perp_markets: self
-                        .perp_markets
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     spot_market_scope: self.spot_market_scope,
-                    perp_market_scope: self.perp_market_scope,
                     actions: self.actions.to_vec(),
                     is_template: self.is_template,
                     source_template_id: self.source_template_id,
-                    global_notional_cap: self.global_notional_cap,
                     max_order_notional: self.max_order_notional,
                     max_open_orders: self.max_open_orders,
-                    max_open_positions: self.max_open_positions,
-                    global_perp_leverage_x: self.global_perp_leverage_x,
-                    daily_internal_transfer_out_limit: self
-                        .daily_internal_transfer_out_limit,
-                    daily_withdraw_limit: self.daily_withdraw_limit,
-                    internal_transfers_own_only: self.internal_transfers_own_only,
-                    enforce_withdraw_whitelist: self.enforce_withdraw_whitelist,
                     trading_halted: self.trading_halted,
-                    liquidation_only: self.liquidation_only,
-                    daily_loss_limit: self.daily_loss_limit,
-                    intraday_drawdown_limit_bps: self.intraday_drawdown_limit_bps,
                     locked: self.locked,
                     review_at: match self.review_at.as_option() {
                         Some(v) => {
@@ -47500,22 +46134,8 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                for v in &self.perp_markets {
-                    let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
-                }
                 {
                     let val = self.spot_market_scope.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -47536,13 +46156,6 @@ pub mod __buffa {
                 if self.source_template_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if self.global_notional_cap != 0u64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.global_notional_cap,
-                            ) as u32;
-                }
                 if self.max_order_notional != 0u64 {
                     size
                         += 1u32
@@ -47554,36 +46167,6 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::uint32_encoded_len(self.max_open_orders)
                                 as u32;
-                }
-                if self.max_open_positions != 0u32 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.max_open_positions)
-                                as u32;
-                }
-                if self.global_perp_leverage_x != 0u32 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint32_encoded_len(
-                                self.global_perp_leverage_x,
-                            ) as u32;
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_internal_transfer_out_limit,
-                            ) as u32;
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_withdraw_limit,
-                            ) as u32;
-                }
-                if self.internal_transfers_own_only {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
                 if self.created_at.is_set() {
                     let __slot = __cache.reserve();
@@ -47601,27 +46184,8 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if self.enforce_withdraw_whitelist {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
                 if self.trading_halted {
                     size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.liquidation_only {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.daily_loss_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(self.daily_loss_limit)
-                                as u32;
-                }
-                if self.intraday_drawdown_limit_bps != 0u32 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint32_encoded_len(
-                                self.intraday_drawdown_limit_bps,
-                            ) as u32;
                 }
                 if self.locked {
                     size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
@@ -47675,24 +46239,10 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
-                for v in &self.perp_markets {
-                    ::buffa::types::put_len_delimited_header(
-                        5u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    v.write_to(__cache, buf);
-                }
                 {
                     let val = self.spot_market_scope.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(6u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(7u32, val, buf);
                     }
                 }
                 if !self.actions.is_empty() {
@@ -47716,13 +46266,6 @@ pub mod __buffa {
                         buf,
                     );
                 }
-                if self.global_notional_cap != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        12u32,
-                        self.global_notional_cap,
-                        buf,
-                    );
-                }
                 if self.max_order_notional != 0u64 {
                     ::buffa::types::put_uint64_field(
                         13u32,
@@ -47732,41 +46275,6 @@ pub mod __buffa {
                 }
                 if self.max_open_orders != 0u32 {
                     ::buffa::types::put_uint32_field(14u32, self.max_open_orders, buf);
-                }
-                if self.max_open_positions != 0u32 {
-                    ::buffa::types::put_uint32_field(
-                        15u32,
-                        self.max_open_positions,
-                        buf,
-                    );
-                }
-                if self.global_perp_leverage_x != 0u32 {
-                    ::buffa::types::put_uint32_field(
-                        16u32,
-                        self.global_perp_leverage_x,
-                        buf,
-                    );
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        17u32,
-                        self.daily_internal_transfer_out_limit,
-                        buf,
-                    );
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        18u32,
-                        self.daily_withdraw_limit,
-                        buf,
-                    );
-                }
-                if self.internal_transfers_own_only {
-                    ::buffa::types::put_bool_field(
-                        19u32,
-                        self.internal_transfers_own_only,
-                        buf,
-                    );
                 }
                 if self.created_at.is_set() {
                     ::buffa::types::put_len_delimited_header(
@@ -47784,28 +46292,8 @@ pub mod __buffa {
                     );
                     self.updated_at.write_to(__cache, buf);
                 }
-                if self.enforce_withdraw_whitelist {
-                    ::buffa::types::put_bool_field(
-                        22u32,
-                        self.enforce_withdraw_whitelist,
-                        buf,
-                    );
-                }
                 if self.trading_halted {
                     ::buffa::types::put_bool_field(23u32, self.trading_halted, buf);
-                }
-                if self.liquidation_only {
-                    ::buffa::types::put_bool_field(24u32, self.liquidation_only, buf);
-                }
-                if self.daily_loss_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(25u32, self.daily_loss_limit, buf);
-                }
-                if self.intraday_drawdown_limit_bps != 0u32 {
-                    ::buffa::types::put_uint32_field(
-                        26u32,
-                        self.intraday_drawdown_limit_bps,
-                        buf,
-                    );
                 }
                 if self.locked {
                     ::buffa::types::put_bool_field(27u32, self.locked, buf);
@@ -47866,18 +46354,10 @@ pub mod __buffa {
                 if !self.spot_markets.is_empty() {
                     __map.serialize_entry("spotMarkets", &*self.spot_markets)?;
                 }
-                if !self.perp_markets.is_empty() {
-                    __map.serialize_entry("perpMarkets", &*self.perp_markets)?;
-                }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.spot_market_scope,
                 ) {
                     __map.serialize_entry("spotMarketScope", &self.spot_market_scope)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.perp_market_scope,
-                ) {
-                    __map.serialize_entry("perpMarketScope", &self.perp_market_scope)?;
                 }
                 if !self.actions.is_empty() {
                     __map
@@ -47899,15 +46379,6 @@ pub mod __buffa {
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.global_notional_cap,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "globalNotionalCap",
-                            &::buffa::json_helpers::ProtoJson(&self.global_notional_cap),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
                     &self.max_order_notional,
                 ) {
                     __map
@@ -47923,83 +46394,8 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.max_open_orders),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.max_open_positions,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "maxOpenPositions",
-                            &::buffa::json_helpers::ProtoJson(&self.max_open_positions),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.global_perp_leverage_x,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "globalPerpLeverageX",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.global_perp_leverage_x,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_internal_transfer_out_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyInternalTransferOutLimit",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.daily_internal_transfer_out_limit,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_withdraw_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyWithdrawLimit",
-                            &::buffa::json_helpers::ProtoJson(&self.daily_withdraw_limit),
-                        )?;
-                }
-                if self.internal_transfers_own_only {
-                    __map
-                        .serialize_entry(
-                            "internalTransfersOwnOnly",
-                            &self.internal_transfers_own_only,
-                        )?;
-                }
-                if self.enforce_withdraw_whitelist {
-                    __map
-                        .serialize_entry(
-                            "enforceWithdrawWhitelist",
-                            &self.enforce_withdraw_whitelist,
-                        )?;
-                }
                 if self.trading_halted {
                     __map.serialize_entry("tradingHalted", &self.trading_halted)?;
-                }
-                if self.liquidation_only {
-                    __map.serialize_entry("liquidationOnly", &self.liquidation_only)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.daily_loss_limit) {
-                    __map
-                        .serialize_entry(
-                            "dailyLossLimit",
-                            &::buffa::json_helpers::ProtoJson(&self.daily_loss_limit),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.intraday_drawdown_limit_bps,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "intradayDrawdownLimitBps",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.intraday_drawdown_limit_bps,
-                            ),
-                        )?;
                 }
                 if self.locked {
                     __map.serialize_entry("locked", &self.locked)?;
@@ -48170,18 +46566,6 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().spot_markets
             }
-            /// Allowed perp contracts for this sub-account, with optional per-contract caps.
-            ///
-            /// Field 5: `perp_markets`
-            #[must_use]
-            pub fn perp_markets(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::PerpMarketRuleView<'_>,
-            > {
-                &self.0.reborrow().perp_markets
-            }
             /// Market-level scope for spot markets. When ALL, spot_markets is returned
             /// for display only and is not enforced.
             ///
@@ -48192,18 +46576,8 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
                 self.0.reborrow().spot_market_scope
             }
-            /// Market-level scope for perp contracts. When ALL, perp_markets is returned
-            /// for display only and is not enforced.
-            ///
-            /// Field 7: `perp_market_scope`
-            #[must_use]
-            pub fn perp_market_scope(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
-                self.0.reborrow().perp_market_scope
-            }
-            /// High-level actions enabled for the sub-account. Up to 64 unique explicit
-            /// actions may be returned.
+            /// Effective high-level actions enabled for the sub-account. Mandatory
+            /// read-only actions are always included.
             ///
             /// Field 8: `actions`
             #[must_use]
@@ -48231,19 +46605,8 @@ pub mod __buffa {
             pub fn source_template_id(&self) -> u64 {
                 self.0.reborrow().source_template_id
             }
-            /// --- Global risk limits (sub-account scope) ---
-            ///
-            /// Maximum total notional exposure (across all positions) allowed for this
-            /// sub-account, expressed in a canonical quote unit (e.g. micro-USDT).
-            /// A value of 0 means "no explicit cap".
-            ///
-            /// Field 12: `global_notional_cap`
-            #[must_use]
-            pub fn global_notional_cap(&self) -> u64 {
-                self.0.reborrow().global_notional_cap
-            }
             /// Maximum notional size allowed for any single order on this sub-account,
-            /// expressed in the same canonical quote unit as global_notional_cap.
+            /// expressed in canonical quote microunits (one unit is 0.000001 USDT).
             /// A value of 0 means "no explicit cap".
             ///
             /// Field 13: `max_order_notional`
@@ -48259,97 +46622,16 @@ pub mod __buffa {
             pub fn max_open_orders(&self) -> u32 {
                 self.0.reborrow().max_open_orders
             }
-            /// Maximum number of open perp positions allowed on this sub-account.
-            /// A value of 0 means "no explicit cap".
-            ///
-            /// Field 15: `max_open_positions`
-            #[must_use]
-            pub fn max_open_positions(&self) -> u32 {
-                self.0.reborrow().max_open_positions
-            }
-            /// Optional global leverage cap across all perp contracts, expressed as a
-            /// maximum leverage multiple. Supported non-zero values are 1, 3, 5, 10, 20,
-            /// 50, and 100. A value of 0 means "no explicit global cap"; per-contract
-            /// caps still apply.
-            ///
-            /// Field 16: `global_perp_leverage_x`
-            #[must_use]
-            pub fn global_perp_leverage_x(&self) -> u32 {
-                self.0.reborrow().global_perp_leverage_x
-            }
-            /// --- Capital movement limits (sub-account scope) ---
-            ///
-            /// Maximum total notional this sub-account can transfer out internally per
-            /// day, expressed in the canonical quote unit (for example, micro-USDT). A
-            /// value of 0 means "no explicit cap".
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            #[must_use]
-            pub fn daily_internal_transfer_out_limit(&self) -> u64 {
-                self.0.reborrow().daily_internal_transfer_out_limit
-            }
-            /// Maximum total notional this sub-account can withdraw per day, expressed in
-            /// the canonical quote unit (for example, micro-USDT). A value of 0 means "no
-            /// explicit cap".
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            #[must_use]
-            pub fn daily_withdraw_limit(&self) -> u64 {
-                self.0.reborrow().daily_withdraw_limit
-            }
-            /// When true, internal transfers from this sub-account may only target other
-            /// sub-accounts owned by the same root account. When false, transfers to
-            /// other owners are allowed (subject to other policy checks).
-            ///
-            /// Field 19: `internal_transfers_own_only`
-            #[must_use]
-            pub fn internal_transfers_own_only(&self) -> bool {
-                self.0.reborrow().internal_transfers_own_only
-            }
-            /// When true, external withdrawals from this sub-account must target an
-            /// approved withdrawal destination.
-            ///
-            /// Field 22: `enforce_withdraw_whitelist`
-            #[must_use]
-            pub fn enforce_withdraw_whitelist(&self) -> bool {
-                self.0.reborrow().enforce_withdraw_whitelist
-            }
             /// --- Safety / kill-switch controls ---
             ///
-            /// When true, trading on this sub-account is halted: new orders are rejected
-            /// regardless of other settings. Existing positions may still be closed by
-            /// product safety controls.
+            /// When true, new orders and exposure-increasing order or trigger changes are
+            /// rejected regardless of other settings. Existing orders and triggers may
+            /// still be canceled or paused.
             ///
             /// Field 23: `trading_halted`
             #[must_use]
             pub fn trading_halted(&self) -> bool {
                 self.0.reborrow().trading_halted
-            }
-            /// When true, this sub-account is in liquidation-only mode: new exposure
-            /// cannot be opened, but reduce-only / close-out actions are allowed.
-            ///
-            /// Field 24: `liquidation_only`
-            #[must_use]
-            pub fn liquidation_only(&self) -> bool {
-                self.0.reborrow().liquidation_only
-            }
-            /// Maximum allowed realized loss for this sub-account over a rolling day
-            /// before safety controls may halt activity, expressed in the canonical quote
-            /// unit (for example, micro-USDT). A value of 0 means "no explicit limit".
-            ///
-            /// Field 25: `daily_loss_limit`
-            #[must_use]
-            pub fn daily_loss_limit(&self) -> u64 {
-                self.0.reborrow().daily_loss_limit
-            }
-            /// Maximum allowed drawdown from peak equity in basis points (1/100 of a
-            /// percent) before safety controls may halt activity. A value of 0 means "no
-            /// explicit limit".
-            ///
-            /// Field 26: `intraday_drawdown_limit_bps`
-            #[must_use]
-            pub fn intraday_drawdown_limit_bps(&self) -> u32 {
-                self.0.reborrow().intraday_drawdown_limit_bps
             }
             /// --- Governance / lifecycle metadata ---
             ///
@@ -49693,40 +47975,24 @@ pub mod __buffa {
             /// Field 3: `spot_markets`
             pub spot_markets: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::SpotMarketRuleView<'a>,
-            >,
-            /// Allowed perp markets and optional per-contract leverage caps.
-            ///
-            /// Field 4: `perp_markets`
-            pub perp_markets: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::PerpMarketRuleView<'a>,
+                super::super::__buffa::view::SpotMarketSelectorView<'a>,
             >,
             /// Market-level scope for spot markets. When unspecified, defaults to ALL.
             ///
             /// Field 5: `spot_market_scope`
             pub spot_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-            ///
-            /// Field 6: `perp_market_scope`
-            pub perp_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// High-level actions enabled for the sub-account policy. Up to 64 unique
-            /// explicit actions are allowed.
+            /// High-level actions enabled for the sub-account policy. Mandatory read-only
+            /// actions are included when omitted. Up to 64 unique explicit actions are
+            /// allowed.
             ///
             /// Field 7: `actions`
             pub actions: ::buffa::RepeatedView<
                 'a,
                 ::buffa::EnumValue<super::super::PolicyAction>,
             >,
-            /// Maximum total notional exposure across all positions for this sub-account,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no explicit cap.
-            ///
-            /// Field 12: `global_notional_cap`
-            pub global_notional_cap: u64,
             /// Maximum notional size for any single order on this sub-account, expressed
-            /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-            /// no explicit cap.
+            /// in canonical quote microunits (one unit is 0.000001 USDT). A value of 0
+            /// means no explicit cap.
             ///
             /// Field 13: `max_order_notional`
             pub max_order_notional: u64,
@@ -49735,58 +48001,12 @@ pub mod __buffa {
             ///
             /// Field 14: `max_open_orders`
             pub max_open_orders: u32,
-            /// Maximum number of open perp positions allowed on this sub-account. A value
-            /// of 0 means no explicit cap.
-            ///
-            /// Field 15: `max_open_positions`
-            pub max_open_positions: u32,
-            /// Optional global leverage cap across all perp contracts. Supported non-zero
-            /// values are 1, 3, 5, 10, 20, 50, and 100. A value of 0 means no explicit cap.
-            ///
-            /// Field 16: `global_perp_leverage_x`
-            pub global_perp_leverage_x: u32,
-            /// Maximum total notional this sub-account can transfer out internally per
-            /// rolling day, expressed in the canonical quote unit (for example,
-            /// micro-USDT). A value of 0 means no explicit cap.
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            pub daily_internal_transfer_out_limit: u64,
-            /// Maximum total notional this sub-account can withdraw per rolling day,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no explicit cap.
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            pub daily_withdraw_limit: u64,
-            /// When true, internal transfers from this sub-account may only target other
-            /// sub-accounts owned by the same root account.
-            ///
-            /// Field 19: `internal_transfers_own_only`
-            pub internal_transfers_own_only: bool,
-            /// When true, external withdrawals from this sub-account must target an
-            /// approved withdrawal destination.
-            ///
-            /// Field 20: `enforce_withdraw_whitelist`
-            pub enforce_withdraw_whitelist: bool,
-            /// When true, new orders for this sub-account are rejected regardless of other
-            /// policy settings.
+            /// When true, new orders and exposure-increasing order or trigger changes are
+            /// rejected regardless of other settings. Existing orders and triggers may
+            /// still be canceled or paused.
             ///
             /// Field 21: `trading_halted`
             pub trading_halted: bool,
-            /// When true, this sub-account may only reduce or close existing exposure.
-            ///
-            /// Field 22: `liquidation_only`
-            pub liquidation_only: bool,
-            /// Maximum realized loss over a rolling day before safety controls may halt
-            /// activity, expressed in the canonical quote unit (for example, micro-USDT).
-            /// A value of 0 means no explicit limit.
-            ///
-            /// Field 23: `daily_loss_limit`
-            pub daily_loss_limit: u64,
-            /// Maximum drawdown from peak equity in basis points. One basis point is
-            /// 1/100 of one percent. A value of 0 means no explicit limit.
-            ///
-            /// Field 24: `intraday_drawdown_limit_bps`
-            pub intraday_drawdown_limit_bps: u32,
             /// When true, the policy is write-protected and requires an elevated mutation path.
             ///
             /// Field 25: `locked`
@@ -49859,24 +48079,6 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.perp_market_scope = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    12u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.global_notional_cap = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
                     13u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -49893,89 +48095,12 @@ pub mod __buffa {
                         )?;
                         view.max_open_orders = ::buffa::types::decode_uint32(&mut cur)?;
                     }
-                    15u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_open_positions = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
-                    }
-                    16u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.global_perp_leverage_x = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
-                    }
-                    17u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    18u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_withdraw_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    19u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.internal_transfers_own_only = ::buffa::types::decode_bool(
-                            &mut cur,
-                        )?;
-                    }
-                    20u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.enforce_withdraw_whitelist = ::buffa::types::decode_bool(
-                            &mut cur,
-                        )?;
-                    }
                     21u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.trading_halted = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    22u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.liquidation_only = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    23u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_loss_limit = ::buffa::types::decode_uint64(&mut cur)?;
-                    }
-                    24u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.intraday_drawdown_limit_bps = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
                     }
                     25u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -50043,22 +48168,7 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         view.spot_markets
                             .push(
-                                <super::super::__buffa::view::SpotMarketRuleView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        view.perp_markets
-                            .push(
-                                <super::super::__buffa::view::PerpMarketRuleView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::SpotMarketSelectorView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -50133,28 +48243,11 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    perp_markets: self
-                        .perp_markets
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     spot_market_scope: self.spot_market_scope,
-                    perp_market_scope: self.perp_market_scope,
                     actions: self.actions.to_vec(),
-                    global_notional_cap: self.global_notional_cap,
                     max_order_notional: self.max_order_notional,
                     max_open_orders: self.max_open_orders,
-                    max_open_positions: self.max_open_positions,
-                    global_perp_leverage_x: self.global_perp_leverage_x,
-                    daily_internal_transfer_out_limit: self
-                        .daily_internal_transfer_out_limit,
-                    daily_withdraw_limit: self.daily_withdraw_limit,
-                    internal_transfers_own_only: self.internal_transfers_own_only,
-                    enforce_withdraw_whitelist: self.enforce_withdraw_whitelist,
                     trading_halted: self.trading_halted,
-                    liquidation_only: self.liquidation_only,
-                    daily_loss_limit: self.daily_loss_limit,
-                    intraday_drawdown_limit_bps: self.intraday_drawdown_limit_bps,
                     locked: self.locked,
                     review_at: match self.review_at.as_option() {
                         Some(v) => {
@@ -50203,22 +48296,8 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                for v in &self.perp_markets {
-                    let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
-                }
                 {
                     let val = self.spot_market_scope.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -50233,13 +48312,6 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
                             + payload;
                 }
-                if self.global_notional_cap != 0u64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.global_notional_cap,
-                            ) as u32;
-                }
                 if self.max_order_notional != 0u64 {
                     size
                         += 1u32
@@ -50252,57 +48324,8 @@ pub mod __buffa {
                             + ::buffa::types::uint32_encoded_len(self.max_open_orders)
                                 as u32;
                 }
-                if self.max_open_positions != 0u32 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.max_open_positions)
-                                as u32;
-                }
-                if self.global_perp_leverage_x != 0u32 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint32_encoded_len(
-                                self.global_perp_leverage_x,
-                            ) as u32;
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_internal_transfer_out_limit,
-                            ) as u32;
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_withdraw_limit,
-                            ) as u32;
-                }
-                if self.internal_transfers_own_only {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.enforce_withdraw_whitelist {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
                 if self.trading_halted {
                     size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.liquidation_only {
-                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.daily_loss_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(self.daily_loss_limit)
-                                as u32;
-                }
-                if self.intraday_drawdown_limit_bps != 0u32 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint32_encoded_len(
-                                self.intraday_drawdown_limit_bps,
-                            ) as u32;
                 }
                 if self.locked {
                     size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
@@ -50348,24 +48371,10 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
-                for v in &self.perp_markets {
-                    ::buffa::types::put_len_delimited_header(
-                        4u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    v.write_to(__cache, buf);
-                }
                 {
                     let val = self.spot_market_scope.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(5u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(6u32, val, buf);
                     }
                 }
                 if !self.actions.is_empty() {
@@ -50379,13 +48388,6 @@ pub mod __buffa {
                         ::buffa::types::encode_int32(v.to_i32(), buf);
                     }
                 }
-                if self.global_notional_cap != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        12u32,
-                        self.global_notional_cap,
-                        buf,
-                    );
-                }
                 if self.max_order_notional != 0u64 {
                     ::buffa::types::put_uint64_field(
                         13u32,
@@ -50396,63 +48398,8 @@ pub mod __buffa {
                 if self.max_open_orders != 0u32 {
                     ::buffa::types::put_uint32_field(14u32, self.max_open_orders, buf);
                 }
-                if self.max_open_positions != 0u32 {
-                    ::buffa::types::put_uint32_field(
-                        15u32,
-                        self.max_open_positions,
-                        buf,
-                    );
-                }
-                if self.global_perp_leverage_x != 0u32 {
-                    ::buffa::types::put_uint32_field(
-                        16u32,
-                        self.global_perp_leverage_x,
-                        buf,
-                    );
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        17u32,
-                        self.daily_internal_transfer_out_limit,
-                        buf,
-                    );
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        18u32,
-                        self.daily_withdraw_limit,
-                        buf,
-                    );
-                }
-                if self.internal_transfers_own_only {
-                    ::buffa::types::put_bool_field(
-                        19u32,
-                        self.internal_transfers_own_only,
-                        buf,
-                    );
-                }
-                if self.enforce_withdraw_whitelist {
-                    ::buffa::types::put_bool_field(
-                        20u32,
-                        self.enforce_withdraw_whitelist,
-                        buf,
-                    );
-                }
                 if self.trading_halted {
                     ::buffa::types::put_bool_field(21u32, self.trading_halted, buf);
-                }
-                if self.liquidation_only {
-                    ::buffa::types::put_bool_field(22u32, self.liquidation_only, buf);
-                }
-                if self.daily_loss_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(23u32, self.daily_loss_limit, buf);
-                }
-                if self.intraday_drawdown_limit_bps != 0u32 {
-                    ::buffa::types::put_uint32_field(
-                        24u32,
-                        self.intraday_drawdown_limit_bps,
-                        buf,
-                    );
                 }
                 if self.locked {
                     ::buffa::types::put_bool_field(25u32, self.locked, buf);
@@ -50503,33 +48450,16 @@ pub mod __buffa {
                 if !self.spot_markets.is_empty() {
                     __map.serialize_entry("spotMarkets", &*self.spot_markets)?;
                 }
-                if !self.perp_markets.is_empty() {
-                    __map.serialize_entry("perpMarkets", &*self.perp_markets)?;
-                }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.spot_market_scope,
                 ) {
                     __map.serialize_entry("spotMarketScope", &self.spot_market_scope)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.perp_market_scope,
-                ) {
-                    __map.serialize_entry("perpMarketScope", &self.perp_market_scope)?;
                 }
                 if !self.actions.is_empty() {
                     __map
                         .serialize_entry(
                             "actions",
                             &::buffa::json_helpers::EnumSeqJson(&self.actions),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.global_notional_cap,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "globalNotionalCap",
-                            &::buffa::json_helpers::ProtoJson(&self.global_notional_cap),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(
@@ -50548,83 +48478,8 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.max_open_orders),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.max_open_positions,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "maxOpenPositions",
-                            &::buffa::json_helpers::ProtoJson(&self.max_open_positions),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.global_perp_leverage_x,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "globalPerpLeverageX",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.global_perp_leverage_x,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_internal_transfer_out_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyInternalTransferOutLimit",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.daily_internal_transfer_out_limit,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_withdraw_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyWithdrawLimit",
-                            &::buffa::json_helpers::ProtoJson(&self.daily_withdraw_limit),
-                        )?;
-                }
-                if self.internal_transfers_own_only {
-                    __map
-                        .serialize_entry(
-                            "internalTransfersOwnOnly",
-                            &self.internal_transfers_own_only,
-                        )?;
-                }
-                if self.enforce_withdraw_whitelist {
-                    __map
-                        .serialize_entry(
-                            "enforceWithdrawWhitelist",
-                            &self.enforce_withdraw_whitelist,
-                        )?;
-                }
                 if self.trading_halted {
                     __map.serialize_entry("tradingHalted", &self.trading_halted)?;
-                }
-                if self.liquidation_only {
-                    __map.serialize_entry("liquidationOnly", &self.liquidation_only)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.daily_loss_limit) {
-                    __map
-                        .serialize_entry(
-                            "dailyLossLimit",
-                            &::buffa::json_helpers::ProtoJson(&self.daily_loss_limit),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.intraday_drawdown_limit_bps,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "intradayDrawdownLimitBps",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.intraday_drawdown_limit_bps,
-                            ),
-                        )?;
                 }
                 if self.locked {
                     __map.serialize_entry("locked", &self.locked)?;
@@ -50762,21 +48617,9 @@ pub mod __buffa {
                 &self,
             ) -> &::buffa::RepeatedView<
                 '_,
-                super::super::__buffa::view::SpotMarketRuleView<'_>,
+                super::super::__buffa::view::SpotMarketSelectorView<'_>,
             > {
                 &self.0.reborrow().spot_markets
-            }
-            /// Allowed perp markets and optional per-contract leverage caps.
-            ///
-            /// Field 4: `perp_markets`
-            #[must_use]
-            pub fn perp_markets(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::PerpMarketRuleView<'_>,
-            > {
-                &self.0.reborrow().perp_markets
             }
             /// Market-level scope for spot markets. When unspecified, defaults to ALL.
             ///
@@ -50787,17 +48630,9 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
                 self.0.reborrow().spot_market_scope
             }
-            /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-            ///
-            /// Field 6: `perp_market_scope`
-            #[must_use]
-            pub fn perp_market_scope(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
-                self.0.reborrow().perp_market_scope
-            }
-            /// High-level actions enabled for the sub-account policy. Up to 64 unique
-            /// explicit actions are allowed.
+            /// High-level actions enabled for the sub-account policy. Mandatory read-only
+            /// actions are included when omitted. Up to 64 unique explicit actions are
+            /// allowed.
             ///
             /// Field 7: `actions`
             #[must_use]
@@ -50809,18 +48644,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().actions
             }
-            /// Maximum total notional exposure across all positions for this sub-account,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no explicit cap.
-            ///
-            /// Field 12: `global_notional_cap`
-            #[must_use]
-            pub fn global_notional_cap(&self) -> u64 {
-                self.0.reborrow().global_notional_cap
-            }
             /// Maximum notional size for any single order on this sub-account, expressed
-            /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-            /// no explicit cap.
+            /// in canonical quote microunits (one unit is 0.000001 USDT). A value of 0
+            /// means no explicit cap.
             ///
             /// Field 13: `max_order_notional`
             #[must_use]
@@ -50835,87 +48661,14 @@ pub mod __buffa {
             pub fn max_open_orders(&self) -> u32 {
                 self.0.reborrow().max_open_orders
             }
-            /// Maximum number of open perp positions allowed on this sub-account. A value
-            /// of 0 means no explicit cap.
-            ///
-            /// Field 15: `max_open_positions`
-            #[must_use]
-            pub fn max_open_positions(&self) -> u32 {
-                self.0.reborrow().max_open_positions
-            }
-            /// Optional global leverage cap across all perp contracts. Supported non-zero
-            /// values are 1, 3, 5, 10, 20, 50, and 100. A value of 0 means no explicit cap.
-            ///
-            /// Field 16: `global_perp_leverage_x`
-            #[must_use]
-            pub fn global_perp_leverage_x(&self) -> u32 {
-                self.0.reborrow().global_perp_leverage_x
-            }
-            /// Maximum total notional this sub-account can transfer out internally per
-            /// rolling day, expressed in the canonical quote unit (for example,
-            /// micro-USDT). A value of 0 means no explicit cap.
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            #[must_use]
-            pub fn daily_internal_transfer_out_limit(&self) -> u64 {
-                self.0.reborrow().daily_internal_transfer_out_limit
-            }
-            /// Maximum total notional this sub-account can withdraw per rolling day,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no explicit cap.
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            #[must_use]
-            pub fn daily_withdraw_limit(&self) -> u64 {
-                self.0.reborrow().daily_withdraw_limit
-            }
-            /// When true, internal transfers from this sub-account may only target other
-            /// sub-accounts owned by the same root account.
-            ///
-            /// Field 19: `internal_transfers_own_only`
-            #[must_use]
-            pub fn internal_transfers_own_only(&self) -> bool {
-                self.0.reborrow().internal_transfers_own_only
-            }
-            /// When true, external withdrawals from this sub-account must target an
-            /// approved withdrawal destination.
-            ///
-            /// Field 20: `enforce_withdraw_whitelist`
-            #[must_use]
-            pub fn enforce_withdraw_whitelist(&self) -> bool {
-                self.0.reborrow().enforce_withdraw_whitelist
-            }
-            /// When true, new orders for this sub-account are rejected regardless of other
-            /// policy settings.
+            /// When true, new orders and exposure-increasing order or trigger changes are
+            /// rejected regardless of other settings. Existing orders and triggers may
+            /// still be canceled or paused.
             ///
             /// Field 21: `trading_halted`
             #[must_use]
             pub fn trading_halted(&self) -> bool {
                 self.0.reborrow().trading_halted
-            }
-            /// When true, this sub-account may only reduce or close existing exposure.
-            ///
-            /// Field 22: `liquidation_only`
-            #[must_use]
-            pub fn liquidation_only(&self) -> bool {
-                self.0.reborrow().liquidation_only
-            }
-            /// Maximum realized loss over a rolling day before safety controls may halt
-            /// activity, expressed in the canonical quote unit (for example, micro-USDT).
-            /// A value of 0 means no explicit limit.
-            ///
-            /// Field 23: `daily_loss_limit`
-            #[must_use]
-            pub fn daily_loss_limit(&self) -> u64 {
-                self.0.reborrow().daily_loss_limit
-            }
-            /// Maximum drawdown from peak equity in basis points. One basis point is
-            /// 1/100 of one percent. A value of 0 means no explicit limit.
-            ///
-            /// Field 24: `intraday_drawdown_limit_bps`
-            #[must_use]
-            pub fn intraday_drawdown_limit_bps(&self) -> u32 {
-                self.0.reborrow().intraday_drawdown_limit_bps
             }
             /// When true, the policy is write-protected and requires an elevated mutation path.
             ///
@@ -52978,8 +50731,8 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: u64,
-            /// Policy template to attach (opaque ID). A value of 0 clears the policy
-            /// and reverts to the platform default for this sub-account.
+            /// Policy template to attach (opaque ID). A value of 0 clears the explicit
+            /// binding and restores the system Read Only policy.
             ///
             /// Field 2: `policy_id`
             pub policy_id: u64,
@@ -53240,8 +50993,8 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> u64 {
                 self.0.reborrow().subaccount_id
             }
-            /// Policy template to attach (opaque ID). A value of 0 clears the policy
-            /// and reverts to the platform default for this sub-account.
+            /// Policy template to attach (opaque ID). A value of 0 clears the explicit
+            /// binding and restores the system Read Only policy.
             ///
             /// Field 2: `policy_id`
             #[must_use]
@@ -53533,8 +51286,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ApiPolicyView is the public view of an API key policy template. API key
-        /// policy limits are additional caps and cannot exceed the sub-account policy.
+        /// ApiPolicyView is the public view of an API key policy template. Its action
+        /// and spot-market floor cannot exceed an attached sub-account policy.
         #[derive(Clone, Debug, Default)]
         pub struct ApiPolicyViewView<'a> {
             /// Policy identifier (opaque ID).
@@ -53556,13 +51309,6 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::SpotMarketRuleView<'a>,
             >,
-            /// Allowed perp contracts for this API key policy, with optional per-contract caps.
-            ///
-            /// Field 5: `perp_markets`
-            pub perp_markets: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::PerpMarketRuleView<'a>,
-            >,
             /// High-level actions enabled for this API key. Up to 64 unique explicit
             /// actions may be returned.
             ///
@@ -53574,37 +51320,10 @@ pub mod __buffa {
             /// Market-level scope for spot markets. When ALL, spot_markets is returned
             /// for display only and is not enforced.
             ///
-            /// Field 7: `spot_market_scope`
-            pub spot_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// Market-level scope for perp contracts. When ALL, perp_markets is returned
-            /// for display only and is not enforced.
-            ///
-            /// Field 8: `perp_market_scope`
-            pub perp_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// --- Global risk limits (API key scope) ---
-            ///
-            /// Maximum notional size allowed for any single order via this key, expressed
-            /// in a canonical quote unit (e.g. micro-USDT). A value of 0 means "no
-            /// explicit additional cap" beyond the sub-account policy.
-            ///
-            /// Field 13: `max_order_notional`
-            pub max_order_notional: u64,
-            /// --- Capital movement limits (API key scope) ---
-            ///
-            /// Maximum total notional this API key can transfer out internally per day,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no additional cap beyond the sub-account policy.
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            pub daily_internal_transfer_out_limit: u64,
-            /// Maximum total notional this API key can withdraw per day, expressed in the
-            /// canonical quote unit (for example, micro-USDT). A value of 0 means no
-            /// additional cap beyond the sub-account policy.
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            pub daily_withdraw_limit: u64,
             /// --- Template / lifecycle metadata ---
             ///
+            /// Field 7: `spot_market_scope`
+            pub spot_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
             /// When true, this policy is intended to be reused as a template across
             /// multiple API keys. When false, it represents a single-key instance.
             ///
@@ -53694,42 +51413,6 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
-                    8u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.perp_market_scope = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    13u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_order_notional = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    17u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    18u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_withdraw_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
                     19u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -53818,21 +51501,6 @@ pub mod __buffa {
                                 )?,
                             );
                     }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        view.perp_markets
-                            .push(
-                                <super::super::__buffa::view::PerpMarketRuleView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
                     6u32 => {
                         if tag.wire_type()
                             == ::buffa::encoding::WireType::LengthDelimited
@@ -53903,18 +51571,8 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    perp_markets: self
-                        .perp_markets
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     actions: self.actions.to_vec(),
                     spot_market_scope: self.spot_market_scope,
-                    perp_market_scope: self.perp_market_scope,
-                    max_order_notional: self.max_order_notional,
-                    daily_internal_transfer_out_limit: self
-                        .daily_internal_transfer_out_limit,
-                    daily_withdraw_limit: self.daily_withdraw_limit,
                     is_template: self.is_template,
                     source_template_id: self.source_template_id,
                     created_at: match self.created_at.as_option() {
@@ -53968,14 +51626,6 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                for v in &self.perp_markets {
-                    let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
-                }
                 if !self.actions.is_empty() {
                     let payload: u32 = self
                         .actions
@@ -53991,32 +51641,6 @@ pub mod __buffa {
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                if self.max_order_notional != 0u64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint64_encoded_len(self.max_order_notional)
-                                as u32;
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_internal_transfer_out_limit,
-                            ) as u32;
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_withdraw_limit,
-                            ) as u32;
                 }
                 if self.is_template {
                     size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
@@ -54073,14 +51697,6 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
-                for v in &self.perp_markets {
-                    ::buffa::types::put_len_delimited_header(
-                        5u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    v.write_to(__cache, buf);
-                }
                 if !self.actions.is_empty() {
                     let payload: u32 = self
                         .actions
@@ -54097,33 +51713,6 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(7u32, val, buf);
                     }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(8u32, val, buf);
-                    }
-                }
-                if self.max_order_notional != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        13u32,
-                        self.max_order_notional,
-                        buf,
-                    );
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        17u32,
-                        self.daily_internal_transfer_out_limit,
-                        buf,
-                    );
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        18u32,
-                        self.daily_withdraw_limit,
-                        buf,
-                    );
                 }
                 if self.is_template {
                     ::buffa::types::put_bool_field(19u32, self.is_template, buf);
@@ -54191,9 +51780,6 @@ pub mod __buffa {
                 if !self.spot_markets.is_empty() {
                     __map.serialize_entry("spotMarkets", &*self.spot_markets)?;
                 }
-                if !self.perp_markets.is_empty() {
-                    __map.serialize_entry("perpMarkets", &*self.perp_markets)?;
-                }
                 if !self.actions.is_empty() {
                     __map
                         .serialize_entry(
@@ -54205,40 +51791,6 @@ pub mod __buffa {
                     &self.spot_market_scope,
                 ) {
                     __map.serialize_entry("spotMarketScope", &self.spot_market_scope)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.perp_market_scope,
-                ) {
-                    __map.serialize_entry("perpMarketScope", &self.perp_market_scope)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.max_order_notional,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "maxOrderNotional",
-                            &::buffa::json_helpers::ProtoJson(&self.max_order_notional),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_internal_transfer_out_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyInternalTransferOutLimit",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.daily_internal_transfer_out_limit,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_withdraw_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyWithdrawLimit",
-                            &::buffa::json_helpers::ProtoJson(&self.daily_withdraw_limit),
-                        )?;
                 }
                 if self.is_template {
                     __map.serialize_entry("isTemplate", &self.is_template)?;
@@ -54404,18 +51956,6 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().spot_markets
             }
-            /// Allowed perp contracts for this API key policy, with optional per-contract caps.
-            ///
-            /// Field 5: `perp_markets`
-            #[must_use]
-            pub fn perp_markets(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::PerpMarketRuleView<'_>,
-            > {
-                &self.0.reborrow().perp_markets
-            }
             /// High-level actions enabled for this API key. Up to 64 unique explicit
             /// actions may be returned.
             ///
@@ -54432,6 +51972,8 @@ pub mod __buffa {
             /// Market-level scope for spot markets. When ALL, spot_markets is returned
             /// for display only and is not enforced.
             ///
+            /// --- Template / lifecycle metadata ---
+            ///
             /// Field 7: `spot_market_scope`
             #[must_use]
             pub fn spot_market_scope(
@@ -54439,49 +51981,6 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
                 self.0.reborrow().spot_market_scope
             }
-            /// Market-level scope for perp contracts. When ALL, perp_markets is returned
-            /// for display only and is not enforced.
-            ///
-            /// Field 8: `perp_market_scope`
-            #[must_use]
-            pub fn perp_market_scope(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
-                self.0.reborrow().perp_market_scope
-            }
-            /// --- Global risk limits (API key scope) ---
-            ///
-            /// Maximum notional size allowed for any single order via this key, expressed
-            /// in a canonical quote unit (e.g. micro-USDT). A value of 0 means "no
-            /// explicit additional cap" beyond the sub-account policy.
-            ///
-            /// Field 13: `max_order_notional`
-            #[must_use]
-            pub fn max_order_notional(&self) -> u64 {
-                self.0.reborrow().max_order_notional
-            }
-            /// --- Capital movement limits (API key scope) ---
-            ///
-            /// Maximum total notional this API key can transfer out internally per day,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no additional cap beyond the sub-account policy.
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            #[must_use]
-            pub fn daily_internal_transfer_out_limit(&self) -> u64 {
-                self.0.reborrow().daily_internal_transfer_out_limit
-            }
-            /// Maximum total notional this API key can withdraw per day, expressed in the
-            /// canonical quote unit (for example, micro-USDT). A value of 0 means no
-            /// additional cap beyond the sub-account policy.
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            #[must_use]
-            pub fn daily_withdraw_limit(&self) -> u64 {
-                self.0.reborrow().daily_withdraw_limit
-            }
-            /// --- Template / lifecycle metadata ---
-            ///
             /// When true, this policy is intended to be reused as a template across
             /// multiple API keys. When false, it represents a single-key instance.
             ///
@@ -55770,49 +53269,20 @@ pub mod __buffa {
             /// Field 3: `spot_markets`
             pub spot_markets: ::buffa::RepeatedView<
                 'a,
-                super::super::__buffa::view::SpotMarketRuleView<'a>,
-            >,
-            /// Allowed perp markets and optional per-contract leverage caps.
-            ///
-            /// Field 4: `perp_markets`
-            pub perp_markets: ::buffa::RepeatedView<
-                'a,
-                super::super::__buffa::view::PerpMarketRuleView<'a>,
+                super::super::__buffa::view::SpotMarketSelectorView<'a>,
             >,
             /// Market-level scope for spot markets. When unspecified, defaults to ALL.
             ///
             /// Field 5: `spot_market_scope`
             pub spot_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-            ///
-            /// Field 6: `perp_market_scope`
-            pub perp_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// High-level actions enabled for the API key policy. Up to 64 unique explicit
-            /// actions are allowed.
+            /// High-level actions enabled for the API key policy. An empty list grants no
+            /// access. Up to 64 unique explicit actions are allowed.
             ///
             /// Field 7: `actions`
             pub actions: ::buffa::RepeatedView<
                 'a,
                 ::buffa::EnumValue<super::super::PolicyAction>,
             >,
-            /// Maximum notional size for any single order submitted with this API key,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no additional cap beyond the sub-account policy.
-            ///
-            /// Field 13: `max_order_notional`
-            pub max_order_notional: u64,
-            /// Maximum total notional this API key can transfer out internally per rolling
-            /// day, expressed in the canonical quote unit (for example, micro-USDT). A
-            /// value of 0 means no additional cap beyond the sub-account policy.
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            pub daily_internal_transfer_out_limit: u64,
-            /// Maximum total notional this API key can withdraw per rolling day, expressed
-            /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-            /// no additional cap beyond the sub-account policy.
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            pub daily_withdraw_limit: u64,
             /// Whether this policy should be treated as a reusable template.
             ///
             /// Field 19: `is_template`
@@ -55873,42 +53343,6 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.perp_market_scope = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    13u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.max_order_notional = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    17u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_internal_transfer_out_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
-                    18u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.daily_withdraw_limit = ::buffa::types::decode_uint64(
-                            &mut cur,
-                        )?;
-                    }
                     19u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -55925,22 +53359,7 @@ pub mod __buffa {
                         let sub = ::buffa::types::borrow_bytes(&mut cur)?;
                         view.spot_markets
                             .push(
-                                <super::super::__buffa::view::SpotMarketRuleView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            );
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        view.perp_markets
-                            .push(
-                                <super::super::__buffa::view::PerpMarketRuleView as ::buffa::MessageView>::decode_view_ctx(
+                                <super::super::__buffa::view::SpotMarketSelectorView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -56015,18 +53434,8 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
-                    perp_markets: self
-                        .perp_markets
-                        .iter()
-                        .map(|v| v.to_owned_from_source(__buffa_src))
-                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     spot_market_scope: self.spot_market_scope,
-                    perp_market_scope: self.perp_market_scope,
                     actions: self.actions.to_vec(),
-                    max_order_notional: self.max_order_notional,
-                    daily_internal_transfer_out_limit: self
-                        .daily_internal_transfer_out_limit,
-                    daily_withdraw_limit: self.daily_withdraw_limit,
                     is_template: self.is_template,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -56059,22 +53468,8 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                for v in &self.perp_markets {
-                    let __slot = __cache.reserve();
-                    let inner_size = v.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
-                }
                 {
                     let val = self.spot_market_scope.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
@@ -56088,26 +53483,6 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
                             + payload;
-                }
-                if self.max_order_notional != 0u64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint64_encoded_len(self.max_order_notional)
-                                as u32;
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_internal_transfer_out_limit,
-                            ) as u32;
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint64_encoded_len(
-                                self.daily_withdraw_limit,
-                            ) as u32;
                 }
                 if self.is_template {
                     size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
@@ -56137,24 +53512,10 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
-                for v in &self.perp_markets {
-                    ::buffa::types::put_len_delimited_header(
-                        4u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    v.write_to(__cache, buf);
-                }
                 {
                     let val = self.spot_market_scope.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(5u32, val, buf);
-                    }
-                }
-                {
-                    let val = self.perp_market_scope.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(6u32, val, buf);
                     }
                 }
                 if !self.actions.is_empty() {
@@ -56167,27 +53528,6 @@ pub mod __buffa {
                     for v in &self.actions {
                         ::buffa::types::encode_int32(v.to_i32(), buf);
                     }
-                }
-                if self.max_order_notional != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        13u32,
-                        self.max_order_notional,
-                        buf,
-                    );
-                }
-                if self.daily_internal_transfer_out_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        17u32,
-                        self.daily_internal_transfer_out_limit,
-                        buf,
-                    );
-                }
-                if self.daily_withdraw_limit != 0u64 {
-                    ::buffa::types::put_uint64_field(
-                        18u32,
-                        self.daily_withdraw_limit,
-                        buf,
-                    );
                 }
                 if self.is_template {
                     ::buffa::types::put_bool_field(19u32, self.is_template, buf);
@@ -56222,53 +53562,16 @@ pub mod __buffa {
                 if !self.spot_markets.is_empty() {
                     __map.serialize_entry("spotMarkets", &*self.spot_markets)?;
                 }
-                if !self.perp_markets.is_empty() {
-                    __map.serialize_entry("perpMarkets", &*self.perp_markets)?;
-                }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.spot_market_scope,
                 ) {
                     __map.serialize_entry("spotMarketScope", &self.spot_market_scope)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(
-                    &self.perp_market_scope,
-                ) {
-                    __map.serialize_entry("perpMarketScope", &self.perp_market_scope)?;
                 }
                 if !self.actions.is_empty() {
                     __map
                         .serialize_entry(
                             "actions",
                             &::buffa::json_helpers::EnumSeqJson(&self.actions),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.max_order_notional,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "maxOrderNotional",
-                            &::buffa::json_helpers::ProtoJson(&self.max_order_notional),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_internal_transfer_out_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyInternalTransferOutLimit",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.daily_internal_transfer_out_limit,
-                            ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(
-                    &self.daily_withdraw_limit,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "dailyWithdrawLimit",
-                            &::buffa::json_helpers::ProtoJson(&self.daily_withdraw_limit),
                         )?;
                 }
                 if self.is_template {
@@ -56393,21 +53696,9 @@ pub mod __buffa {
                 &self,
             ) -> &::buffa::RepeatedView<
                 '_,
-                super::super::__buffa::view::SpotMarketRuleView<'_>,
+                super::super::__buffa::view::SpotMarketSelectorView<'_>,
             > {
                 &self.0.reborrow().spot_markets
-            }
-            /// Allowed perp markets and optional per-contract leverage caps.
-            ///
-            /// Field 4: `perp_markets`
-            #[must_use]
-            pub fn perp_markets(
-                &self,
-            ) -> &::buffa::RepeatedView<
-                '_,
-                super::super::__buffa::view::PerpMarketRuleView<'_>,
-            > {
-                &self.0.reborrow().perp_markets
             }
             /// Market-level scope for spot markets. When unspecified, defaults to ALL.
             ///
@@ -56418,17 +53709,8 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
                 self.0.reborrow().spot_market_scope
             }
-            /// Market-level scope for perp contracts. When unspecified, defaults to ALL.
-            ///
-            /// Field 6: `perp_market_scope`
-            #[must_use]
-            pub fn perp_market_scope(
-                &self,
-            ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
-                self.0.reborrow().perp_market_scope
-            }
-            /// High-level actions enabled for the API key policy. Up to 64 unique explicit
-            /// actions are allowed.
+            /// High-level actions enabled for the API key policy. An empty list grants no
+            /// access. Up to 64 unique explicit actions are allowed.
             ///
             /// Field 7: `actions`
             #[must_use]
@@ -56439,33 +53721,6 @@ pub mod __buffa {
                 ::buffa::EnumValue<super::super::PolicyAction>,
             > {
                 &self.0.reborrow().actions
-            }
-            /// Maximum notional size for any single order submitted with this API key,
-            /// expressed in the canonical quote unit (for example, micro-USDT). A value of
-            /// 0 means no additional cap beyond the sub-account policy.
-            ///
-            /// Field 13: `max_order_notional`
-            #[must_use]
-            pub fn max_order_notional(&self) -> u64 {
-                self.0.reborrow().max_order_notional
-            }
-            /// Maximum total notional this API key can transfer out internally per rolling
-            /// day, expressed in the canonical quote unit (for example, micro-USDT). A
-            /// value of 0 means no additional cap beyond the sub-account policy.
-            ///
-            /// Field 17: `daily_internal_transfer_out_limit`
-            #[must_use]
-            pub fn daily_internal_transfer_out_limit(&self) -> u64 {
-                self.0.reborrow().daily_internal_transfer_out_limit
-            }
-            /// Maximum total notional this API key can withdraw per rolling day, expressed
-            /// in the canonical quote unit (for example, micro-USDT). A value of 0 means
-            /// no additional cap beyond the sub-account policy.
-            ///
-            /// Field 18: `daily_withdraw_limit`
-            #[must_use]
-            pub fn daily_withdraw_limit(&self) -> u64 {
-                self.0.reborrow().daily_withdraw_limit
             }
             /// Whether this policy should be treated as a reusable template.
             ///
@@ -58484,9 +55739,8 @@ pub mod __buffa {
             ///
             /// Field 1: `key_id`
             pub key_id: &'a str,
-            /// Policy template to attach (opaque ID). A value of 0 clears the policy
-            /// and reverts to no per-key policy. The sub-account policy and role remain
-            /// the permission ceiling.
+            /// Policy template to attach (opaque ID). A value of 0 clears the binding.
+            /// An API key without an attached policy has no permissions.
             ///
             /// Field 2: `policy_id`
             pub policy_id: u64,
@@ -58742,9 +55996,8 @@ pub mod __buffa {
             pub fn key_id(&self) -> &'_ str {
                 self.0.reborrow().key_id
             }
-            /// Policy template to attach (opaque ID). A value of 0 clears the policy
-            /// and reverts to no per-key policy. The sub-account policy and role remain
-            /// the permission ceiling.
+            /// Policy template to attach (opaque ID). A value of 0 clears the binding.
+            /// An API key without an attached policy has no permissions.
             ///
             /// Field 2: `policy_id`
             #[must_use]
@@ -112006,8 +109259,8 @@ pub mod __buffa {
         reg.register_json_any(super::__UPDATE_API_KEY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPDATE_API_KEY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MARKET_SCOPE_JSON_ANY);
+        reg.register_json_any(super::__SPOT_MARKET_SELECTOR_JSON_ANY);
         reg.register_json_any(super::__SPOT_MARKET_RULE_JSON_ANY);
-        reg.register_json_any(super::__PERP_MARKET_RULE_JSON_ANY);
         reg.register_json_any(super::__SUBACCOUNT_POLICY_VIEW_JSON_ANY);
         reg.register_json_any(super::__LIST_SUBACCOUNT_POLICIES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_SUBACCOUNT_POLICIES_RESPONSE_JSON_ANY);
@@ -112234,13 +109487,13 @@ pub use self::__buffa::view::MarketScopeView;
 #[doc(inline)]
 pub use self::__buffa::view::MarketScopeOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::SpotMarketSelectorView;
+#[doc(inline)]
+pub use self::__buffa::view::SpotMarketSelectorOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::SpotMarketRuleView;
 #[doc(inline)]
 pub use self::__buffa::view::SpotMarketRuleOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::PerpMarketRuleView;
-#[doc(inline)]
-pub use self::__buffa::view::PerpMarketRuleOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::SubaccountPolicyViewView;
 #[doc(inline)]

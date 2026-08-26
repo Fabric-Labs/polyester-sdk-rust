@@ -1015,15 +1015,6 @@ pub struct MarketOverview {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub symbol_id: u32,
-    /// Canonical pair symbol, e.g. "BTC-USDT".
-    ///
-    /// Field 2: `symbol`
-    #[serde(
-        rename = "symbol",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub symbol: ::buffa::alloc::string::String,
     /// Last traded price in quote units scaled by 1e6.
     ///
     /// Field 3: `last_price_ticks`
@@ -1177,7 +1168,6 @@ impl ::core::fmt::Debug for MarketOverview {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("MarketOverview")
             .field("symbol_id", &self.symbol_id)
-            .field("symbol", &self.symbol)
             .field("last_price_ticks", &self.last_price_ticks)
             .field("last_trade_ts_ns", &self.last_trade_ts_ns)
             .field("change_24h_bps", &self.change_24h_bps)
@@ -1222,9 +1212,6 @@ impl ::buffa::Message for MarketOverview {
         let mut size = 0u32;
         if self.symbol_id != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
-        }
-        if !self.symbol.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
         }
         if self.last_price_ticks != 0i64 {
             size
@@ -1302,9 +1289,6 @@ impl ::buffa::Message for MarketOverview {
         if self.symbol_id != 0u32 {
             ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
         }
-        if !self.symbol.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.symbol, buf);
-        }
         if self.last_price_ticks != 0i64 {
             ::buffa::types::put_int64_field(3u32, self.last_price_ticks, buf);
         }
@@ -1367,13 +1351,6 @@ impl ::buffa::Message for MarketOverview {
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.symbol_id = ::buffa::types::decode_uint32(buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.symbol, buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -1484,7 +1461,6 @@ impl ::buffa::Message for MarketOverview {
     }
     fn clear(&mut self) {
         self.symbol_id = 0u32;
-        self.symbol.clear();
         self.last_price_ticks = 0i64;
         self.last_trade_ts_ns = 0u64;
         self.change_24h_bps = 0i32;
@@ -1535,15 +1511,17 @@ pub const __MARKET_OVERVIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListMarketOverviewRequest {
-    /// Filter by specific symbols; when empty, returns all enabled markets.
+    /// Filter by stable numeric pair IDs from GetSpotConfig. When empty, returns
+    /// all enabled markets.
     ///
-    /// Field 1: `symbols`
+    /// Field 1: `symbol_id`
     #[serde(
-        rename = "symbols",
+        rename = "symbolId",
+        alias = "symbol_id",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub symbols: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    pub symbol_id: ::buffa::alloc::vec::Vec<u32>,
     /// Maximum number of markets to return. Defaults to 50 when omitted; maximum
     /// is 2000.
     ///
@@ -1555,8 +1533,8 @@ pub struct ListMarketOverviewRequest {
     )]
     pub limit: u32,
     /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-    /// bound to symbols, sort key, and sort direction. Sparkline options affect
-    /// only response enrichment and may change between pages.
+    /// bound to symbol IDs, sort key, and sort direction. Sparkline options
+    /// affect only response enrichment and may change between pages.
     ///
     /// Field 3: `page_token`
     #[serde(
@@ -1615,7 +1593,7 @@ pub struct ListMarketOverviewRequest {
 impl ::core::fmt::Debug for ListMarketOverviewRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListMarketOverviewRequest")
-            .field("symbols", &self.symbols)
+            .field("symbol_id", &self.symbol_id)
             .field("limit", &self.limit)
             .field("page_token", &self.page_token)
             .field("order_by", &self.order_by)
@@ -1650,8 +1628,14 @@ impl ::buffa::Message for ListMarketOverviewRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        for v in &self.symbols {
-            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        if !self.symbol_id.is_empty() {
+            let payload: u32 = self
+                .symbol_id
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
         }
         if self.limit != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
@@ -1693,8 +1677,16 @@ impl ::buffa::Message for ListMarketOverviewRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        for v in &self.symbols {
-            ::buffa::types::put_string_field(1u32, v, buf);
+        if !self.symbol_id.is_empty() {
+            let payload: u32 = self
+                .symbol_id
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(1u32, payload, buf);
+            for &v in &self.symbol_id {
+                ::buffa::types::encode_uint32(v, buf);
+            }
         }
         if self.limit != 0u32 {
             ::buffa::types::put_uint32_field(2u32, self.limit, buf);
@@ -1742,11 +1734,35 @@ impl ::buffa::Message for ListMarketOverviewRequest {
         use ::buffa::Enumeration as _;
         match tag.field_number() {
             1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                self.symbols.push(::buffa::types::decode_string(buf)?);
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.symbol_id.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.symbol_id
+                            .push(::buffa::types::decode_uint32(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.symbol_id.push(::buffa::types::decode_uint32(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -1831,7 +1847,7 @@ impl ::buffa::Message for ListMarketOverviewRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.symbols.clear();
+        self.symbol_id.clear();
         self.limit = 0u32;
         self.page_token.clear();
         self.order_by = ::buffa::EnumValue::from(0);
@@ -2819,10 +2835,6 @@ pub mod __buffa {
             ///
             /// Field 1: `symbol_id`
             pub symbol_id: u32,
-            /// Canonical pair symbol, e.g. "BTC-USDT".
-            ///
-            /// Field 2: `symbol`
-            pub symbol: &'a str,
             /// Last traded price in quote units scaled by 1e6.
             ///
             /// Field 3: `last_price_ticks`
@@ -2927,13 +2939,6 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -3079,7 +3084,6 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::MarketOverview {
                     symbol_id: self.symbol_id,
-                    symbol: self.symbol.to_string(),
                     last_price_ticks: self.last_price_ticks,
                     last_trade_ts_ns: self.last_trade_ts_ns,
                     change_24h_bps: self.change_24h_bps,
@@ -3116,11 +3120,6 @@ pub mod __buffa {
                     size
                         += 1u32
                             + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
-                }
-                if !self.symbol.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
                 }
                 if self.last_price_ticks != 0i64 {
                     size
@@ -3224,9 +3223,6 @@ pub mod __buffa {
                 if self.symbol_id != 0u32 {
                     ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
                 }
-                if !self.symbol.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.symbol, buf);
-                }
                 if self.last_price_ticks != 0i64 {
                     ::buffa::types::put_int64_field(3u32, self.last_price_ticks, buf);
                 }
@@ -3317,9 +3313,6 @@ pub mod __buffa {
                             "symbolId",
                             &::buffa::json_helpers::ProtoJson(&self.symbol_id),
                         )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
-                    __map.serialize_entry("symbol", self.symbol)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_i64(&self.last_price_ticks) {
                     __map
@@ -3532,13 +3525,6 @@ pub mod __buffa {
             pub fn symbol_id(&self) -> u32 {
                 self.0.reborrow().symbol_id
             }
-            /// Canonical pair symbol, e.g. "BTC-USDT".
-            ///
-            /// Field 2: `symbol`
-            #[must_use]
-            pub fn symbol(&self) -> &'_ str {
-                self.0.reborrow().symbol
-            }
             /// Last traded price in quote units scaled by 1e6.
             ///
             /// Field 3: `last_price_ticks`
@@ -3681,18 +3667,19 @@ pub mod __buffa {
         }
         #[derive(Clone, Debug, Default)]
         pub struct ListMarketOverviewRequestView<'a> {
-            /// Filter by specific symbols; when empty, returns all enabled markets.
+            /// Filter by stable numeric pair IDs from GetSpotConfig. When empty, returns
+            /// all enabled markets.
             ///
-            /// Field 1: `symbols`
-            pub symbols: ::buffa::RepeatedView<'a, &'a str>,
+            /// Field 1: `symbol_id`
+            pub symbol_id: ::buffa::RepeatedView<'a, u32>,
             /// Maximum number of markets to return. Defaults to 50 when omitted; maximum
             /// is 2000.
             ///
             /// Field 2: `limit`
             pub limit: u32,
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-            /// bound to symbols, sort key, and sort direction. Sparkline options affect
-            /// only response enrichment and may change between pages.
+            /// bound to symbol IDs, sort key, and sort direction. Sparkline options
+            /// affect only response enrichment and may change between pages.
             ///
             /// Field 3: `page_token`
             pub page_token: &'a str,
@@ -3789,11 +3776,29 @@ pub mod __buffa {
                         view.include_sparklines = ::buffa::types::decode_bool(&mut cur)?;
                     }
                     1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.symbols.push(::buffa::types::borrow_str(&mut cur)?);
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.symbol_id
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.symbol_id
+                                    .push(::buffa::types::decode_uint32(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.symbol_id
+                                .push(::buffa::types::decode_uint32(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
                     }
                     7u32 => {
                         if tag.wire_type()
@@ -3857,7 +3862,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListMarketOverviewRequest {
-                    symbols: self.symbols.iter().map(|s| s.to_string()).collect(),
+                    symbol_id: self.symbol_id.to_vec(),
                     limit: self.limit,
                     page_token: self.page_token.to_string(),
                     order_by: self.order_by,
@@ -3878,8 +3883,15 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                for v in &self.symbols {
-                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                if !self.symbol_id.is_empty() {
+                    let payload: u32 = self
+                        .symbol_id
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
                 }
                 if self.limit != 0u32 {
                     size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
@@ -3926,8 +3938,16 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                for v in &self.symbols {
-                    ::buffa::types::put_string_field(1u32, v, buf);
+                if !self.symbol_id.is_empty() {
+                    let payload: u32 = self
+                        .symbol_id
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(1u32, payload, buf);
+                    for &v in &self.symbol_id {
+                        ::buffa::types::encode_uint32(v, buf);
+                    }
                 }
                 if self.limit != 0u32 {
                     ::buffa::types::put_uint32_field(2u32, self.limit, buf);
@@ -3982,8 +4002,12 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !self.symbols.is_empty() {
-                    __map.serialize_entry("symbols", &*self.symbols)?;
+                if !self.symbol_id.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::RepeatedJson(&self.symbol_id),
+                        )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(&self.limit) {
                     __map
@@ -4116,12 +4140,13 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Filter by specific symbols; when empty, returns all enabled markets.
+            /// Filter by stable numeric pair IDs from GetSpotConfig. When empty, returns
+            /// all enabled markets.
             ///
-            /// Field 1: `symbols`
+            /// Field 1: `symbol_id`
             #[must_use]
-            pub fn symbols(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
-                &self.0.reborrow().symbols
+            pub fn symbol_id(&self) -> &::buffa::RepeatedView<'_, u32> {
+                &self.0.reborrow().symbol_id
             }
             /// Maximum number of markets to return. Defaults to 50 when omitted; maximum
             /// is 2000.
@@ -4132,8 +4157,8 @@ pub mod __buffa {
                 self.0.reborrow().limit
             }
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-            /// bound to symbols, sort key, and sort direction. Sparkline options affect
-            /// only response enrichment and may change between pages.
+            /// bound to symbol IDs, sort key, and sort direction. Sparkline options
+            /// affect only response enrichment and may change between pages.
             ///
             /// Field 3: `page_token`
             #[must_use]
