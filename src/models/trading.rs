@@ -443,6 +443,7 @@ pub struct CancelOrderParams {
 #[derive(Debug, Clone, Default)]
 pub struct CancelAllOpts {
     pub symbol: Option<String>,
+    pub symbol_id: Option<u32>,
     pub dry_run: bool,
     pub subaccount_id: Option<u64>,
     pub side: Option<String>,

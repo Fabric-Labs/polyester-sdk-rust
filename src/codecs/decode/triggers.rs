@@ -334,13 +334,8 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
     } else {
         Some(symbol_id)
     };
-    let symbol = if msg.symbol.is_empty() {
-        None
-    } else {
-        Some(msg.symbol.clone())
-    };
-    let details = trigger_details_from_proto(msg, symbol.clone(), symbol_id_opt);
-    let proj = trigger_config_projection(msg, symbol.clone());
+    let details = trigger_details_from_proto(msg, None, symbol_id_opt);
+    let proj = trigger_config_projection(msg, None);
     // Fall back to stop runtime details for the trigger-price convenience field.
     let trigger_price = proj
         .trigger_price
@@ -350,14 +345,14 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         trigger_id: format_uint64_id(msg.trigger_id),
         subaccount_id: format_uint64_id(msg.subaccount_id),
         symbol_id,
-        symbol: msg.symbol.clone(),
+        symbol: String::new(),
         trigger_type: proj.trigger_type,
         status: enum_value_trigger_status(msg.status),
         parent_order_id: msg.parent_order_id.map(format_uint64_id),
         side: proj.side,
         order_type: proj.order_type,
         time_in_force: proj.time_in_force,
-        qty: decode_qty_scaled(msg.qty_scaled, None, symbol.clone(), symbol_id_opt),
+        qty: decode_qty_scaled(msg.qty_scaled, None, None, symbol_id_opt),
         limit_price: proj.limit_price,
         fee_asset: fee_asset_label(msg.fee_asset),
         self_trade_prevention_mode: stp_mode_label(msg.self_trade_prevention_mode),
@@ -449,6 +444,7 @@ fn trigger_event_type_label(value: buffa::EnumValue<TriggerEventType>) -> String
         Some(TriggerEventType::EventFired) => "fired".to_owned(),
         Some(TriggerEventType::EventCanceled) => "canceled".to_owned(),
         Some(TriggerEventType::EventUpdated) => "updated".to_owned(),
+        Some(TriggerEventType::EventFailed) => "failed".to_owned(),
         Some(TriggerEventType::EventUnspecified) => String::new(),
         None => format!("UNKNOWN({})", value.to_i32()),
     }
@@ -471,8 +467,9 @@ pub fn trigger_event_type_from_label(label: &str) -> Result<TriggerEventType, St
         "fired" => Ok(TriggerEventType::EventFired),
         "canceled" | "cancelled" => Ok(TriggerEventType::EventCanceled),
         "updated" => Ok(TriggerEventType::EventUpdated),
+        "failed" => Ok(TriggerEventType::EventFailed),
         other => Err(format!(
-            "invalid trigger event type {other:?}; expected one of: fired, canceled, updated"
+            "invalid trigger event type {other:?}; expected one of: fired, canceled, updated, failed"
         )),
     }
 }
@@ -533,7 +530,6 @@ mod tests {
             trigger_id: 77,
             subaccount_id: 9,
             symbol_id: 3,
-            symbol: "ETH-USDT".into(),
             status: TriggerStatus::StatusArmed.into(),
             parent_order_id: Some(9001),
             qty_scaled: 100,
@@ -565,7 +561,6 @@ mod tests {
             trigger_id: 42,
             subaccount_id: 9,
             symbol_id: 3,
-            symbol: "ETH-USDT".into(),
             status: TriggerStatus::StatusArmed.into(),
             qty_scaled: 100,
             client_trigger_id: "cid".into(),
@@ -596,6 +591,8 @@ mod tests {
         let t = trigger_from_proto(&msg);
         assert_eq!(t.trigger_id, format_uint64_id(42));
         assert_eq!(t.subaccount_id, format_uint64_id(9));
+        assert_eq!(t.symbol, "");
+        assert_eq!(t.symbol_id, 3);
         assert_eq!(t.trigger_type, "stop_loss");
         assert_eq!(t.status, "armed");
         assert_eq!(t.side, "buy");
@@ -616,7 +613,6 @@ mod tests {
         let msg = ProtoTrigger {
             trigger_id: 11,
             symbol_id: 1,
-            symbol: "BTC-USDT".into(),
             status: TriggerStatus::StatusRunning.into(),
             qty_scaled: 100_000_000,
             client_trigger_id: "twap-1".into(),
@@ -730,6 +726,13 @@ mod tests {
         assert_eq!(listed.next_page_token, "evt-page-2");
         let event = &listed.events[0];
         assert_eq!(event.event_type, "fired");
+        let failed = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 2,
+            event_type: TriggerEventType::EventFailed.into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(failed.event_type, "failed");
         assert_eq!(event.trigger_type, "take_profit");
         assert_eq!(event.subaccount_id, format_uint64_id(9));
         assert_eq!(event.child_seq, 3);
@@ -772,6 +775,10 @@ mod tests {
         assert_eq!(
             trigger_event_type_from_label("canceled").unwrap(),
             TriggerEventType::EventCanceled
+        );
+        assert_eq!(
+            trigger_event_type_from_label("failed").unwrap(),
+            TriggerEventType::EventFailed
         );
         assert!(trigger_event_type_from_label("nope").is_err());
     }

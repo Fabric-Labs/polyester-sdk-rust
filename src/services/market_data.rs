@@ -352,10 +352,9 @@ impl MarketOverviewService {
         opts: impl Into<ListMarketOverviewOptions>,
     ) -> Result<MarketOverviewList> {
         let opts = opts.into();
+        self.ctx.wait_for_catalogs().await?;
         let req = ListMarketOverviewRequest {
-            symbols: crate::catalogs::Manager::normalize_raw_symbol_filters(
-                opts.symbols.as_deref(),
-            ),
+            symbol_id: self.ctx.catalogs.resolve_symbol_ids(opts.symbols.as_deref())?,
             // Proto u32: 0 means omit / server default (typically 50).
             limit: opts.limit.unwrap_or_default(),
             include_sparklines: opts.include_sparklines,
@@ -368,7 +367,13 @@ impl MarketOverviewService {
         let resp = unary::await_public(client.list_market_overview(req))
             .await?
             .into_owned();
-        Ok(market_overview_list_from_proto(&resp))
+        let mut list = market_overview_list_from_proto(&resp);
+        for market in &mut list.markets {
+            if market.symbol.is_empty() {
+                market.symbol = self.ctx.catalogs.display_symbol(market.symbol_id);
+            }
+        }
+        Ok(list)
     }
 
     /// Subscribe to public market overview batches.
@@ -397,10 +402,18 @@ impl MarketOverviewService {
 
         // Snapshot fetch uses the list default when omitted/zero.
         let limit = opts.limit.filter(|n| *n > 0).unwrap_or(50);
+        if opts
+            .symbols
+            .as_ref()
+            .is_some_and(|symbols| !symbols.is_empty())
+        {
+            self.ctx.wait_for_catalogs().await?;
+        }
         let symbols = {
-            let resolved =
-                crate::catalogs::Manager::normalize_raw_symbol_filters(opts.symbols.as_deref());
-            (!resolved.is_empty()).then_some(resolved)
+            let resolved = self.ctx.catalogs.resolve_symbol_ids(opts.symbols.as_deref())?;
+            // Keep the original display list for snapshot fetch; wire IDs are
+            // resolved again in `list`.
+            (!resolved.is_empty()).then_some(opts.symbols.clone().unwrap_or_default())
         };
         let include_sparklines = opts.include_sparklines;
         let channel = "public:spot:market_overview:updates:proto".to_owned();
@@ -557,7 +570,7 @@ impl OrderbookService {
         // Record the requested depth for the model; unspecified defaults to 50 server-side.
         let reported_depth = if depth_levels == 0 { 50 } else { depth_levels };
         let req = GetOrderBookRequest {
-            symbol: symbol.to_owned(),
+            symbol_id: self.ctx.catalogs.require_symbol_id(symbol)?,
             depth: depth_enum.into(),
             ..Default::default()
         };

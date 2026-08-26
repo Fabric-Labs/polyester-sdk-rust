@@ -706,7 +706,6 @@ async fn managed_overview_overflow_terminates_receiver_callback_task_and_socket(
     let publication = MarketOverviewBatch {
         markets: vec![MarketOverview {
             symbol_id: 1,
-            symbol: "BTC-USDT".into(),
             last_price_ticks: 1,
             ..Default::default()
         }],

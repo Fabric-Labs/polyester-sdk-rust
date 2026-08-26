@@ -12,8 +12,8 @@ use crate::connect::triggers::v1::TriggersServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::{
     CreateOrderType, CreateSide, CreateTimeInForce, CreateTriggerParams, CreateTriggerType,
-    FeeAsset, ListTriggersOpts, ModifyTriggerParams, Trigger, TriggerEvent, TriggerEventsList,
-    TriggerMutationResult, TriggersList,
+    FeeAsset, ListTriggersOpts, ModifyTriggerParams, ResumeTriggerParams, Trigger, TriggerEvent,
+    TriggerEventsList, TriggerMutationResult, TriggersList,
 };
 use crate::proto::orders::v1::{FeeAsset as ProtoFeeAsset, SelfTradePreventionMode, Side};
 use crate::proto::triggers::v1::{
@@ -53,7 +53,13 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(triggers_list_from_proto(&resp))
+        let mut list = triggers_list_from_proto(&resp);
+        for trigger in &mut list.triggers {
+            if trigger.symbol.is_empty() {
+                trigger.symbol = self.ctx.catalogs.display_symbol(trigger.symbol_id);
+            }
+        }
+        Ok(list)
     }
 
     pub async fn list_with(&self, opts: ListTriggersOpts) -> Result<TriggersList> {
@@ -63,11 +69,13 @@ impl TriggersService {
             limit: opts.limit.unwrap_or(0),
             ..Default::default()
         };
-        if let Some(symbol) =
-            crate::catalogs::Manager::normalize_raw_symbol_filter(opts.symbol.as_deref())
-        {
-            req.symbol = symbol;
+        if opts.symbol.is_some() || opts.symbol_id.is_some() {
+            self.ctx.wait_for_catalogs().await?;
         }
+        req.symbol_id = self
+            .ctx
+            .catalogs
+            .optional_symbol_id(opts.symbol.as_deref(), opts.symbol_id)?;
         if let Some(token) = opts.page_token {
             req.page_token = token;
         }
@@ -89,7 +97,12 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(get_trigger_from_proto(&resp))
+        Ok(get_trigger_from_proto(&resp).map(|mut trigger| {
+            if trigger.symbol.is_empty() {
+                trigger.symbol = self.ctx.catalogs.display_symbol(trigger.symbol_id);
+            }
+            trigger
+        }))
     }
 
     /// Retrieve a trigger using the public string ID returned by create and list calls.
@@ -125,7 +138,7 @@ impl TriggersService {
             self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
         )?;
         let mut intent = TriggerIntent {
-            symbol: params.symbol.clone(),
+            symbol_id: self.ctx.catalogs.require_symbol_id(&params.symbol)?,
             qty_scaled: qty,
             ..Default::default()
         };
@@ -397,6 +410,11 @@ impl TriggersService {
         let mut req = ModifyTriggerRequest {
             trigger_id: id_to_u64(&params.trigger_id, "trigger_id")?,
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            symbol_id: self.ctx.catalogs.required_symbol_id(
+                params.symbol.as_deref(),
+                params.symbol_id,
+                "modify",
+            )?,
             ..Default::default()
         };
         if let Some(price) = params.trigger_price.as_ref() {
@@ -555,11 +573,31 @@ impl TriggersService {
     pub async fn resume_by_id(
         &self,
         trigger_id: &str,
+        symbol: Option<&str>,
         subaccount_id: Option<u64>,
     ) -> Result<TriggerMutationResult> {
-        self.resume(ResumeTriggerRequest {
-            trigger_id: id_to_u64(trigger_id, "trigger_id")?,
+        self.resume_with(ResumeTriggerParams {
+            trigger_id: trigger_id.to_owned(),
+            symbol: symbol.map(str::to_owned),
+            symbol_id: None,
             subaccount_id,
+        })
+        .await
+    }
+
+    /// Resume a trigger. Connect requires `symbol` or `symbol_id`.
+    pub async fn resume_with(&self, params: ResumeTriggerParams) -> Result<TriggerMutationResult> {
+        if params.symbol.is_some() {
+            self.ctx.wait_for_catalogs().await?;
+        }
+        self.resume(ResumeTriggerRequest {
+            trigger_id: id_to_u64(&params.trigger_id, "trigger_id")?,
+            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            symbol_id: self.ctx.catalogs.required_symbol_id(
+                params.symbol.as_deref(),
+                params.symbol_id,
+                "resume",
+            )?,
             ..Default::default()
         })
         .await
@@ -567,6 +605,9 @@ impl TriggersService {
 
     /// Modify a trigger. Price fields must be `Price` wrappers.
     pub async fn modify(&self, params: ModifyTriggerParams) -> Result<TriggerMutationResult> {
+        if params.symbol.is_some() {
+            self.ctx.wait_for_catalogs().await?;
+        }
         let req = self.encode_modify_params(&params)?;
         let client = self.client();
         let resp = unary::await_auth(
@@ -772,6 +813,7 @@ mod tests {
         params.limit_price = None;
         let wire = client.triggers.encode_create_params(&params).unwrap();
         let intent = wire.trigger.expect("trigger intent");
+        assert_eq!(intent.symbol_id, 7);
         let Some(Strategy::TrailingStop(trailing)) = intent.strategy.as_ref() else {
             panic!("expected TrailingStop strategy, got {:?}", intent.strategy);
         };
@@ -843,6 +885,7 @@ mod tests {
         let encoded = bs58::encode(42_u64.to_be_bytes()).into_string();
         let params = ModifyTriggerParams {
             trigger_id: encoded,
+            symbol: Some("BTC-USDT".into()),
             trailing_distance_bps: Some(50),
             ..modify_params(None, None, None)
         };
@@ -856,6 +899,8 @@ mod tests {
         let params = ModifyTriggerParams {
             trigger_id: "1".into(),
             subaccount_id: None,
+            symbol: Some("BTC-USDT".into()),
+            symbol_id: None,
             trigger_price: None,
             limit_price: None,
             activation_price: None,
@@ -888,6 +933,8 @@ mod tests {
         ModifyTriggerParams {
             trigger_id: "1".into(),
             subaccount_id: None,
+            symbol: Some("BTC-USDT".into()),
+            symbol_id: None,
             trigger_price,
             limit_price,
             activation_price,

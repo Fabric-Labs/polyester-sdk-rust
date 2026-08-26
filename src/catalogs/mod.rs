@@ -64,6 +64,7 @@ pub struct Manager {
 #[derive(Debug, Default)]
 struct Inner {
     symbol_to_id: HashMap<String, u32>,
+    id_to_symbol: HashMap<u32, String>,
     id_to_base_scale: HashMap<u32, u32>,
     symbol_to_base_scale: HashMap<String, u32>,
     id_to_quote_scale: HashMap<u32, u32>,
@@ -81,6 +82,7 @@ struct Inner {
 #[derive(Default)]
 struct SpotSnapshot {
     symbol_to_id: HashMap<String, u32>,
+    id_to_symbol: HashMap<u32, String>,
     id_to_base_scale: HashMap<u32, u32>,
     symbol_to_base_scale: HashMap<String, u32>,
     id_to_quote_scale: HashMap<u32, u32>,
@@ -155,6 +157,7 @@ fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
         // admission owns those checks; zero-valued optional minima must not
         // block hydration of otherwise valid spot rows.
         id_to_symbol.insert(symbol_id, symbol.to_owned());
+        snap.id_to_symbol.insert(symbol_id, symbol.to_owned());
         let buckets = m
             .get("orderbook_price_buckets")
             .or_else(|| m.get("orderbookPriceBuckets"))
@@ -310,12 +313,86 @@ impl Manager {
             .copied()
     }
 
-    /// Normalize an optional raw symbol filter for wire fields that accept
-    /// symbol strings.
+    /// Reverse lookup for a Connect `symbol_id`. Zero and unknown IDs return `None`.
+    pub fn symbol_for_symbol_id(&self, symbol_id: u32) -> Option<String> {
+        if symbol_id == 0 {
+            return None;
+        }
+        read_unpoisoned(&self.inner)
+            .id_to_symbol
+            .get(&symbol_id)
+            .cloned()
+    }
+
+    /// Display symbol for `symbol_id`, or `""` when the catalog has no row.
+    pub fn display_symbol(&self, symbol_id: u32) -> String {
+        self.symbol_for_symbol_id(symbol_id).unwrap_or_default()
+    }
+
+    /// Resolve a required display symbol to a Connect `symbol_id`. Fails closed.
+    pub fn require_symbol_id(&self, symbol: &str) -> Result<u32> {
+        let Some(symbol) = Self::normalize_raw_symbol_filter(Some(symbol)) else {
+            return Err(Error::validation("symbol must be non-empty"));
+        };
+        self.symbol_id_for_symbol(&symbol).ok_or_else(|| {
+            Error::validation(format!(
+                "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
+            ))
+        })
+    }
+
+    /// Optional Connect symbol filter. Empty/omitted stays `0` (all symbols).
+    /// A supplied display symbol is resolved and fails closed.
+    pub fn optional_symbol_id(&self, symbol: Option<&str>, symbol_id: Option<u32>) -> Result<u32> {
+        match (Self::normalize_raw_symbol_filter(symbol), symbol_id) {
+            (None, None) => Ok(0),
+            (_, Some(0)) => Err(Error::validation(
+                "symbol_id must be non-zero when explicitly supplied",
+            )),
+            (Some(_), Some(_)) => Err(Error::validation(
+                "request accepts symbol or symbol_id, not both",
+            )),
+            (None, Some(symbol_id)) => Ok(symbol_id),
+            (Some(symbol), None) => self.require_symbol_id(&symbol),
+        }
+    }
+
+    /// Required Connect `symbol_id` from display `symbol` and/or numeric id.
+    pub fn required_symbol_id(
+        &self,
+        symbol: Option<&str>,
+        symbol_id: Option<u32>,
+        label: &str,
+    ) -> Result<u32> {
+        match (Self::normalize_raw_symbol_filter(symbol), symbol_id) {
+            (None, None) => Err(Error::validation(format!(
+                "{label} requires symbol or symbol_id"
+            ))),
+            (_, Some(0)) => Err(Error::validation(
+                "symbol_id must be non-zero when explicitly supplied",
+            )),
+            (Some(_), Some(_)) => Err(Error::validation(format!(
+                "{label} accepts symbol or symbol_id, not both"
+            ))),
+            (None, Some(symbol_id)) => Ok(symbol_id),
+            (Some(symbol), None) => self.require_symbol_id(&symbol),
+        }
+    }
+
+    /// Resolve a list of display symbols to Connect `symbol_id`s. Fails closed.
+    pub fn resolve_symbol_ids(&self, symbols: Option<&[String]>) -> Result<Vec<u32>> {
+        Self::normalize_raw_symbol_filters(symbols)
+            .into_iter()
+            .map(|symbol| self.require_symbol_id(&symbol))
+            .collect()
+    }
+
+    /// Trim an optional display symbol before catalog resolution.
     ///
-    /// Empty/whitespace filters remain omitted. Unknown symbols are forwarded
-    /// unchanged; the venue owns acceptance. Paths that need `symbol_id`
-    /// conversion should resolve via [`Self::symbol_id_for_symbol`] instead.
+    /// Empty/whitespace values remain omitted. These helpers only normalize
+    /// caller-facing display symbols; do not assign the result onto Connect
+    /// `symbol` fields that no longer exist. Resolve via
+    /// [`Self::symbol_id_for_symbol`] / [`Self::require_symbol_id`] instead.
     pub fn normalize_raw_symbol_filter(symbol: Option<&str>) -> Option<String> {
         symbol
             .map(str::trim)
@@ -323,7 +400,7 @@ impl Manager {
             .map(|value| value.to_owned())
     }
 
-    /// Normalize a list of raw symbol filters (trim; omit empty entries).
+    /// Trim a list of display symbols (omit empty entries) before catalog resolution.
     pub fn normalize_raw_symbol_filters(symbols: Option<&[String]>) -> Vec<String> {
         symbols
             .unwrap_or_default()
@@ -438,6 +515,7 @@ impl Manager {
 fn apply_spot(inner: &mut Inner, snap: SpotSnapshot) {
     // Replace spot maps wholesale so a refresh cannot leave stale symbols.
     inner.symbol_to_id = snap.symbol_to_id;
+    inner.id_to_symbol = snap.id_to_symbol;
     inner.id_to_base_scale = snap.id_to_base_scale;
     inner.symbol_to_base_scale = snap.symbol_to_base_scale;
     inner.id_to_quote_scale = snap.id_to_quote_scale;
@@ -473,6 +551,10 @@ mod tests {
         }))
         .expect("hydrate");
         assert_eq!(mgr.symbol_id_for_symbol("BTC-USDT"), Some(1));
+        assert_eq!(mgr.symbol_for_symbol_id(1).as_deref(), Some("BTC-USDT"));
+        assert_eq!(mgr.symbol_for_symbol_id(0), None);
+        assert_eq!(mgr.display_symbol(1), "BTC-USDT");
+        assert_eq!(mgr.display_symbol(99), "");
         assert_eq!(mgr.base_quantity_scale_for_symbol("BTC-USDT"), Some(8));
         assert_eq!(mgr.base_quantity_scale_for_symbol_id(1), Some(8));
         assert_eq!(mgr.quote_quantity_scale_for_symbol("BTC-USDT"), Some(6));
@@ -669,6 +751,7 @@ mod tests {
         assert_eq!(mgr.base_quantity_scale_for_symbol("ETH-USDT"), None);
         assert_eq!(mgr.quote_quantity_scale_for_symbol("NOPE"), None);
         assert_eq!(mgr.quote_quantity_scale_for_symbol_id(999), None);
+        assert_eq!(mgr.symbol_for_symbol_id(999), None);
     }
 
     #[test]
@@ -690,6 +773,29 @@ mod tests {
                 "NOPE-USDT".into(),
             ])),
             vec!["ETH-USDT".to_owned(), "NOPE-USDT".to_owned()]
+        );
+    }
+
+    #[test]
+    fn optional_and_required_symbol_id_resolution_fails_closed() {
+        let mgr = Manager::new();
+        mgr.hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+        assert_eq!(mgr.optional_symbol_id(None, None).unwrap(), 0);
+        assert_eq!(mgr.optional_symbol_id(Some(" BTC-USDT "), None).unwrap(), 1);
+        assert_eq!(mgr.required_symbol_id(Some("BTC-USDT"), None, "create").unwrap(), 1);
+        assert!(mgr.optional_symbol_id(Some("NOPE-USDT"), None).is_err());
+        assert!(mgr.required_symbol_id(None, None, "modify").is_err());
+        assert!(mgr.resolve_symbol_ids(Some(&["NOPE-USDT".into()])).is_err());
+        assert_eq!(
+            mgr.resolve_symbol_ids(Some(&["BTC-USDT".into()])).unwrap(),
+            vec![1]
         );
     }
 

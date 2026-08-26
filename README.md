@@ -237,12 +237,13 @@ Catalogs supply scales and symbol IDs for encoding. Tick/step/minimum
 quantity and notional checks are venue-owned (preview/admission); the SDK does
 not preflight those pair constraints client-side.
 
-Raw `symbol` / `symbols` filters on market overview, triggers list, and
-cancel-all paths are forwarded after trim/empty-omit. Unknown symbols are not
-rejected by the SDK on those endpoints. Paths that convert a symbol string into
-a wire `symbol_id` still wait for catalogs and fail closed when the symbol is
-unknown. Optional ListOpen limits reject an explicit `Some(0)`; other
-zero-means-default proto limits pass `0` through as the server default.
+Public methods may still accept display `symbol` strings. Connect is
+`symbol_id`-only except `GetSpotConfig` (which still returns both `symbol`
+and `symbol_id`). The SDK trims display symbols, resolves them through the
+hydrated catalog, and fails closed on unknown values. It does not forward raw
+symbol strings onto Connect fields that no longer exist. Optional ListOpen
+limits reject an explicit `Some(0)`; other zero-means-default proto limits
+pass `0` through as the server default.
 
 If a client is constructed before entering a Tokio runtime,
 `wait_for_catalogs()` starts hydration on the current runtime. Scaled bot inputs

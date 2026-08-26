@@ -50,6 +50,10 @@ pub struct CreateTriggerParams {
 pub struct ModifyTriggerParams {
     pub trigger_id: String,
     pub subaccount_id: Option<u64>,
+    /// Display symbol; resolved to Connect `symbol_id`. Mutually exclusive with [`Self::symbol_id`].
+    pub symbol: Option<String>,
+    /// Connect `symbol_id`. Mutually exclusive with [`Self::symbol`].
+    pub symbol_id: Option<u32>,
     pub trigger_price: Option<Price>,
     pub limit_price: Option<Price>,
     pub activation_price: Option<Price>,
@@ -57,6 +61,17 @@ pub struct ModifyTriggerParams {
     pub trailing_distance_bps: Option<i32>,
     pub max_slippage_ticks: Option<i32>,
     pub max_slippage_bps: Option<i32>,
+}
+
+/// Typed resume-trigger params. Connect requires `symbol_id`.
+#[derive(Debug, Clone)]
+pub struct ResumeTriggerParams {
+    pub trigger_id: String,
+    pub subaccount_id: Option<u64>,
+    /// Display symbol; resolved to Connect `symbol_id`. Mutually exclusive with [`Self::symbol_id`].
+    pub symbol: Option<String>,
+    /// Connect `symbol_id`. Mutually exclusive with [`Self::symbol`].
+    pub symbol_id: Option<u32>,
 }
 
 /// Valid trigger status filter / response labels (British "cancelled").
@@ -74,6 +89,7 @@ pub const TRIGGER_STATUS_VALUES: &[&str] = &[
 #[derive(Debug, Clone, Default)]
 pub struct ListTriggersOpts {
     pub symbol: Option<String>,
+    pub symbol_id: Option<u32>,
     /// Status filter labels (`created`, `armed`, …). Unknown values are rejected.
     pub status: Vec<String>,
     /// Omitted or `Some(0)` uses the server default.
