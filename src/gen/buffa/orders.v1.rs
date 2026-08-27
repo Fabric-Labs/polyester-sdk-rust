@@ -834,6 +834,8 @@ pub enum ErrorCode {
     ERROR_CODE_POST_ONLY_LIMIT_ONLY = 32i32,
     /// Batch size exceeds the maximum allowed.
     ERROR_CODE_BATCH_TOO_LARGE = 33i32,
+    /// Sub-account policy maximum number of open orders has been reached.
+    ERROR_CODE_POLICY_MAX_OPEN_ORDERS = 34i32,
     /// Modify request in AMEND_ONLY mode requires replace semantics.
     ERROR_CODE_MODIFICATION_REQUIRES_REPLACE = 35i32,
     /// Idempotency key was reused with a different payload.
@@ -900,6 +902,12 @@ pub enum ErrorCode {
     ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL = 68i32,
     /// The account exhausted its current order-admission quota.
     ERROR_CODE_RATE_LIMIT_EXCEEDED = 69i32,
+    /// Caller has a sub-account role that does not allow reading spot data.
+    ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN = 70i32,
+    /// Sub-account policy does not allow reading spot data.
+    ERROR_CODE_POLICY_SPOT_READ_DENY = 71i32,
+    /// API key policy does not allow reading spot data.
+    ERROR_CODE_API_KEY_SPOT_READ_DENY = 72i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1004,6 +1012,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_BATCH_TOO_LARGE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const BatchTooLarge: Self = Self::ERROR_CODE_BATCH_TOO_LARGE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicyMaxOpenOrders: Self = Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS;
     ///Idiomatic alias for [`Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ModificationRequiresReplace: Self = Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE;
@@ -1100,6 +1111,15 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_RATE_LIMIT_EXCEEDED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const RateLimitExceeded: Self = Self::ERROR_CODE_RATE_LIMIT_EXCEEDED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SubaccountReadForbidden: Self = Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN;
+    ///Idiomatic alias for [`Self::ERROR_CODE_POLICY_SPOT_READ_DENY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicySpotReadDeny: Self = Self::ERROR_CODE_POLICY_SPOT_READ_DENY;
+    ///Idiomatic alias for [`Self::ERROR_CODE_API_KEY_SPOT_READ_DENY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ApiKeySpotReadDeny: Self = Self::ERROR_CODE_API_KEY_SPOT_READ_DENY;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -1245,6 +1265,9 @@ impl ::buffa::Enumeration for ErrorCode {
             31i32 => ::core::option::Option::Some(Self::ERROR_CODE_MIN_QTY),
             32i32 => ::core::option::Option::Some(Self::ERROR_CODE_POST_ONLY_LIMIT_ONLY),
             33i32 => ::core::option::Option::Some(Self::ERROR_CODE_BATCH_TOO_LARGE),
+            34i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS)
+            }
             35i32 => {
                 ::core::option::Option::Some(
                     Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE,
@@ -1309,6 +1332,13 @@ impl ::buffa::Enumeration for ErrorCode {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL)
             }
             69i32 => ::core::option::Option::Some(Self::ERROR_CODE_RATE_LIMIT_EXCEEDED),
+            70i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN)
+            }
+            71i32 => ::core::option::Option::Some(Self::ERROR_CODE_POLICY_SPOT_READ_DENY),
+            72i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_SPOT_READ_DENY)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1363,6 +1393,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_MIN_QTY => "ERROR_CODE_MIN_QTY",
             Self::ERROR_CODE_POST_ONLY_LIMIT_ONLY => "ERROR_CODE_POST_ONLY_LIMIT_ONLY",
             Self::ERROR_CODE_BATCH_TOO_LARGE => "ERROR_CODE_BATCH_TOO_LARGE",
+            Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS => {
+                "ERROR_CODE_POLICY_MAX_OPEN_ORDERS"
+            }
             Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE => {
                 "ERROR_CODE_MODIFICATION_REQUIRES_REPLACE"
             }
@@ -1419,6 +1452,13 @@ impl ::buffa::Enumeration for ErrorCode {
                 "ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL"
             }
             Self::ERROR_CODE_RATE_LIMIT_EXCEEDED => "ERROR_CODE_RATE_LIMIT_EXCEEDED",
+            Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN => {
+                "ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN"
+            }
+            Self::ERROR_CODE_POLICY_SPOT_READ_DENY => "ERROR_CODE_POLICY_SPOT_READ_DENY",
+            Self::ERROR_CODE_API_KEY_SPOT_READ_DENY => {
+                "ERROR_CODE_API_KEY_SPOT_READ_DENY"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1529,6 +1569,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_BATCH_TOO_LARGE" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_BATCH_TOO_LARGE)
             }
+            "ERROR_CODE_POLICY_MAX_OPEN_ORDERS" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS)
+            }
             "ERROR_CODE_MODIFICATION_REQUIRES_REPLACE" => {
                 ::core::option::Option::Some(
                     Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE,
@@ -1633,6 +1676,15 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_RATE_LIMIT_EXCEEDED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_RATE_LIMIT_EXCEEDED)
             }
+            "ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN)
+            }
+            "ERROR_CODE_POLICY_SPOT_READ_DENY" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_POLICY_SPOT_READ_DENY)
+            }
+            "ERROR_CODE_API_KEY_SPOT_READ_DENY" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_SPOT_READ_DENY)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1672,6 +1724,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_MIN_QTY,
             Self::ERROR_CODE_POST_ONLY_LIMIT_ONLY,
             Self::ERROR_CODE_BATCH_TOO_LARGE,
+            Self::ERROR_CODE_POLICY_MAX_OPEN_ORDERS,
             Self::ERROR_CODE_MODIFICATION_REQUIRES_REPLACE,
             Self::ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE,
             Self::ERROR_CODE_MARKET_PRICE_UNAVAILABLE,
@@ -1704,6 +1757,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_OVERLOADED,
             Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL,
             Self::ERROR_CODE_RATE_LIMIT_EXCEEDED,
+            Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN,
+            Self::ERROR_CODE_POLICY_SPOT_READ_DENY,
+            Self::ERROR_CODE_API_KEY_SPOT_READ_DENY,
         ]
     }
 }
@@ -3429,15 +3485,16 @@ pub const __LIMIT_FOK_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct OrderIntent {
-    /// Trading pair symbol, for example "BTC-USDT".
+    /// Stable numeric pair ID from GetSpotConfig.
     ///
-    /// Field 1: `symbol`
+    /// Field 1: `symbol_id`
     #[serde(
-        rename = "symbol",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
-    pub symbol: ::buffa::alloc::string::String,
+    pub symbol_id: u32,
     /// Order side.
     ///
     /// Field 2: `side`
@@ -3498,7 +3555,7 @@ pub struct OrderIntent {
 impl ::core::fmt::Debug for OrderIntent {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("OrderIntent")
-            .field("symbol", &self.symbol)
+            .field("symbol_id", &self.symbol_id)
             .field("side", &self.side)
             .field("client_order_id", &self.client_order_id)
             .field("fee_asset", &self.fee_asset)
@@ -3534,8 +3591,8 @@ impl ::buffa::Message for OrderIntent {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.symbol.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
         }
         {
             let val = self.side.to_i32();
@@ -3624,8 +3681,8 @@ impl ::buffa::Message for OrderIntent {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.symbol.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.symbol, buf);
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
         }
         {
             let val = self.side.to_i32();
@@ -3714,9 +3771,9 @@ impl ::buffa::Message for OrderIntent {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.symbol, buf)?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -3871,7 +3928,7 @@ impl ::buffa::Message for OrderIntent {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.symbol.clear();
+        self.symbol_id = 0u32;
         self.side = ::buffa::EnumValue::from(0);
         self.sizing = ::core::option::Option::None;
         self.execution = ::core::option::Option::None;
@@ -3906,9 +3963,7 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                 self,
                 mut map: A,
             ) -> ::core::result::Result<OrderIntent, A::Error> {
-                let mut __f_symbol: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
+                let mut __f_symbol_id: ::core::option::Option<u32> = None;
                 let mut __f_side: ::core::option::Option<::buffa::EnumValue<Side>> = None;
                 let mut __f_client_order_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
@@ -3930,19 +3985,16 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
-                        "symbol" => {
-                            __f_symbol = Some({
+                        "symbolId" | "symbol_id" => {
+                            __f_symbol_id = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
+                                    type Value = u32;
                                     fn deserialize<D: serde::Deserializer<'de>>(
                                         self,
                                         d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    ) -> ::core::result::Result<u32, D::Error> {
+                                        ::buffa::json_helpers::uint32::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -4183,8 +4235,8 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                     }
                 }
                 let mut __r = <OrderIntent as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_symbol {
-                    __r.symbol = v;
+                if let ::core::option::Option::Some(v) = __f_symbol_id {
+                    __r.symbol_id = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_side {
                     __r.side = v;
@@ -7845,16 +7897,17 @@ pub struct CancelAllOrdersRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Symbol filter. When set, only orders on this symbol are canceled.
-    /// When empty, all symbols are canceled.
+    /// Symbol ID filter. When set, only orders on this symbol are canceled.
+    /// When zero, all symbols are canceled.
     ///
-    /// Field 2: `symbol`
+    /// Field 2: `symbol_id`
     #[serde(
-        rename = "symbol",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
-    pub symbol: ::buffa::alloc::string::String,
+    pub symbol_id: u32,
     /// Side filter. When set, only orders on this side are canceled.
     ///
     /// Field 3: `side`
@@ -7892,7 +7945,7 @@ impl ::core::fmt::Debug for CancelAllOrdersRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CancelAllOrdersRequest")
             .field("subaccount_id", &self.subaccount_id)
-            .field("symbol", &self.symbol)
+            .field("symbol_id", &self.symbol_id)
             .field("side", &self.side)
             .field("dry_run", &self.dry_run)
             .field("request_id", &self.request_id)
@@ -7936,8 +7989,8 @@ impl ::buffa::Message for CancelAllOrdersRequest {
         if self.subaccount_id.is_some() {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if !self.symbol.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
         }
         {
             let val = self.side.to_i32();
@@ -7964,8 +8017,8 @@ impl ::buffa::Message for CancelAllOrdersRequest {
         if let Some(v) = self.subaccount_id {
             ::buffa::types::put_fixed64_field(1u32, v, buf);
         }
-        if !self.symbol.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.symbol, buf);
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.symbol_id, buf);
         }
         {
             let val = self.side.to_i32();
@@ -8004,9 +8057,9 @@ impl ::buffa::Message for CancelAllOrdersRequest {
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.symbol, buf)?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -8038,7 +8091,7 @@ impl ::buffa::Message for CancelAllOrdersRequest {
     }
     fn clear(&mut self) {
         self.subaccount_id = ::core::option::Option::None;
-        self.symbol.clear();
+        self.symbol_id = 0u32;
         self.side = ::buffa::EnumValue::from(0);
         self.dry_run = false;
         self.request_id.clear();
@@ -8369,16 +8422,17 @@ pub struct CancelAllAfterRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub timeout_sec: u32,
-    /// Optional symbol filter. When set, only orders on this symbol are canceled
-    /// on expiry. When empty, all symbols are canceled.
+    /// Optional symbol ID filter. When set, only orders on this symbol are
+    /// canceled on expiry. When zero, all symbols are canceled.
     ///
-    /// Field 3: `symbol`
+    /// Field 3: `symbol_id`
     #[serde(
-        rename = "symbol",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
-    pub symbol: ::buffa::alloc::string::String,
+    pub symbol_id: u32,
     /// Optional side filter for cancel-on-expiry.
     ///
     /// Field 4: `side`
@@ -8407,7 +8461,7 @@ impl ::core::fmt::Debug for CancelAllAfterRequest {
         f.debug_struct("CancelAllAfterRequest")
             .field("subaccount_id", &self.subaccount_id)
             .field("timeout_sec", &self.timeout_sec)
-            .field("symbol", &self.symbol)
+            .field("symbol_id", &self.symbol_id)
             .field("side", &self.side)
             .field("request_id", &self.request_id)
             .finish()
@@ -8453,8 +8507,8 @@ impl ::buffa::Message for CancelAllAfterRequest {
         if self.timeout_sec != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.timeout_sec) as u32;
         }
-        if !self.symbol.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
         }
         {
             let val = self.side.to_i32();
@@ -8481,8 +8535,8 @@ impl ::buffa::Message for CancelAllAfterRequest {
         if self.timeout_sec != 0u32 {
             ::buffa::types::put_uint32_field(2u32, self.timeout_sec, buf);
         }
-        if !self.symbol.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.symbol, buf);
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.symbol_id, buf);
         }
         {
             let val = self.side.to_i32();
@@ -8525,9 +8579,9 @@ impl ::buffa::Message for CancelAllAfterRequest {
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.symbol, buf)?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -8553,7 +8607,7 @@ impl ::buffa::Message for CancelAllAfterRequest {
     fn clear(&mut self) {
         self.subaccount_id = ::core::option::Option::None;
         self.timeout_sec = 0u32;
-        self.symbol.clear();
+        self.symbol_id = 0u32;
         self.side = ::buffa::EnumValue::from(0);
         self.request_id.clear();
         self.__buffa_unknown_fields.clear();
@@ -10120,6 +10174,17 @@ pub struct ModifyOrderRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub new_client_order_id: ::buffa::alloc::string::String,
+    /// Trading symbol numeric identifier. Required so API-key market policy can
+    /// be enforced before forwarding; AAS verifies it against the target order.
+    ///
+    /// Field 10: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
     #[serde(flatten)]
     pub key: ::core::option::Option<__buffa::oneof::modify_order_request::Key>,
     #[serde(skip)]
@@ -10136,6 +10201,7 @@ impl ::core::fmt::Debug for ModifyOrderRequest {
             .field("new_attached_risk", &self.new_attached_risk)
             .field("behavior", &self.behavior)
             .field("new_client_order_id", &self.new_client_order_id)
+            .field("symbol_id", &self.symbol_id)
             .field("key", &self.key)
             .finish()
     }
@@ -10230,6 +10296,9 @@ impl ::buffa::Message for ModifyOrderRequest {
                     + ::buffa::types::string_encoded_len(&self.new_client_order_id)
                         as u32;
         }
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -10274,6 +10343,9 @@ impl ::buffa::Message for ModifyOrderRequest {
         }
         if !self.new_client_order_id.is_empty() {
             ::buffa::types::put_string_field(9u32, &self.new_client_order_id, buf);
+        }
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(10u32, self.symbol_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -10371,6 +10443,13 @@ impl ::buffa::Message for ModifyOrderRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.new_client_order_id, buf)?;
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -10387,6 +10466,7 @@ impl ::buffa::Message for ModifyOrderRequest {
         self.new_attached_risk = ::buffa::MessageField::none();
         self.behavior = ::buffa::EnumValue::from(0);
         self.new_client_order_id.clear();
+        self.symbol_id = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -10435,6 +10515,7 @@ impl<'de> serde::Deserialize<'de> for ModifyOrderRequest {
                 let mut __f_new_client_order_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
+                let mut __f_symbol_id: ::core::option::Option<u32> = None;
                 let mut __oneof_key: ::core::option::Option<
                     __buffa::oneof::modify_order_request::Key,
                 > = None;
@@ -10553,6 +10634,21 @@ impl<'de> serde::Deserialize<'de> for ModifyOrderRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
+                        "symbolId" | "symbol_id" => {
+                            __f_symbol_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u32;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u32, D::Error> {
+                                        ::buffa::json_helpers::uint32::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
                         "orderId" | "order_id" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
@@ -10631,6 +10727,9 @@ impl<'de> serde::Deserialize<'de> for ModifyOrderRequest {
                 }
                 if let ::core::option::Option::Some(v) = __f_new_client_order_id {
                     __r.new_client_order_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_symbol_id {
+                    __r.symbol_id = v;
                 }
                 __r.key = __oneof_key;
                 Ok(__r)
@@ -21274,10 +21373,10 @@ pub mod __buffa {
         /// intent. Single and batch create use this same message.
         #[derive(Clone, Debug, Default)]
         pub struct OrderIntentView<'a> {
-            /// Trading pair symbol, for example "BTC-USDT".
+            /// Stable numeric pair ID from GetSpotConfig.
             ///
-            /// Field 1: `symbol`
-            pub symbol: &'a str,
+            /// Field 1: `symbol_id`
+            pub symbol_id: u32,
             /// Order side.
             ///
             /// Field 2: `side`
@@ -21345,9 +21444,9 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -21583,7 +21682,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::OrderIntent {
-                    symbol: self.symbol.to_string(),
+                    symbol_id: self.symbol_id,
                     side: self.side,
                     client_order_id: self.client_order_id.to_string(),
                     fee_asset: self.fee_asset,
@@ -21674,10 +21773,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.symbol.is_empty() {
+                if self.symbol_id != 0u32 {
                     size
                         += 1u32
-                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
                 }
                 {
                     let val = self.side.to_i32();
@@ -21780,8 +21879,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.symbol.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.symbol, buf);
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
                 }
                 {
                     let val = self.side.to_i32();
@@ -21891,8 +21990,12 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
-                    __map.serialize_entry("symbol", self.symbol)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
                     __map.serialize_entry("side", &self.side)?;
@@ -22062,12 +22165,12 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trading pair symbol, for example "BTC-USDT".
+            /// Stable numeric pair ID from GetSpotConfig.
             ///
-            /// Field 1: `symbol`
+            /// Field 1: `symbol_id`
             #[must_use]
-            pub fn symbol(&self) -> &'_ str {
-                self.0.reborrow().symbol
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
             }
             /// Order side.
             ///
@@ -28123,11 +28226,11 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Symbol filter. When set, only orders on this symbol are canceled.
-            /// When empty, all symbols are canceled.
+            /// Symbol ID filter. When set, only orders on this symbol are canceled.
+            /// When zero, all symbols are canceled.
             ///
-            /// Field 2: `symbol`
-            pub symbol: &'a str,
+            /// Field 2: `symbol_id`
+            pub symbol_id: u32,
             /// Side filter. When set, only orders on this side are canceled.
             ///
             /// Field 3: `side`
@@ -28185,9 +28288,9 @@ pub mod __buffa {
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -28242,7 +28345,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CancelAllOrdersRequest {
                     subaccount_id: self.subaccount_id,
-                    symbol: self.symbol.to_string(),
+                    symbol_id: self.symbol_id,
                     side: self.side,
                     dry_run: self.dry_run,
                     request_id: self.request_id.to_string(),
@@ -28263,10 +28366,10 @@ pub mod __buffa {
                 if self.subaccount_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if !self.symbol.is_empty() {
+                if self.symbol_id != 0u32 {
                     size
                         += 1u32
-                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
                 }
                 {
                     let val = self.side.to_i32();
@@ -28297,8 +28400,8 @@ pub mod __buffa {
                 if let Some(v) = self.subaccount_id {
                     ::buffa::types::put_fixed64_field(1u32, v, buf);
                 }
-                if !self.symbol.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.symbol, buf);
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.symbol_id, buf);
                 }
                 {
                     let val = self.side.to_i32();
@@ -28340,8 +28443,12 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
-                    __map.serialize_entry("symbol", self.symbol)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
                     __map.serialize_entry("side", &self.side)?;
@@ -28455,13 +28562,13 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Symbol filter. When set, only orders on this symbol are canceled.
-            /// When empty, all symbols are canceled.
+            /// Symbol ID filter. When set, only orders on this symbol are canceled.
+            /// When zero, all symbols are canceled.
             ///
-            /// Field 2: `symbol`
+            /// Field 2: `symbol_id`
             #[must_use]
-            pub fn symbol(&self) -> &'_ str {
-                self.0.reborrow().symbol
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
             }
             /// Side filter. When set, only orders on this side are canceled.
             ///
@@ -29026,11 +29133,11 @@ pub mod __buffa {
             ///
             /// Field 2: `timeout_sec`
             pub timeout_sec: u32,
-            /// Optional symbol filter. When set, only orders on this symbol are canceled
-            /// on expiry. When empty, all symbols are canceled.
+            /// Optional symbol ID filter. When set, only orders on this symbol are
+            /// canceled on expiry. When zero, all symbols are canceled.
             ///
-            /// Field 3: `symbol`
-            pub symbol: &'a str,
+            /// Field 3: `symbol_id`
+            pub symbol_id: u32,
             /// Optional side filter for cancel-on-expiry.
             ///
             /// Field 4: `side`
@@ -29091,9 +29198,9 @@ pub mod __buffa {
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -29142,7 +29249,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::CancelAllAfterRequest {
                     subaccount_id: self.subaccount_id,
                     timeout_sec: self.timeout_sec,
-                    symbol: self.symbol.to_string(),
+                    symbol_id: self.symbol_id,
                     side: self.side,
                     request_id: self.request_id.to_string(),
                     __buffa_unknown_fields: self
@@ -29168,10 +29275,10 @@ pub mod __buffa {
                             + ::buffa::types::uint32_encoded_len(self.timeout_sec)
                                 as u32;
                 }
-                if !self.symbol.is_empty() {
+                if self.symbol_id != 0u32 {
                     size
                         += 1u32
-                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
                 }
                 {
                     let val = self.side.to_i32();
@@ -29202,8 +29309,8 @@ pub mod __buffa {
                 if self.timeout_sec != 0u32 {
                     ::buffa::types::put_uint32_field(2u32, self.timeout_sec, buf);
                 }
-                if !self.symbol.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.symbol, buf);
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.symbol_id, buf);
                 }
                 {
                     let val = self.side.to_i32();
@@ -29249,8 +29356,12 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.timeout_sec),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
-                    __map.serialize_entry("symbol", self.symbol)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
                     __map.serialize_entry("side", &self.side)?;
@@ -29370,13 +29481,13 @@ pub mod __buffa {
             pub fn timeout_sec(&self) -> u32 {
                 self.0.reborrow().timeout_sec
             }
-            /// Optional symbol filter. When set, only orders on this symbol are canceled
-            /// on expiry. When empty, all symbols are canceled.
+            /// Optional symbol ID filter. When set, only orders on this symbol are
+            /// canceled on expiry. When zero, all symbols are canceled.
             ///
-            /// Field 3: `symbol`
+            /// Field 3: `symbol_id`
             #[must_use]
-            pub fn symbol(&self) -> &'_ str {
-                self.0.reborrow().symbol
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
             }
             /// Optional side filter for cancel-on-expiry.
             ///
@@ -31992,6 +32103,11 @@ pub mod __buffa {
             ///
             /// Field 9: `new_client_order_id`
             pub new_client_order_id: &'a str,
+            /// Trading symbol numeric identifier. Required so API-key market policy can
+            /// be enforced before forwarding; AAS verifies it against the target order.
+            ///
+            /// Field 10: `symbol_id`
+            pub symbol_id: u32,
             pub key: ::core::option::Option<
                 super::super::__buffa::view::oneof::modify_order_request::Key<'a>,
             >,
@@ -32103,6 +32219,13 @@ pub mod __buffa {
                         )?;
                         view.new_client_order_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -32168,6 +32291,7 @@ pub mod __buffa {
                     },
                     behavior: self.behavior,
                     new_client_order_id: self.new_client_order_id.to_string(),
+                    symbol_id: self.symbol_id,
                     key: self
                         .key
                         .as_ref()
@@ -32251,6 +32375,11 @@ pub mod __buffa {
                                 &self.new_client_order_id,
                             ) as u32;
                 }
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -32308,6 +32437,9 @@ pub mod __buffa {
                         &self.new_client_order_id,
                         buf,
                     );
+                }
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(10u32, self.symbol_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -32371,6 +32503,13 @@ pub mod __buffa {
                     self.new_client_order_id,
                 ) {
                     __map.serialize_entry("newClientOrderId", self.new_client_order_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.key {
                     match __ov {
@@ -32541,6 +32680,14 @@ pub mod __buffa {
             #[must_use]
             pub fn new_client_order_id(&self) -> &'_ str {
                 self.0.reborrow().new_client_order_id
+            }
+            /// Trading symbol numeric identifier. Required so API-key market policy can
+            /// be enforced before forwarding; AAS verifies it against the target order.
+            ///
+            /// Field 10: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
             }
             /// Oneof `key`.
             #[must_use]

@@ -330,8 +330,9 @@ impl OrdersService {
     }
 
     fn order_intent_from_params(&self, params: &CreateOrderParams) -> Result<OrderIntent> {
+        let symbol_id = self.ctx.catalogs.require_symbol_id(&params.symbol)?;
         let mut intent = OrderIntent {
-            symbol: params.symbol.clone(),
+            symbol_id,
             side: match params.side {
                 CreateSide::Buy => Side::Buy.into(),
                 CreateSide::Sell => Side::Sell.into(),
@@ -670,6 +671,7 @@ impl OrdersService {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
             request_id: Self::coalesce_request_id(params.request_id, "mod")?,
             key: Some(Self::encode_modify_order_key(&params.key)?),
+            symbol_id: self.ctx.catalogs.require_symbol_id(&params.symbol)?,
             ..Default::default()
         };
         if let Some(price) = params.new_price.as_ref() {
@@ -960,11 +962,13 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         request_id: Option<String>,
     ) -> Result<CancelAllAfterResult> {
+        if symbol.is_some() {
+            self.ctx.wait_for_catalogs().await?;
+        }
         let req = CancelAllAfterRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
             timeout_sec,
-            symbol: crate::catalogs::Manager::normalize_raw_symbol_filter(symbol)
-                .unwrap_or_default(),
+            symbol_id: self.ctx.catalogs.optional_symbol_id(symbol, None)?,
             request_id: Self::coalesce_request_id(request_id, "cancel-after")?,
             ..Default::default()
         };
@@ -999,11 +1003,10 @@ impl OrdersService {
         if params.symbol_id.is_none() && params.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
-        let symbol_id = Self::resolve_cancel_symbol_id(
-            &self.ctx.catalogs,
-            params.symbol.as_deref(),
-            params.symbol_id,
-        )?;
+        let symbol_id = self
+            .ctx
+            .catalogs
+            .optional_symbol_id(params.symbol.as_deref(), params.symbol_id)?;
         let req = CancelOrderRequest {
             symbol_id,
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
@@ -1011,28 +1014,6 @@ impl OrdersService {
             ..Default::default()
         };
         self.cancel(req).await
-    }
-
-    fn resolve_cancel_symbol_id(
-        catalogs: &crate::catalogs::Manager,
-        symbol: Option<&str>,
-        symbol_id: Option<u32>,
-    ) -> Result<u32> {
-        match (symbol, symbol_id) {
-            (None, None) => Ok(0),
-            (_, Some(0)) => Err(Error::validation(
-                "symbol_id must be non-zero when explicitly supplied",
-            )),
-            (Some(_), Some(_)) => Err(Error::validation(
-                "cancel accepts symbol or symbol_id, not both",
-            )),
-            (None, Some(symbol_id)) => Ok(symbol_id),
-            (Some(symbol), None) => catalogs.symbol_id_for_symbol(symbol).ok_or_else(|| {
-                Error::validation(format!(
-                    "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
-                ))
-            }),
-        }
     }
 
     pub async fn cancel_by_client_order_id(
@@ -1088,10 +1069,15 @@ impl OrdersService {
     /// A `request_id` is generated when omitted or blank. Provide a stable non-empty value when
     /// retrying the same logical bulk cancellation.
     pub async fn cancel_all_with(&self, opts: CancelAllOpts) -> Result<CancelAllOrdersResult> {
+        if opts.symbol.is_some() || opts.symbol_id.is_some() {
+            self.ctx.wait_for_catalogs().await?;
+        }
         let mut req = CancelAllOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
-            symbol: crate::catalogs::Manager::normalize_raw_symbol_filter(opts.symbol.as_deref())
-                .unwrap_or_default(),
+            symbol_id: self
+                .ctx
+                .catalogs
+                .optional_symbol_id(opts.symbol.as_deref(), opts.symbol_id)?,
             dry_run: opts.dry_run,
             request_id: Self::coalesce_request_id(opts.request_id, "cancel-all")?,
             ..Default::default()
@@ -1606,7 +1592,7 @@ mod tests {
         let wire = client.orders.encode_preview_params(&preview).unwrap();
         assert_eq!(wire.subaccount_id, Some(9));
         let intent = wire.order.as_option().expect("preview order intent");
-        assert_eq!(intent.symbol, "BTC-USDT");
+        assert_eq!(intent.symbol_id, 7);
         assert_eq!(intent.side.as_known(), Some(Side::Buy));
         assert_eq!(intent.client_order_id, "preview-cid");
         assert!(matches!(
@@ -1810,21 +1796,27 @@ mod tests {
     #[test]
     fn cancel_symbol_routing_distinguishes_omitted_and_invalid_inputs() {
         let client = client();
+        assert_eq!(client.catalogs.optional_symbol_id(None, None).unwrap(), 0);
         assert_eq!(
-            OrdersService::resolve_cancel_symbol_id(&client.catalogs, None, None).unwrap(),
-            0
-        );
-        assert_eq!(
-            OrdersService::resolve_cancel_symbol_id(&client.catalogs, Some("BTC-USDT"), None)
+            client
+                .catalogs
+                .optional_symbol_id(Some("BTC-USDT"), None)
                 .unwrap(),
             7
         );
 
         for err in [
-            OrdersService::resolve_cancel_symbol_id(&client.catalogs, Some("UNKNOWN-USDT"), None)
+            client
+                .catalogs
+                .optional_symbol_id(Some("UNKNOWN-USDT"), None)
                 .unwrap_err(),
-            OrdersService::resolve_cancel_symbol_id(&client.catalogs, None, Some(0)).unwrap_err(),
-            OrdersService::resolve_cancel_symbol_id(&client.catalogs, Some("BTC-USDT"), Some(7))
+            client
+                .catalogs
+                .optional_symbol_id(None, Some(0))
+                .unwrap_err(),
+            client
+                .catalogs
+                .optional_symbol_id(Some("BTC-USDT"), Some(7))
                 .unwrap_err(),
         ] {
             assert!(matches!(err, Error::Validation(_)));

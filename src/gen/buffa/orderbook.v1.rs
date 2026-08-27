@@ -216,15 +216,16 @@ impl ::buffa::Enumeration for Depth {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetOrderBookRequest {
-    /// e.g. "BTC-USDT"; resolved to symbol_id server-side.
+    /// Stable numeric pair ID from GetSpotConfig.
     ///
-    /// Field 1: `symbol`
+    /// Field 1: `symbol_id`
     #[serde(
-        rename = "symbol",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
-    pub symbol: ::buffa::alloc::string::String,
+    pub symbol_id: u32,
     /// Requested depth per side (number of price levels). Default is 50.
     ///
     /// Field 2: `depth`
@@ -241,7 +242,7 @@ pub struct GetOrderBookRequest {
 impl ::core::fmt::Debug for GetOrderBookRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetOrderBookRequest")
-            .field("symbol", &self.symbol)
+            .field("symbol_id", &self.symbol_id)
             .field("depth", &self.depth)
             .finish()
     }
@@ -271,8 +272,8 @@ impl ::buffa::Message for GetOrderBookRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.symbol.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
         }
         {
             let val = self.depth.to_i32();
@@ -290,8 +291,8 @@ impl ::buffa::Message for GetOrderBookRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.symbol.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.symbol, buf);
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
         }
         {
             let val = self.depth.to_i32();
@@ -315,9 +316,9 @@ impl ::buffa::Message for GetOrderBookRequest {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.symbol, buf)?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -336,7 +337,7 @@ impl ::buffa::Message for GetOrderBookRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.symbol.clear();
+        self.symbol_id = 0u32;
         self.depth = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
@@ -1109,10 +1110,10 @@ pub mod __buffa {
         /// GetOrderBookRequest describes a snapshot view request.
         #[derive(Clone, Debug, Default)]
         pub struct GetOrderBookRequestView<'a> {
-            /// e.g. "BTC-USDT"; resolved to symbol_id server-side.
+            /// Stable numeric pair ID from GetSpotConfig.
             ///
-            /// Field 1: `symbol`
-            pub symbol: &'a str,
+            /// Field 1: `symbol_id`
+            pub symbol_id: u32,
             /// Requested depth per side (number of price levels). Default is 50.
             ///
             /// Field 2: `depth`
@@ -1153,9 +1154,9 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -1195,7 +1196,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::GetOrderBookRequest {
-                    symbol: self.symbol.to_string(),
+                    symbol_id: self.symbol_id,
                     depth: self.depth,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -1211,10 +1212,10 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.symbol.is_empty() {
+                if self.symbol_id != 0u32 {
                     size
                         += 1u32
-                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
                 }
                 {
                     let val = self.depth.to_i32();
@@ -1233,8 +1234,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.symbol.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.symbol, buf);
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
                 }
                 {
                     let val = self.depth.to_i32();
@@ -1263,8 +1264,12 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
-                    __map.serialize_entry("symbol", self.symbol)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.depth) {
                     __map.serialize_entry("depth", &self.depth)?;
@@ -1365,12 +1370,12 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// e.g. "BTC-USDT"; resolved to symbol_id server-side.
+            /// Stable numeric pair ID from GetSpotConfig.
             ///
-            /// Field 1: `symbol`
+            /// Field 1: `symbol_id`
             #[must_use]
-            pub fn symbol(&self) -> &'_ str {
-                self.0.reborrow().symbol
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
             }
             /// Requested depth per side (number of price levels). Default is 50.
             ///

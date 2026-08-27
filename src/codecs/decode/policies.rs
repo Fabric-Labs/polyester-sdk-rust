@@ -1,18 +1,33 @@
 //! Policy decoders.
 
 use crate::codecs::scalars::format_uint64_id;
-use crate::models::{ApiPoliciesList, ApiPolicy, SubaccountPoliciesList, SubaccountPolicy};
+use crate::models::{
+    ApiPoliciesList, ApiPolicy, SpotMarketRule, SubaccountPoliciesList, SubaccountPolicy,
+};
 use crate::proto::auth::v1::{
     ApiPolicyView, CreateApiPolicyResponse, CreateSubaccountPolicyResponse, GetApiPolicyResponse,
     GetSubaccountPolicyResponse, ListApiPoliciesResponse, ListSubaccountPoliciesResponse,
-    SubaccountPolicyView, UpdateApiPolicyResponse, UpdateSubaccountPolicyResponse,
+    SpotMarketRule as ProtoSpotMarketRule, SubaccountPolicyView, UpdateApiPolicyResponse,
+    UpdateSubaccountPolicyResponse,
 };
+
+fn spot_market_rule_from_proto(msg: &ProtoSpotMarketRule) -> SpotMarketRule {
+    SpotMarketRule {
+        symbol_id: msg.symbol_id,
+        symbol: String::new(),
+    }
+}
 
 pub fn subaccount_policy_from_proto(msg: &SubaccountPolicyView) -> SubaccountPolicy {
     SubaccountPolicy {
         policy_id: format_uint64_id(msg.id),
         name: msg.name.clone(),
         description: msg.description.clone(),
+        spot_markets: msg
+            .spot_markets
+            .iter()
+            .map(spot_market_rule_from_proto)
+            .collect(),
         revision: msg.revision,
     }
 }
@@ -52,6 +67,11 @@ pub fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
         policy_id: format_uint64_id(msg.id),
         name: msg.name.clone(),
         description: msg.description.clone(),
+        spot_markets: msg
+            .spot_markets
+            .iter()
+            .map(spot_market_rule_from_proto)
+            .collect(),
         revision: msg.revision,
     }
 }
@@ -95,6 +115,7 @@ mod tests {
         assert_eq!(result.policies[0].policy_id, format_uint64_id(42));
         assert_eq!(result.policies[0].name, "default");
         assert_eq!(result.policies[0].revision, 3);
+        assert!(result.policies[0].spot_markets.is_empty());
     }
 
     #[test]
@@ -104,6 +125,10 @@ mod tests {
                 id: 7,
                 name: "read-only".into(),
                 revision: 2,
+                spot_markets: vec![crate::proto::auth::v1::SpotMarketRule {
+                    symbol_id: 3,
+                    ..Default::default()
+                }],
                 ..Default::default()
             }],
             ..Default::default()
@@ -112,5 +137,8 @@ mod tests {
         assert_eq!(result.policies.len(), 1);
         assert_eq!(result.policies[0].policy_id, format_uint64_id(7));
         assert_eq!(result.policies[0].revision, 2);
+        assert_eq!(result.policies[0].spot_markets.len(), 1);
+        assert_eq!(result.policies[0].spot_markets[0].symbol_id, 3);
+        assert_eq!(result.policies[0].spot_markets[0].symbol, "");
     }
 }

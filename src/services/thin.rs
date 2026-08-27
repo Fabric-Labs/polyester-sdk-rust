@@ -2119,7 +2119,13 @@ impl FeeService {
         )
         .await?
         .into_owned();
-        Ok(spot_fee_rates_list_from_proto(&resp))
+        let mut list = spot_fee_rates_list_from_proto(&resp);
+        for row in &mut list.fee_rates {
+            if row.symbol.is_empty() {
+                row.symbol = self.ctx.catalogs.display_symbol(row.symbol_id);
+            }
+        }
+        Ok(list)
     }
 }
 

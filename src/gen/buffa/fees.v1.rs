@@ -16,15 +16,6 @@ pub struct SpotFeeRate {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub symbol_id: u32,
-    /// Canonical spot market symbol, for example "BTC-USDT".
-    ///
-    /// Field 2: `symbol`
-    #[serde(
-        rename = "symbol",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub symbol: ::buffa::alloc::string::String,
     /// Effective maker fee rate encoded as a base-10 percentage string without a
     /// percent sign. Values are between -100 and 100 inclusive.
     ///
@@ -65,7 +56,6 @@ impl ::core::fmt::Debug for SpotFeeRate {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("SpotFeeRate")
             .field("symbol_id", &self.symbol_id)
-            .field("symbol", &self.symbol)
             .field("maker_fee_rate_percent", &self.maker_fee_rate_percent)
             .field("taker_fee_rate_percent", &self.taker_fee_rate_percent)
             .field("vip_tier", &self.vip_tier)
@@ -100,9 +90,6 @@ impl ::buffa::Message for SpotFeeRate {
         if self.symbol_id != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
         }
-        if !self.symbol.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
-        }
         if !self.maker_fee_rate_percent.is_empty() {
             size
                 += 1u32
@@ -130,9 +117,6 @@ impl ::buffa::Message for SpotFeeRate {
         use ::buffa::Enumeration as _;
         if self.symbol_id != 0u32 {
             ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
-        }
-        if !self.symbol.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.symbol, buf);
         }
         if !self.maker_fee_rate_percent.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.maker_fee_rate_percent, buf);
@@ -162,13 +146,6 @@ impl ::buffa::Message for SpotFeeRate {
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.symbol_id = ::buffa::types::decode_uint32(buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.symbol, buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -200,7 +177,6 @@ impl ::buffa::Message for SpotFeeRate {
     }
     fn clear(&mut self) {
         self.symbol_id = 0u32;
-        self.symbol.clear();
         self.maker_fee_rate_percent.clear();
         self.taker_fee_rate_percent.clear();
         self.vip_tier = 0u32;
@@ -606,10 +582,6 @@ pub mod __buffa {
             ///
             /// Field 1: `symbol_id`
             pub symbol_id: u32,
-            /// Canonical spot market symbol, for example "BTC-USDT".
-            ///
-            /// Field 2: `symbol`
-            pub symbol: &'a str,
             /// Effective maker fee rate encoded as a base-10 percentage string without a
             /// percent sign. Values are between -100 and 100 inclusive.
             ///
@@ -663,13 +635,6 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -726,7 +691,6 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::SpotFeeRate {
                     symbol_id: self.symbol_id,
-                    symbol: self.symbol.to_string(),
                     maker_fee_rate_percent: self.maker_fee_rate_percent.to_string(),
                     taker_fee_rate_percent: self.taker_fee_rate_percent.to_string(),
                     vip_tier: self.vip_tier,
@@ -748,11 +712,6 @@ pub mod __buffa {
                     size
                         += 1u32
                             + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
-                }
-                if !self.symbol.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
                 }
                 if !self.maker_fee_rate_percent.is_empty() {
                     size
@@ -786,9 +745,6 @@ pub mod __buffa {
                 use ::buffa::Enumeration as _;
                 if self.symbol_id != 0u32 {
                     ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
-                }
-                if !self.symbol.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.symbol, buf);
                 }
                 if !self.maker_fee_rate_percent.is_empty() {
                     ::buffa::types::put_string_field(
@@ -834,9 +790,6 @@ pub mod __buffa {
                             "symbolId",
                             &::buffa::json_helpers::ProtoJson(&self.symbol_id),
                         )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
-                    __map.serialize_entry("symbol", self.symbol)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(
                     self.maker_fee_rate_percent,
@@ -963,13 +916,6 @@ pub mod __buffa {
             #[must_use]
             pub fn symbol_id(&self) -> u32 {
                 self.0.reborrow().symbol_id
-            }
-            /// Canonical spot market symbol, for example "BTC-USDT".
-            ///
-            /// Field 2: `symbol`
-            #[must_use]
-            pub fn symbol(&self) -> &'_ str {
-                self.0.reborrow().symbol
             }
             /// Effective maker fee rate encoded as a base-10 percentage string without a
             /// percent sign. Values are between -100 and 100 inclusive.

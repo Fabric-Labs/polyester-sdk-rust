@@ -9,9 +9,9 @@ use crate::proto::marketoverview::v1::{
 pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> MarketOverviewEntry {
     MarketOverviewEntry {
         symbol_id: msg.symbol_id,
-        symbol: msg.symbol.clone(),
-        last_price: decode_price_ticks(msg.last_price_ticks, Some(msg.symbol.clone())),
-        index_price: decode_price_ticks(msg.index_price_ticks, Some(msg.symbol.clone())),
+        symbol: String::new(),
+        last_price: decode_price_ticks(msg.last_price_ticks, None),
+        index_price: decode_price_ticks(msg.index_price_ticks, None),
     }
 }
 
@@ -46,7 +46,6 @@ mod tests {
         let msg = ListMarketOverviewResponse {
             markets: vec![ProtoMarketOverview {
                 symbol_id: 2,
-                symbol: "ETH-USDT".into(),
                 last_price_ticks: 2_000_000,
                 index_price_ticks: 1_999_500,
                 ..Default::default()
@@ -56,7 +55,8 @@ mod tests {
         };
         let list = market_overview_list_from_proto(&msg);
         assert_eq!(list.markets.len(), 1);
-        assert_eq!(list.markets[0].symbol, "ETH-USDT");
+        assert_eq!(list.markets[0].symbol_id, 2);
+        assert_eq!(list.markets[0].symbol, "");
         assert_eq!(
             list.markets[0].last_price.as_ref().unwrap().as_ticks(),
             2_000_000
