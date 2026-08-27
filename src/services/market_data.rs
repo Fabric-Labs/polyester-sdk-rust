@@ -354,7 +354,10 @@ impl MarketOverviewService {
         let opts = opts.into();
         self.ctx.wait_for_catalogs().await?;
         let req = ListMarketOverviewRequest {
-            symbol_id: self.ctx.catalogs.resolve_symbol_ids(opts.symbols.as_deref())?,
+            symbol_id: self
+                .ctx
+                .catalogs
+                .resolve_symbol_ids(opts.symbols.as_deref())?,
             // Proto u32: 0 means omit / server default (typically 50).
             limit: opts.limit.unwrap_or_default(),
             include_sparklines: opts.include_sparklines,
@@ -410,7 +413,10 @@ impl MarketOverviewService {
             self.ctx.wait_for_catalogs().await?;
         }
         let symbols = {
-            let resolved = self.ctx.catalogs.resolve_symbol_ids(opts.symbols.as_deref())?;
+            let resolved = self
+                .ctx
+                .catalogs
+                .resolve_symbol_ids(opts.symbols.as_deref())?;
             // Keep the original display list for snapshot fetch; wire IDs are
             // resolved again in `list`.
             (!resolved.is_empty()).then_some(opts.symbols.clone().unwrap_or_default())

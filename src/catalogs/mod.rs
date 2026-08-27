@@ -789,7 +789,11 @@ mod tests {
         .unwrap();
         assert_eq!(mgr.optional_symbol_id(None, None).unwrap(), 0);
         assert_eq!(mgr.optional_symbol_id(Some(" BTC-USDT "), None).unwrap(), 1);
-        assert_eq!(mgr.required_symbol_id(Some("BTC-USDT"), None, "create").unwrap(), 1);
+        assert_eq!(
+            mgr.required_symbol_id(Some("BTC-USDT"), None, "create")
+                .unwrap(),
+            1
+        );
         assert!(mgr.optional_symbol_id(Some("NOPE-USDT"), None).is_err());
         assert!(mgr.required_symbol_id(None, None, "modify").is_err());
         assert!(mgr.resolve_symbol_ids(Some(&["NOPE-USDT".into()])).is_err());

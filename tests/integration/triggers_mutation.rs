@@ -7,9 +7,7 @@ use crate::support::{
 };
 use polyester::codecs::scalars::id_to_u64;
 use polyester::models::{CreateOrderType, CreateSide, CreateTriggerParams, CreateTriggerType};
-use polyester::proto::triggers::v1::{
-    CancelTriggerRequest, PauseTriggerRequest,
-};
+use polyester::proto::triggers::v1::{CancelTriggerRequest, PauseTriggerRequest};
 use polyester::types::{Price, Quantity};
 
 #[tokio::test]

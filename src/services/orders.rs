@@ -1003,10 +1003,10 @@ impl OrdersService {
         if params.symbol_id.is_none() && params.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
-        let symbol_id = self.ctx.catalogs.optional_symbol_id(
-            params.symbol.as_deref(),
-            params.symbol_id,
-        )?;
+        let symbol_id = self
+            .ctx
+            .catalogs
+            .optional_symbol_id(params.symbol.as_deref(), params.symbol_id)?;
         let req = CancelOrderRequest {
             symbol_id,
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
@@ -1796,10 +1796,7 @@ mod tests {
     #[test]
     fn cancel_symbol_routing_distinguishes_omitted_and_invalid_inputs() {
         let client = client();
-        assert_eq!(
-            client.catalogs.optional_symbol_id(None, None).unwrap(),
-            0
-        );
+        assert_eq!(client.catalogs.optional_symbol_id(None, None).unwrap(), 0);
         assert_eq!(
             client
                 .catalogs
@@ -1813,7 +1810,10 @@ mod tests {
                 .catalogs
                 .optional_symbol_id(Some("UNKNOWN-USDT"), None)
                 .unwrap_err(),
-            client.catalogs.optional_symbol_id(None, Some(0)).unwrap_err(),
+            client
+                .catalogs
+                .optional_symbol_id(None, Some(0))
+                .unwrap_err(),
             client
                 .catalogs
                 .optional_symbol_id(Some("BTC-USDT"), Some(7))
