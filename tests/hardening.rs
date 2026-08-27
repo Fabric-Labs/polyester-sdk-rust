@@ -326,14 +326,20 @@ async fn l2_scale_dependent_public_paths_fail_closed_without_catalogs() {
     })
     .unwrap();
 
+    // Display-symbol Connect paths must fail at catalog resolution first.
+    // Guessing a symbol_id (or skipping to scale 8) would send a fabricated wire id.
     let orderbook_err = client
         .orderbook
         .get("ETH-USDT", Some(50))
         .await
-        .expect_err("orderbook must not guess scale 8");
+        .expect_err("orderbook must not guess a symbol_id");
     assert!(matches!(orderbook_err, Error::Validation(_)));
-    assert!(orderbook_err.to_string().contains("catalog quantity scale"));
+    assert!(
+        orderbook_err.to_string().contains("unknown symbol"),
+        "{orderbook_err}"
+    );
 
+    // An explicit symbol_id still cannot format quantities without a catalog scale.
     let trades_err = client
         .market_data
         .get_trades_with(polyester::models::GetTradesOpts {
