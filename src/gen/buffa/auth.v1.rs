@@ -1107,13 +1107,14 @@ pub const __CREATE_API_KEY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     from_json: ::buffa::type_registry::any_from_json::<CreateApiKeyResponse>,
     is_wkt: false,
 };
-/// ListApiKeysRequest lists non-revoked API keys owned by the caller.
+/// ListApiKeysRequest lists non-revoked API keys visible to the caller.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListApiKeysRequest {
-    /// Optional filter: only keys scoped to this sub-account (opaque ID). If unset,
-    /// all non-revoked keys owned by the caller are returned.
+    /// Optional filter: only keys scoped to this sub-account (opaque ID). The
+    /// caller must own or administer the sub-account. If unset, only non-revoked
+    /// keys owned by the caller are returned.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -1610,7 +1611,7 @@ pub const __DELETE_API_KEY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     from_json: ::buffa::type_registry::any_from_json::<DeleteApiKeyResponse>,
     is_wkt: false,
 };
-/// GetApiKeyRequest returns a single API key owned by the caller's account.
+/// GetApiKeyRequest returns one API key visible to its owner or a sub-account admin.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -1737,7 +1738,7 @@ pub const __GET_API_KEY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     from_json: ::buffa::type_registry::any_from_json::<GetApiKeyRequest>,
     is_wkt: false,
 };
-/// GetApiKeyResponse returns one API key owned by the caller.
+/// GetApiKeyResponse returns one API key visible to the caller.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -3861,8 +3862,10 @@ pub const __SUBACCOUNT_POLICY_VIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListSubaccountPoliciesRequest {
-    /// Optional sub-account context for delegated administration. When omitted,
-    /// only policies owned by the caller's root account are returned.
+    /// Optional sub-account context. When provided, a current member may read the
+    /// policy attached to that sub-account; the owner retains visibility of all
+    /// policies owned by their root account. When omitted, only policies owned by
+    /// the caller's root account are returned.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -4147,8 +4150,10 @@ pub struct GetSubaccountPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub policy_id: u64,
-    /// Optional sub-account context for delegated administration. When omitted,
-    /// the policy must be owned by the caller's root account.
+    /// Optional sub-account context. When provided, a current member may read the
+    /// policy attached to that sub-account; the owner may also read another policy
+    /// owned by their root account. When omitted, the policy must be owned by the
+    /// caller's root account.
     ///
     /// Field 2: `subaccount_id`
     #[serde(
@@ -8742,6 +8747,568 @@ impl ::buffa::Enumeration for SubaccountRole {
         ]
     }
 }
+/// A stable capability granted by a sub-account role. These values describe
+/// role authorization only; resource state, MFA, limits, and other request
+/// context may still deny an operation.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum SubaccountPermission {
+    /// No permission selected.
+    SUBACCOUNT_PERMISSION_UNSPECIFIED = 0i32,
+    /// Read the sub-account and its non-sensitive metadata.
+    SUBACCOUNT_PERMISSION_READ_SUBACCOUNT = 1i32,
+    /// Update sub-account metadata or lifecycle status.
+    SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT = 2i32,
+    /// Read balances and equity.
+    SUBACCOUNT_PERMISSION_READ_BALANCES = 3i32,
+    /// Read spot orders and trades.
+    SUBACCOUNT_PERMISSION_READ_SPOT = 4i32,
+    /// Place and manage spot orders and triggers.
+    SUBACCOUNT_PERMISSION_TRADE_SPOT = 5i32,
+    /// Read internal-transfer history.
+    SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS = 6i32,
+    /// Create internal transfers.
+    SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER = 7i32,
+    /// Withdraw value from Trading to an external destination.
+    SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW = 8i32,
+    /// Read saved, recent, and whitelisted destinations.
+    SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK = 9i32,
+    /// Create, update, delete, and copy saved destinations.
+    SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK = 10i32,
+    /// Read the current member roster.
+    SUBACCOUNT_PERMISSION_READ_MEMBERS = 11i32,
+    /// Invite, remove, and change delegated members.
+    SUBACCOUNT_PERMISSION_MANAGE_MEMBERS = 12i32,
+    /// Read pending and historical invitations for the sub-account.
+    SUBACCOUNT_PERMISSION_READ_INVITES = 13i32,
+    /// Cancel invitations for the sub-account.
+    SUBACCOUNT_PERMISSION_MANAGE_INVITES = 14i32,
+    /// Read API keys and their attached policies for the sub-account.
+    SUBACCOUNT_PERMISSION_READ_API_KEYS = 15i32,
+    /// Create, update, and delete API keys for the sub-account.
+    SUBACCOUNT_PERMISSION_MANAGE_API_KEYS = 16i32,
+    /// Read the policy attached to the sub-account.
+    SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY = 17i32,
+    /// Create, update, attach, or replace policies for the sub-account, subject to owner-only policy safeguards.
+    SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY = 18i32,
+    /// Read sub-account activity with role-appropriate redaction.
+    SUBACCOUNT_PERMISSION_READ_ACTIVITY = 19i32,
+    /// Read unmasked security details in sub-account activity.
+    SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS = 20i32,
+    /// Change the delegated-member MFA requirement.
+    SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT = 21i32,
+    /// Create or retrieve a deposit address for the sub-account.
+    SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS = 22i32,
+    /// List deposit addresses for the sub-account.
+    SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES = 23i32,
+    /// Read Guard Signer wallet and on-chain status for the sub-account.
+    SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS = 24i32,
+    /// Create, sign with, rotate, or export the sub-account Guard Signer wallet.
+    SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER = 25i32,
+}
+impl SubaccountPermission {
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::SUBACCOUNT_PERMISSION_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadSubaccount: Self = Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UpdateSubaccount: Self = Self::SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_BALANCES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadBalances: Self = Self::SUBACCOUNT_PERMISSION_READ_BALANCES;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_SPOT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadSpot: Self = Self::SUBACCOUNT_PERMISSION_READ_SPOT;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_TRADE_SPOT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TradeSpot: Self = Self::SUBACCOUNT_PERMISSION_TRADE_SPOT;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadInternalTransfers: Self = Self::SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InternalTransfer: Self = Self::SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ExternalWithdraw: Self = Self::SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadAddressBook: Self = Self::SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageAddressBook: Self = Self::SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_MEMBERS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadMembers: Self = Self::SUBACCOUNT_PERMISSION_READ_MEMBERS;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBERS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageMembers: Self = Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBERS;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_INVITES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadInvites: Self = Self::SUBACCOUNT_PERMISSION_READ_INVITES;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_MANAGE_INVITES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageInvites: Self = Self::SUBACCOUNT_PERMISSION_MANAGE_INVITES;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_API_KEYS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadApiKeys: Self = Self::SUBACCOUNT_PERMISSION_READ_API_KEYS;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_MANAGE_API_KEYS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageApiKeys: Self = Self::SUBACCOUNT_PERMISSION_MANAGE_API_KEYS;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadSubaccountPolicy: Self = Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageSubaccountPolicy: Self = Self::SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadActivity: Self = Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadActivitySecurityDetails: Self = Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageMemberMfaRequirement: Self = Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CreateDepositAddress: Self = Self::SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadDepositAddresses: Self = Self::SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadGuardSignerStatus: Self = Self::SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageGuardSigner: Self = Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER;
+}
+impl ::core::default::Default for SubaccountPermission {
+    fn default() -> Self {
+        Self::SUBACCOUNT_PERMISSION_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for SubaccountPermission {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for SubaccountPermission {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = SubaccountPermission;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(SubaccountPermission)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<SubaccountPermission, E> {
+                <SubaccountPermission as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<SubaccountPermission, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <SubaccountPermission as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<SubaccountPermission, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <SubaccountPermission as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<SubaccountPermission, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SubaccountPermission {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for SubaccountPermission {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_UNSPECIFIED),
+            1i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT)
+            }
+            2i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT,
+                )
+            }
+            3i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_BALANCES)
+            }
+            4i32 => ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_SPOT),
+            5i32 => ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_TRADE_SPOT),
+            6i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS,
+                )
+            }
+            7i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER,
+                )
+            }
+            8i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW,
+                )
+            }
+            9i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK,
+                )
+            }
+            10i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK,
+                )
+            }
+            11i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_MEMBERS)
+            }
+            12i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBERS)
+            }
+            13i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_INVITES)
+            }
+            14i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_MANAGE_INVITES)
+            }
+            15i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_API_KEYS)
+            }
+            16i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_MANAGE_API_KEYS)
+            }
+            17i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY,
+                )
+            }
+            18i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY,
+                )
+            }
+            19i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY)
+            }
+            20i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS,
+                )
+            }
+            21i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT,
+                )
+            }
+            22i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS,
+                )
+            }
+            23i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES,
+                )
+            }
+            24i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS,
+                )
+            }
+            25i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::SUBACCOUNT_PERMISSION_UNSPECIFIED => {
+                "SUBACCOUNT_PERMISSION_UNSPECIFIED"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT => {
+                "SUBACCOUNT_PERMISSION_READ_SUBACCOUNT"
+            }
+            Self::SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT => {
+                "SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_BALANCES => {
+                "SUBACCOUNT_PERMISSION_READ_BALANCES"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_SPOT => "SUBACCOUNT_PERMISSION_READ_SPOT",
+            Self::SUBACCOUNT_PERMISSION_TRADE_SPOT => "SUBACCOUNT_PERMISSION_TRADE_SPOT",
+            Self::SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS => {
+                "SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS"
+            }
+            Self::SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER => {
+                "SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER"
+            }
+            Self::SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW => {
+                "SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK => {
+                "SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK"
+            }
+            Self::SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK => {
+                "SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_MEMBERS => {
+                "SUBACCOUNT_PERMISSION_READ_MEMBERS"
+            }
+            Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBERS => {
+                "SUBACCOUNT_PERMISSION_MANAGE_MEMBERS"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_INVITES => {
+                "SUBACCOUNT_PERMISSION_READ_INVITES"
+            }
+            Self::SUBACCOUNT_PERMISSION_MANAGE_INVITES => {
+                "SUBACCOUNT_PERMISSION_MANAGE_INVITES"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_API_KEYS => {
+                "SUBACCOUNT_PERMISSION_READ_API_KEYS"
+            }
+            Self::SUBACCOUNT_PERMISSION_MANAGE_API_KEYS => {
+                "SUBACCOUNT_PERMISSION_MANAGE_API_KEYS"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY => {
+                "SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY"
+            }
+            Self::SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY => {
+                "SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY => {
+                "SUBACCOUNT_PERMISSION_READ_ACTIVITY"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS => {
+                "SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS"
+            }
+            Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT => {
+                "SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT"
+            }
+            Self::SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS => {
+                "SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES => {
+                "SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS => {
+                "SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS"
+            }
+            Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER => {
+                "SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "SUBACCOUNT_PERMISSION_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_UNSPECIFIED)
+            }
+            "SUBACCOUNT_PERMISSION_READ_SUBACCOUNT" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT)
+            }
+            "SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_READ_BALANCES" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_BALANCES)
+            }
+            "SUBACCOUNT_PERMISSION_READ_SPOT" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_SPOT)
+            }
+            "SUBACCOUNT_PERMISSION_TRADE_SPOT" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_TRADE_SPOT)
+            }
+            "SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_READ_MEMBERS" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_MEMBERS)
+            }
+            "SUBACCOUNT_PERMISSION_MANAGE_MEMBERS" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBERS)
+            }
+            "SUBACCOUNT_PERMISSION_READ_INVITES" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_INVITES)
+            }
+            "SUBACCOUNT_PERMISSION_MANAGE_INVITES" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_MANAGE_INVITES)
+            }
+            "SUBACCOUNT_PERMISSION_READ_API_KEYS" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_API_KEYS)
+            }
+            "SUBACCOUNT_PERMISSION_MANAGE_API_KEYS" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_MANAGE_API_KEYS)
+            }
+            "SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_READ_ACTIVITY" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY)
+            }
+            "SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER,
+                )
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::SUBACCOUNT_PERMISSION_UNSPECIFIED,
+            Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT,
+            Self::SUBACCOUNT_PERMISSION_UPDATE_SUBACCOUNT,
+            Self::SUBACCOUNT_PERMISSION_READ_BALANCES,
+            Self::SUBACCOUNT_PERMISSION_READ_SPOT,
+            Self::SUBACCOUNT_PERMISSION_TRADE_SPOT,
+            Self::SUBACCOUNT_PERMISSION_READ_INTERNAL_TRANSFERS,
+            Self::SUBACCOUNT_PERMISSION_INTERNAL_TRANSFER,
+            Self::SUBACCOUNT_PERMISSION_EXTERNAL_WITHDRAW,
+            Self::SUBACCOUNT_PERMISSION_READ_ADDRESS_BOOK,
+            Self::SUBACCOUNT_PERMISSION_MANAGE_ADDRESS_BOOK,
+            Self::SUBACCOUNT_PERMISSION_READ_MEMBERS,
+            Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBERS,
+            Self::SUBACCOUNT_PERMISSION_READ_INVITES,
+            Self::SUBACCOUNT_PERMISSION_MANAGE_INVITES,
+            Self::SUBACCOUNT_PERMISSION_READ_API_KEYS,
+            Self::SUBACCOUNT_PERMISSION_MANAGE_API_KEYS,
+            Self::SUBACCOUNT_PERMISSION_READ_SUBACCOUNT_POLICY,
+            Self::SUBACCOUNT_PERMISSION_MANAGE_SUBACCOUNT_POLICY,
+            Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY,
+            Self::SUBACCOUNT_PERMISSION_READ_ACTIVITY_SECURITY_DETAILS,
+            Self::SUBACCOUNT_PERMISSION_MANAGE_MEMBER_MFA_REQUIREMENT,
+            Self::SUBACCOUNT_PERMISSION_CREATE_DEPOSIT_ADDRESS,
+            Self::SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES,
+            Self::SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS,
+            Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER,
+        ]
+    }
+}
 /// Status of an invitation to join a sub-account.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -8943,7 +9510,7 @@ pub enum SubaccountInviteAction {
     SUBACCOUNT_INVITE_ACTION_ACCEPT = 1i32,
     /// Decline an incoming invitation as the grantee.
     SUBACCOUNT_INVITE_ACTION_DECLINE = 2i32,
-    /// Cancel an outgoing invitation as the inviter.
+    /// Cancel an invitation as a current owner or admin of its sub-account.
     SUBACCOUNT_INVITE_ACTION_CANCEL = 3i32,
 }
 impl SubaccountInviteAction {
@@ -9795,6 +10362,1132 @@ impl ::buffa::Enumeration for ActivityEventSource {
         ]
     }
 }
+/// User-facing metadata for one stable sub-account permission.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SubaccountPermissionDefinition {
+    /// Stable permission identifier used by authorization and clients.
+    ///
+    /// Field 1: `permission`
+    #[serde(
+        rename = "permission",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub permission: ::buffa::EnumValue<SubaccountPermission>,
+    /// Human-readable permission name.
+    ///
+    /// Field 2: `display_name`
+    #[serde(
+        rename = "displayName",
+        alias = "display_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub display_name: ::buffa::alloc::string::String,
+    /// Human-readable explanation of the capability and its important boundaries.
+    ///
+    /// Field 3: `description`
+    #[serde(
+        rename = "description",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub description: ::buffa::alloc::string::String,
+    /// Policy action that can further restrict this permission. Unspecified means
+    /// the permission is controlled by role and request context only.
+    ///
+    /// Field 4: `policy_action`
+    #[serde(
+        rename = "policyAction",
+        alias = "policy_action",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub policy_action: ::buffa::EnumValue<PolicyAction>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SubaccountPermissionDefinition {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SubaccountPermissionDefinition")
+            .field("permission", &self.permission)
+            .field("display_name", &self.display_name)
+            .field("description", &self.description)
+            .field("policy_action", &self.policy_action)
+            .finish()
+    }
+}
+impl SubaccountPermissionDefinition {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountPermissionDefinition";
+}
+::buffa::impl_default_instance!(SubaccountPermissionDefinition);
+impl ::buffa::MessageName for SubaccountPermissionDefinition {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "SubaccountPermissionDefinition";
+    const FULL_NAME: &'static str = "auth.v1.SubaccountPermissionDefinition";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountPermissionDefinition";
+}
+impl ::buffa::Message for SubaccountPermissionDefinition {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.permission.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.display_name.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.display_name) as u32;
+        }
+        if !self.description.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.description) as u32;
+        }
+        {
+            let val = self.policy_action.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.permission.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.display_name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.display_name, buf);
+        }
+        if !self.description.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.description, buf);
+        }
+        {
+            let val = self.policy_action.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.permission = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.display_name, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.description, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.policy_action = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.permission = ::buffa::EnumValue::from(0);
+        self.display_name.clear();
+        self.description.clear();
+        self.policy_action = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SubaccountPermissionDefinition {
+    const PROTO_FQN: &'static str = "auth.v1.SubaccountPermissionDefinition";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SubaccountPermissionDefinition {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SUBACCOUNT_PERMISSION_DEFINITION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.SubaccountPermissionDefinition",
+    to_json: ::buffa::type_registry::any_to_json::<SubaccountPermissionDefinition>,
+    from_json: ::buffa::type_registry::any_from_json::<SubaccountPermissionDefinition>,
+    is_wkt: false,
+};
+/// Authoritative definition of one built-in sub-account role.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SubaccountRoleDefinition {
+    /// Stable built-in role identifier.
+    ///
+    /// Field 1: `role`
+    #[serde(
+        rename = "role",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub role: ::buffa::EnumValue<SubaccountRole>,
+    /// Human-readable role name.
+    ///
+    /// Field 2: `display_name`
+    #[serde(
+        rename = "displayName",
+        alias = "display_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub display_name: ::buffa::alloc::string::String,
+    /// Human-readable summary of the role.
+    ///
+    /// Field 3: `description`
+    #[serde(
+        rename = "description",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub description: ::buffa::alloc::string::String,
+    /// Whether this role can be assigned to a delegated member.
+    ///
+    /// Field 4: `assignable`
+    #[serde(
+        rename = "assignable",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub assignable: bool,
+    /// Complete role-granted permission set in canonical permission order.
+    ///
+    /// Field 5: `permissions`
+    #[serde(
+        rename = "permissions",
+        with = "::buffa::json_helpers::repeated_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub permissions: ::buffa::alloc::vec::Vec<::buffa::EnumValue<SubaccountPermission>>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SubaccountRoleDefinition {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SubaccountRoleDefinition")
+            .field("role", &self.role)
+            .field("display_name", &self.display_name)
+            .field("description", &self.description)
+            .field("assignable", &self.assignable)
+            .field("permissions", &self.permissions)
+            .finish()
+    }
+}
+impl SubaccountRoleDefinition {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountRoleDefinition";
+}
+::buffa::impl_default_instance!(SubaccountRoleDefinition);
+impl ::buffa::MessageName for SubaccountRoleDefinition {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "SubaccountRoleDefinition";
+    const FULL_NAME: &'static str = "auth.v1.SubaccountRoleDefinition";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountRoleDefinition";
+}
+impl ::buffa::Message for SubaccountRoleDefinition {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.display_name.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.display_name) as u32;
+        }
+        if !self.description.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.description) as u32;
+        }
+        if self.assignable {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        if !self.permissions.is_empty() {
+            let payload: u32 = self
+                .permissions
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.display_name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.display_name, buf);
+        }
+        if !self.description.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.description, buf);
+        }
+        if self.assignable {
+            ::buffa::types::put_bool_field(4u32, self.assignable, buf);
+        }
+        if !self.permissions.is_empty() {
+            let payload: u32 = self
+                .permissions
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(5u32, payload, buf);
+            for v in &self.permissions {
+                ::buffa::types::encode_int32(v.to_i32(), buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.role = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.display_name, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.description, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.assignable = ::buffa::types::decode_bool(buf)?;
+            }
+            5u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.permissions.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.permissions
+                            .push(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32(&mut limited)?,
+                                ),
+                            );
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.permissions
+                        .push(
+                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                        );
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.role = ::buffa::EnumValue::from(0);
+        self.display_name.clear();
+        self.description.clear();
+        self.assignable = false;
+        self.permissions.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SubaccountRoleDefinition {
+    const PROTO_FQN: &'static str = "auth.v1.SubaccountRoleDefinition";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SubaccountRoleDefinition {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SUBACCOUNT_ROLE_DEFINITION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.SubaccountRoleDefinition",
+    to_json: ::buffa::type_registry::any_to_json::<SubaccountRoleDefinition>,
+    from_json: ::buffa::type_registry::any_from_json::<SubaccountRoleDefinition>,
+    is_wkt: false,
+};
+/// Request for the public built-in sub-account role and permission catalog.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListSubaccountRolesRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListSubaccountRolesRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListSubaccountRolesRequest").finish()
+    }
+}
+impl ListSubaccountRolesRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListSubaccountRolesRequest";
+}
+::buffa::impl_default_instance!(ListSubaccountRolesRequest);
+impl ::buffa::MessageName for ListSubaccountRolesRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ListSubaccountRolesRequest";
+    const FULL_NAME: &'static str = "auth.v1.ListSubaccountRolesRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListSubaccountRolesRequest";
+}
+impl ::buffa::Message for ListSubaccountRolesRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListSubaccountRolesRequest {
+    const PROTO_FQN: &'static str = "auth.v1.ListSubaccountRolesRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListSubaccountRolesRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_SUBACCOUNT_ROLES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ListSubaccountRolesRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListSubaccountRolesRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListSubaccountRolesRequest>,
+    is_wkt: false,
+};
+/// Public built-in sub-account role and permission catalog.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListSubaccountRolesResponse {
+    /// Stable permission metadata in canonical permission order.
+    ///
+    /// Field 1: `permissions`
+    #[serde(
+        rename = "permissions",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub permissions: ::buffa::alloc::vec::Vec<SubaccountPermissionDefinition>,
+    /// Built-in roles in display order from Owner through Viewer.
+    ///
+    /// Field 2: `roles`
+    #[serde(
+        rename = "roles",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub roles: ::buffa::alloc::vec::Vec<SubaccountRoleDefinition>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListSubaccountRolesResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListSubaccountRolesResponse")
+            .field("permissions", &self.permissions)
+            .field("roles", &self.roles)
+            .finish()
+    }
+}
+impl ListSubaccountRolesResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListSubaccountRolesResponse";
+}
+::buffa::impl_default_instance!(ListSubaccountRolesResponse);
+impl ::buffa::MessageName for ListSubaccountRolesResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ListSubaccountRolesResponse";
+    const FULL_NAME: &'static str = "auth.v1.ListSubaccountRolesResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListSubaccountRolesResponse";
+}
+impl ::buffa::Message for ListSubaccountRolesResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.permissions {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.roles {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.permissions {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        for v in &self.roles {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.permissions.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.roles.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.permissions.clear();
+        self.roles.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListSubaccountRolesResponse {
+    const PROTO_FQN: &'static str = "auth.v1.ListSubaccountRolesResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListSubaccountRolesResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_SUBACCOUNT_ROLES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ListSubaccountRolesResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListSubaccountRolesResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListSubaccountRolesResponse>,
+    is_wkt: false,
+};
+/// Request for the authenticated caller's effective permissions on one sub-account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetEffectiveSubaccountPermissionsRequest {
+    /// Target sub-account (opaque ID).
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetEffectiveSubaccountPermissionsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetEffectiveSubaccountPermissionsRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .finish()
+    }
+}
+impl GetEffectiveSubaccountPermissionsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetEffectiveSubaccountPermissionsRequest";
+}
+::buffa::impl_default_instance!(GetEffectiveSubaccountPermissionsRequest);
+impl ::buffa::MessageName for GetEffectiveSubaccountPermissionsRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "GetEffectiveSubaccountPermissionsRequest";
+    const FULL_NAME: &'static str = "auth.v1.GetEffectiveSubaccountPermissionsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetEffectiveSubaccountPermissionsRequest";
+}
+impl ::buffa::Message for GetEffectiveSubaccountPermissionsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetEffectiveSubaccountPermissionsRequest {
+    const PROTO_FQN: &'static str = "auth.v1.GetEffectiveSubaccountPermissionsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetEffectiveSubaccountPermissionsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_EFFECTIVE_SUBACCOUNT_PERMISSIONS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.GetEffectiveSubaccountPermissionsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<
+        GetEffectiveSubaccountPermissionsRequest,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetEffectiveSubaccountPermissionsRequest,
+    >,
+    is_wkt: false,
+};
+/// Effective role-granted permissions for the caller on one sub-account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetEffectiveSubaccountPermissionsResponse {
+    /// Current role of the caller on the sub-account.
+    ///
+    /// Field 1: `role`
+    #[serde(
+        rename = "role",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub role: ::buffa::EnumValue<SubaccountRole>,
+    /// Permissions allowed by the role and current sub-account policy. Resource
+    /// state, MFA, limits, and other request context may still deny an operation.
+    ///
+    /// Field 2: `permissions`
+    #[serde(
+        rename = "permissions",
+        with = "::buffa::json_helpers::repeated_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub permissions: ::buffa::alloc::vec::Vec<::buffa::EnumValue<SubaccountPermission>>,
+    /// Attached sub-account policy identifier, or zero when no policy is attached.
+    ///
+    /// Field 3: `subaccount_policy_id`
+    #[serde(
+        rename = "subaccountPolicyId",
+        alias = "subaccount_policy_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_policy_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetEffectiveSubaccountPermissionsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetEffectiveSubaccountPermissionsResponse")
+            .field("role", &self.role)
+            .field("permissions", &self.permissions)
+            .field("subaccount_policy_id", &self.subaccount_policy_id)
+            .finish()
+    }
+}
+impl GetEffectiveSubaccountPermissionsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetEffectiveSubaccountPermissionsResponse";
+}
+::buffa::impl_default_instance!(GetEffectiveSubaccountPermissionsResponse);
+impl ::buffa::MessageName for GetEffectiveSubaccountPermissionsResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "GetEffectiveSubaccountPermissionsResponse";
+    const FULL_NAME: &'static str = "auth.v1.GetEffectiveSubaccountPermissionsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetEffectiveSubaccountPermissionsResponse";
+}
+impl ::buffa::Message for GetEffectiveSubaccountPermissionsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.permissions.is_empty() {
+            let payload: u32 = self
+                .permissions
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if self.subaccount_policy_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.permissions.is_empty() {
+            let payload: u32 = self
+                .permissions
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+            for v in &self.permissions {
+                ::buffa::types::encode_int32(v.to_i32(), buf);
+            }
+        }
+        if self.subaccount_policy_id != 0u64 {
+            ::buffa::types::put_fixed64_field(3u32, self.subaccount_policy_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.role = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            2u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.permissions.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.permissions
+                            .push(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32(&mut limited)?,
+                                ),
+                            );
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.permissions
+                        .push(
+                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                        );
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_policy_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.role = ::buffa::EnumValue::from(0);
+        self.permissions.clear();
+        self.subaccount_policy_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetEffectiveSubaccountPermissionsResponse {
+    const PROTO_FQN: &'static str = "auth.v1.GetEffectiveSubaccountPermissionsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetEffectiveSubaccountPermissionsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_EFFECTIVE_SUBACCOUNT_PERMISSIONS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.GetEffectiveSubaccountPermissionsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<
+        GetEffectiveSubaccountPermissionsResponse,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetEffectiveSubaccountPermissionsResponse,
+    >,
+    is_wkt: false,
+};
 /// Role summary for one sub-account visible to the caller.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -14006,7 +15699,9 @@ pub const __INVITE_SUBACCOUNT_MEMBER_RESPONSE_JSON_ANY: ::buffa::type_registry::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListSubaccountInvitesRequest {
-    /// Optional direction filter. Use "incoming" for invites where the caller is grantee, "outgoing" for invites sent by the caller, or empty for both.
+    /// Optional direction filter. Use "incoming" for invites where the caller is grantee,
+    /// "outgoing" for all invites on sub-accounts the caller currently owns or administers,
+    /// or empty for both scopes.
     ///
     /// Field 1: `direction`
     #[serde(
@@ -14133,7 +15828,8 @@ pub const __LIST_SUBACCOUNT_INVITES_REQUEST_JSON_ANY: ::buffa::type_registry::Js
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListSubaccountInvitesResponse {
-    /// Invitations for the caller, ordered newest first.
+    /// Invitations visible to the caller, ordered newest first. Owners and admins
+    /// see all invitations for sub-accounts they administer, regardless of inviter.
     ///
     /// Field 1: `invites`
     #[serde(
@@ -14559,7 +16255,9 @@ pub const __RESPOND_SUBACCOUNT_INVITE_RESPONSE_JSON_ANY: ::buffa::type_registry:
     from_json: ::buffa::type_registry::any_from_json::<RespondSubaccountInviteResponse>,
     is_wkt: false,
 };
-/// Request for an aggregated sub-account read view.
+/// Request for an aggregated sub-account read view. Requested administrative
+/// sections unavailable to the caller are returned empty without failing an
+/// otherwise authorized sub-account read.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -14574,7 +16272,7 @@ pub struct GetSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub subaccount_id: u64,
-    /// Include API keys scoped to this sub-account.
+    /// Include API keys scoped to this sub-account. Only owner and admin callers receive API keys.
     ///
     /// Field 2: `include_api_keys`
     #[serde(
@@ -14584,7 +16282,7 @@ pub struct GetSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub include_api_keys: bool,
-    /// Include members for this sub-account. Only owner and admin callers receive members.
+    /// Include current members for this sub-account. Every current member may receive the roster.
     ///
     /// Field 3: `include_members`
     #[serde(
@@ -14594,7 +16292,7 @@ pub struct GetSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub include_members: bool,
-    /// Include invitations for the caller.
+    /// Include invitations visible to the caller.
     ///
     /// Field 4: `include_invites`
     #[serde(
@@ -14604,7 +16302,7 @@ pub struct GetSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub include_invites: bool,
-    /// Include the attached sub-account policy, when one is attached.
+    /// Include the attached sub-account policy, when one is attached. Every current member may receive it.
     ///
     /// Field 5: `include_policy`
     #[serde(
@@ -14852,7 +16550,7 @@ pub struct GetSubaccountResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub subaccount: ::buffa::MessageField<Subaccount>,
-    /// API keys scoped to this sub-account when include_api_keys is true.
+    /// API keys scoped to this sub-account when include_api_keys is true and the caller is owner or admin.
     ///
     /// Field 2: `api_keys`
     #[serde(
@@ -14862,7 +16560,7 @@ pub struct GetSubaccountResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub api_keys: ::buffa::alloc::vec::Vec<ApiKey>,
-    /// Members for this sub-account when include_members is true and the caller is owner or admin.
+    /// Current members for this sub-account when include_members is true and the caller is a current member.
     ///
     /// Field 3: `members`
     #[serde(
@@ -14871,7 +16569,7 @@ pub struct GetSubaccountResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub members: ::buffa::alloc::vec::Vec<SubaccountMemberView>,
-    /// Invitations for the caller when include_invites is true.
+    /// Invitations visible to the caller when include_invites is true.
     ///
     /// Field 4: `invites`
     #[serde(
@@ -14880,7 +16578,7 @@ pub struct GetSubaccountResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub invites: ::buffa::alloc::vec::Vec<SubaccountInvite>,
-    /// Attached policy when include_policy is true and the sub-account has a policy.
+    /// Attached policy when include_policy is true, the caller is a current member, and the sub-account has a policy.
     ///
     /// Field 5: `policy`
     #[serde(
@@ -41979,11 +43677,12 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ListApiKeysRequest lists non-revoked API keys owned by the caller.
+        /// ListApiKeysRequest lists non-revoked API keys visible to the caller.
         #[derive(Clone, Debug, Default)]
         pub struct ListApiKeysRequestView<'a> {
-            /// Optional filter: only keys scoped to this sub-account (opaque ID). If unset,
-            /// all non-revoked keys owned by the caller are returned.
+            /// Optional filter: only keys scoped to this sub-account (opaque ID). The
+            /// caller must own or administer the sub-account. If unset, only non-revoked
+            /// keys owned by the caller are returned.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -42214,8 +43913,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional filter: only keys scoped to this sub-account (opaque ID). If unset,
-            /// all non-revoked keys owned by the caller are returned.
+            /// Optional filter: only keys scoped to this sub-account (opaque ID). The
+            /// caller must own or administer the sub-account. If unset, only non-revoked
+            /// keys owned by the caller are returned.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -43064,7 +44764,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetApiKeyRequest returns a single API key owned by the caller's account.
+        /// GetApiKeyRequest returns one API key visible to its owner or a sub-account admin.
         #[derive(Clone, Debug, Default)]
         pub struct GetApiKeyRequestView<'a> {
             /// Opaque API key identifier, formatted as "ak_" followed by 32 lowercase hex
@@ -43334,7 +45034,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetApiKeyResponse returns one API key owned by the caller.
+        /// GetApiKeyResponse returns one API key visible to the caller.
         #[derive(Clone, Debug, Default)]
         pub struct GetApiKeyResponseView<'a> {
             /// Matching API key metadata.
@@ -46735,8 +48435,10 @@ pub mod __buffa {
         /// policy ID and are not paginated.
         #[derive(Clone, Debug, Default)]
         pub struct ListSubaccountPoliciesRequestView<'a> {
-            /// Optional sub-account context for delegated administration. When omitted,
-            /// only policies owned by the caller's root account are returned.
+            /// Optional sub-account context. When provided, a current member may read the
+            /// policy attached to that sub-account; the owner retains visibility of all
+            /// policies owned by their root account. When omitted, only policies owned by
+            /// the caller's root account are returned.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -46971,8 +48673,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional sub-account context for delegated administration. When omitted,
-            /// only policies owned by the caller's root account are returned.
+            /// Optional sub-account context. When provided, a current member may read the
+            /// policy attached to that sub-account; the owner retains visibility of all
+            /// policies owned by their root account. When omitted, only policies owned by
+            /// the caller's root account are returned.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -47330,8 +49034,10 @@ pub mod __buffa {
             ///
             /// Field 1: `policy_id`
             pub policy_id: u64,
-            /// Optional sub-account context for delegated administration. When omitted,
-            /// the policy must be owned by the caller's root account.
+            /// Optional sub-account context. When provided, a current member may read the
+            /// policy attached to that sub-account; the owner may also read another policy
+            /// owned by their root account. When omitted, the policy must be owned by the
+            /// caller's root account.
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -47594,8 +49300,10 @@ pub mod __buffa {
             pub fn policy_id(&self) -> u64 {
                 self.0.reborrow().policy_id
             }
-            /// Optional sub-account context for delegated administration. When omitted,
-            /// the policy must be owned by the caller's root account.
+            /// Optional sub-account context. When provided, a current member may read the
+            /// policy attached to that sub-account; the owner may also read another policy
+            /// owned by their root account. When omitted, the policy must be owned by the
+            /// caller's root account.
             ///
             /// Field 2: `subaccount_id`
             #[must_use]
@@ -56287,6 +57995,2174 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// User-facing metadata for one stable sub-account permission.
+        #[derive(Clone, Debug, Default)]
+        pub struct SubaccountPermissionDefinitionView<'a> {
+            /// Stable permission identifier used by authorization and clients.
+            ///
+            /// Field 1: `permission`
+            pub permission: ::buffa::EnumValue<super::super::SubaccountPermission>,
+            /// Human-readable permission name.
+            ///
+            /// Field 2: `display_name`
+            pub display_name: &'a str,
+            /// Human-readable explanation of the capability and its important boundaries.
+            ///
+            /// Field 3: `description`
+            pub description: &'a str,
+            /// Policy action that can further restrict this permission. Unspecified means
+            /// the permission is controlled by role and request context only.
+            ///
+            /// Field 4: `policy_action`
+            pub policy_action: ::buffa::EnumValue<super::super::PolicyAction>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SubaccountPermissionDefinitionView<'a> {
+            type Owned = super::super::SubaccountPermissionDefinition;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.permission = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.display_name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.description = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.policy_action = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SubaccountPermissionDefinition,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SubaccountPermissionDefinition,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SubaccountPermissionDefinition {
+                    permission: self.permission,
+                    display_name: self.display_name.to_string(),
+                    description: self.description.to_string(),
+                    policy_action: self.policy_action,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SubaccountPermissionDefinitionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.permission.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.display_name.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.display_name)
+                                as u32;
+                }
+                if !self.description.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.description)
+                                as u32;
+                }
+                {
+                    let val = self.policy_action.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.permission.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.display_name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.display_name, buf);
+                }
+                if !self.description.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.description, buf);
+                }
+                {
+                    let val = self.policy_action.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SubaccountPermissionDefinitionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.permission,
+                ) {
+                    __map.serialize_entry("permission", &self.permission)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.display_name) {
+                    __map.serialize_entry("displayName", self.display_name)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.description) {
+                    __map.serialize_entry("description", self.description)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.policy_action,
+                ) {
+                    __map.serialize_entry("policyAction", &self.policy_action)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SubaccountPermissionDefinitionView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "SubaccountPermissionDefinition";
+            const FULL_NAME: &'static str = "auth.v1.SubaccountPermissionDefinition";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountPermissionDefinition";
+        }
+        ::buffa::impl_default_view_instance!(SubaccountPermissionDefinitionView);
+        ::buffa::impl_view_reborrow!(SubaccountPermissionDefinitionView);
+        /** Self-contained, `'static` owned view of a `SubaccountPermissionDefinition` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SubaccountPermissionDefinitionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SubaccountPermissionDefinitionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SubaccountPermissionDefinitionOwnedView(
+            ::buffa::OwnedView<SubaccountPermissionDefinitionView<'static>>,
+        );
+        impl SubaccountPermissionDefinitionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SubaccountPermissionDefinitionOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SubaccountPermissionDefinitionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SubaccountPermissionDefinition,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SubaccountPermissionDefinitionOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`SubaccountPermissionDefinitionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SubaccountPermissionDefinitionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SubaccountPermissionDefinition,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable permission identifier used by authorization and clients.
+            ///
+            /// Field 1: `permission`
+            #[must_use]
+            pub fn permission(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::SubaccountPermission> {
+                self.0.reborrow().permission
+            }
+            /// Human-readable permission name.
+            ///
+            /// Field 2: `display_name`
+            #[must_use]
+            pub fn display_name(&self) -> &'_ str {
+                self.0.reborrow().display_name
+            }
+            /// Human-readable explanation of the capability and its important boundaries.
+            ///
+            /// Field 3: `description`
+            #[must_use]
+            pub fn description(&self) -> &'_ str {
+                self.0.reborrow().description
+            }
+            /// Policy action that can further restrict this permission. Unspecified means
+            /// the permission is controlled by role and request context only.
+            ///
+            /// Field 4: `policy_action`
+            #[must_use]
+            pub fn policy_action(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::PolicyAction> {
+                self.0.reborrow().policy_action
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<SubaccountPermissionDefinitionView<'static>>,
+        > for SubaccountPermissionDefinitionOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SubaccountPermissionDefinitionView<'static>>,
+            ) -> Self {
+                SubaccountPermissionDefinitionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SubaccountPermissionDefinitionOwnedView>
+        for ::buffa::OwnedView<SubaccountPermissionDefinitionView<'static>> {
+            fn from(wrapper: SubaccountPermissionDefinitionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SubaccountPermissionDefinitionView<'static>>,
+        > for SubaccountPermissionDefinitionOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<SubaccountPermissionDefinitionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SubaccountPermissionDefinition {
+            type View<'a> = SubaccountPermissionDefinitionView<'a>;
+            type ViewHandle = SubaccountPermissionDefinitionOwnedView;
+        }
+        impl ::serde::Serialize for SubaccountPermissionDefinitionOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Authoritative definition of one built-in sub-account role.
+        #[derive(Clone, Debug, Default)]
+        pub struct SubaccountRoleDefinitionView<'a> {
+            /// Stable built-in role identifier.
+            ///
+            /// Field 1: `role`
+            pub role: ::buffa::EnumValue<super::super::SubaccountRole>,
+            /// Human-readable role name.
+            ///
+            /// Field 2: `display_name`
+            pub display_name: &'a str,
+            /// Human-readable summary of the role.
+            ///
+            /// Field 3: `description`
+            pub description: &'a str,
+            /// Whether this role can be assigned to a delegated member.
+            ///
+            /// Field 4: `assignable`
+            pub assignable: bool,
+            /// Complete role-granted permission set in canonical permission order.
+            ///
+            /// Field 5: `permissions`
+            pub permissions: ::buffa::RepeatedView<
+                'a,
+                ::buffa::EnumValue<super::super::SubaccountPermission>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SubaccountRoleDefinitionView<'a> {
+            type Owned = super::super::SubaccountRoleDefinition;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.role = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.display_name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.description = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.assignable = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    5u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.permissions
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.permissions
+                                    .push(
+                                        ::buffa::EnumValue::from(
+                                            ::buffa::types::decode_int32(&mut pcur)?,
+                                        ),
+                                    );
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.permissions
+                                .push(
+                                    ::buffa::EnumValue::from(
+                                        ::buffa::types::decode_int32(&mut cur)?,
+                                    ),
+                                );
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SubaccountRoleDefinition,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SubaccountRoleDefinition,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SubaccountRoleDefinition {
+                    role: self.role,
+                    display_name: self.display_name.to_string(),
+                    description: self.description.to_string(),
+                    assignable: self.assignable,
+                    permissions: self.permissions.to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SubaccountRoleDefinitionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.display_name.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.display_name)
+                                as u32;
+                }
+                if !self.description.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.description)
+                                as u32;
+                }
+                if self.assignable {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                if !self.permissions.is_empty() {
+                    let payload: u32 = self
+                        .permissions
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.display_name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.display_name, buf);
+                }
+                if !self.description.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.description, buf);
+                }
+                if self.assignable {
+                    ::buffa::types::put_bool_field(4u32, self.assignable, buf);
+                }
+                if !self.permissions.is_empty() {
+                    let payload: u32 = self
+                        .permissions
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(5u32, payload, buf);
+                    for v in &self.permissions {
+                        ::buffa::types::encode_int32(v.to_i32(), buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SubaccountRoleDefinitionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.role) {
+                    __map.serialize_entry("role", &self.role)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.display_name) {
+                    __map.serialize_entry("displayName", self.display_name)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.description) {
+                    __map.serialize_entry("description", self.description)?;
+                }
+                if self.assignable {
+                    __map.serialize_entry("assignable", &self.assignable)?;
+                }
+                if !self.permissions.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "permissions",
+                            &::buffa::json_helpers::EnumSeqJson(&self.permissions),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SubaccountRoleDefinitionView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "SubaccountRoleDefinition";
+            const FULL_NAME: &'static str = "auth.v1.SubaccountRoleDefinition";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SubaccountRoleDefinition";
+        }
+        ::buffa::impl_default_view_instance!(SubaccountRoleDefinitionView);
+        ::buffa::impl_view_reborrow!(SubaccountRoleDefinitionView);
+        /** Self-contained, `'static` owned view of a `SubaccountRoleDefinition` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SubaccountRoleDefinitionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SubaccountRoleDefinitionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SubaccountRoleDefinitionOwnedView(
+            ::buffa::OwnedView<SubaccountRoleDefinitionView<'static>>,
+        );
+        impl SubaccountRoleDefinitionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SubaccountRoleDefinitionOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SubaccountRoleDefinitionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SubaccountRoleDefinition,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SubaccountRoleDefinitionOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`SubaccountRoleDefinitionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SubaccountRoleDefinitionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SubaccountRoleDefinition,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable built-in role identifier.
+            ///
+            /// Field 1: `role`
+            #[must_use]
+            pub fn role(&self) -> ::buffa::EnumValue<super::super::SubaccountRole> {
+                self.0.reborrow().role
+            }
+            /// Human-readable role name.
+            ///
+            /// Field 2: `display_name`
+            #[must_use]
+            pub fn display_name(&self) -> &'_ str {
+                self.0.reborrow().display_name
+            }
+            /// Human-readable summary of the role.
+            ///
+            /// Field 3: `description`
+            #[must_use]
+            pub fn description(&self) -> &'_ str {
+                self.0.reborrow().description
+            }
+            /// Whether this role can be assigned to a delegated member.
+            ///
+            /// Field 4: `assignable`
+            #[must_use]
+            pub fn assignable(&self) -> bool {
+                self.0.reborrow().assignable
+            }
+            /// Complete role-granted permission set in canonical permission order.
+            ///
+            /// Field 5: `permissions`
+            #[must_use]
+            pub fn permissions(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                ::buffa::EnumValue<super::super::SubaccountPermission>,
+            > {
+                &self.0.reborrow().permissions
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<SubaccountRoleDefinitionView<'static>>,
+        > for SubaccountRoleDefinitionOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SubaccountRoleDefinitionView<'static>>,
+            ) -> Self {
+                SubaccountRoleDefinitionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SubaccountRoleDefinitionOwnedView>
+        for ::buffa::OwnedView<SubaccountRoleDefinitionView<'static>> {
+            fn from(wrapper: SubaccountRoleDefinitionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SubaccountRoleDefinitionView<'static>>,
+        > for SubaccountRoleDefinitionOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<SubaccountRoleDefinitionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SubaccountRoleDefinition {
+            type View<'a> = SubaccountRoleDefinitionView<'a>;
+            type ViewHandle = SubaccountRoleDefinitionOwnedView;
+        }
+        impl ::serde::Serialize for SubaccountRoleDefinitionOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Request for the public built-in sub-account role and permission catalog.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListSubaccountRolesRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListSubaccountRolesRequestView<'a> {
+            type Owned = super::super::ListSubaccountRolesRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListSubaccountRolesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListSubaccountRolesRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListSubaccountRolesRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListSubaccountRolesRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListSubaccountRolesRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListSubaccountRolesRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ListSubaccountRolesRequest";
+            const FULL_NAME: &'static str = "auth.v1.ListSubaccountRolesRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListSubaccountRolesRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListSubaccountRolesRequestView);
+        ::buffa::impl_view_reborrow!(ListSubaccountRolesRequestView);
+        /** Self-contained, `'static` owned view of a `ListSubaccountRolesRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListSubaccountRolesRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListSubaccountRolesRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListSubaccountRolesRequestOwnedView(
+            ::buffa::OwnedView<ListSubaccountRolesRequestView<'static>>,
+        );
+        impl ListSubaccountRolesRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSubaccountRolesRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSubaccountRolesRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListSubaccountRolesRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSubaccountRolesRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListSubaccountRolesRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListSubaccountRolesRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListSubaccountRolesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListSubaccountRolesRequestView<'static>>,
+        > for ListSubaccountRolesRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListSubaccountRolesRequestView<'static>>,
+            ) -> Self {
+                ListSubaccountRolesRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListSubaccountRolesRequestOwnedView>
+        for ::buffa::OwnedView<ListSubaccountRolesRequestView<'static>> {
+            fn from(wrapper: ListSubaccountRolesRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListSubaccountRolesRequestView<'static>>,
+        > for ListSubaccountRolesRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListSubaccountRolesRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListSubaccountRolesRequest {
+            type View<'a> = ListSubaccountRolesRequestView<'a>;
+            type ViewHandle = ListSubaccountRolesRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListSubaccountRolesRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Public built-in sub-account role and permission catalog.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListSubaccountRolesResponseView<'a> {
+            /// Stable permission metadata in canonical permission order.
+            ///
+            /// Field 1: `permissions`
+            pub permissions: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::SubaccountPermissionDefinitionView<'a>,
+            >,
+            /// Built-in roles in display order from Owner through Viewer.
+            ///
+            /// Field 2: `roles`
+            pub roles: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::SubaccountRoleDefinitionView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListSubaccountRolesResponseView<'a> {
+            type Owned = super::super::ListSubaccountRolesResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.permissions
+                            .push(
+                                <super::super::__buffa::view::SubaccountPermissionDefinitionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.roles
+                            .push(
+                                <super::super::__buffa::view::SubaccountRoleDefinitionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListSubaccountRolesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListSubaccountRolesResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListSubaccountRolesResponse {
+                    permissions: self
+                        .permissions
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    roles: self
+                        .roles
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListSubaccountRolesResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.permissions {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.roles {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.permissions {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                for v in &self.roles {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListSubaccountRolesResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.permissions.is_empty() {
+                    __map.serialize_entry("permissions", &*self.permissions)?;
+                }
+                if !self.roles.is_empty() {
+                    __map.serialize_entry("roles", &*self.roles)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListSubaccountRolesResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ListSubaccountRolesResponse";
+            const FULL_NAME: &'static str = "auth.v1.ListSubaccountRolesResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListSubaccountRolesResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListSubaccountRolesResponseView);
+        ::buffa::impl_view_reborrow!(ListSubaccountRolesResponseView);
+        /** Self-contained, `'static` owned view of a `ListSubaccountRolesResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListSubaccountRolesResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListSubaccountRolesResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListSubaccountRolesResponseOwnedView(
+            ::buffa::OwnedView<ListSubaccountRolesResponseView<'static>>,
+        );
+        impl ListSubaccountRolesResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSubaccountRolesResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSubaccountRolesResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListSubaccountRolesResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListSubaccountRolesResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListSubaccountRolesResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListSubaccountRolesResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListSubaccountRolesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable permission metadata in canonical permission order.
+            ///
+            /// Field 1: `permissions`
+            #[must_use]
+            pub fn permissions(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::SubaccountPermissionDefinitionView<'_>,
+            > {
+                &self.0.reborrow().permissions
+            }
+            /// Built-in roles in display order from Owner through Viewer.
+            ///
+            /// Field 2: `roles`
+            #[must_use]
+            pub fn roles(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::SubaccountRoleDefinitionView<'_>,
+            > {
+                &self.0.reborrow().roles
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListSubaccountRolesResponseView<'static>>,
+        > for ListSubaccountRolesResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListSubaccountRolesResponseView<'static>>,
+            ) -> Self {
+                ListSubaccountRolesResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListSubaccountRolesResponseOwnedView>
+        for ::buffa::OwnedView<ListSubaccountRolesResponseView<'static>> {
+            fn from(wrapper: ListSubaccountRolesResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListSubaccountRolesResponseView<'static>>,
+        > for ListSubaccountRolesResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListSubaccountRolesResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListSubaccountRolesResponse {
+            type View<'a> = ListSubaccountRolesResponseView<'a>;
+            type ViewHandle = ListSubaccountRolesResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListSubaccountRolesResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Request for the authenticated caller's effective permissions on one sub-account.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetEffectiveSubaccountPermissionsRequestView<'a> {
+            /// Target sub-account (opaque ID).
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for GetEffectiveSubaccountPermissionsRequestView<'a> {
+            type Owned = super::super::GetEffectiveSubaccountPermissionsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetEffectiveSubaccountPermissionsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetEffectiveSubaccountPermissionsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetEffectiveSubaccountPermissionsRequest {
+                    subaccount_id: self.subaccount_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for GetEffectiveSubaccountPermissionsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for GetEffectiveSubaccountPermissionsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for GetEffectiveSubaccountPermissionsRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "GetEffectiveSubaccountPermissionsRequest";
+            const FULL_NAME: &'static str = "auth.v1.GetEffectiveSubaccountPermissionsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetEffectiveSubaccountPermissionsRequest";
+        }
+        ::buffa::impl_default_view_instance!(
+            GetEffectiveSubaccountPermissionsRequestView
+        );
+        ::buffa::impl_view_reborrow!(GetEffectiveSubaccountPermissionsRequestView);
+        /** Self-contained, `'static` owned view of a `GetEffectiveSubaccountPermissionsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetEffectiveSubaccountPermissionsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetEffectiveSubaccountPermissionsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetEffectiveSubaccountPermissionsRequestOwnedView(
+            ::buffa::OwnedView<GetEffectiveSubaccountPermissionsRequestView<'static>>,
+        );
+        impl GetEffectiveSubaccountPermissionsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetEffectiveSubaccountPermissionsRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetEffectiveSubaccountPermissionsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetEffectiveSubaccountPermissionsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetEffectiveSubaccountPermissionsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetEffectiveSubaccountPermissionsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetEffectiveSubaccountPermissionsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetEffectiveSubaccountPermissionsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Target sub-account (opaque ID).
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetEffectiveSubaccountPermissionsRequestView<'static>>,
+        > for GetEffectiveSubaccountPermissionsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    GetEffectiveSubaccountPermissionsRequestView<'static>,
+                >,
+            ) -> Self {
+                GetEffectiveSubaccountPermissionsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetEffectiveSubaccountPermissionsRequestOwnedView>
+        for ::buffa::OwnedView<GetEffectiveSubaccountPermissionsRequestView<'static>> {
+            fn from(wrapper: GetEffectiveSubaccountPermissionsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetEffectiveSubaccountPermissionsRequestView<'static>>,
+        > for GetEffectiveSubaccountPermissionsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                GetEffectiveSubaccountPermissionsRequestView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetEffectiveSubaccountPermissionsRequest {
+            type View<'a> = GetEffectiveSubaccountPermissionsRequestView<'a>;
+            type ViewHandle = GetEffectiveSubaccountPermissionsRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetEffectiveSubaccountPermissionsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Effective role-granted permissions for the caller on one sub-account.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetEffectiveSubaccountPermissionsResponseView<'a> {
+            /// Current role of the caller on the sub-account.
+            ///
+            /// Field 1: `role`
+            pub role: ::buffa::EnumValue<super::super::SubaccountRole>,
+            /// Permissions allowed by the role and current sub-account policy. Resource
+            /// state, MFA, limits, and other request context may still deny an operation.
+            ///
+            /// Field 2: `permissions`
+            pub permissions: ::buffa::RepeatedView<
+                'a,
+                ::buffa::EnumValue<super::super::SubaccountPermission>,
+            >,
+            /// Attached sub-account policy identifier, or zero when no policy is attached.
+            ///
+            /// Field 3: `subaccount_policy_id`
+            pub subaccount_policy_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for GetEffectiveSubaccountPermissionsResponseView<'a> {
+            type Owned = super::super::GetEffectiveSubaccountPermissionsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.role = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_policy_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    2u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.permissions
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.permissions
+                                    .push(
+                                        ::buffa::EnumValue::from(
+                                            ::buffa::types::decode_int32(&mut pcur)?,
+                                        ),
+                                    );
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.permissions
+                                .push(
+                                    ::buffa::EnumValue::from(
+                                        ::buffa::types::decode_int32(&mut cur)?,
+                                    ),
+                                );
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetEffectiveSubaccountPermissionsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetEffectiveSubaccountPermissionsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetEffectiveSubaccountPermissionsResponse {
+                    role: self.role,
+                    permissions: self.permissions.to_vec(),
+                    subaccount_policy_id: self.subaccount_policy_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for GetEffectiveSubaccountPermissionsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.permissions.is_empty() {
+                    let payload: u32 = self
+                        .permissions
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if self.subaccount_policy_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.role.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.permissions.is_empty() {
+                    let payload: u32 = self
+                        .permissions
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+                    for v in &self.permissions {
+                        ::buffa::types::encode_int32(v.to_i32(), buf);
+                    }
+                }
+                if self.subaccount_policy_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(
+                        3u32,
+                        self.subaccount_policy_id,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for GetEffectiveSubaccountPermissionsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.role) {
+                    __map.serialize_entry("role", &self.role)?;
+                }
+                if !self.permissions.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "permissions",
+                            &::buffa::json_helpers::EnumSeqJson(&self.permissions),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.subaccount_policy_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "subaccountPolicyId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_policy_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for GetEffectiveSubaccountPermissionsResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "GetEffectiveSubaccountPermissionsResponse";
+            const FULL_NAME: &'static str = "auth.v1.GetEffectiveSubaccountPermissionsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetEffectiveSubaccountPermissionsResponse";
+        }
+        ::buffa::impl_default_view_instance!(
+            GetEffectiveSubaccountPermissionsResponseView
+        );
+        ::buffa::impl_view_reborrow!(GetEffectiveSubaccountPermissionsResponseView);
+        /** Self-contained, `'static` owned view of a `GetEffectiveSubaccountPermissionsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetEffectiveSubaccountPermissionsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetEffectiveSubaccountPermissionsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetEffectiveSubaccountPermissionsResponseOwnedView(
+            ::buffa::OwnedView<GetEffectiveSubaccountPermissionsResponseView<'static>>,
+        );
+        impl GetEffectiveSubaccountPermissionsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetEffectiveSubaccountPermissionsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetEffectiveSubaccountPermissionsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetEffectiveSubaccountPermissionsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetEffectiveSubaccountPermissionsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetEffectiveSubaccountPermissionsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetEffectiveSubaccountPermissionsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetEffectiveSubaccountPermissionsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Current role of the caller on the sub-account.
+            ///
+            /// Field 1: `role`
+            #[must_use]
+            pub fn role(&self) -> ::buffa::EnumValue<super::super::SubaccountRole> {
+                self.0.reborrow().role
+            }
+            /// Permissions allowed by the role and current sub-account policy. Resource
+            /// state, MFA, limits, and other request context may still deny an operation.
+            ///
+            /// Field 2: `permissions`
+            #[must_use]
+            pub fn permissions(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                ::buffa::EnumValue<super::super::SubaccountPermission>,
+            > {
+                &self.0.reborrow().permissions
+            }
+            /// Attached sub-account policy identifier, or zero when no policy is attached.
+            ///
+            /// Field 3: `subaccount_policy_id`
+            #[must_use]
+            pub fn subaccount_policy_id(&self) -> u64 {
+                self.0.reborrow().subaccount_policy_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetEffectiveSubaccountPermissionsResponseView<'static>>,
+        > for GetEffectiveSubaccountPermissionsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    GetEffectiveSubaccountPermissionsResponseView<'static>,
+                >,
+            ) -> Self {
+                GetEffectiveSubaccountPermissionsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetEffectiveSubaccountPermissionsResponseOwnedView>
+        for ::buffa::OwnedView<GetEffectiveSubaccountPermissionsResponseView<'static>> {
+            fn from(
+                wrapper: GetEffectiveSubaccountPermissionsResponseOwnedView,
+            ) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetEffectiveSubaccountPermissionsResponseView<'static>>,
+        > for GetEffectiveSubaccountPermissionsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                GetEffectiveSubaccountPermissionsResponseView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetEffectiveSubaccountPermissionsResponse {
+            type View<'a> = GetEffectiveSubaccountPermissionsResponseView<'a>;
+            type ViewHandle = GetEffectiveSubaccountPermissionsResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetEffectiveSubaccountPermissionsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// Role summary for one sub-account visible to the caller.
         #[derive(Clone, Debug, Default)]
         pub struct SubaccountRoleViewView<'a> {
@@ -64307,7 +68183,9 @@ pub mod __buffa {
         /// Request to list sub-account invitations.
         #[derive(Clone, Debug, Default)]
         pub struct ListSubaccountInvitesRequestView<'a> {
-            /// Optional direction filter. Use "incoming" for invites where the caller is grantee, "outgoing" for invites sent by the caller, or empty for both.
+            /// Optional direction filter. Use "incoming" for invites where the caller is grantee,
+            /// "outgoing" for all invites on sub-accounts the caller currently owns or administers,
+            /// or empty for both scopes.
             ///
             /// Field 1: `direction`
             pub direction: &'a str,
@@ -64538,7 +68416,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional direction filter. Use "incoming" for invites where the caller is grantee, "outgoing" for invites sent by the caller, or empty for both.
+            /// Optional direction filter. Use "incoming" for invites where the caller is grantee,
+            /// "outgoing" for all invites on sub-accounts the caller currently owns or administers,
+            /// or empty for both scopes.
             ///
             /// Field 1: `direction`
             #[must_use]
@@ -64585,7 +68465,8 @@ pub mod __buffa {
         /// Response containing sub-account invitations.
         #[derive(Clone, Debug, Default)]
         pub struct ListSubaccountInvitesResponseView<'a> {
-            /// Invitations for the caller, ordered newest first.
+            /// Invitations visible to the caller, ordered newest first. Owners and admins
+            /// see all invitations for sub-accounts they administer, regardless of inviter.
             ///
             /// Field 1: `invites`
             pub invites: ::buffa::RepeatedView<
@@ -64839,7 +68720,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Invitations for the caller, ordered newest first.
+            /// Invitations visible to the caller, ordered newest first. Owners and admins
+            /// see all invitations for sub-accounts they administer, regardless of inviter.
             ///
             /// Field 1: `invites`
             #[must_use]
@@ -65525,26 +69407,28 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// Request for an aggregated sub-account read view.
+        /// Request for an aggregated sub-account read view. Requested administrative
+        /// sections unavailable to the caller are returned empty without failing an
+        /// otherwise authorized sub-account read.
         #[derive(Clone, Debug, Default)]
         pub struct GetSubaccountRequestView<'a> {
             /// Target sub-account (opaque ID).
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: u64,
-            /// Include API keys scoped to this sub-account.
+            /// Include API keys scoped to this sub-account. Only owner and admin callers receive API keys.
             ///
             /// Field 2: `include_api_keys`
             pub include_api_keys: bool,
-            /// Include members for this sub-account. Only owner and admin callers receive members.
+            /// Include current members for this sub-account. Every current member may receive the roster.
             ///
             /// Field 3: `include_members`
             pub include_members: bool,
-            /// Include invitations for the caller.
+            /// Include invitations visible to the caller.
             ///
             /// Field 4: `include_invites`
             pub include_invites: bool,
-            /// Include the attached sub-account policy, when one is attached.
+            /// Include the attached sub-account policy, when one is attached. Every current member may receive it.
             ///
             /// Field 5: `include_policy`
             pub include_policy: bool,
@@ -65895,28 +69779,28 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> u64 {
                 self.0.reborrow().subaccount_id
             }
-            /// Include API keys scoped to this sub-account.
+            /// Include API keys scoped to this sub-account. Only owner and admin callers receive API keys.
             ///
             /// Field 2: `include_api_keys`
             #[must_use]
             pub fn include_api_keys(&self) -> bool {
                 self.0.reborrow().include_api_keys
             }
-            /// Include members for this sub-account. Only owner and admin callers receive members.
+            /// Include current members for this sub-account. Every current member may receive the roster.
             ///
             /// Field 3: `include_members`
             #[must_use]
             pub fn include_members(&self) -> bool {
                 self.0.reborrow().include_members
             }
-            /// Include invitations for the caller.
+            /// Include invitations visible to the caller.
             ///
             /// Field 4: `include_invites`
             #[must_use]
             pub fn include_invites(&self) -> bool {
                 self.0.reborrow().include_invites
             }
-            /// Include the attached sub-account policy, when one is attached.
+            /// Include the attached sub-account policy, when one is attached. Every current member may receive it.
             ///
             /// Field 5: `include_policy`
             #[must_use]
@@ -65980,28 +69864,28 @@ pub mod __buffa {
             pub subaccount: ::buffa::MessageFieldView<
                 super::super::__buffa::view::SubaccountView<'a>,
             >,
-            /// API keys scoped to this sub-account when include_api_keys is true.
+            /// API keys scoped to this sub-account when include_api_keys is true and the caller is owner or admin.
             ///
             /// Field 2: `api_keys`
             pub api_keys: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::ApiKeyView<'a>,
             >,
-            /// Members for this sub-account when include_members is true and the caller is owner or admin.
+            /// Current members for this sub-account when include_members is true and the caller is a current member.
             ///
             /// Field 3: `members`
             pub members: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::SubaccountMemberViewView<'a>,
             >,
-            /// Invitations for the caller when include_invites is true.
+            /// Invitations visible to the caller when include_invites is true.
             ///
             /// Field 4: `invites`
             pub invites: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::SubaccountInviteView<'a>,
             >,
-            /// Attached policy when include_policy is true and the sub-account has a policy.
+            /// Attached policy when include_policy is true, the caller is a current member, and the sub-account has a policy.
             ///
             /// Field 5: `policy`
             pub policy: ::buffa::MessageFieldView<
@@ -66513,7 +70397,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().subaccount
             }
-            /// API keys scoped to this sub-account when include_api_keys is true.
+            /// API keys scoped to this sub-account when include_api_keys is true and the caller is owner or admin.
             ///
             /// Field 2: `api_keys`
             #[must_use]
@@ -66525,7 +70409,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().api_keys
             }
-            /// Members for this sub-account when include_members is true and the caller is owner or admin.
+            /// Current members for this sub-account when include_members is true and the caller is a current member.
             ///
             /// Field 3: `members`
             #[must_use]
@@ -66537,7 +70421,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().members
             }
-            /// Invitations for the caller when include_invites is true.
+            /// Invitations visible to the caller when include_invites is true.
             ///
             /// Field 4: `invites`
             #[must_use]
@@ -66549,7 +70433,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().invites
             }
-            /// Attached policy when include_policy is true and the sub-account has a policy.
+            /// Attached policy when include_policy is true, the caller is a current member, and the sub-account has a policy.
             ///
             /// Field 5: `policy`
             #[must_use]
@@ -109289,6 +113173,16 @@ pub mod __buffa {
         reg.register_json_any(super::__DELETE_API_POLICY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SET_API_KEY_POLICY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_API_KEY_POLICY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SUBACCOUNT_PERMISSION_DEFINITION_JSON_ANY);
+        reg.register_json_any(super::__SUBACCOUNT_ROLE_DEFINITION_JSON_ANY);
+        reg.register_json_any(super::__LIST_SUBACCOUNT_ROLES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_SUBACCOUNT_ROLES_RESPONSE_JSON_ANY);
+        reg.register_json_any(
+            super::__GET_EFFECTIVE_SUBACCOUNT_PERMISSIONS_REQUEST_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::__GET_EFFECTIVE_SUBACCOUNT_PERMISSIONS_RESPONSE_JSON_ANY,
+        );
         reg.register_json_any(super::__SUBACCOUNT_ROLE_VIEW_JSON_ANY);
         reg.register_json_any(super::__SUBACCOUNT_JSON_ANY);
         reg.register_json_any(super::__LIST_SUBACCOUNTS_REQUEST_JSON_ANY);
@@ -109606,6 +113500,30 @@ pub use self::__buffa::view::SetApiKeyPolicyRequestOwnedView;
 pub use self::__buffa::view::SetApiKeyPolicyResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::SetApiKeyPolicyResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SubaccountPermissionDefinitionView;
+#[doc(inline)]
+pub use self::__buffa::view::SubaccountPermissionDefinitionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SubaccountRoleDefinitionView;
+#[doc(inline)]
+pub use self::__buffa::view::SubaccountRoleDefinitionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSubaccountRolesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSubaccountRolesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSubaccountRolesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSubaccountRolesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetEffectiveSubaccountPermissionsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetEffectiveSubaccountPermissionsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetEffectiveSubaccountPermissionsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetEffectiveSubaccountPermissionsResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::SubaccountRoleViewView;
 #[doc(inline)]

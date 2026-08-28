@@ -6341,8 +6341,8 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Trading symbol numeric identifier. Required for API-key market policy;
-    /// AAS verifies it against the stored trigger.
+    /// Trading symbol numeric identifier. Required for API-key market policy and
+    /// must match the stored trigger.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -7650,8 +7650,8 @@ pub struct ResumeTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Trading symbol numeric identifier. Required for API-key market policy;
-    /// AAS verifies it against the stored trigger.
+    /// Trading symbol numeric identifier. Required for API-key market policy and
+    /// must match the stored trigger.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -19557,8 +19557,8 @@ pub mod __buffa {
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Trading symbol numeric identifier. Required for API-key market policy;
-            /// AAS verifies it against the stored trigger.
+            /// Trading symbol numeric identifier. Required for API-key market policy and
+            /// must match the stored trigger.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -20118,8 +20118,8 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Trading symbol numeric identifier. Required for API-key market policy;
-            /// AAS verifies it against the stored trigger.
+            /// Trading symbol numeric identifier. Required for API-key market policy and
+            /// must match the stored trigger.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -21343,8 +21343,8 @@ pub mod __buffa {
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Trading symbol numeric identifier. Required for API-key market policy;
-            /// AAS verifies it against the stored trigger.
+            /// Trading symbol numeric identifier. Required for API-key market policy and
+            /// must match the stored trigger.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -21633,8 +21633,8 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Trading symbol numeric identifier. Required for API-key market policy;
-            /// AAS verifies it against the stored trigger.
+            /// Trading symbol numeric identifier. Required for API-key market policy and
+            /// must match the stored trigger.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
