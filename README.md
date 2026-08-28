@@ -273,7 +273,7 @@ use polyester::types::{Price, Quantity};
 client.wait_for_catalogs().await?;
 
 let mut params = OrdersService::create_params(
-    "ETH-USDT",
+    "BTC-USDT",
     CreateSide::Buy,
     CreateOrderType::Limit,
     Quantity::from_decimal_str("0.01", 8, None, None)?,
@@ -288,7 +288,7 @@ println!("{} {}", result.status, result.order_id);
 
 client
     .orders
-    .cancel_by_client_order_id("my-bot-001", Some("ETH-USDT"), None)
+    .cancel_by_client_order_id("my-bot-001", Some("BTC-USDT"), None)
     .await?;
 ```
 
@@ -310,14 +310,14 @@ latter with `Quantity::from_quote_decimal_str` / `from_quote_decimal` /
 ```rust,no_run
 let quote_scale = client
     .catalogs
-    .quote_quantity_scale_for_symbol("ETH-USDT")
+    .quote_quantity_scale_for_symbol("BTC-USDT")
     .expect("catalog hydrated with quote scale");
 params.quantity = None;
 params.max_quote_debit_scaled = Some(Quantity::from_quote_decimal_str(
     "25.00",
     quote_scale,
-    Some("ETH-USDT".into()),
-    client.catalogs.symbol_id_for_symbol("ETH-USDT"),
+    Some("BTC-USDT".into()),
+    client.catalogs.symbol_id_for_symbol("BTC-USDT"),
 )?);
 ```
 
@@ -357,7 +357,7 @@ use polyester::services::OrdersService;
 use polyester::types::{Price, Quantity};
 
 let params = OrdersService::create_params(
-    "SOL-USDT",
+    "BTC-USDT",
     CreateSide::Buy,
     CreateOrderType::Limit,
     Quantity::from_scaled(1_000_000, Some(8), Default::default(), None, None)?,
@@ -611,7 +611,7 @@ let trades = client.market_data.get_trades("BTC-USDT", Some(20)).await?;
 let _ = (candles, current, trades);
 
 client.wait_for_catalogs().await?;
-let mut sub = client.market_data.subscribe_trades("SOL-USDT").await?;
+let mut sub = client.market_data.subscribe_trades("BTC-USDT").await?;
 sub.set_on_error(|error| eprintln!("realtime interruption: {error}"));
 if let Some(trade) = sub.recv_result().await? {
     println!(
@@ -672,7 +672,7 @@ if let Some(policy) = api_policies.recv_result().await? {
 let mut book = client
     .orderbook
     .create_subscription(CreateSubscriptionOptions {
-        symbol: "ETH-USDT".into(),
+        symbol: "BTC-USDT".into(),
         depth: Some(50),
         ..Default::default()
     })

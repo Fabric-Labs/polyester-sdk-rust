@@ -18,8 +18,8 @@
 - README links the sibling
   [`polyester-examples-rust`](https://github.com/Fabric-Labs/polyester-examples-rust)
   cookbook near the top.
-- README examples use placeholder `YOUR_ACCOUNT_ID` and mix `ETH-USDT` /
-  `SOL-USDT` instead of a live Account ID and `BNB-USDT`.
+- README examples use placeholder `YOUR_ACCOUNT_ID` and `BTC-USDT`
+  instead of a live Account ID and `BNB-USDT`.
 
 ## 0.1.0a39
 
