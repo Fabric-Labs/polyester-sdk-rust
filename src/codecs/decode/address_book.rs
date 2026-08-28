@@ -101,6 +101,7 @@ pub fn address_book_invalidation_from_proto(
     AddressBookViewInvalidation {
         scope,
         invalidated_at,
+        view_revision: msg.view_revision,
     }
 }
 
@@ -239,10 +240,12 @@ mod tests {
                 ..Default::default()
             }
             .into(),
+            view_revision: 7,
             ..Default::default()
         };
         let out = address_book_invalidation_from_proto(&msg);
         assert!(!out.scope.is_empty());
         assert_eq!(out.invalidated_at, "1970-01-01T00:00:00Z");
+        assert_eq!(out.view_revision, 7);
     }
 }

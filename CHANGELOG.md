@@ -13,6 +13,20 @@
   request can carry the required market identifier.
 - Policy models dropped perpetual rules. `SpotMarketRule` is `symbol_id` plus
   optional catalog display `symbol`.
+- `TradingRateLimitRule.tier` is now `vip_tier`.
+- `TriggerEvent.reason` is removed. `Trigger` and `TriggerEvent` expose
+  `cancel_reason` and `failure_reason` (empty when unset or unspecified)
+  decoded from the proto `terminal_reason` oneof as prefix-stripped labels
+  (`user_request`, `insufficient_funds`).
+
+### Added
+- `TradesService::list_with` / `ListUserTradesOpts` for symbol filters,
+  `after_match_id`, `limit`, and `page_token`. `after_match_id` requires a
+  resolved non-zero `symbol_id` (display `symbol` or numeric id).
+  `trades.list(subaccount_id, limit)` remains a thin wrapper.
+- `AddressBookViewInvalidation.view_revision`. `get_view` stays a proto
+  pass-through (`ApiData.raw`); callers set `minimum_view_revision` on the
+  request, and regenerated raw views include `view_revision`.
 
 ## 0.1.0a39
 

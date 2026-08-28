@@ -27,7 +27,7 @@ fn clone_timestamp(ts: Option<&Timestamp>) -> Option<Timestamp> {
 pub fn trading_rate_limit_rule_from_proto(msg: &ProtoTradingRateLimitRule) -> TradingRateLimitRule {
     TradingRateLimitRule {
         policy_class: enum_label(&msg.policy_class, "UNKNOWN_TRADING_RATE_LIMIT_CLASS"),
-        tier: msg.tier,
+        vip_tier: msg.vip_tier,
         quota_weight: msg.quota_weight,
         period_ms: msg.period_ms,
         burst_weight: msg.burst_weight,
@@ -84,7 +84,7 @@ mod tests {
             rules: vec![
                 ProtoTradingRateLimitRule {
                     policy_class: TradingRateLimitClass::TRADING_RATE_LIMIT_CLASS_PLACE.into(),
-                    tier: 0,
+                    vip_tier: 0,
                     quota_weight: 100,
                     period_ms: 1000,
                     burst_weight: 20,
@@ -92,7 +92,7 @@ mod tests {
                 },
                 ProtoTradingRateLimitRule {
                     policy_class: buffa::EnumValue::from(99),
-                    tier: 1,
+                    vip_tier: 1,
                     quota_weight: 50,
                     period_ms: 1000,
                     burst_weight: 10,
@@ -117,7 +117,7 @@ mod tests {
     fn trading_rate_limits_decode_account_and_api_key_rules() {
         let rule = ProtoTradingRateLimitRule {
             policy_class: TradingRateLimitClass::TRADING_RATE_LIMIT_CLASS_CANCEL.into(),
-            tier: 3,
+            vip_tier: 3,
             quota_weight: 200,
             period_ms: 500,
             burst_weight: 40,
@@ -135,6 +135,6 @@ mod tests {
             result.rules[0].policy_class,
             "TRADING_RATE_LIMIT_CLASS_CANCEL"
         );
-        assert_eq!(result.api_key_rules[0].tier, 3);
+        assert_eq!(result.api_key_rules[0].vip_tier, 3);
     }
 }

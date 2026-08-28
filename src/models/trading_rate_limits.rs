@@ -11,7 +11,7 @@ pub struct TradingRateLimitRule {
     /// Full protobuf enum name, for example `TRADING_RATE_LIMIT_CLASS_PLACE`.
     /// Unknown open-enum values become `UNKNOWN_TRADING_RATE_LIMIT_CLASS(n)`.
     pub policy_class: String,
-    pub tier: u32,
+    pub vip_tier: u32,
     pub quota_weight: u64,
     pub period_ms: u64,
     pub burst_weight: u64,

@@ -35,4 +35,7 @@ pub struct AddressBooksList {
 pub struct AddressBookViewInvalidation {
     pub scope: String,
     pub invalidated_at: String,
+    /// Revision that `GetAddressBookView` must reach before this invalidation
+    /// is considered satisfied.
+    pub view_revision: u64,
 }

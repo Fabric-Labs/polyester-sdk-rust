@@ -167,6 +167,10 @@ pub struct Trigger {
     pub updated_at: Option<Timestamp>,
     pub armed_at: Option<Timestamp>,
     pub completed_at: Option<Timestamp>,
+    /// Proto `terminal_reason.cancel_reason`. Empty when unset or unspecified.
+    pub cancel_reason: String,
+    /// Proto `terminal_reason.failure_reason`. Empty when unset or unspecified.
+    pub failure_reason: String,
     pub details: Option<TriggerDetails>,
 }
 
@@ -195,7 +199,10 @@ pub struct TriggerEvent {
     pub child_seq: i32,
     pub child_order_id: String,
     pub fire_price: Option<Price>,
-    pub reason: String,
+    /// Proto `terminal_reason.cancel_reason`. Empty when unset or unspecified.
+    pub cancel_reason: String,
+    /// Proto `terminal_reason.failure_reason`. Empty when unset or unspecified.
+    pub failure_reason: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

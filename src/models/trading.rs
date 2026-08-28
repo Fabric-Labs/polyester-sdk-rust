@@ -421,6 +421,21 @@ pub struct ListOrderHistoryOpts {
     pub trigger_id: Option<String>,
 }
 
+/// Options for [`crate::services::TradesService::list_with`].
+///
+/// When [`Self::after_match_id`] is set, a resolved non-zero `symbol_id` is
+/// required (display `symbol` or numeric id). Without `after_match_id`, the
+/// symbol filter stays optional.
+#[derive(Debug, Clone, Default)]
+pub struct ListUserTradesOpts {
+    pub subaccount_id: Option<u64>,
+    pub symbol: Option<String>,
+    pub symbol_id: Option<u32>,
+    pub after_match_id: Option<u64>,
+    pub limit: Option<u32>,
+    pub page_token: Option<String>,
+}
+
 /// Options for [`crate::services::OrdersService::get_with`].
 #[derive(Debug, Clone)]
 pub struct GetOrderOpts {
