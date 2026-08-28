@@ -14,6 +14,13 @@
 - Policy models dropped perpetual rules. `SpotMarketRule` is `symbol_id` plus
   optional catalog display `symbol`.
 
+### Docs
+- README links the sibling
+  [`polyester-examples-rust`](https://github.com/Fabric-Labs/polyester-examples-rust)
+  cookbook near the top.
+- README examples use placeholder `YOUR_ACCOUNT_ID` and mix `ETH-USDT` /
+  `SOL-USDT` instead of a live Account ID and `BNB-USDT`.
+
 ## 0.1.0a39
 
 Package version: `0.1.0-alpha.39`. Git tag: `v0.1.0a39`.
