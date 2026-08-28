@@ -544,6 +544,1032 @@ impl ::buffa::Enumeration for TriggerEventType {
         ]
     }
 }
+/// TriggerCancelReason identifies why an admitted trigger became canceled.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum TriggerCancelReason {
+    /// No cancellation reason was provided.
+    TRIGGER_CANCEL_REASON_UNSPECIFIED = 0i32,
+    /// The user explicitly canceled the trigger.
+    TRIGGER_CANCEL_REASON_USER_REQUEST = 1i32,
+    /// A linked one-cancels-the-other trigger fired.
+    TRIGGER_CANCEL_REASON_OCO = 2i32,
+    /// The parent order ended without a fill, so its attached trigger was canceled.
+    TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL = 3i32,
+    /// The terminal state did not contain a cancellation reason.
+    TRIGGER_CANCEL_REASON_MISSING_REASON_CODE = 998i32,
+    /// An internal invariant or processing failure canceled the trigger.
+    TRIGGER_CANCEL_REASON_INTERNAL_ERROR = 999i32,
+}
+impl TriggerCancelReason {
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::TRIGGER_CANCEL_REASON_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_USER_REQUEST`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UserRequest: Self = Self::TRIGGER_CANCEL_REASON_USER_REQUEST;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_OCO`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Oco: Self = Self::TRIGGER_CANCEL_REASON_OCO;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ParentCanceledNoFill: Self = Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MissingReasonCode: Self = Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InternalError: Self = Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR;
+}
+impl ::core::default::Default for TriggerCancelReason {
+    fn default() -> Self {
+        Self::TRIGGER_CANCEL_REASON_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for TriggerCancelReason {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for TriggerCancelReason {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = TriggerCancelReason;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(TriggerCancelReason)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<TriggerCancelReason, E> {
+                <TriggerCancelReason as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<TriggerCancelReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <TriggerCancelReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<TriggerCancelReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <TriggerCancelReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<TriggerCancelReason, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TriggerCancelReason {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for TriggerCancelReason {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_UNSPECIFIED),
+            1i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_USER_REQUEST)
+            }
+            2i32 => ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_OCO),
+            3i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL,
+                )
+            }
+            998i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
+                )
+            }
+            999i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::TRIGGER_CANCEL_REASON_UNSPECIFIED => {
+                "TRIGGER_CANCEL_REASON_UNSPECIFIED"
+            }
+            Self::TRIGGER_CANCEL_REASON_USER_REQUEST => {
+                "TRIGGER_CANCEL_REASON_USER_REQUEST"
+            }
+            Self::TRIGGER_CANCEL_REASON_OCO => "TRIGGER_CANCEL_REASON_OCO",
+            Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL => {
+                "TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL"
+            }
+            Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE => {
+                "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE"
+            }
+            Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR => {
+                "TRIGGER_CANCEL_REASON_INTERNAL_ERROR"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "TRIGGER_CANCEL_REASON_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_UNSPECIFIED)
+            }
+            "TRIGGER_CANCEL_REASON_USER_REQUEST" => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_USER_REQUEST)
+            }
+            "TRIGGER_CANCEL_REASON_OCO" => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_OCO)
+            }
+            "TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL,
+                )
+            }
+            "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
+                )
+            }
+            "TRIGGER_CANCEL_REASON_INTERNAL_ERROR" => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::TRIGGER_CANCEL_REASON_UNSPECIFIED,
+            Self::TRIGGER_CANCEL_REASON_USER_REQUEST,
+            Self::TRIGGER_CANCEL_REASON_OCO,
+            Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL,
+            Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
+            Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR,
+        ]
+    }
+}
+/// TriggerFailureReason identifies why an admitted trigger became failed.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum TriggerFailureReason {
+    /// No failure reason was provided.
+    TRIGGER_FAILURE_REASON_UNSPECIFIED = 0i32,
+    /// The requested trading pair was not recognized.
+    TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL = 1i32,
+    /// The trading pair was not accepting new orders.
+    TRIGGER_FAILURE_REASON_PAIR_DISABLED = 2i32,
+    /// The child order value was below the pair's minimum notional.
+    TRIGGER_FAILURE_REASON_MIN_NOTIONAL = 3i32,
+    /// The child order price was not aligned to the pair's tick size.
+    TRIGGER_FAILURE_REASON_TICK_SIZE = 4i32,
+    /// The account did not have enough available funds for the child order.
+    TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS = 5i32,
+    /// The child order would have exceeded an account risk limit.
+    TRIGGER_FAILURE_REASON_RISK_LIMIT = 6i32,
+    /// The child order reused a client order ID that was already accepted.
+    TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID = 7i32,
+    /// Trading was halted for the requested market.
+    TRIGGER_FAILURE_REASON_MARKET_HALTED = 8i32,
+    /// The market could not accept the child order at that time.
+    TRIGGER_FAILURE_REASON_ENGINE_BUSY = 9i32,
+    /// The account associated with the trigger was not recognized.
+    TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN = 10i32,
+    /// An order referenced by the trigger was not found.
+    TRIGGER_FAILURE_REASON_ORDER_UNKNOWN = 11i32,
+    /// The post-only child order would have immediately taken liquidity.
+    TRIGGER_FAILURE_REASON_POST_ONLY_CROSS = 12i32,
+    /// The reduce-only child order would not have reduced the position.
+    TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED = 13i32,
+    /// The child order price was outside the allowed market price band.
+    TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION = 14i32,
+    /// The market child order exceeded the configured execution cap.
+    TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION = 15i32,
+    /// The order book had no liquidity available for the child order.
+    TRIGGER_FAILURE_REASON_EMPTY_BOOK = 16i32,
+    /// The order book could not fill the entire fill-or-kill child order.
+    TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY = 17i32,
+    /// The selected fee asset was not permitted for the child order.
+    TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED = 18i32,
+    /// A current market price was unavailable for sizing or validation.
+    TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE = 19i32,
+    /// The quote used to size or validate the child order was no longer current.
+    TRIGGER_FAILURE_REASON_STALE_QUOTE = 20i32,
+    /// The child order quantity was below the pair's minimum quantity.
+    TRIGGER_FAILURE_REASON_MIN_QUANTITY = 21i32,
+    /// The child order quantity was not aligned to the pair's step size.
+    TRIGGER_FAILURE_REASON_STEP_SIZE = 22i32,
+    /// The child order sizing fields did not form a valid sizing request.
+    TRIGGER_FAILURE_REASON_INVALID_SIZING = 23i32,
+    /// The maximum quote debit could not fund the minimum valid child order.
+    TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL = 24i32,
+    /// The applicable fee rate exceeded the maximum accepted by the trigger.
+    TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED = 25i32,
+    /// The configured trigger price was invalid.
+    TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID = 40i32,
+    /// The selected trigger price source was not supported.
+    TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED = 41i32,
+    /// The configured trailing distance was invalid.
+    TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID = 42i32,
+    /// The requested modification required replacing the trigger instead.
+    TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE = 43i32,
+    /// The referenced order had already reached a terminal state.
+    TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL = 44i32,
+    /// An idempotency key was reused with different request details.
+    TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE = 45i32,
+    /// The request exceeded an applicable rate limit.
+    TRIGGER_FAILURE_REASON_RATE_LIMITED = 46i32,
+    /// Account policy did not permit spot trading.
+    TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY = 47i32,
+    /// Account policy did not permit trading in this market.
+    TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY = 48i32,
+    /// The child order would have exceeded the policy notional limit.
+    TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL = 49i32,
+    /// The child order would have exceeded the policy open-order limit.
+    TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS = 50i32,
+    /// Account policy had halted trading.
+    TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED = 51i32,
+    /// The terminal state did not contain a failure reason.
+    TRIGGER_FAILURE_REASON_MISSING_REASON_CODE = 998i32,
+    /// An internal invariant or processing failure caused the trigger to fail.
+    TRIGGER_FAILURE_REASON_INTERNAL_ERROR = 999i32,
+}
+impl TriggerFailureReason {
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::TRIGGER_FAILURE_REASON_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UnknownSymbol: Self = Self::TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_PAIR_DISABLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PairDisabled: Self = Self::TRIGGER_FAILURE_REASON_PAIR_DISABLED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MIN_NOTIONAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MinNotional: Self = Self::TRIGGER_FAILURE_REASON_MIN_NOTIONAL;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TICK_SIZE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TickSize: Self = Self::TRIGGER_FAILURE_REASON_TICK_SIZE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InsufficientFunds: Self = Self::TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_RISK_LIMIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RiskLimit: Self = Self::TRIGGER_FAILURE_REASON_RISK_LIMIT;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DuplicateClientId: Self = Self::TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MARKET_HALTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketHalted: Self = Self::TRIGGER_FAILURE_REASON_MARKET_HALTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ENGINE_BUSY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const EngineBusy: Self = Self::TRIGGER_FAILURE_REASON_ENGINE_BUSY;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AccountUnknown: Self = Self::TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ORDER_UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderUnknown: Self = Self::TRIGGER_FAILURE_REASON_ORDER_UNKNOWN;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_POST_ONLY_CROSS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PostOnlyCross: Self = Self::TRIGGER_FAILURE_REASON_POST_ONLY_CROSS;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReduceOnlyBlocked: Self = Self::TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PriceBandViolation: Self = Self::TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketCapViolation: Self = Self::TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_EMPTY_BOOK`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const EmptyBook: Self = Self::TRIGGER_FAILURE_REASON_EMPTY_BOOK;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FokInsufficientLiquidity: Self = Self::TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FeeAssetNotAllowed: Self = Self::TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketPriceUnavailable: Self = Self::TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_STALE_QUOTE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StaleQuote: Self = Self::TRIGGER_FAILURE_REASON_STALE_QUOTE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MIN_QUANTITY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MinQuantity: Self = Self::TRIGGER_FAILURE_REASON_MIN_QUANTITY;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_STEP_SIZE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StepSize: Self = Self::TRIGGER_FAILURE_REASON_STEP_SIZE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INVALID_SIZING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidSizing: Self = Self::TRIGGER_FAILURE_REASON_INVALID_SIZING;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxQuoteDebitTooSmall: Self = Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FeeCeilingExceeded: Self = Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerPriceInvalid: Self = Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerPriceSourceUnsupported: Self = Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TrailingDistanceInvalid: Self = Self::TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModificationRequiresReplace: Self = Self::TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderAlreadyTerminal: Self = Self::TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ConflictIdempotencyKeyReuse: Self = Self::TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_RATE_LIMITED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RateLimited: Self = Self::TRIGGER_FAILURE_REASON_RATE_LIMITED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicySpotTradeDeny: Self = Self::TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicyMarketDeny: Self = Self::TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicyMaxNotional: Self = Self::TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicyMaxOpenOrders: Self = Self::TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicyTradingHalted: Self = Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MissingReasonCode: Self = Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InternalError: Self = Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR;
+}
+impl ::core::default::Default for TriggerFailureReason {
+    fn default() -> Self {
+        Self::TRIGGER_FAILURE_REASON_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for TriggerFailureReason {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for TriggerFailureReason {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = TriggerFailureReason;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(TriggerFailureReason)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<TriggerFailureReason, E> {
+                <TriggerFailureReason as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<TriggerFailureReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <TriggerFailureReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<TriggerFailureReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <TriggerFailureReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<TriggerFailureReason, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TriggerFailureReason {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for TriggerFailureReason {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_UNSPECIFIED)
+            }
+            1i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL)
+            }
+            2i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_PAIR_DISABLED)
+            }
+            3i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_MIN_NOTIONAL)
+            }
+            4i32 => ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_TICK_SIZE),
+            5i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS,
+                )
+            }
+            6i32 => ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_RISK_LIMIT),
+            7i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID,
+                )
+            }
+            8i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_MARKET_HALTED)
+            }
+            9i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_ENGINE_BUSY)
+            }
+            10i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN,
+                )
+            }
+            11i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_ORDER_UNKNOWN)
+            }
+            12i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POST_ONLY_CROSS,
+                )
+            }
+            13i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED,
+                )
+            }
+            14i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION,
+                )
+            }
+            15i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION,
+                )
+            }
+            16i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_EMPTY_BOOK)
+            }
+            17i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY,
+                )
+            }
+            18i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED,
+                )
+            }
+            19i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE,
+                )
+            }
+            20i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_STALE_QUOTE)
+            }
+            21i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_MIN_QUANTITY)
+            }
+            22i32 => ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_STEP_SIZE),
+            23i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_INVALID_SIZING)
+            }
+            24i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL,
+                )
+            }
+            25i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED,
+                )
+            }
+            40i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID,
+                )
+            }
+            41i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED,
+                )
+            }
+            42i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID,
+                )
+            }
+            43i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE,
+                )
+            }
+            44i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL,
+                )
+            }
+            45i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE,
+                )
+            }
+            46i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_RATE_LIMITED)
+            }
+            47i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY,
+                )
+            }
+            48i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY,
+                )
+            }
+            49i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL,
+                )
+            }
+            50i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS,
+                )
+            }
+            51i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED,
+                )
+            }
+            998i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
+                )
+            }
+            999i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::TRIGGER_FAILURE_REASON_UNSPECIFIED => {
+                "TRIGGER_FAILURE_REASON_UNSPECIFIED"
+            }
+            Self::TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL => {
+                "TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL"
+            }
+            Self::TRIGGER_FAILURE_REASON_PAIR_DISABLED => {
+                "TRIGGER_FAILURE_REASON_PAIR_DISABLED"
+            }
+            Self::TRIGGER_FAILURE_REASON_MIN_NOTIONAL => {
+                "TRIGGER_FAILURE_REASON_MIN_NOTIONAL"
+            }
+            Self::TRIGGER_FAILURE_REASON_TICK_SIZE => "TRIGGER_FAILURE_REASON_TICK_SIZE",
+            Self::TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS => {
+                "TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS"
+            }
+            Self::TRIGGER_FAILURE_REASON_RISK_LIMIT => {
+                "TRIGGER_FAILURE_REASON_RISK_LIMIT"
+            }
+            Self::TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID => {
+                "TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID"
+            }
+            Self::TRIGGER_FAILURE_REASON_MARKET_HALTED => {
+                "TRIGGER_FAILURE_REASON_MARKET_HALTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_ENGINE_BUSY => {
+                "TRIGGER_FAILURE_REASON_ENGINE_BUSY"
+            }
+            Self::TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN => {
+                "TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN"
+            }
+            Self::TRIGGER_FAILURE_REASON_ORDER_UNKNOWN => {
+                "TRIGGER_FAILURE_REASON_ORDER_UNKNOWN"
+            }
+            Self::TRIGGER_FAILURE_REASON_POST_ONLY_CROSS => {
+                "TRIGGER_FAILURE_REASON_POST_ONLY_CROSS"
+            }
+            Self::TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED => {
+                "TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED"
+            }
+            Self::TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION => {
+                "TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION"
+            }
+            Self::TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION => {
+                "TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION"
+            }
+            Self::TRIGGER_FAILURE_REASON_EMPTY_BOOK => {
+                "TRIGGER_FAILURE_REASON_EMPTY_BOOK"
+            }
+            Self::TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY => {
+                "TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY"
+            }
+            Self::TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED => {
+                "TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED"
+            }
+            Self::TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE => {
+                "TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE"
+            }
+            Self::TRIGGER_FAILURE_REASON_STALE_QUOTE => {
+                "TRIGGER_FAILURE_REASON_STALE_QUOTE"
+            }
+            Self::TRIGGER_FAILURE_REASON_MIN_QUANTITY => {
+                "TRIGGER_FAILURE_REASON_MIN_QUANTITY"
+            }
+            Self::TRIGGER_FAILURE_REASON_STEP_SIZE => "TRIGGER_FAILURE_REASON_STEP_SIZE",
+            Self::TRIGGER_FAILURE_REASON_INVALID_SIZING => {
+                "TRIGGER_FAILURE_REASON_INVALID_SIZING"
+            }
+            Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL => {
+                "TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL"
+            }
+            Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED => {
+                "TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED"
+            }
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID => {
+                "TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED => {
+                "TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID => {
+                "TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE => {
+                "TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE"
+            }
+            Self::TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL => {
+                "TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL"
+            }
+            Self::TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE => {
+                "TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE"
+            }
+            Self::TRIGGER_FAILURE_REASON_RATE_LIMITED => {
+                "TRIGGER_FAILURE_REASON_RATE_LIMITED"
+            }
+            Self::TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY => {
+                "TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY"
+            }
+            Self::TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY => {
+                "TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY"
+            }
+            Self::TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL => {
+                "TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL"
+            }
+            Self::TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS => {
+                "TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS"
+            }
+            Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED => {
+                "TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE => {
+                "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE"
+            }
+            Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR => {
+                "TRIGGER_FAILURE_REASON_INTERNAL_ERROR"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "TRIGGER_FAILURE_REASON_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_UNSPECIFIED)
+            }
+            "TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL)
+            }
+            "TRIGGER_FAILURE_REASON_PAIR_DISABLED" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_PAIR_DISABLED)
+            }
+            "TRIGGER_FAILURE_REASON_MIN_NOTIONAL" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_MIN_NOTIONAL)
+            }
+            "TRIGGER_FAILURE_REASON_TICK_SIZE" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_TICK_SIZE)
+            }
+            "TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_RISK_LIMIT" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_RISK_LIMIT)
+            }
+            "TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_MARKET_HALTED" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_MARKET_HALTED)
+            }
+            "TRIGGER_FAILURE_REASON_ENGINE_BUSY" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_ENGINE_BUSY)
+            }
+            "TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_ORDER_UNKNOWN" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_ORDER_UNKNOWN)
+            }
+            "TRIGGER_FAILURE_REASON_POST_ONLY_CROSS" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POST_ONLY_CROSS,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_EMPTY_BOOK" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_EMPTY_BOOK)
+            }
+            "TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_STALE_QUOTE" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_STALE_QUOTE)
+            }
+            "TRIGGER_FAILURE_REASON_MIN_QUANTITY" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_MIN_QUANTITY)
+            }
+            "TRIGGER_FAILURE_REASON_STEP_SIZE" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_STEP_SIZE)
+            }
+            "TRIGGER_FAILURE_REASON_INVALID_SIZING" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_INVALID_SIZING)
+            }
+            "TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_RATE_LIMITED" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_RATE_LIMITED)
+            }
+            "TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_INTERNAL_ERROR" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::TRIGGER_FAILURE_REASON_UNSPECIFIED,
+            Self::TRIGGER_FAILURE_REASON_UNKNOWN_SYMBOL,
+            Self::TRIGGER_FAILURE_REASON_PAIR_DISABLED,
+            Self::TRIGGER_FAILURE_REASON_MIN_NOTIONAL,
+            Self::TRIGGER_FAILURE_REASON_TICK_SIZE,
+            Self::TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS,
+            Self::TRIGGER_FAILURE_REASON_RISK_LIMIT,
+            Self::TRIGGER_FAILURE_REASON_DUPLICATE_CLIENT_ID,
+            Self::TRIGGER_FAILURE_REASON_MARKET_HALTED,
+            Self::TRIGGER_FAILURE_REASON_ENGINE_BUSY,
+            Self::TRIGGER_FAILURE_REASON_ACCOUNT_UNKNOWN,
+            Self::TRIGGER_FAILURE_REASON_ORDER_UNKNOWN,
+            Self::TRIGGER_FAILURE_REASON_POST_ONLY_CROSS,
+            Self::TRIGGER_FAILURE_REASON_REDUCE_ONLY_BLOCKED,
+            Self::TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION,
+            Self::TRIGGER_FAILURE_REASON_MARKET_CAP_VIOLATION,
+            Self::TRIGGER_FAILURE_REASON_EMPTY_BOOK,
+            Self::TRIGGER_FAILURE_REASON_FOK_INSUFFICIENT_LIQUIDITY,
+            Self::TRIGGER_FAILURE_REASON_FEE_ASSET_NOT_ALLOWED,
+            Self::TRIGGER_FAILURE_REASON_MARKET_PRICE_UNAVAILABLE,
+            Self::TRIGGER_FAILURE_REASON_STALE_QUOTE,
+            Self::TRIGGER_FAILURE_REASON_MIN_QUANTITY,
+            Self::TRIGGER_FAILURE_REASON_STEP_SIZE,
+            Self::TRIGGER_FAILURE_REASON_INVALID_SIZING,
+            Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL,
+            Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED,
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID,
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED,
+            Self::TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID,
+            Self::TRIGGER_FAILURE_REASON_MODIFICATION_REQUIRES_REPLACE,
+            Self::TRIGGER_FAILURE_REASON_ORDER_ALREADY_TERMINAL,
+            Self::TRIGGER_FAILURE_REASON_CONFLICT_IDEMPOTENCY_KEY_REUSE,
+            Self::TRIGGER_FAILURE_REASON_RATE_LIMITED,
+            Self::TRIGGER_FAILURE_REASON_POLICY_SPOT_TRADE_DENY,
+            Self::TRIGGER_FAILURE_REASON_POLICY_MARKET_DENY,
+            Self::TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL,
+            Self::TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS,
+            Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED,
+            Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
+            Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR,
+        ]
+    }
+}
 /// LadderDistribution defines how quantity is distributed across ladder levels.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -5385,7 +6411,7 @@ pub const __LIST_TRIGGER_EVENTS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAn
 };
 /// TriggerEvent describes one historical trigger lifecycle event.
 #[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct TriggerEvent {
     /// Trigger ID associated with the event.
@@ -5479,15 +6505,10 @@ pub struct TriggerEvent {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub fire_price_ticks: ::core::option::Option<i64>,
-    /// Cancel or failure reason.
-    ///
-    /// Field 20: `reason`
-    #[serde(
-        rename = "reason",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub reason: ::buffa::alloc::string::String,
+    #[serde(flatten)]
+    pub terminal_reason: ::core::option::Option<
+        __buffa::oneof::trigger_event::TerminalReason,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5504,7 +6525,7 @@ impl ::core::fmt::Debug for TriggerEvent {
             .field("child_seq", &self.child_seq)
             .field("child_order_id", &self.child_order_id)
             .field("fire_price_ticks", &self.fire_price_ticks)
-            .field("reason", &self.reason)
+            .field("terminal_reason", &self.terminal_reason)
             .finish()
     }
 }
@@ -5575,8 +6596,15 @@ impl ::buffa::Message for TriggerEvent {
         if let Some(v) = self.fire_price_ticks {
             size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
-        if !self.reason.is_empty() {
-            size += 2u32 + ::buffa::types::string_encoded_len(&self.reason) as u32;
+        if let ::core::option::Option::Some(ref v) = self.terminal_reason {
+            match v {
+                __buffa::oneof::trigger_event::TerminalReason::CancelReason(x) => {
+                    size += 2u32 + ::buffa::types::int32_encoded_len(x.to_i32()) as u32;
+                }
+                __buffa::oneof::trigger_event::TerminalReason::FailureReason(x) => {
+                    size += 2u32 + ::buffa::types::int32_encoded_len(x.to_i32()) as u32;
+                }
+            }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -5621,8 +6649,15 @@ impl ::buffa::Message for TriggerEvent {
         if let Some(v) = self.fire_price_ticks {
             ::buffa::types::put_int64_field(13u32, v, buf);
         }
-        if !self.reason.is_empty() {
-            ::buffa::types::put_string_field(20u32, &self.reason, buf);
+        if let ::core::option::Option::Some(ref v) = self.terminal_reason {
+            match v {
+                __buffa::oneof::trigger_event::TerminalReason::CancelReason(x) => {
+                    ::buffa::types::put_int32_field(20u32, x.to_i32(), buf);
+                }
+                __buffa::oneof::trigger_event::TerminalReason::FailureReason(x) => {
+                    ::buffa::types::put_int32_field(21u32, x.to_i32(), buf);
+                }
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5709,9 +6744,24 @@ impl ::buffa::Message for TriggerEvent {
             20u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.reason, buf)?;
+                self.terminal_reason = ::core::option::Option::Some(
+                    __buffa::oneof::trigger_event::TerminalReason::CancelReason(
+                        ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                    ),
+                );
+            }
+            21u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.terminal_reason = ::core::option::Option::Some(
+                    __buffa::oneof::trigger_event::TerminalReason::FailureReason(
+                        ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                    ),
+                );
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -5730,7 +6780,7 @@ impl ::buffa::Message for TriggerEvent {
         self.child_seq = 0i32;
         self.child_order_id = 0u64;
         self.fire_price_ticks = ::core::option::Option::None;
-        self.reason.clear();
+        self.terminal_reason = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5741,6 +6791,277 @@ impl ::buffa::ExtensionSet for TriggerEvent {
     }
     fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
         &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for TriggerEvent {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = TriggerEvent;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct TriggerEvent")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<TriggerEvent, A::Error> {
+                let mut __f_trigger_id: ::core::option::Option<u64> = None;
+                let mut __f_subaccount_id: ::core::option::Option<u64> = None;
+                let mut __f_symbol_id: ::core::option::Option<u32> = None;
+                let mut __f_trigger_type: ::core::option::Option<
+                    ::buffa::EnumValue<TriggerType>,
+                > = None;
+                let mut __f_event_type: ::core::option::Option<
+                    ::buffa::EnumValue<TriggerEventType>,
+                > = None;
+                let mut __f_ts_ns: ::core::option::Option<u64> = None;
+                let mut __f_child_seq: ::core::option::Option<i32> = None;
+                let mut __f_child_order_id: ::core::option::Option<u64> = None;
+                let mut __f_fire_price_ticks: ::core::option::Option<
+                    ::core::option::Option<i64>,
+                > = None;
+                let mut __oneof_terminal_reason: ::core::option::Option<
+                    __buffa::oneof::trigger_event::TerminalReason,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "triggerId" | "trigger_id" => {
+                            __f_trigger_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u64, D::Error> {
+                                        ::buffa::json_helpers::uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "subaccountId" | "subaccount_id" => {
+                            __f_subaccount_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u64, D::Error> {
+                                        ::buffa::json_helpers::uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "symbolId" | "symbol_id" => {
+                            __f_symbol_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u32;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u32, D::Error> {
+                                        ::buffa::json_helpers::uint32::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "triggerType" | "trigger_type" => {
+                            __f_trigger_type = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<TriggerType>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<TriggerType>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "eventType" | "event_type" => {
+                            __f_event_type = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<TriggerEventType>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<TriggerEventType>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "tsNs" | "ts_ns" => {
+                            __f_ts_ns = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u64, D::Error> {
+                                        ::buffa::json_helpers::uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "childSeq" | "child_seq" => {
+                            __f_child_seq = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = i32;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<i32, D::Error> {
+                                        ::buffa::json_helpers::int32::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "childOrderId" | "child_order_id" => {
+                            __f_child_order_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u64, D::Error> {
+                                        ::buffa::json_helpers::uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "firePriceTicks" | "fire_price_ticks" => {
+                            __f_fire_price_ticks = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<i64>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<i64>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_int64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "cancelReason" | "cancel_reason" => {
+                            let v: ::core::option::Option<
+                                ::buffa::EnumValue<TriggerCancelReason>,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::EnumValue<TriggerCancelReason>,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_terminal_reason.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'terminal_reason'",
+                                        ),
+                                    );
+                                }
+                                __oneof_terminal_reason = Some(
+                                    __buffa::oneof::trigger_event::TerminalReason::CancelReason(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "failureReason" | "failure_reason" => {
+                            let v: ::core::option::Option<
+                                ::buffa::EnumValue<TriggerFailureReason>,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::EnumValue<TriggerFailureReason>,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_terminal_reason.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'terminal_reason'",
+                                        ),
+                                    );
+                                }
+                                __oneof_terminal_reason = Some(
+                                    __buffa::oneof::trigger_event::TerminalReason::FailureReason(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <TriggerEvent as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_trigger_id {
+                    __r.trigger_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_subaccount_id {
+                    __r.subaccount_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_symbol_id {
+                    __r.symbol_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_trigger_type {
+                    __r.trigger_type = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_event_type {
+                    __r.event_type = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_ts_ns {
+                    __r.ts_ns = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_child_seq {
+                    __r.child_seq = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_child_order_id {
+                    __r.child_order_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_fire_price_ticks {
+                    __r.fire_price_ticks = v;
+                }
+                __r.terminal_reason = __oneof_terminal_reason;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for TriggerEvent {
@@ -5763,6 +7084,14 @@ pub const __TRIGGER_EVENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
     from_json: ::buffa::type_registry::any_from_json::<TriggerEvent>,
     is_wkt: false,
 };
+pub mod trigger_event {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::trigger_event::TerminalReason;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::trigger_event::TerminalReason as TerminalReasonView;
+}
 /// ListTriggerEventsResponse returns historical events ordered newest-first.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -6341,8 +7670,8 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Trading symbol numeric identifier. Required for API-key market policy;
-    /// AAS verifies it against the stored trigger.
+    /// Trading symbol numeric identifier. Required for API-key market policy and
+    /// must match the stored trigger.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -7650,8 +8979,8 @@ pub struct ResumeTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Trading symbol numeric identifier. Required for API-key market policy;
-    /// AAS verifies it against the stored trigger.
+    /// Trading symbol numeric identifier. Required for API-key market policy and
+    /// must match the stored trigger.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -9194,6 +10523,8 @@ pub struct Trigger {
     )]
     pub completed_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     #[serde(flatten)]
+    pub terminal_reason: ::core::option::Option<__buffa::oneof::trigger::TerminalReason>,
+    #[serde(flatten)]
     pub configuration: ::core::option::Option<__buffa::oneof::trigger::Configuration>,
     #[serde(flatten)]
     pub runtime_details: ::core::option::Option<__buffa::oneof::trigger::RuntimeDetails>,
@@ -9217,6 +10548,7 @@ impl ::core::fmt::Debug for Trigger {
             .field("updated_at", &self.updated_at)
             .field("armed_at", &self.armed_at)
             .field("completed_at", &self.completed_at)
+            .field("terminal_reason", &self.terminal_reason)
             .field("configuration", &self.configuration)
             .field("runtime_details", &self.runtime_details)
             .finish()
@@ -9273,6 +10605,16 @@ impl ::buffa::Message for Trigger {
         }
         if self.parent_order_id.is_some() {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if let ::core::option::Option::Some(ref v) = self.terminal_reason {
+            match v {
+                __buffa::oneof::trigger::TerminalReason::CancelReason(x) => {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(x.to_i32()) as u32;
+                }
+                __buffa::oneof::trigger::TerminalReason::FailureReason(x) => {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(x.to_i32()) as u32;
+                }
+            }
         }
         if self.qty_scaled != 0i64 {
             size += 2u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
@@ -9433,6 +10775,16 @@ impl ::buffa::Message for Trigger {
         }
         if let Some(v) = self.parent_order_id {
             ::buffa::types::put_fixed64_field(6u32, v, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.terminal_reason {
+            match v {
+                __buffa::oneof::trigger::TerminalReason::CancelReason(x) => {
+                    ::buffa::types::put_int32_field(7u32, x.to_i32(), buf);
+                }
+                __buffa::oneof::trigger::TerminalReason::FailureReason(x) => {
+                    ::buffa::types::put_int32_field(8u32, x.to_i32(), buf);
+                }
+            }
         }
         if self.qty_scaled != 0i64 {
             ::buffa::types::put_int64_field(20u32, self.qty_scaled, buf);
@@ -9598,6 +10950,28 @@ impl ::buffa::Message for Trigger {
                 )?;
                 self.parent_order_id = ::core::option::Option::Some(
                     ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.terminal_reason = ::core::option::Option::Some(
+                    __buffa::oneof::trigger::TerminalReason::CancelReason(
+                        ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                    ),
+                );
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.terminal_reason = ::core::option::Option::Some(
+                    __buffa::oneof::trigger::TerminalReason::FailureReason(
+                        ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                    ),
                 );
             }
             20u32 => {
@@ -9873,6 +11247,7 @@ impl ::buffa::Message for Trigger {
         self.symbol_id = 0u32;
         self.status = ::buffa::EnumValue::from(0);
         self.parent_order_id = ::core::option::Option::None;
+        self.terminal_reason = ::core::option::Option::None;
         self.qty_scaled = 0i64;
         self.fee_asset = ::buffa::EnumValue::from(0);
         self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
@@ -9940,6 +11315,9 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 > = None;
                 let mut __f_completed_at: ::core::option::Option<
                     ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+                > = None;
+                let mut __oneof_terminal_reason: ::core::option::Option<
+                    __buffa::oneof::trigger::TerminalReason,
                 > = None;
                 let mut __oneof_configuration: ::core::option::Option<
                     __buffa::oneof::trigger::Configuration,
@@ -10144,6 +11522,54 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                         >,
                                     >()?,
                             );
+                        }
+                        "cancelReason" | "cancel_reason" => {
+                            let v: ::core::option::Option<
+                                ::buffa::EnumValue<TriggerCancelReason>,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::EnumValue<TriggerCancelReason>,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_terminal_reason.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'terminal_reason'",
+                                        ),
+                                    );
+                                }
+                                __oneof_terminal_reason = Some(
+                                    __buffa::oneof::trigger::TerminalReason::CancelReason(v),
+                                );
+                            }
+                        }
+                        "failureReason" | "failure_reason" => {
+                            let v: ::core::option::Option<
+                                ::buffa::EnumValue<TriggerFailureReason>,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::EnumValue<TriggerFailureReason>,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_terminal_reason.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'terminal_reason'",
+                                        ),
+                                    );
+                                }
+                                __oneof_terminal_reason = Some(
+                                    __buffa::oneof::trigger::TerminalReason::FailureReason(v),
+                                );
+                            }
                         }
                         "stopLoss" | "stop_loss" => {
                             let v: ::core::option::Option<ConditionalTrigger> = map
@@ -10406,6 +11832,7 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 if let ::core::option::Option::Some(v) = __f_completed_at {
                     __r.completed_at = v;
                 }
+                __r.terminal_reason = __oneof_terminal_reason;
                 __r.configuration = __oneof_configuration;
                 __r.runtime_details = __oneof_runtime_details;
                 Ok(__r)
@@ -10438,9 +11865,13 @@ pub mod trigger {
     #[allow(unused_imports)]
     use super::*;
     #[doc(inline)]
+    pub use super::__buffa::oneof::trigger::TerminalReason;
+    #[doc(inline)]
     pub use super::__buffa::oneof::trigger::Configuration;
     #[doc(inline)]
     pub use super::__buffa::oneof::trigger::RuntimeDetails;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::trigger::TerminalReason as TerminalReasonView;
     #[doc(inline)]
     pub use super::__buffa::view::oneof::trigger::Configuration as ConfigurationView;
     #[doc(inline)]
@@ -17943,10 +19374,9 @@ pub mod __buffa {
             ///
             /// Field 13: `fire_price_ticks`
             pub fire_price_ticks: ::core::option::Option<i64>,
-            /// Cancel or failure reason.
-            ///
-            /// Field 20: `reason`
-            pub reason: &'a str,
+            pub terminal_reason: ::core::option::Option<
+                super::super::__buffa::view::oneof::trigger_event::TerminalReason,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for TriggerEventView<'a> {
@@ -18052,9 +19482,28 @@ pub mod __buffa {
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.reason = ::buffa::types::borrow_str(&mut cur)?;
+                        view.terminal_reason = Some(
+                            super::super::__buffa::view::oneof::trigger_event::TerminalReason::CancelReason(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32(&mut cur)?,
+                                ),
+                            ),
+                        );
+                    }
+                    21u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.terminal_reason = Some(
+                            super::super::__buffa::view::oneof::trigger_event::TerminalReason::FailureReason(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32(&mut cur)?,
+                                ),
+                            ),
+                        );
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -18094,7 +19543,25 @@ pub mod __buffa {
                     child_seq: self.child_seq,
                     child_order_id: self.child_order_id,
                     fire_price_ticks: self.fire_price_ticks,
-                    reason: self.reason.to_string(),
+                    terminal_reason: self
+                        .terminal_reason
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::trigger_event::TerminalReason::CancelReason(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::trigger_event::TerminalReason::CancelReason(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::trigger_event::TerminalReason::FailureReason(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::trigger_event::TerminalReason::FailureReason(
+                                    *v,
+                                )
+                            }
+                        }),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -18146,10 +19613,23 @@ pub mod __buffa {
                 if let Some(v) = self.fire_price_ticks {
                     size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
-                if !self.reason.is_empty() {
-                    size
-                        += 2u32
-                            + ::buffa::types::string_encoded_len(&self.reason) as u32;
+                if let ::core::option::Option::Some(ref v) = self.terminal_reason {
+                    match v {
+                        super::super::__buffa::view::oneof::trigger_event::TerminalReason::CancelReason(
+                            x,
+                        ) => {
+                            size
+                                += 2u32
+                                    + ::buffa::types::int32_encoded_len(x.to_i32()) as u32;
+                        }
+                        super::super::__buffa::view::oneof::trigger_event::TerminalReason::FailureReason(
+                            x,
+                        ) => {
+                            size
+                                += 2u32
+                                    + ::buffa::types::int32_encoded_len(x.to_i32()) as u32;
+                        }
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -18195,8 +19675,19 @@ pub mod __buffa {
                 if let Some(v) = self.fire_price_ticks {
                     ::buffa::types::put_int64_field(13u32, v, buf);
                 }
-                if !self.reason.is_empty() {
-                    ::buffa::types::put_string_field(20u32, &self.reason, buf);
+                if let ::core::option::Option::Some(ref v) = self.terminal_reason {
+                    match v {
+                        super::super::__buffa::view::oneof::trigger_event::TerminalReason::CancelReason(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(20u32, x.to_i32(), buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger_event::TerminalReason::FailureReason(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(21u32, x.to_i32(), buf);
+                        }
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -18278,8 +19769,19 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.reason) {
-                    __map.serialize_entry("reason", self.reason)?;
+                if let ::core::option::Option::Some(ref __ov) = self.terminal_reason {
+                    match __ov {
+                        super::super::__buffa::view::oneof::trigger_event::TerminalReason::CancelReason(
+                            v,
+                        ) => {
+                            __map.serialize_entry("cancelReason", v)?;
+                        }
+                        super::super::__buffa::view::oneof::trigger_event::TerminalReason::FailureReason(
+                            v,
+                        ) => {
+                            __map.serialize_entry("failureReason", v)?;
+                        }
+                    }
                 }
                 __map.end()
             }
@@ -18441,12 +19943,14 @@ pub mod __buffa {
             pub fn fire_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().fire_price_ticks
             }
-            /// Cancel or failure reason.
-            ///
-            /// Field 20: `reason`
+            /// Oneof `terminal_reason`.
             #[must_use]
-            pub fn reason(&self) -> &'_ str {
-                self.0.reborrow().reason
+            pub fn terminal_reason(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::trigger_event::TerminalReason,
+            > {
+                self.0.reborrow().terminal_reason.as_ref()
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<TriggerEventView<'static>>>
@@ -19557,8 +21061,8 @@ pub mod __buffa {
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Trading symbol numeric identifier. Required for API-key market policy;
-            /// AAS verifies it against the stored trigger.
+            /// Trading symbol numeric identifier. Required for API-key market policy and
+            /// must match the stored trigger.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -20118,8 +21622,8 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Trading symbol numeric identifier. Required for API-key market policy;
-            /// AAS verifies it against the stored trigger.
+            /// Trading symbol numeric identifier. Required for API-key market policy and
+            /// must match the stored trigger.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -21343,8 +22847,8 @@ pub mod __buffa {
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Trading symbol numeric identifier. Required for API-key market policy;
-            /// AAS verifies it against the stored trigger.
+            /// Trading symbol numeric identifier. Required for API-key market policy and
+            /// must match the stored trigger.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -21633,8 +23137,8 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Trading symbol numeric identifier. Required for API-key market policy;
-            /// AAS verifies it against the stored trigger.
+            /// Trading symbol numeric identifier. Required for API-key market policy and
+            /// must match the stored trigger.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -23988,6 +25492,9 @@ pub mod __buffa {
             pub completed_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            pub terminal_reason: ::core::option::Option<
+                super::super::__buffa::view::oneof::trigger::TerminalReason,
+            >,
             pub configuration: ::core::option::Option<
                 super::super::__buffa::view::oneof::trigger::Configuration<'a>,
             >,
@@ -24197,6 +25704,32 @@ pub mod __buffa {
                                 );
                             }
                         }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.terminal_reason = Some(
+                            super::super::__buffa::view::oneof::trigger::TerminalReason::CancelReason(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32(&mut cur)?,
+                                ),
+                            ),
+                        );
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.terminal_reason = Some(
+                            super::super::__buffa::view::oneof::trigger::TerminalReason::FailureReason(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32(&mut cur)?,
+                                ),
+                            ),
+                        );
                     }
                     30u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -24541,6 +26074,25 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    terminal_reason: self
+                        .terminal_reason
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::trigger::TerminalReason::CancelReason(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::trigger::TerminalReason::CancelReason(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::trigger::TerminalReason::FailureReason(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::trigger::TerminalReason::FailureReason(
+                                    *v,
+                                )
+                            }
+                        }),
                     configuration: match self.configuration.as_ref() {
                         ::core::option::Option::Some(v) => {
                             ::core::option::Option::Some(
@@ -24673,6 +26225,24 @@ pub mod __buffa {
                 }
                 if self.parent_order_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if let ::core::option::Option::Some(ref v) = self.terminal_reason {
+                    match v {
+                        super::super::__buffa::view::oneof::trigger::TerminalReason::CancelReason(
+                            x,
+                        ) => {
+                            size
+                                += 1u32
+                                    + ::buffa::types::int32_encoded_len(x.to_i32()) as u32;
+                        }
+                        super::super::__buffa::view::oneof::trigger::TerminalReason::FailureReason(
+                            x,
+                        ) => {
+                            size
+                                += 1u32
+                                    + ::buffa::types::int32_encoded_len(x.to_i32()) as u32;
+                        }
+                    }
                 }
                 if self.qty_scaled != 0i64 {
                     size
@@ -24855,6 +26425,20 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.parent_order_id {
                     ::buffa::types::put_fixed64_field(6u32, v, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.terminal_reason {
+                    match v {
+                        super::super::__buffa::view::oneof::trigger::TerminalReason::CancelReason(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(7u32, x.to_i32(), buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger::TerminalReason::FailureReason(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(8u32, x.to_i32(), buf);
+                        }
+                    }
                 }
                 if self.qty_scaled != 0i64 {
                     ::buffa::types::put_int64_field(20u32, self.qty_scaled, buf);
@@ -25116,6 +26700,20 @@ pub mod __buffa {
                         __map.serialize_entry("completedAt", __v)?;
                     }
                 }
+                if let ::core::option::Option::Some(ref __ov) = self.terminal_reason {
+                    match __ov {
+                        super::super::__buffa::view::oneof::trigger::TerminalReason::CancelReason(
+                            v,
+                        ) => {
+                            __map.serialize_entry("cancelReason", v)?;
+                        }
+                        super::super::__buffa::view::oneof::trigger::TerminalReason::FailureReason(
+                            v,
+                        ) => {
+                            __map.serialize_entry("failureReason", v)?;
+                        }
+                    }
+                }
                 if let ::core::option::Option::Some(ref __ov) = self.configuration {
                     match __ov {
                         super::super::__buffa::view::oneof::trigger::Configuration::StopLoss(
@@ -25373,6 +26971,15 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().completed_at
             }
+            /// Oneof `terminal_reason`.
+            #[must_use]
+            pub fn terminal_reason(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::trigger::TerminalReason,
+            > {
+                self.0.reborrow().terminal_reason.as_ref()
+            }
             /// Oneof `configuration`.
             #[must_use]
             pub fn configuration(
@@ -25537,6 +27144,23 @@ pub mod __buffa {
                     ),
                 }
             }
+            pub mod trigger_event {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum TerminalReason {
+                    CancelReason(
+                        ::buffa::EnumValue<
+                            super::super::super::super::TriggerCancelReason,
+                        >,
+                    ),
+                    FailureReason(
+                        ::buffa::EnumValue<
+                            super::super::super::super::TriggerFailureReason,
+                        >,
+                    ),
+                }
+            }
             pub mod modify_trigger_request {
                 #[allow(unused_imports)]
                 use super::*;
@@ -25554,6 +27178,19 @@ pub mod __buffa {
             pub mod trigger {
                 #[allow(unused_imports)]
                 use super::*;
+                #[derive(Clone, Debug)]
+                pub enum TerminalReason {
+                    CancelReason(
+                        ::buffa::EnumValue<
+                            super::super::super::super::TriggerCancelReason,
+                        >,
+                    ),
+                    FailureReason(
+                        ::buffa::EnumValue<
+                            super::super::super::super::TriggerFailureReason,
+                        >,
+                    ),
+                }
                 #[derive(Clone, Debug)]
                 pub enum Configuration<'a> {
                     StopLoss(
@@ -25916,6 +27553,39 @@ pub mod __buffa {
                 }
             }
         }
+        pub mod trigger_event {
+            #[allow(unused_imports)]
+            use super::*;
+            /// Terminal reason for canceled or failed events. Other event types leave it unset.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum TerminalReason {
+                CancelReason(
+                    ::buffa::EnumValue<super::super::super::TriggerCancelReason>,
+                ),
+                FailureReason(
+                    ::buffa::EnumValue<super::super::super::TriggerFailureReason>,
+                ),
+            }
+            impl ::buffa::Oneof for TerminalReason {}
+            impl serde::Serialize for TerminalReason {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::CancelReason(v) => {
+                            map.serialize_entry("cancelReason", v)?;
+                        }
+                        Self::FailureReason(v) => {
+                            map.serialize_entry("failureReason", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
         pub mod modify_trigger_request {
             #[allow(unused_imports)]
             use super::*;
@@ -25985,6 +27655,35 @@ pub mod __buffa {
         pub mod trigger {
             #[allow(unused_imports)]
             use super::*;
+            /// Terminal reason for canceled or failed triggers. Other statuses leave it unset.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum TerminalReason {
+                CancelReason(
+                    ::buffa::EnumValue<super::super::super::TriggerCancelReason>,
+                ),
+                FailureReason(
+                    ::buffa::EnumValue<super::super::super::TriggerFailureReason>,
+                ),
+            }
+            impl ::buffa::Oneof for TerminalReason {}
+            impl serde::Serialize for TerminalReason {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::CancelReason(v) => {
+                            map.serialize_entry("cancelReason", v)?;
+                        }
+                        Self::FailureReason(v) => {
+                            map.serialize_entry("failureReason", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
             /// Immutable strategy configuration. The selected variant is the trigger
             /// category and uses the same shape accepted by CreateTrigger.
             #[derive(Clone, PartialEq, Debug)]
