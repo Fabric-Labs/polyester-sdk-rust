@@ -180,13 +180,14 @@ pub struct TradingRateLimitRule {
     pub policy_class: ::buffa::EnumValue<TradingRateLimitClass>,
     /// VIP tier for this rule, in the inclusive range 0 through 10.
     ///
-    /// Field 2: `tier`
+    /// Field 2: `vip_tier`
     #[serde(
-        rename = "tier",
+        rename = "vipTier",
+        alias = "vip_tier",
         with = "::buffa::json_helpers::uint32",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
-    pub tier: u32,
+    pub vip_tier: u32,
     /// Weighted request capacity available during each policy period. One
     /// operation consumes the weight assigned to that operation.
     ///
@@ -226,7 +227,7 @@ impl ::core::fmt::Debug for TradingRateLimitRule {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("TradingRateLimitRule")
             .field("policy_class", &self.policy_class)
-            .field("tier", &self.tier)
+            .field("vip_tier", &self.vip_tier)
             .field("quota_weight", &self.quota_weight)
             .field("period_ms", &self.period_ms)
             .field("burst_weight", &self.burst_weight)
@@ -264,8 +265,8 @@ impl ::buffa::Message for TradingRateLimitRule {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
-        if self.tier != 0u32 {
-            size += 1u32 + ::buffa::types::uint32_encoded_len(self.tier) as u32;
+        if self.vip_tier != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.vip_tier) as u32;
         }
         if self.quota_weight != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.quota_weight) as u32;
@@ -292,8 +293,8 @@ impl ::buffa::Message for TradingRateLimitRule {
                 ::buffa::types::put_int32_field(1u32, val, buf);
             }
         }
-        if self.tier != 0u32 {
-            ::buffa::types::put_uint32_field(2u32, self.tier, buf);
+        if self.vip_tier != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.vip_tier, buf);
         }
         if self.quota_weight != 0u64 {
             ::buffa::types::put_uint64_field(3u32, self.quota_weight, buf);
@@ -331,7 +332,7 @@ impl ::buffa::Message for TradingRateLimitRule {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.tier = ::buffa::types::decode_uint32(buf)?;
+                self.vip_tier = ::buffa::types::decode_uint32(buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -363,7 +364,7 @@ impl ::buffa::Message for TradingRateLimitRule {
     }
     fn clear(&mut self) {
         self.policy_class = ::buffa::EnumValue::from(0);
-        self.tier = 0u32;
+        self.vip_tier = 0u32;
         self.quota_weight = 0u64;
         self.period_ms = 0u64;
         self.burst_weight = 0u64;
@@ -1106,8 +1107,8 @@ pub mod __buffa {
             pub policy_class: ::buffa::EnumValue<super::super::TradingRateLimitClass>,
             /// VIP tier for this rule, in the inclusive range 0 through 10.
             ///
-            /// Field 2: `tier`
-            pub tier: u32,
+            /// Field 2: `vip_tier`
+            pub vip_tier: u32,
             /// Weighted request capacity available during each policy period. One
             /// operation consumes the weight assigned to that operation.
             ///
@@ -1168,7 +1169,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.tier = ::buffa::types::decode_uint32(&mut cur)?;
+                        view.vip_tier = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -1221,7 +1222,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::TradingRateLimitRule {
                     policy_class: self.policy_class,
-                    tier: self.tier,
+                    vip_tier: self.vip_tier,
                     quota_weight: self.quota_weight,
                     period_ms: self.period_ms,
                     burst_weight: self.burst_weight,
@@ -1245,8 +1246,10 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
-                if self.tier != 0u32 {
-                    size += 1u32 + ::buffa::types::uint32_encoded_len(self.tier) as u32;
+                if self.vip_tier != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.vip_tier) as u32;
                 }
                 if self.quota_weight != 0u64 {
                     size
@@ -1282,8 +1285,8 @@ pub mod __buffa {
                         ::buffa::types::put_int32_field(1u32, val, buf);
                     }
                 }
-                if self.tier != 0u32 {
-                    ::buffa::types::put_uint32_field(2u32, self.tier, buf);
+                if self.vip_tier != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.vip_tier, buf);
                 }
                 if self.quota_weight != 0u64 {
                     ::buffa::types::put_uint64_field(3u32, self.quota_weight, buf);
@@ -1320,11 +1323,11 @@ pub mod __buffa {
                 ) {
                     __map.serialize_entry("policyClass", &self.policy_class)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.tier) {
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.vip_tier) {
                     __map
                         .serialize_entry(
-                            "tier",
-                            &::buffa::json_helpers::ProtoJson(&self.tier),
+                            "vipTier",
+                            &::buffa::json_helpers::ProtoJson(&self.vip_tier),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.quota_weight) {
@@ -1456,10 +1459,10 @@ pub mod __buffa {
             }
             /// VIP tier for this rule, in the inclusive range 0 through 10.
             ///
-            /// Field 2: `tier`
+            /// Field 2: `vip_tier`
             #[must_use]
-            pub fn tier(&self) -> u32 {
-                self.0.reborrow().tier
+            pub fn vip_tier(&self) -> u32 {
+                self.0.reborrow().vip_tier
             }
             /// Weighted request capacity available during each policy period. One
             /// operation consumes the weight assigned to that operation.

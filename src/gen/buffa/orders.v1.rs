@@ -10174,8 +10174,8 @@ pub struct ModifyOrderRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub new_client_order_id: ::buffa::alloc::string::String,
-    /// Trading symbol numeric identifier. Required so API-key market policy can
-    /// be enforced before forwarding; AAS verifies it against the target order.
+    /// Trading symbol numeric identifier. Required for API-key market policy and
+    /// must match the target order.
     ///
     /// Field 10: `symbol_id`
     #[serde(
@@ -15571,8 +15571,8 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub post_only: bool,
-    /// Original order quantity scaled by the pair's base_quantity_scale from
-    /// GetSpotConfig for symbol_id.
+    /// Current accepted total order quantity, updated by successful modifies,
+    /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
     ///
     /// Field 12: `orig_qty_scaled`
     #[serde(
@@ -18405,6 +18405,18 @@ pub struct GetUserTradesRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub page_token: ::buffa::alloc::string::String,
+    /// Return only durable fills whose per-symbol match ID is greater than this
+    /// value. Subscribe to the execution WebSocket before calling this method and
+    /// de-duplicate overlapping results by (symbol_id, match_id, order_id).
+    ///
+    /// Field 14: `after_match_id`
+    #[serde(
+        rename = "afterMatchId",
+        alias = "after_match_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub after_match_id: ::core::option::Option<u64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -18419,6 +18431,7 @@ impl ::core::fmt::Debug for GetUserTradesRequest {
             .field("end_ts_ns", &self.end_ts_ns)
             .field("limit", &self.limit)
             .field("page_token", &self.page_token)
+            .field("after_match_id", &self.after_match_id)
             .finish()
     }
 }
@@ -18456,6 +18469,13 @@ impl GetUserTradesRequest {
     ///Sets [`Self::limit`] to `Some(value)`, consuming and returning `self`.
     pub fn with_limit(mut self, value: u32) -> Self {
         self.limit = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::after_match_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_after_match_id(mut self, value: u64) -> Self {
+        self.after_match_id = Some(value);
         self
     }
 }
@@ -18501,6 +18521,9 @@ impl ::buffa::Message for GetUserTradesRequest {
         if !self.page_token.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.page_token) as u32;
         }
+        if let Some(v) = self.after_match_id {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -18534,6 +18557,9 @@ impl ::buffa::Message for GetUserTradesRequest {
         }
         if !self.page_token.is_empty() {
             ::buffa::types::put_string_field(13u32, &self.page_token, buf);
+        }
+        if let Some(v) = self.after_match_id {
+            ::buffa::types::put_uint64_field(14u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -18605,6 +18631,15 @@ impl ::buffa::Message for GetUserTradesRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.page_token, buf)?;
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.after_match_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -18620,6 +18655,7 @@ impl ::buffa::Message for GetUserTradesRequest {
         self.end_ts_ns = ::core::option::Option::None;
         self.limit = ::core::option::Option::None;
         self.page_token.clear();
+        self.after_match_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -32103,8 +32139,8 @@ pub mod __buffa {
             ///
             /// Field 9: `new_client_order_id`
             pub new_client_order_id: &'a str,
-            /// Trading symbol numeric identifier. Required so API-key market policy can
-            /// be enforced before forwarding; AAS verifies it against the target order.
+            /// Trading symbol numeric identifier. Required for API-key market policy and
+            /// must match the target order.
             ///
             /// Field 10: `symbol_id`
             pub symbol_id: u32,
@@ -32681,8 +32717,8 @@ pub mod __buffa {
             pub fn new_client_order_id(&self) -> &'_ str {
                 self.0.reborrow().new_client_order_id
             }
-            /// Trading symbol numeric identifier. Required so API-key market policy can
-            /// be enforced before forwarding; AAS verifies it against the target order.
+            /// Trading symbol numeric identifier. Required for API-key market policy and
+            /// must match the target order.
             ///
             /// Field 10: `symbol_id`
             #[must_use]
@@ -39463,8 +39499,8 @@ pub mod __buffa {
             ///
             /// Field 11: `post_only`
             pub post_only: bool,
-            /// Original order quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig for symbol_id.
+            /// Current accepted total order quantity, updated by successful modifies,
+            /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
             ///
             /// Field 12: `orig_qty_scaled`
             pub orig_qty_scaled: i64,
@@ -40562,8 +40598,8 @@ pub mod __buffa {
             pub fn post_only(&self) -> bool {
                 self.0.reborrow().post_only
             }
-            /// Original order quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig for symbol_id.
+            /// Current accepted total order quantity, updated by successful modifies,
+            /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
             ///
             /// Field 12: `orig_qty_scaled`
             #[must_use]
@@ -43892,6 +43928,12 @@ pub mod __buffa {
             ///
             /// Field 13: `page_token`
             pub page_token: &'a str,
+            /// Return only durable fills whose per-symbol match ID is greater than this
+            /// value. Subscribe to the execution WebSocket before calling this method and
+            /// de-duplicate overlapping results by (symbol_id, match_id, order_id).
+            ///
+            /// Field 14: `after_match_id`
+            pub after_match_id: ::core::option::Option<u64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetUserTradesRequestView<'a> {
@@ -43980,6 +44022,15 @@ pub mod __buffa {
                         )?;
                         view.page_token = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.after_match_id = Some(
+                            ::buffa::types::decode_uint64(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -44016,6 +44067,7 @@ pub mod __buffa {
                     end_ts_ns: self.end_ts_ns,
                     limit: self.limit,
                     page_token: self.page_token.to_string(),
+                    after_match_id: self.after_match_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -44059,6 +44111,9 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.page_token)
                                 as u32;
                 }
+                if let Some(v) = self.after_match_id {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -44093,6 +44148,9 @@ pub mod __buffa {
                 }
                 if !self.page_token.is_empty() {
                     ::buffa::types::put_string_field(13u32, &self.page_token, buf);
+                }
+                if let Some(v) = self.after_match_id {
+                    ::buffa::types::put_uint64_field(14u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -44155,6 +44213,13 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.page_token) {
                     __map.serialize_entry("pageToken", self.page_token)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.after_match_id {
+                    __map
+                        .serialize_entry(
+                            "afterMatchId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -44302,6 +44367,15 @@ pub mod __buffa {
             #[must_use]
             pub fn page_token(&self) -> &'_ str {
                 self.0.reborrow().page_token
+            }
+            /// Return only durable fills whose per-symbol match ID is greater than this
+            /// value. Subscribe to the execution WebSocket before calling this method and
+            /// de-duplicate overlapping results by (symbol_id, match_id, order_id).
+            ///
+            /// Field 14: `after_match_id`
+            #[must_use]
+            pub fn after_match_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().after_match_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetUserTradesRequestView<'static>>>
