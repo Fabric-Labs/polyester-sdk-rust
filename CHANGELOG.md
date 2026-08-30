@@ -28,6 +28,13 @@
   pass-through (`ApiData.raw`); callers set `minimum_view_revision` on the
   request, and regenerated raw views include `view_revision`.
 
+### Docs
+- README links the sibling
+  [`polyester-examples-rust`](https://github.com/Fabric-Labs/polyester-examples-rust)
+  cookbook near the top.
+- README examples use placeholder `YOUR_ACCOUNT_ID` and `BTC-USDT`
+  instead of a live Account ID and `BNB-USDT`.
+
 ## 0.1.0a39
 
 Package version: `0.1.0-alpha.39`. Git tag: `v0.1.0a39`.

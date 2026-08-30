@@ -110,6 +110,12 @@ cargo test --lib
 Pin the Connect runtime: this crate depends on `connectrpc` / `buffa` **0.8.x**.
 Review upstream notes before upgrading.
 
+## Examples
+
+Runnable cookbook examples live in the sibling repo
+[`polyester-examples-rust`](https://github.com/Fabric-Labs/polyester-examples-rust)
+(REST market data, realtime streams, decimal + scaled-int order paths, batch create, RSI bot).
+
 ## Quick start
 
 Create an API key in the Polyester app (**API** in the sidebar). Copy the key id
@@ -132,7 +138,7 @@ async fn main() -> Result<()> {
     let client = Client::new(Config {
         api_key_id: Some("ak_...".into()),
         api_private_key: Some("...".into()), // 64-char hex from key creation
-        default_account_id: Some("RLxqJGUDg92".into()), // Profile → Account ID
+        default_account_id: Some("YOUR_ACCOUNT_ID".into()), // Profile → Account ID
         ..Default::default()
     })?;
 
@@ -161,7 +167,7 @@ async fn main() -> Result<()> {
 | --- | --- | --- |
 | API key id | **API** → create or view key | `api_key_id` |
 | API private key | Shown once when the key is created | `api_private_key` |
-| Account ID | **Profile** → **Account ID** (e.g. `RLxqJGUDg92`) | `default_account_id` |
+| Account ID | **Profile** → **Account ID** | `default_account_id` |
 
 Pass credentials on `Config` / `Client::new`. The SDK does not implicitly read
 environment variables unless you call `Client::from_env`.
@@ -194,7 +200,7 @@ use polyester::{Client, Config};
 let client = Client::new(Config {
     api_key_id: Some("ak_...".into()),
     api_private_key: Some("...".into()),
-    default_account_id: Some("RLxqJGUDg92".into()),
+    default_account_id: Some("YOUR_ACCOUNT_ID".into()),
     ..Default::default()
 })?;
 ```
@@ -270,7 +276,7 @@ use polyester::types::{Price, Quantity};
 client.wait_for_catalogs().await?;
 
 let mut params = OrdersService::create_params(
-    "BNB-USDT",
+    "BTC-USDT",
     CreateSide::Buy,
     CreateOrderType::Limit,
     Quantity::from_decimal_str("0.01", 8, None, None)?,
@@ -285,7 +291,7 @@ println!("{} {}", result.status, result.order_id);
 
 client
     .orders
-    .cancel_by_client_order_id("my-bot-001", Some("BNB-USDT"), None)
+    .cancel_by_client_order_id("my-bot-001", Some("BTC-USDT"), None)
     .await?;
 ```
 
@@ -307,14 +313,14 @@ latter with `Quantity::from_quote_decimal_str` / `from_quote_decimal` /
 ```rust,no_run
 let quote_scale = client
     .catalogs
-    .quote_quantity_scale_for_symbol("BNB-USDT")
+    .quote_quantity_scale_for_symbol("BTC-USDT")
     .expect("catalog hydrated with quote scale");
 params.quantity = None;
 params.max_quote_debit_scaled = Some(Quantity::from_quote_decimal_str(
     "25.00",
     quote_scale,
-    Some("BNB-USDT".into()),
-    client.catalogs.symbol_id_for_symbol("BNB-USDT"),
+    Some("BTC-USDT".into()),
+    client.catalogs.symbol_id_for_symbol("BTC-USDT"),
 )?);
 ```
 
@@ -354,7 +360,7 @@ use polyester::services::OrdersService;
 use polyester::types::{Price, Quantity};
 
 let params = OrdersService::create_params(
-    "BNB-USDT",
+    "BTC-USDT",
     CreateSide::Buy,
     CreateOrderType::Limit,
     Quantity::from_scaled(1_000_000, Some(8), Default::default(), None, None)?,
@@ -615,7 +621,7 @@ let trades = client.market_data.get_trades("BTC-USDT", Some(20)).await?;
 let _ = (candles, current, trades);
 
 client.wait_for_catalogs().await?;
-let mut sub = client.market_data.subscribe_trades("BNB-USDT").await?;
+let mut sub = client.market_data.subscribe_trades("BTC-USDT").await?;
 sub.set_on_error(|error| eprintln!("realtime interruption: {error}"));
 if let Some(trade) = sub.recv_result().await? {
     println!(
@@ -676,7 +682,7 @@ if let Some(policy) = api_policies.recv_result().await? {
 let mut book = client
     .orderbook
     .create_subscription(CreateSubscriptionOptions {
-        symbol: "ETH-USDT".into(),
+        symbol: "BTC-USDT".into(),
         depth: Some(50),
         ..Default::default()
     })
@@ -802,12 +808,6 @@ loop {
 
 `Client::get_flow_by_tx` also returns the complete requested page. Use
 `Client::list_flows_by_tx` when following pagination.
-
-## Examples
-
-Runnable cookbook examples live in the sibling repo
-[`polyester-examples-rust`](https://github.com/Fabric-Labs/polyester-examples-rust)
-(REST market data, realtime streams, decimal + scaled-int order paths, batch create, RSI bot).
 
 ## Changelog
 
