@@ -96,6 +96,9 @@ pub const INTERNAL_TRANSFER_SERVICE_CREATE_INTERNAL_TRANSFER_SPEC: ::connectrpc:
 #[allow(clippy::type_complexity)]
 pub trait InternalTransferService: Send + Sync + 'static {
     /// Create or return one accepted Trading to Trading transfer.
+    /// Root-owner same-owner transfers and root-owner transfers to explicitly
+    /// whitelisted destinations accept recent MFA; delegated and other
+    /// interactive transfers require fresh step-up.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

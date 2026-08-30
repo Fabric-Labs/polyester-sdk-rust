@@ -62,8 +62,11 @@ Full cross-language comparison:
 Create and update accept atomic `new_tags`: new tags are created and attached in
 the same protected request. When `tag_ids` is also selected on update, the
 result is those ids plus the new tags; otherwise currently attached tags are
-preserved and `new_tags` are appended. Twitter social-verification `start`
-forwards the handle as-is, including an optional leading `@`.
+preserved and `new_tags` are appended. `AddressBookViewInvalidation` includes
+`view_revision`. `get_view` is a proto pass-through (`ApiData.raw`); set
+`minimum_view_revision` on the request. Regenerated raw views include
+`view_revision`. Twitter social-verification `start` forwards the handle as-is,
+including an optional leading `@`.
 
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
 still applies. In particular, whiteboard/social-verification and some
@@ -371,6 +374,11 @@ balance (see below).
 
 ## User trade fees
 
+`trades.list(subaccount_id, limit)` remains. Use
+`trades.list_with(ListUserTradesOpts { ... })` for symbol filters, `page_token`,
+and `after_match_id`. When `after_match_id` is set, a resolved non-zero
+`symbol_id` is required (display `symbol` or numeric id).
+
 `UserTrade` fee fields are fixed **18-decimal** magnitudes of `fee_asset`
 (`fee_amount_e18`, `referral_share_amount_e18`), not catalog asset-scaled
 integers. Convert e18 → the fee asset's catalog scale before subtracting from a
@@ -419,7 +427,9 @@ Identify orders with `OrderKey::OrderId` or `OrderKey::ClientOrderId` (exclusive
 `ListOpenOrdersOpts.trigger_id` / `ListOrderHistoryOpts.trigger_id` filter
 child orders created by a standalone trigger (TWAP/ladder slices).
 Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
-(`fire_price_ticks` is optional on the wire).
+(`fire_price_ticks` is optional on the wire). Terminal `cancel_reason` /
+`failure_reason` on `Trigger` and `TriggerEvent` decode the proto
+`terminal_reason` oneof (empty when unset; unspecified enum → `""`).
 
 ## Qty / price rules
 

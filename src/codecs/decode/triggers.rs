@@ -17,7 +17,7 @@ use crate::proto::triggers::v1::{
     LadderDistribution, ListTriggerEventsResponse, ListTriggersResponse, ModifyTriggerResponse,
     PauseTriggerResponse, ResumeTriggerResponse, Trigger as ProtoTrigger,
     TriggerEvent as ProtoTriggerEvent, TriggerEventType, TriggerStatus, TriggerType,
-    conditional_child_execution, trigger, twap_trigger,
+    conditional_child_execution, trigger, trigger_event, twap_trigger,
 };
 use crate::types::Price;
 use buffa::Enumeration;
@@ -114,6 +114,52 @@ fn clone_timestamp(ts: Option<&Timestamp>) -> Option<Timestamp> {
         nanos: t.nanos,
         ..Default::default()
     })
+}
+
+fn enum_label<T: Enumeration>(value: &buffa::EnumValue<T>, unknown_prefix: &str) -> String {
+    match value.as_known() {
+        Some(known) if known.to_i32() == 0 => String::new(),
+        Some(known) => {
+            let name = known.proto_name();
+            for prefix in ["TRIGGER_CANCEL_REASON_", "TRIGGER_FAILURE_REASON_"] {
+                if let Some(rest) = name.strip_prefix(prefix) {
+                    return rest.to_ascii_lowercase();
+                }
+            }
+            name.to_ascii_lowercase()
+        }
+        None => format!("{unknown_prefix}({})", value.to_i32()),
+    }
+}
+
+fn trigger_terminal_reasons(reason: Option<&trigger::TerminalReason>) -> (String, String) {
+    match reason {
+        Some(trigger::TerminalReason::CancelReason(value)) => (
+            enum_label(value, "UNKNOWN_TRIGGER_CANCEL_REASON"),
+            String::new(),
+        ),
+        Some(trigger::TerminalReason::FailureReason(value)) => (
+            String::new(),
+            enum_label(value, "UNKNOWN_TRIGGER_FAILURE_REASON"),
+        ),
+        None => (String::new(), String::new()),
+    }
+}
+
+fn trigger_event_terminal_reasons(
+    reason: Option<&trigger_event::TerminalReason>,
+) -> (String, String) {
+    match reason {
+        Some(trigger_event::TerminalReason::CancelReason(value)) => (
+            enum_label(value, "UNKNOWN_TRIGGER_CANCEL_REASON"),
+            String::new(),
+        ),
+        Some(trigger_event::TerminalReason::FailureReason(value)) => (
+            String::new(),
+            enum_label(value, "UNKNOWN_TRIGGER_FAILURE_REASON"),
+        ),
+        None => (String::new(), String::new()),
+    }
 }
 
 fn trigger_details_from_proto(
@@ -341,6 +387,7 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         .trigger_price
         .clone()
         .or_else(|| trigger_price_from_details(&details));
+    let (cancel_reason, failure_reason) = trigger_terminal_reasons(msg.terminal_reason.as_ref());
     Trigger {
         trigger_id: format_uint64_id(msg.trigger_id),
         subaccount_id: format_uint64_id(msg.subaccount_id),
@@ -363,6 +410,8 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         updated_at: clone_timestamp(msg.updated_at.as_option()),
         armed_at: clone_timestamp(msg.armed_at.as_option()),
         completed_at: clone_timestamp(msg.completed_at.as_option()),
+        cancel_reason,
+        failure_reason,
         details,
     }
 }
@@ -475,6 +524,8 @@ pub fn trigger_event_type_from_label(label: &str) -> Result<TriggerEventType, St
 }
 
 pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> crate::errors::Result<TriggerEvent> {
+    let (cancel_reason, failure_reason) =
+        trigger_event_terminal_reasons(msg.terminal_reason.as_ref());
     Ok(TriggerEvent {
         trigger_id: format_uint64_id(msg.trigger_id),
         subaccount_id: if msg.subaccount_id == 0 {
@@ -495,7 +546,8 @@ pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> crate::errors::Resul
         fire_price: msg
             .fire_price_ticks
             .and_then(|ticks| decode_price_ticks(ticks, None)),
-        reason: msg.reason.clone(),
+        cancel_reason,
+        failure_reason,
     })
 }
 
@@ -518,8 +570,8 @@ mod tests {
     use crate::proto::orders::v1::Side;
     use crate::proto::triggers::v1::{
         ConditionalChildExecution, ConditionalTrigger, GetTriggerResponse,
-        ListTriggerEventsResponse, ListTriggersResponse, StopDetails, TriggerEventType,
-        TriggerLimitGtc, TriggerType,
+        ListTriggerEventsResponse, ListTriggersResponse, StopDetails, TriggerCancelReason,
+        TriggerEventType, TriggerFailureReason, TriggerLimitGtc, TriggerType,
     };
 
     #[test]
@@ -715,7 +767,9 @@ mod tests {
                 child_seq: 3,
                 child_order_id: 77,
                 fire_price_ticks: Some(100),
-                reason: "hit".into(),
+                terminal_reason: Some(trigger_event::TerminalReason::CancelReason(
+                    TriggerCancelReason::TRIGGER_CANCEL_REASON_USER_REQUEST.into(),
+                )),
                 ..Default::default()
             }],
             next_page_token: "evt-page-2".into(),
@@ -729,16 +783,60 @@ mod tests {
         let failed = trigger_event_from_proto(&ProtoTriggerEvent {
             trigger_id: 2,
             event_type: TriggerEventType::EventFailed.into(),
+            terminal_reason: Some(trigger_event::TerminalReason::FailureReason(
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_INSUFFICIENT_FUNDS.into(),
+            )),
             ..Default::default()
         })
         .unwrap();
         assert_eq!(failed.event_type, "failed");
+        assert_eq!(failed.failure_reason, "insufficient_funds");
+        assert!(failed.cancel_reason.is_empty());
         assert_eq!(event.trigger_type, "take_profit");
         assert_eq!(event.subaccount_id, format_uint64_id(9));
         assert_eq!(event.child_seq, 3);
         assert_eq!(event.child_order_id, format_uint64_id(77));
         assert_eq!(event.fire_price.as_ref().unwrap().as_ticks(), 100);
-        assert_eq!(event.reason, "hit");
+        assert_eq!(event.cancel_reason, "user_request");
+        assert!(event.failure_reason.is_empty());
+    }
+
+    #[test]
+    fn trigger_terminal_reasons_map_oneof_and_unspecified_is_empty() {
+        let canceled = trigger_from_proto(&ProtoTrigger {
+            trigger_id: 5,
+            terminal_reason: Some(trigger::TerminalReason::CancelReason(
+                TriggerCancelReason::TRIGGER_CANCEL_REASON_OCO.into(),
+            )),
+            ..Default::default()
+        });
+        assert_eq!(canceled.cancel_reason, "oco");
+        assert!(canceled.failure_reason.is_empty());
+
+        let unspecified = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 6,
+            terminal_reason: Some(trigger_event::TerminalReason::CancelReason(
+                TriggerCancelReason::TRIGGER_CANCEL_REASON_UNSPECIFIED.into(),
+            )),
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(unspecified.cancel_reason.is_empty());
+        assert!(unspecified.failure_reason.is_empty());
+
+        let unknown = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 7,
+            terminal_reason: Some(trigger_event::TerminalReason::FailureReason(
+                buffa::EnumValue::Unknown(321),
+            )),
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(unknown.cancel_reason.is_empty());
+        assert_eq!(
+            unknown.failure_reason,
+            "UNKNOWN_TRIGGER_FAILURE_REASON(321)"
+        );
     }
 
     #[test]

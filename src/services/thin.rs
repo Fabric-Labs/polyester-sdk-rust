@@ -639,6 +639,8 @@ impl AddressBookService {
         Ok(api_data_from_proto(&resp))
     }
 
+    /// Proto pass-through. Set `minimum_view_revision` on the request; the
+    /// regenerated `ApiData.raw` payload includes `view_revision`.
     pub async fn get_view(
         &self,
         req: crate::proto::auth::v1::GetAddressBookViewRequest,

@@ -65,3 +65,7 @@ reason = "Subaccount mutations and invite/member writes are JWT/session-only."
 [[allowlist]]
 procedure = "/auth.v1.SubaccountService/RespondSubaccountInvite"
 reason = "Subaccount mutations and invite/member writes are JWT/session-only."
+
+[[allowlist]]
+service = "auth.v1.SubaccountRoleService"
+reason = "Subaccount role catalog RPCs are JWT/session-only; outside the API-key SDK surface."

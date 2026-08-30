@@ -19,8 +19,8 @@ use crate::models::{
     BatchReplaceItem, BatchReplaceOrdersResult, BatchReplaceStatusResult, CancelAllAfterResult,
     CancelAllOpts, CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType,
     CreateSide, CreateTimeInForce, FeeAsset, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts,
-    ListOrderHistoryOpts, MaxSlippage, ModifyOrderParams, ModifyOrderResult, Order, OrderKey,
-    OrderMutationResult, OrderSelfTradePrevention, OrdersList, PreviewOrderParams,
+    ListOrderHistoryOpts, ListUserTradesOpts, MaxSlippage, ModifyOrderParams, ModifyOrderResult,
+    Order, OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, PreviewOrderParams,
     PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
@@ -1197,10 +1197,41 @@ impl TradesService {
         subaccount_id: Option<u64>,
         limit: Option<u32>,
     ) -> Result<UserTradesList> {
-        let req = GetUserTradesRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
-            // Option wire field: None omits; Some(0) means server default.
+        self.list_with(ListUserTradesOpts {
+            subaccount_id,
             limit,
+            ..Default::default()
+        })
+        .await
+    }
+
+    pub async fn list_with(&self, opts: ListUserTradesOpts) -> Result<UserTradesList> {
+        if opts.symbol_id.is_none()
+            && opts
+                .symbol
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+        {
+            self.ctx.wait_for_catalogs().await?;
+        }
+        let symbol_id = if opts.after_match_id.is_some() {
+            self.ctx.catalogs.required_symbol_id(
+                opts.symbol.as_deref(),
+                opts.symbol_id,
+                "after_match_id",
+            )?
+        } else {
+            self.ctx
+                .catalogs
+                .optional_symbol_id(opts.symbol.as_deref(), opts.symbol_id)?
+        };
+        let req = GetUserTradesRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
+            symbol_id,
+            after_match_id: opts.after_match_id,
+            // Option wire field: None omits; Some(0) means server default.
+            limit: opts.limit,
+            page_token: opts.page_token.unwrap_or_default(),
             ..Default::default()
         };
         let client = OrdersReadServiceClient::new(
