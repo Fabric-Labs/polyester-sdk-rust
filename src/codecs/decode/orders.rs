@@ -772,6 +772,24 @@ mod tests {
     }
 
     #[test]
+    fn order_orig_qty_is_current_accepted_total() {
+        let before = order_from_proto(&ProtoOrder {
+            orig_qty_scaled: 100,
+            leaves_qty_scaled: 100,
+            ..Default::default()
+        })
+        .unwrap();
+        let after = order_from_proto(&ProtoOrder {
+            orig_qty_scaled: 150,
+            leaves_qty_scaled: 150,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(before.orig_qty.as_ref().unwrap().as_scaled(), 100);
+        assert_eq!(after.orig_qty.as_ref().unwrap().as_scaled(), 150);
+    }
+
+    #[test]
     fn order_and_trade_decoders_accept_millisecond_shaped_ts_ns() {
         let order = order_from_proto(&ProtoOrder {
             created_ts_ns: 1_700_000_000_000,

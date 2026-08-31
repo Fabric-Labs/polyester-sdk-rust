@@ -12,6 +12,10 @@ pub struct Order {
     pub status: String,
     pub order_type: String,
     pub tif: String,
+    /// Current accepted total quantity. A successful modify updates this to
+    /// the amended total; retain the first submitted quantity separately if
+    /// needed. `cum_qty` is cumulative fills; `leaves_qty` is remaining
+    /// working quantity.
     pub orig_qty: Option<Quantity>,
     pub cum_qty: Option<Quantity>,
     pub leaves_qty: Option<Quantity>,

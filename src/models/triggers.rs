@@ -46,6 +46,10 @@ pub struct CreateTriggerParams {
 }
 
 /// Typed modify-trigger params.
+///
+/// Omitted `activation_price` / `max_slippage_*` preserve the current values.
+/// Send an explicit zero (`Price::from_ticks(0)` or `Some(0)`) to clear an
+/// existing activation price or maximum-slippage cap.
 #[derive(Debug, Clone)]
 pub struct ModifyTriggerParams {
     pub trigger_id: String,

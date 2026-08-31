@@ -369,6 +369,7 @@ let params = OrdersService::create_params(
 );
 let _ = client.orders.create(params).await?;
 // Reads expose the same types: order.price.as_ticks(), order.orig_qty.as_scaled()
+// orig_qty is the current accepted total and changes after a successful modify.
 ```
 
 Compatible values from fills/books can be passed back into writes when the
@@ -429,6 +430,12 @@ list). Response `status` uses the same labels (British spelling `cancelled`).
 `orders.get_with(GetOrderOpts { key: OrderKey::OrderId(id), include_attached_risk: true, subaccount_id: None, include_attached_risk_state: false })`
 returns policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
 Identify orders with `OrderKey::OrderId` or `OrderKey::ClientOrderId` (exclusive oneOf).
+
+When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
+`max_slippage_bps` to preserve the current values. Send an explicit zero
+(`Price::from_ticks(0)` or `Some(0)`) to clear an existing activation price
+or maximum-slippage cap. Create/modify `max_slippage_bps` must be 1–10000;
+modify still accepts `0` to clear.
 
 `ListOpenOrdersOpts.trigger_id` / `ListOrderHistoryOpts.trigger_id` filter
 child orders created by a standalone trigger (TWAP/ladder slices).
