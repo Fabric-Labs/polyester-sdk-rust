@@ -7703,7 +7703,8 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub limit_price_ticks: ::core::option::Option<i64>,
-    /// Updated activation price in quote units scaled by 1e6.
+    /// Updated activation price in quote units scaled by 1e6. Set to zero to
+    /// clear an existing activation price; omit to leave it unchanged.
     ///
     /// Field 14: `activation_price_ticks`
     #[serde(
@@ -21076,7 +21077,8 @@ pub mod __buffa {
             ///
             /// Field 11: `limit_price_ticks`
             pub limit_price_ticks: ::core::option::Option<i64>,
-            /// Updated activation price in quote units scaled by 1e6.
+            /// Updated activation price in quote units scaled by 1e6. Set to zero to
+            /// clear an existing activation price; omit to leave it unchanged.
             ///
             /// Field 14: `activation_price_ticks`
             pub activation_price_ticks: ::core::option::Option<i64>,
@@ -21646,7 +21648,8 @@ pub mod __buffa {
             pub fn limit_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().limit_price_ticks
             }
-            /// Updated activation price in quote units scaled by 1e6.
+            /// Updated activation price in quote units scaled by 1e6. Set to zero to
+            /// clear an existing activation price; omit to leave it unchanged.
             ///
             /// Field 14: `activation_price_ticks`
             #[must_use]
@@ -27620,7 +27623,8 @@ pub mod __buffa {
                     map.end()
                 }
             }
-            /// Optional price protection.
+            /// Optional price protection. Select either field with a zero value to clear
+            /// an existing max-slippage cap; omit the oneof to leave it unchanged.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
                 MaxSlippageTicks(i32),
