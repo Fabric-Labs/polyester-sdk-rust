@@ -70,6 +70,20 @@ pub struct HoldsList {
     pub holds: Vec<Hold>,
 }
 
+/// One display side of a ledger transfer.
+///
+/// `kind` is a snake_case label (`funding_account`, `trading_account`,
+/// `external_address`, `private_counterparty`, `fee_account`,
+/// `system_account`). `chain_id` is the Zipper `ChainConfig.chain_id` for
+/// external-address sides, not an EIP-155 or Polyester chain id.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransferSide {
+    pub kind: String,
+    pub account_id: String,
+    pub address: String,
+    pub chain_id: Option<u32>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LedgerTransfer {
     pub asset_id: u32,
@@ -79,6 +93,8 @@ pub struct LedgerTransfer {
     pub timestamp: i64,
     pub tx_id: String,
     pub is_debit: bool,
+    pub source: Option<TransferSide>,
+    pub destination: Option<TransferSide>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

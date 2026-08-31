@@ -3,11 +3,12 @@
 use crate::codecs::scalars::{format_uint64_id, u128_to_str};
 use crate::models::{
     AssetBalance, BalanceHistory, BalanceHistorySeries, BalancesList, Hold, HoldsList,
-    LedgerTransfer, TransfersList,
+    LedgerTransfer, TransferSide, TransfersList,
 };
 use crate::proto::ledger::read::v1::{
     AssetBalance as ProtoAssetBalance, BalanceRange, GetBalanceHistoryResponse,
     GetBalancesResponse, HoldRow, ListHoldsResponse, ListTransfersResponse, TransferRow,
+    TransferSide as ProtoTransferSide, TransferSideKind,
 };
 use crate::proto::polyester::r#type::v1::U128;
 
@@ -127,6 +128,37 @@ pub fn holds_list_from_proto(msg: &ListHoldsResponse) -> HoldsList {
     }
 }
 
+fn transfer_side_kind_label(kind: buffa::EnumValue<TransferSideKind>) -> String {
+    match kind.as_known() {
+        Some(TransferSideKind::FundingAccount) => "funding_account".to_owned(),
+        Some(TransferSideKind::TradingAccount) => "trading_account".to_owned(),
+        Some(TransferSideKind::ExternalAddress) => "external_address".to_owned(),
+        Some(TransferSideKind::PrivateCounterparty) => "private_counterparty".to_owned(),
+        Some(TransferSideKind::FeeAccount) => "fee_account".to_owned(),
+        Some(TransferSideKind::SystemAccount) => "system_account".to_owned(),
+        Some(TransferSideKind::TRANSFER_SIDE_KIND_UNSPECIFIED) | None => String::new(),
+    }
+}
+
+fn transfer_side_from_proto(msg: Option<&ProtoTransferSide>) -> Option<TransferSide> {
+    let msg = msg?;
+    let side = TransferSide {
+        kind: transfer_side_kind_label(msg.kind),
+        account_id: msg.account_id.map(format_uint64_id).unwrap_or_default(),
+        address: msg.address.clone(),
+        chain_id: msg.chain_id,
+    };
+    if side.kind.is_empty()
+        && side.account_id.is_empty()
+        && side.address.is_empty()
+        && side.chain_id.is_none()
+    {
+        None
+    } else {
+        Some(side)
+    }
+}
+
 pub fn transfer_row_from_proto(msg: &TransferRow) -> LedgerTransfer {
     LedgerTransfer {
         asset_id: msg.asset_id,
@@ -136,6 +168,8 @@ pub fn transfer_row_from_proto(msg: &TransferRow) -> LedgerTransfer {
         timestamp: msg.ts_us as i64,
         tx_id: msg.flow_id.clone(),
         is_debit: msg.is_debit,
+        source: transfer_side_from_proto(msg.source.as_option()),
+        destination: transfer_side_from_proto(msg.destination.as_option()),
     }
 }
 
@@ -353,6 +387,32 @@ mod tests {
         assert_eq!(transfer.transfer_type, 5);
         assert_eq!(transfer.tx_id, "flow-abc");
         assert!(transfer.is_debit);
+        assert!(transfer.source.is_none());
+        assert!(transfer.destination.is_none());
+
+        let mut external = row.clone();
+        external.source = ProtoTransferSide {
+            kind: TransferSideKind::FundingAccount.into(),
+            account_id: Some(11),
+            address: "0x1111111111111111111111111111111111111111".into(),
+            ..Default::default()
+        }
+        .into();
+        external.destination = ProtoTransferSide {
+            kind: TransferSideKind::ExternalAddress.into(),
+            address: "0x2222222222222222222222222222222222222222".into(),
+            chain_id: Some(8453),
+            ..Default::default()
+        }
+        .into();
+        let with_sides = transfer_row_from_proto(&external);
+        let source = with_sides.source.expect("source");
+        assert_eq!(source.kind, "funding_account");
+        assert_eq!(source.account_id, format_uint64_id(11));
+        assert_eq!(source.chain_id, None);
+        let destination = with_sides.destination.expect("destination");
+        assert_eq!(destination.kind, "external_address");
+        assert_eq!(destination.chain_id, Some(8453));
 
         let list = transfers_list_from_proto(&ListTransfersResponse {
             transfers: vec![TransferRow {

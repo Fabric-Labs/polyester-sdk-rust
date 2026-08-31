@@ -120,6 +120,14 @@ async fn order_round_trip_mutation() {
     .await;
     let order = detail.order.expect("detail.order");
     assert_eq!(order.client_order_id, client_order_id);
+    assert!(
+        order
+            .orig_qty
+            .as_ref()
+            .is_some_and(|qty| qty.as_scaled() > 0),
+        "expected current accepted orig_qty, got {:?}",
+        order.orig_qty
+    );
 
     // Cancel by client id first (Go parity); cancel_all is cleanup only.
     match client

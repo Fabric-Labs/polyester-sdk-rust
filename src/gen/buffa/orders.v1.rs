@@ -9667,7 +9667,9 @@ pub struct BatchCreateOrdersRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Top-level idempotency key for the batch request.
+    /// Required idempotency key for the entire ordered batch. Reusing it with the
+    /// same payload returns the original outcome; reusing it with another payload
+    /// is rejected.
     ///
     /// Field 2: `request_id`
     #[serde(
@@ -9678,7 +9680,8 @@ pub struct BatchCreateOrdersRequest {
     )]
     pub request_id: ::buffa::alloc::string::String,
     /// Orders to create (max 20). Every item uses the same OrderIntent contract as
-    /// single create.
+    /// single create, but client_order_id remains optional because request_id is
+    /// the idempotency boundary for the ordered batch.
     ///
     /// Field 3: `items`
     #[serde(
@@ -15571,8 +15574,8 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub post_only: bool,
-    /// Original order quantity scaled by the pair's base_quantity_scale from
-    /// GetSpotConfig for symbol_id.
+    /// Current accepted total order quantity, updated by successful modifies,
+    /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
     ///
     /// Field 12: `orig_qty_scaled`
     #[serde(
@@ -31256,12 +31259,15 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Top-level idempotency key for the batch request.
+            /// Required idempotency key for the entire ordered batch. Reusing it with the
+            /// same payload returns the original outcome; reusing it with another payload
+            /// is rejected.
             ///
             /// Field 2: `request_id`
             pub request_id: &'a str,
             /// Orders to create (max 20). Every item uses the same OrderIntent contract as
-            /// single create.
+            /// single create, but client_order_id remains optional because request_id is
+            /// the idempotency boundary for the ordered batch.
             ///
             /// Field 3: `items`
             pub items: ::buffa::RepeatedView<
@@ -31563,7 +31569,9 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Top-level idempotency key for the batch request.
+            /// Required idempotency key for the entire ordered batch. Reusing it with the
+            /// same payload returns the original outcome; reusing it with another payload
+            /// is rejected.
             ///
             /// Field 2: `request_id`
             #[must_use]
@@ -31571,7 +31579,8 @@ pub mod __buffa {
                 self.0.reborrow().request_id
             }
             /// Orders to create (max 20). Every item uses the same OrderIntent contract as
-            /// single create.
+            /// single create, but client_order_id remains optional because request_id is
+            /// the idempotency boundary for the ordered batch.
             ///
             /// Field 3: `items`
             #[must_use]
@@ -39499,8 +39508,8 @@ pub mod __buffa {
             ///
             /// Field 11: `post_only`
             pub post_only: bool,
-            /// Original order quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig for symbol_id.
+            /// Current accepted total order quantity, updated by successful modifies,
+            /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
             ///
             /// Field 12: `orig_qty_scaled`
             pub orig_qty_scaled: i64,
@@ -40598,8 +40607,8 @@ pub mod __buffa {
             pub fn post_only(&self) -> bool {
                 self.0.reborrow().post_only
             }
-            /// Original order quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig for symbol_id.
+            /// Current accepted total order quantity, updated by successful modifies,
+            /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
             ///
             /// Field 12: `orig_qty_scaled`
             #[must_use]

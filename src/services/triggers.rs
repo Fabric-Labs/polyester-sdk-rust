@@ -26,6 +26,20 @@ use crate::proto::triggers::v1::{
 };
 use crate::types::{resolve_price_ticks, resolve_qty_scaled};
 
+const MAX_SLIPPAGE_BPS: i32 = 10_000;
+
+fn validate_slippage_bps(bps: i32, allow_clear: bool) -> Result<()> {
+    if allow_clear && bps == 0 {
+        return Ok(());
+    }
+    if !(1..=MAX_SLIPPAGE_BPS).contains(&bps) {
+        return Err(Error::validation(
+            "max_slippage_bps must be between 1 and 10000",
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Clone)]
 pub struct TriggersService {
     ctx: ServiceContext,
@@ -236,9 +250,7 @@ impl TriggersService {
                     trailing.max_slippage =
                         Some(trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(ticks));
                 } else if let Some(bps) = params.max_slippage_bps {
-                    if bps <= 0 {
-                        return Err(Error::validation("max_slippage_bps must be positive"));
-                    }
+                    validate_slippage_bps(bps, false)?;
                     trailing.max_slippage =
                         Some(trailing_stop_trigger::MaxSlippage::MaxSlippageBps(bps));
                 }
@@ -452,14 +464,12 @@ impl TriggersService {
                 Some(modify_trigger_request::TrailingDistance::TrailingDistanceBps(bps));
         }
         if let Some(ticks) = params.max_slippage_ticks {
-            if ticks <= 0 {
-                return Err(Error::validation("max_slippage_ticks must be positive"));
+            if ticks < 0 {
+                return Err(Error::validation("max_slippage_ticks must be non-negative"));
             }
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageTicks(ticks));
         } else if let Some(bps) = params.max_slippage_bps {
-            if bps <= 0 {
-                return Err(Error::validation("max_slippage_bps must be positive"));
-            }
+            validate_slippage_bps(bps, true)?;
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageBps(bps));
         }
         Ok(req)
@@ -913,9 +923,73 @@ mod tests {
 
         let nonpositive = ModifyTriggerParams {
             trailing_distance_bps: Some(0),
-            ..params
+            ..params.clone()
         };
         assert!(client.triggers.encode_modify_params(&nonpositive).is_err());
+
+        let clear_slippage = ModifyTriggerParams {
+            max_slippage_bps: Some(0),
+            ..params.clone()
+        };
+        let cleared = client
+            .triggers
+            .encode_modify_params(&clear_slippage)
+            .unwrap();
+        assert_eq!(
+            cleared.max_slippage,
+            Some(modify_trigger_request::MaxSlippage::MaxSlippageBps(0))
+        );
+
+        let preserve = ModifyTriggerParams {
+            trailing_distance_bps: Some(50),
+            ..params
+        };
+        let preserved = client.triggers.encode_modify_params(&preserve).unwrap();
+        assert!(preserved.activation_price_ticks.is_none());
+        assert!(preserved.max_slippage.is_none());
+    }
+
+    fn trailing_create(max_slippage_bps: Option<i32>) -> CreateTriggerParams {
+        let mut params = create_params(
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+        params.trigger_type = CreateTriggerType::TrailingStop;
+        params.side = CreateSide::Sell;
+        params.trailing_distance_bps = Some(100);
+        params.trigger_price = None;
+        params.limit_price = None;
+        params.max_slippage_bps = max_slippage_bps;
+        params
+    }
+
+    #[test]
+    fn trigger_slippage_bps_cap() {
+        let client = client();
+        client
+            .triggers
+            .encode_create_params(&trailing_create(Some(10_000)))
+            .unwrap();
+        assert!(
+            client
+                .triggers
+                .encode_create_params(&trailing_create(Some(10_001)))
+                .is_err()
+        );
+
+        let modify_too_high = ModifyTriggerParams {
+            trigger_id: "1".into(),
+            symbol: Some("BTC-USDT".into()),
+            max_slippage_bps: Some(10_001),
+            ..modify_params(None, None, None)
+        };
+        assert!(
+            client
+                .triggers
+                .encode_modify_params(&modify_too_high)
+                .is_err()
+        );
     }
 
     #[test]

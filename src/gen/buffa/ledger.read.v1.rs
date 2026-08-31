@@ -3797,6 +3797,18 @@ pub struct TransferSide {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub address: ::buffa::alloc::string::String,
+    /// PolyChain-registered external network identifier for EXTERNAL_ADDRESS.
+    /// This matches chain.zipper.v1.ChainConfig.chain_id and is not the chain's
+    /// native identifier (for example, an EIP-155 id) or the Polyester chain id.
+    ///
+    /// Field 4: `chain_id`
+    #[serde(
+        rename = "chainId",
+        alias = "chain_id",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub chain_id: ::core::option::Option<u32>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3807,6 +3819,7 @@ impl ::core::fmt::Debug for TransferSide {
             .field("kind", &self.kind)
             .field("account_id", &self.account_id)
             .field("address", &self.address)
+            .field("chain_id", &self.chain_id)
             .finish()
     }
 }
@@ -3823,6 +3836,13 @@ impl TransferSide {
     ///Sets [`Self::account_id`] to `Some(value)`, consuming and returning `self`.
     pub fn with_account_id(mut self, value: u64) -> Self {
         self.account_id = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::chain_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_chain_id(mut self, value: u32) -> Self {
+        self.chain_id = Some(value);
         self
     }
 }
@@ -3856,6 +3876,9 @@ impl ::buffa::Message for TransferSide {
         if !self.address.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.address) as u32;
         }
+        if let Some(v) = self.chain_id {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3877,6 +3900,9 @@ impl ::buffa::Message for TransferSide {
         }
         if !self.address.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.address, buf);
+        }
+        if let Some(v) = self.chain_id {
+            ::buffa::types::put_uint32_field(4u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3914,6 +3940,15 @@ impl ::buffa::Message for TransferSide {
                 )?;
                 ::buffa::types::merge_string(&mut self.address, buf)?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.chain_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3925,6 +3960,7 @@ impl ::buffa::Message for TransferSide {
         self.kind = ::buffa::EnumValue::from(0);
         self.account_id = ::core::option::Option::None;
         self.address.clear();
+        self.chain_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -10439,6 +10475,12 @@ pub mod __buffa {
             ///
             /// Field 3: `address`
             pub address: &'a str,
+            /// PolyChain-registered external network identifier for EXTERNAL_ADDRESS.
+            /// This matches chain.zipper.v1.ChainConfig.chain_id and is not the chain's
+            /// native identifier (for example, an EIP-155 id) or the Polyester chain id.
+            ///
+            /// Field 4: `chain_id`
+            pub chain_id: ::core::option::Option<u32>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for TransferSideView<'a> {
@@ -10497,6 +10539,13 @@ pub mod __buffa {
                         )?;
                         view.address = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.chain_id = Some(::buffa::types::decode_uint32(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -10529,6 +10578,7 @@ pub mod __buffa {
                     kind: self.kind,
                     account_id: self.account_id,
                     address: self.address.to_string(),
+                    chain_id: self.chain_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -10557,6 +10607,9 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.address) as u32;
                 }
+                if let Some(v) = self.chain_id {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -10579,6 +10632,9 @@ pub mod __buffa {
                 }
                 if !self.address.is_empty() {
                     ::buffa::types::put_string_field(3u32, &self.address, buf);
+                }
+                if let Some(v) = self.chain_id {
+                    ::buffa::types::put_uint32_field(4u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -10613,6 +10669,13 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.address) {
                     __map.serialize_entry("address", self.address)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.chain_id {
+                    __map
+                        .serialize_entry(
+                            "chainId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -10732,6 +10795,15 @@ pub mod __buffa {
             #[must_use]
             pub fn address(&self) -> &'_ str {
                 self.0.reborrow().address
+            }
+            /// PolyChain-registered external network identifier for EXTERNAL_ADDRESS.
+            /// This matches chain.zipper.v1.ChainConfig.chain_id and is not the chain's
+            /// native identifier (for example, an EIP-155 id) or the Polyester chain id.
+            ///
+            /// Field 4: `chain_id`
+            #[must_use]
+            pub fn chain_id(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().chain_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<TransferSideView<'static>>>
