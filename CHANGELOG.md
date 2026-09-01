@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a41
+
+Package version: `0.1.0-alpha.41`. Git tag: `v0.1.0a41`.
+
 ### Breaking
 - `RiskLeg.trigger_price` and `TrailingStop.distance` are now optional so
   state-only attached-risk responses remain representable without fabricated
