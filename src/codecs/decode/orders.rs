@@ -11,22 +11,23 @@ use super::money::{
 use crate::codecs::scalars::{TsNs, format_uint64_id, u128_to_str};
 use crate::errors::{Error, Result};
 use crate::models::{
-    AttachedRisk, BatchCancelOrdersResult, BatchCancelResultItem, BatchCreateOrdersResult,
-    BatchCreateResultItem, BatchReplaceAdmissionItem, BatchReplaceOrdersResult,
-    BatchReplaceStatusItem, BatchReplaceStatusResult, CancelAllAfterResult, CancelAllOrdersResult,
-    CreateOrderType, GetOrderResult, MaxSlippage, ModifyOrderResult, Order, OrderErrorDetail,
-    OrderFieldViolation, OrderMutationResult, OrdersList, PreviewOrderResult, RiskLeg,
-    TrailingDistance, TrailingStop, UserTrade, UserTradesList,
+    AttachedRisk, AttachedRiskLegState, BatchCancelOrdersResult, BatchCancelResultItem,
+    BatchCreateOrdersResult, BatchCreateResultItem, BatchReplaceAdmissionItem,
+    BatchReplaceOrdersResult, BatchReplaceStatusItem, BatchReplaceStatusResult,
+    CancelAllAfterResult, CancelAllOrdersResult, CreateOrderType, GetOrderResult, MaxSlippage,
+    ModifyOrderResult, Order, OrderErrorDetail, OrderFieldViolation, OrderMutationResult,
+    OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, UserTrade,
+    UserTradesList,
 };
 use crate::proto::orders::v1::{
-    AttachedRisk as ProtoAttachedRisk, BatchCancelOrdersResponse, BatchCreateOrdersResponse,
-    BatchReplaceAdmissionStatus, BatchReplaceItemAdmissionStatus, BatchReplaceOrdersResponse,
-    BatchReplacePhase, CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse,
-    CreateOrderResponse, ErrorDetail, GetBatchReplaceStatusResponse, GetOpenOrdersResponse,
-    GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse,
-    Order as ProtoOrder, PreviewOrderResponse, RiskExecution, StopLossPolicy, TakeProfitPolicy,
-    TrailingStopPolicy, UserTrade as ProtoUserTrade, batch_create_result_item, risk_execution,
-    trailing_stop_policy,
+    AttachedRisk as ProtoAttachedRisk, AttachedRiskLegState as ProtoAttachedRiskLegState,
+    BatchCancelOrdersResponse, BatchCreateOrdersResponse, BatchReplaceAdmissionStatus,
+    BatchReplaceItemAdmissionStatus, BatchReplaceOrdersResponse, BatchReplacePhase,
+    CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse, CreateOrderResponse,
+    ErrorDetail, GetBatchReplaceStatusResponse, GetOpenOrdersResponse, GetOrderHistoryResponse,
+    GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse, Order as ProtoOrder,
+    PreviewOrderResponse, RiskExecution, TrailingStopPolicy, UserTrade as ProtoUserTrade,
+    batch_create_result_item, risk_execution, trailing_stop_policy,
 };
 use crate::proto::polyester::r#type::v1::U128;
 use buffa::Enumeration;
@@ -59,7 +60,9 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
         attached_risk: msg
             .attached_risk
             .as_option()
-            .and_then(attached_risk_from_proto),
+            .map(attached_risk_from_proto)
+            .transpose()?
+            .flatten(),
     })
 }
 
@@ -67,13 +70,18 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
 /// [`RiskLeg`]. The child execution determines `order_type`/`limit_price`.
 /// `trigger_price_source` is no longer part of the policy wire and is left empty.
 #[allow(deprecated)]
-fn decode_risk_leg(trigger_price_ticks: i64, child: Option<&RiskExecution>) -> Option<RiskLeg> {
-    if trigger_price_ticks == 0 {
-        return None;
+fn decode_risk_leg(
+    policy: Option<(i64, Option<&RiskExecution>)>,
+    state: Option<&ProtoAttachedRiskLegState>,
+) -> Result<Option<RiskLeg>> {
+    let policy = policy.filter(|(trigger_price_ticks, _)| *trigger_price_ticks > 0);
+    let state = state.filter(|state| attached_risk_state_is_meaningful(state));
+    if policy.is_none() && state.is_none() {
+        return Ok(None);
     }
     let mut order_type = None;
     let mut limit_price = None;
-    if let Some(child) = child {
+    if let Some(child) = policy.and_then(|(_, child)| child) {
         match child.execution.as_ref() {
             Some(risk_execution::Execution::MarketIoc(_)) => {
                 order_type = Some(CreateOrderType::Market);
@@ -85,36 +93,37 @@ fn decode_risk_leg(trigger_price_ticks: i64, child: Option<&RiskExecution>) -> O
             None => {}
         }
     }
-    Some(RiskLeg {
-        trigger_price: decode_price_ticks(trigger_price_ticks, None)?,
+    Ok(Some(RiskLeg {
+        trigger_price: policy.and_then(|(ticks, _)| decode_price_ticks(ticks, None)),
         trigger_price_source: None,
         order_type,
         limit_price,
-    })
-}
-
-fn risk_leg_from_take_profit(policy: &TakeProfitPolicy) -> Option<RiskLeg> {
-    decode_risk_leg(policy.trigger_price_ticks, policy.child.as_option())
-}
-
-fn risk_leg_from_stop_loss(policy: &StopLossPolicy) -> Option<RiskLeg> {
-    decode_risk_leg(policy.trigger_price_ticks, policy.child.as_option())
+        state: state.map(attached_risk_leg_state_from_proto).transpose()?,
+    }))
 }
 
 #[allow(deprecated)]
-fn trailing_stop_from_policy(policy: &TrailingStopPolicy) -> Option<TrailingStop> {
-    let distance = match policy.trailing_distance.as_ref() {
+fn decode_trailing_stop(
+    policy: Option<&TrailingStopPolicy>,
+    state: Option<&ProtoAttachedRiskLegState>,
+) -> Result<Option<TrailingStop>> {
+    let distance = match policy.and_then(|policy| policy.trailing_distance.as_ref()) {
         Some(trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(v)) if *v > 0 => {
-            TrailingDistance::Ticks(*v)
+            Some(TrailingDistance::Ticks(*v))
         }
         Some(trailing_stop_policy::TrailingDistance::TrailingDistanceBps(v)) if *v > 0 => {
-            TrailingDistance::Bps(*v)
+            Some(TrailingDistance::Bps(*v))
         }
-        // Missing or non-positive distance is not a usable trailing stop; omit
-        // rather than fabricating Ticks(0).
-        _ => return None,
+        // Missing/non-positive policy data remains absent. The wrapper and its
+        // runtime state are still representable.
+        _ => None,
     };
-    let max_slippage = match policy.max_slippage.as_ref() {
+    let policy = policy.filter(|_| distance.is_some());
+    let state = state.filter(|state| attached_risk_state_is_meaningful(state));
+    if policy.is_none() && state.is_none() {
+        return Ok(None);
+    }
+    let max_slippage = match policy.and_then(|policy| policy.max_slippage.as_ref()) {
         Some(trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)) if *v > 0 => {
             Some(MaxSlippage::Ticks(*v))
         }
@@ -123,47 +132,91 @@ fn trailing_stop_from_policy(policy: &TrailingStopPolicy) -> Option<TrailingStop
         }
         _ => None,
     };
-    Some(TrailingStop {
+    Ok(Some(TrailingStop {
         distance,
-        activation_price: if policy.activation_price_ticks > 0 {
-            decode_price_ticks(policy.activation_price_ticks, None)
-        } else {
-            None
-        },
+        activation_price: policy
+            .filter(|policy| policy.activation_price_ticks > 0)
+            .and_then(|policy| decode_price_ticks(policy.activation_price_ticks, None)),
         // `trigger_price_source`/`order_type` were dropped from the trailing-stop
         // policy wire; the child is an implicit market execution.
         trigger_price_source: None,
         order_type: None,
         max_slippage,
+        state: state.map(attached_risk_leg_state_from_proto).transpose()?,
+    }))
+}
+
+fn attached_risk_state_is_meaningful(msg: &ProtoAttachedRiskLegState) -> bool {
+    msg.status.to_i32() != 0
+        || msg.armed_ts_ns != 0
+        || msg.terminal_ts_ns != 0
+        || msg.trigger_id.is_some()
+        || msg.child_order_id.is_some()
+}
+
+fn attached_risk_leg_state_from_proto(
+    msg: &ProtoAttachedRiskLegState,
+) -> Result<AttachedRiskLegState> {
+    use crate::proto::orders::v1::attached_risk_leg_state::Status;
+
+    let status = match msg.status.as_known() {
+        Some(Status::StatusUnspecified) => String::new(),
+        Some(status) => status.proto_name().to_ascii_lowercase(),
+        None => format!("UNKNOWN({})", msg.status.to_i32()),
+    };
+    Ok(AttachedRiskLegState {
+        status,
+        armed_ts_ns: TsNs::from_wire(msg.armed_ts_ns, "AttachedRiskLegState.armed_ts_ns")?
+            .optional_string(),
+        terminal_ts_ns: TsNs::from_wire(msg.terminal_ts_ns, "AttachedRiskLegState.terminal_ts_ns")?
+            .optional_string(),
+        trigger_id: msg.trigger_id.map(format_uint64_id),
+        child_order_id: msg.child_order_id.map(format_uint64_id),
     })
 }
 
-fn attached_risk_from_proto(msg: &ProtoAttachedRisk) -> Option<AttachedRisk> {
+fn attached_risk_from_proto(msg: &ProtoAttachedRisk) -> Result<Option<AttachedRisk>> {
     let take_profit = msg
         .take_profit
         .as_option()
-        .and_then(|leg| leg.policy.as_option().and_then(risk_leg_from_take_profit));
+        .map(|leg| {
+            decode_risk_leg(
+                leg.policy
+                    .as_option()
+                    .map(|policy| (policy.trigger_price_ticks, policy.child.as_option())),
+                leg.state.as_option(),
+            )
+        })
+        .transpose()?
+        .flatten();
+    let stop_loss = msg
+        .stop_loss
+        .as_option()
+        .map(|leg| {
+            decode_risk_leg(
+                leg.policy
+                    .as_option()
+                    .map(|policy| (policy.trigger_price_ticks, policy.child.as_option())),
+                leg.state.as_option(),
+            )
+        })
+        .transpose()?
+        .flatten();
     let trailing_stop = msg
         .trailing_stop
         .as_option()
-        .and_then(|leg| leg.policy.as_option().and_then(trailing_stop_from_policy));
-    // Match TS: when trailing is present, stop-loss is suppressed.
-    let stop_loss = if trailing_stop.is_some() {
-        None
-    } else {
-        msg.stop_loss
-            .as_option()
-            .and_then(|leg| leg.policy.as_option().and_then(risk_leg_from_stop_loss))
-    };
+        .map(|leg| decode_trailing_stop(leg.policy.as_option(), leg.state.as_option()))
+        .transpose()?
+        .flatten();
     if take_profit.is_none() && stop_loss.is_none() && trailing_stop.is_none() {
-        return None;
+        return Ok(None);
     }
-    Some(AttachedRisk {
+    Ok(Some(AttachedRisk {
         take_profit,
         stop_loss,
         trailing_stop,
         oco: msg.oco,
-    })
+    }))
 }
 
 pub fn orders_list_from_open(msg: &GetOpenOrdersResponse) -> Result<OrdersList> {
@@ -305,7 +358,7 @@ fn order_error_detail_from_proto(msg: &ErrorDetail) -> OrderErrorDetail {
 /// Decode an admission-oriented preview response.
 ///
 /// Quote/fee scales are no longer required. `base_scale` is used only when
-/// `resolved_base_qty_scaled` is present so the public [`Quantity`] carries the
+/// `resolved_base_qty_scaled` is present so the public [`crate::Quantity`] carries the
 /// pair's catalog base scale.
 pub fn preview_order_from_proto(
     msg: &PreviewOrderResponse,
@@ -858,14 +911,14 @@ mod tests {
         let risk = order.attached_risk.expect("attached_risk");
         assert!(risk.oco);
         let tp = risk.take_profit.expect("take_profit");
-        assert_eq!(tp.trigger_price.as_ticks(), 6000);
+        assert_eq!(tp.trigger_price.as_ref().unwrap().as_ticks(), 6000);
         // trigger_price_source is no longer carried on the policy wire.
         assert!(tp.trigger_price_source.is_none());
         assert_eq!(tp.order_type, Some(CreateOrderType::Market));
         assert!(tp.limit_price.is_none());
         assert!(risk.stop_loss.is_none());
         let trailing = risk.trailing_stop.expect("trailing_stop");
-        assert_eq!(trailing.distance, TrailingDistance::Bps(25));
+        assert_eq!(trailing.distance, Some(TrailingDistance::Bps(25)));
         assert_eq!(
             trailing.max_slippage,
             Some(crate::models::MaxSlippage::Ticks(10))
@@ -874,7 +927,7 @@ mod tests {
         assert!(trailing.trigger_price_source.is_none());
         assert!(trailing.order_type.is_none());
 
-        // Missing trailing distance must omit the leg (not fabricate Ticks(0)).
+        // A policy-only trailing wrapper with no usable distance is omitted.
         let missing_distance = ProtoOrder {
             order_id: 3,
             symbol_id: 1,
@@ -936,9 +989,350 @@ mod tests {
             .expect("attached_risk")
             .stop_loss
             .expect("stop_loss");
-        assert_eq!(sl.trigger_price.as_ticks(), 4900);
+        assert_eq!(sl.trigger_price.as_ref().unwrap().as_ticks(), 4900);
         assert_eq!(sl.order_type, Some(CreateOrderType::Limit));
         assert_eq!(sl.limit_price.as_ref().unwrap().as_ticks(), 4890);
+    }
+
+    #[test]
+    fn unusable_policy_only_take_profit_is_omitted() {
+        use crate::proto::orders::v1::{AttachedRiskTakeProfit, TakeProfitPolicy};
+
+        let order = order_from_proto(&ProtoOrder {
+            order_id: 1,
+            attached_risk: ProtoAttachedRisk {
+                take_profit: AttachedRiskTakeProfit {
+                    policy: TakeProfitPolicy {
+                        trigger_price_ticks: 0,
+                        ..Default::default()
+                    }
+                    .into(),
+                    state: ProtoAttachedRiskLegState::default().into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(
+            order.attached_risk.is_none(),
+            "zero-price policy without state must not create attached_risk"
+        );
+    }
+
+    #[test]
+    fn unusable_policy_only_stop_loss_is_omitted() {
+        use crate::proto::orders::v1::{AttachedRiskStopLoss, StopLossPolicy};
+
+        let order = order_from_proto(&ProtoOrder {
+            order_id: 1,
+            attached_risk: ProtoAttachedRisk {
+                stop_loss: AttachedRiskStopLoss {
+                    policy: StopLossPolicy {
+                        trigger_price_ticks: 0,
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(
+            order.attached_risk.is_none(),
+            "zero-price policy without state must not create attached_risk"
+        );
+    }
+
+    #[test]
+    fn unusable_policy_only_trailing_distance_is_omitted() {
+        use crate::proto::orders::v1::{AttachedRiskTrailingStop, TrailingStopPolicy};
+
+        for distance in [
+            None,
+            Some(trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(0)),
+            Some(trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(-1)),
+            Some(trailing_stop_policy::TrailingDistance::TrailingDistanceBps(
+                0,
+            )),
+            Some(trailing_stop_policy::TrailingDistance::TrailingDistanceBps(
+                -1,
+            )),
+        ] {
+            let order = order_from_proto(&ProtoOrder {
+                order_id: 1,
+                attached_risk: ProtoAttachedRisk {
+                    trailing_stop: AttachedRiskTrailingStop {
+                        policy: TrailingStopPolicy {
+                            trailing_distance: distance,
+                            ..Default::default()
+                        }
+                        .into(),
+                        state: ProtoAttachedRiskLegState::default().into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            })
+            .unwrap();
+            assert!(
+                order.attached_risk.is_none(),
+                "missing/nonpositive distance without state must not create attached_risk"
+            );
+        }
+    }
+
+    #[test]
+    fn poly_4687_attached_risk_preserves_each_leg_runtime_state_and_legacy_stop() {
+        use crate::proto::orders::v1::attached_risk_leg_state::Status;
+        use crate::proto::orders::v1::{
+            AttachedRiskLegState, AttachedRiskStopLoss, AttachedRiskTakeProfit,
+            AttachedRiskTrailingStop, RiskExecution, StopLossPolicy, TakeProfitPolicy,
+            TrailingStopPolicy, risk_execution, trailing_stop_policy,
+        };
+
+        let state = |status, armed_ts_ns, terminal_ts_ns, trigger_id, child_order_id| {
+            AttachedRiskLegState {
+                status,
+                armed_ts_ns,
+                terminal_ts_ns,
+                trigger_id: Some(trigger_id),
+                child_order_id: Some(child_order_id),
+                ..Default::default()
+            }
+        };
+        let msg = ProtoOrder {
+            order_id: 1,
+            symbol_id: 1,
+            attached_risk: ProtoAttachedRisk {
+                take_profit: AttachedRiskTakeProfit {
+                    policy: TakeProfitPolicy {
+                        trigger_price_ticks: 6_000,
+                        child: RiskExecution {
+                            execution: Some(risk_execution::Execution::MarketIoc(Box::default())),
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    state: state(Status::Completed.into(), 101, 201, 41, 51).into(),
+                    ..Default::default()
+                }
+                .into(),
+                stop_loss: AttachedRiskStopLoss {
+                    policy: StopLossPolicy {
+                        trigger_price_ticks: 4_900,
+                        child: RiskExecution {
+                            execution: Some(risk_execution::Execution::MarketIoc(Box::default())),
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    state: state(Status::Armed.into(), 102, 0, 42, 52).into(),
+                    ..Default::default()
+                }
+                .into(),
+                // Legacy/malformed responses can contain both stop variants.
+                trailing_stop: AttachedRiskTrailingStop {
+                    policy: TrailingStopPolicy {
+                        trailing_distance: Some(
+                            trailing_stop_policy::TrailingDistance::TrailingDistanceBps(25),
+                        ),
+                        ..Default::default()
+                    }
+                    .into(),
+                    state: state(Status::Failed.into(), 103, 203, 43, 53).into(),
+                    ..Default::default()
+                }
+                .into(),
+                oco: true,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+
+        let risk = order_from_proto(&msg)
+            .unwrap()
+            .attached_risk
+            .expect("attached risk");
+        assert!(
+            risk.stop_loss.is_some(),
+            "a legacy stop-loss must not be hidden when trailing is also present"
+        );
+        assert!(risk.trailing_stop.is_some());
+        let rendered = format!("{risk:?}");
+        for expected in [
+            "status: \"completed\"",
+            "armed_ts_ns: \"101\"",
+            "terminal_ts_ns: \"201\"",
+            &format!("trigger_id: Some(\"{}\")", format_uint64_id(41)),
+            &format!("child_order_id: Some(\"{}\")", format_uint64_id(51)),
+            "status: \"armed\"",
+            "armed_ts_ns: \"102\"",
+            "status: \"failed\"",
+            "terminal_ts_ns: \"203\"",
+        ] {
+            assert!(
+                rendered.contains(expected),
+                "decoded attached-risk state missing {expected:?}: {rendered}"
+            );
+        }
+    }
+
+    fn state_only_fixture(
+        status: crate::proto::orders::v1::attached_risk_leg_state::Status,
+        trigger_id: u64,
+        child_order_id: u64,
+    ) -> crate::proto::orders::v1::AttachedRiskLegState {
+        crate::proto::orders::v1::AttachedRiskLegState {
+            status: status.into(),
+            armed_ts_ns: 1_700_000_000_000_000_101,
+            terminal_ts_ns: 1_700_000_000_000_000_202,
+            trigger_id: Some(trigger_id),
+            child_order_id: Some(child_order_id),
+            ..Default::default()
+        }
+    }
+
+    fn assert_state_only_fields(
+        state: &AttachedRiskLegState,
+        status: &str,
+        trigger_id: u64,
+        child_order_id: u64,
+    ) {
+        assert_eq!(state.status, status);
+        assert_eq!(state.armed_ts_ns, "1700000000000000101");
+        assert_eq!(state.terminal_ts_ns, "1700000000000000202");
+        assert_eq!(
+            state.trigger_id.as_deref(),
+            Some(format_uint64_id(trigger_id).as_str())
+        );
+        assert_eq!(
+            state.child_order_id.as_deref(),
+            Some(format_uint64_id(child_order_id).as_str())
+        );
+    }
+
+    #[test]
+    fn state_only_attached_risk_take_profit_remains_representable() {
+        use crate::proto::orders::v1::attached_risk_leg_state::Status;
+        use crate::proto::orders::v1::{AttachedRisk as ProtoRisk, AttachedRiskTakeProfit};
+
+        let order = order_from_proto(&ProtoOrder {
+            order_id: 1,
+            attached_risk: ProtoRisk {
+                take_profit: AttachedRiskTakeProfit {
+                    state: state_only_fixture(Status::Completed, 61, 71).into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        let risk = order
+            .attached_risk
+            .expect("state-only response must preserve attached_risk");
+        let leg = risk
+            .take_profit
+            .expect("state-only take-profit wrapper must remain visible");
+        assert!(leg.trigger_price.is_none());
+        assert!(leg.order_type.is_none());
+        assert!(leg.limit_price.is_none());
+        assert_state_only_fields(
+            leg.state.as_ref().expect("take-profit state"),
+            "completed",
+            61,
+            71,
+        );
+    }
+
+    #[test]
+    fn state_only_attached_risk_stop_loss_remains_representable() {
+        use crate::proto::orders::v1::attached_risk_leg_state::Status;
+        use crate::proto::orders::v1::{AttachedRisk as ProtoRisk, AttachedRiskStopLoss};
+
+        let order = order_from_proto(&ProtoOrder {
+            order_id: 1,
+            attached_risk: ProtoRisk {
+                stop_loss: AttachedRiskStopLoss {
+                    state: state_only_fixture(Status::Armed, 62, 72).into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        let risk = order
+            .attached_risk
+            .expect("state-only response must preserve attached_risk");
+        let leg = risk
+            .stop_loss
+            .expect("state-only stop-loss wrapper must remain visible");
+        assert!(leg.trigger_price.is_none());
+        assert!(leg.order_type.is_none());
+        assert!(leg.limit_price.is_none());
+        assert_state_only_fields(
+            leg.state.as_ref().expect("stop-loss state"),
+            "armed",
+            62,
+            72,
+        );
+    }
+
+    #[test]
+    fn state_only_attached_risk_trailing_remains_representable() {
+        use crate::proto::orders::v1::attached_risk_leg_state::Status;
+        use crate::proto::orders::v1::{AttachedRisk as ProtoRisk, AttachedRiskTrailingStop};
+
+        let order = order_from_proto(&ProtoOrder {
+            order_id: 1,
+            attached_risk: ProtoRisk {
+                trailing_stop: AttachedRiskTrailingStop {
+                    state: state_only_fixture(Status::Failed, 63, 73).into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        let risk = order
+            .attached_risk
+            .expect("state-only response must preserve attached_risk");
+        let leg = risk
+            .trailing_stop
+            .expect("state-only trailing wrapper must remain visible");
+        assert!(leg.distance.is_none());
+        assert!(leg.activation_price.is_none());
+        assert!(leg.max_slippage.is_none());
+        assert_state_only_fields(
+            leg.state.as_ref().expect("trailing state"),
+            "failed",
+            63,
+            73,
+        );
     }
 
     #[test]

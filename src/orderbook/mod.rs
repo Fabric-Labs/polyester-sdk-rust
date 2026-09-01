@@ -132,6 +132,11 @@ pub fn apply_delta(
     if seq_end < seq_start {
         return (current_seq, true);
     }
+    // A reset is a replacement state at seq_end, not permission to rewind a
+    // newer snapshot. Equal is an idempotent replay; older is stale.
+    if delta.reset && seq_end <= current_seq {
+        return (current_seq, false);
+    }
     let comparison_seq = if delta.reset { 0 } else { current_seq };
     if comparison_seq != 0 && seq_start > comparison_seq.saturating_add(1) {
         return (current_seq, true);
@@ -334,20 +339,59 @@ mod tests {
     }
 
     #[test]
-    fn apply_delta_reset_clears_book() {
+    fn poly_4688_stale_or_equal_reset_never_rewinds_or_mutates_newer_snapshot() {
         let mut bids = BookSide::from([(100, 5)]);
         let mut asks = BookSide::from([(200, 3)]);
-        let (seq, needs_refresh) = apply_delta(
-            &mut bids,
-            &mut asks,
-            9,
-            &delta(1, 2, &[(101, 4)], &[], true),
-        );
-        assert!(!needs_refresh);
-        assert_eq!(seq, 2);
-        assert_eq!(bids.get(&101), Some(&4));
-        assert!(!bids.contains_key(&100));
-        assert!(asks.is_empty());
+        for reset in [
+            delta(94, 95, &[(101, 4)], &[], true),
+            delta(99, 100, &[(102, 6)], &[], true),
+        ] {
+            let before_bids = bids.clone();
+            let before_asks = asks.clone();
+            let (seq, needs_refresh) = apply_delta(&mut bids, &mut asks, 100, &reset);
+            assert!(!needs_refresh);
+            assert_eq!(seq, 100);
+            assert_eq!(bids, before_bids);
+            assert_eq!(asks, before_asks);
+        }
+    }
+
+    #[test]
+    fn poly_4688_newer_and_overlapping_resets_replace_snapshot_atomically() {
+        for reset in [
+            delta(101, 102, &[(101, 4)], &[], true),
+            delta(99, 101, &[(102, 6)], &[], true),
+        ] {
+            let expected_seq = reset.book_seq_end;
+            let expected_bids = reset
+                .bids
+                .iter()
+                .map(|pair| (pair.price_ticks, pair.qty_scaled))
+                .collect::<BookSide>();
+            let mut bids = BookSide::from([(100, 5)]);
+            let mut asks = BookSide::from([(200, 3)]);
+            let (seq, needs_refresh) = apply_delta(&mut bids, &mut asks, 100, &reset);
+            assert!(!needs_refresh);
+            assert_eq!(seq, expected_seq);
+            assert_eq!(bids, expected_bids);
+            assert!(asks.is_empty());
+        }
+    }
+
+    #[test]
+    fn poly_4688_malformed_reset_requests_refresh_without_mutation() {
+        for reset in [
+            delta(102, 101, &[(101, 4)], &[], true),
+            delta(101, 102, &[(101, -1)], &[], true),
+        ] {
+            let mut bids = BookSide::from([(100, 5)]);
+            let mut asks = BookSide::from([(200, 3)]);
+            let (seq, needs_refresh) = apply_delta(&mut bids, &mut asks, 100, &reset);
+            assert!(needs_refresh);
+            assert_eq!(seq, 100);
+            assert_eq!(bids, BookSide::from([(100, 5)]));
+            assert_eq!(asks, BookSide::from([(200, 3)]));
+        }
     }
 
     #[test]

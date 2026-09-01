@@ -39,7 +39,19 @@ use crate::types::{
     Price, Quantity, resolve_price_ticks, resolve_qty_scaled, resolve_quote_qty_scaled,
 };
 use rand_core::{OsRng, RngCore};
+use std::collections::HashSet;
 use std::time::Duration;
+
+const MAX_BPS: i32 = 10_000;
+
+fn validate_bps(field: &str, value: i32) -> Result<()> {
+    if !(1..=MAX_BPS).contains(&value) {
+        return Err(Error::validation(format!(
+            "{field} must be between 1 and {MAX_BPS}"
+        )));
+    }
+    Ok(())
+}
 
 #[derive(Clone)]
 pub struct OrdersService {
@@ -329,6 +341,21 @@ impl OrdersService {
         Ok(())
     }
 
+    fn validate_batch_client_order_ids(items: &[CreateOrderParams]) -> Result<()> {
+        let mut seen = HashSet::with_capacity(items.len());
+        for item in items {
+            let Some(id) = optional_client_order_id(item.client_order_id.as_deref())? else {
+                continue;
+            };
+            if !seen.insert(id.clone()) {
+                return Err(Error::validation(format!(
+                    "duplicate client_order_id {id:?} in batch_create"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     fn order_intent_from_params(&self, params: &CreateOrderParams) -> Result<OrderIntent> {
         let symbol_id = self.ctx.catalogs.require_symbol_id(&params.symbol)?;
         let mut intent = OrderIntent {
@@ -407,7 +434,8 @@ impl OrdersService {
                     Some(MaxSlippage::Ticks(value)) if value > 0 => {
                         Some(market_ioc::MaxSlippage::MaxSlippageTicks(value))
                     }
-                    Some(MaxSlippage::Bps(value)) if value > 0 => {
+                    Some(MaxSlippage::Bps(value)) => {
+                        validate_bps("market_max_slippage_bps", value)?;
                         Some(market_ioc::MaxSlippage::MaxSlippageBps(value))
                     }
                     Some(_) => {
@@ -510,7 +538,12 @@ impl OrdersService {
 
     fn encode_take_profit(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<TakeProfitPolicy> {
         let mut policy = TakeProfitPolicy {
-            trigger_price_ticks: self.resolve_constraint_price(&leg.trigger_price, symbol)?,
+            trigger_price_ticks: self.resolve_constraint_price(
+                leg.trigger_price.as_ref().ok_or_else(|| {
+                    Error::validation("attached take_profit requires trigger_price")
+                })?,
+                symbol,
+            )?,
             ..Default::default()
         };
         *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol)?;
@@ -519,7 +552,12 @@ impl OrdersService {
 
     fn encode_stop_loss(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<StopLossPolicy> {
         let mut policy = StopLossPolicy {
-            trigger_price_ticks: self.resolve_constraint_price(&leg.trigger_price, symbol)?,
+            trigger_price_ticks: self.resolve_constraint_price(
+                leg.trigger_price.as_ref().ok_or_else(|| {
+                    Error::validation("attached stop_loss requires trigger_price")
+                })?,
+                symbol,
+            )?,
             ..Default::default()
         };
         *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol)?;
@@ -548,7 +586,11 @@ impl OrdersService {
         if let Some(activation) = stop.activation_price.as_ref() {
             proto.activation_price_ticks = self.resolve_constraint_price(activation, symbol)?;
         }
-        proto.trailing_distance = Some(match stop.distance {
+        proto.trailing_distance = Some(match stop.distance.ok_or_else(|| {
+            Error::validation(
+                "attached trailing_stop requires trailing_distance_ticks or trailing_distance_bps",
+            )
+        })? {
             TrailingDistance::Ticks(v) => {
                 if v <= 0 {
                     return Err(Error::validation(
@@ -558,9 +600,7 @@ impl OrdersService {
                 trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(v)
             }
             TrailingDistance::Bps(v) => {
-                if v <= 0 {
-                    return Err(Error::validation("trailing_distance_bps must be positive"));
-                }
+                validate_bps("trailing_distance_bps", v)?;
                 trailing_stop_policy::TrailingDistance::TrailingDistanceBps(v)
             }
         });
@@ -573,9 +613,7 @@ impl OrdersService {
                     trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)
                 }
                 MaxSlippage::Bps(v) => {
-                    if v <= 0 {
-                        return Err(Error::validation("max_slippage_bps must be positive"));
-                    }
+                    validate_bps("max_slippage_bps", v)?;
                     trailing_stop_policy::MaxSlippage::MaxSlippageBps(v)
                 }
             });
@@ -596,6 +634,14 @@ impl OrdersService {
         if risk.take_profit.is_none() && risk.stop_loss.is_none() && risk.trailing_stop.is_none() {
             return Err(Error::validation(
                 "attached_risk requires take_profit and/or a stop leg",
+            ));
+        }
+        if risk.oco
+            && (risk.take_profit.is_none()
+                || (risk.stop_loss.is_some() == risk.trailing_stop.is_some()))
+        {
+            return Err(Error::validation(
+                "attached_risk oco=true requires take_profit plus exactly one of stop_loss or trailing_stop",
             ));
         }
         let mut proto = RiskPolicy {
@@ -784,6 +830,7 @@ impl OrdersService {
         request_id: Option<String>,
     ) -> Result<BatchCreateOrdersResult> {
         Self::validate_batch_size("batch_create", items.len())?;
+        Self::validate_batch_client_order_ids(&items)?;
         self.ctx.wait_for_catalogs().await?;
         let mut encoded = Vec::with_capacity(items.len());
         for item in &items {
@@ -1048,7 +1095,7 @@ impl OrdersService {
     /// Cancels all matching open orders for the account scope (optional symbol / dry-run).
     ///
     /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
-    /// non-empty value via [`cancel_all_with`] when retrying the same logical bulk cancellation.
+    /// non-empty value via [`Self::cancel_all_with`] when retrying the same logical bulk cancellation.
     pub async fn cancel_all(
         &self,
         symbol: Option<&str>,
@@ -1441,18 +1488,24 @@ mod tests {
         let client = client();
         let risk = AttachedRisk {
             take_profit: Some(RiskLeg {
-                trigger_price: Price::from_ticks(51_000_000_000, Some("BTC-USDT".into())).unwrap(),
+                trigger_price: Some(
+                    Price::from_ticks(51_000_000_000, Some("BTC-USDT".into())).unwrap(),
+                ),
                 trigger_price_source: None,
                 order_type: Some(CreateOrderType::Market),
                 limit_price: None,
+                state: None,
             }),
             stop_loss: Some(RiskLeg {
-                trigger_price: Price::from_ticks(49_000_000_000, Some("BTC-USDT".into())).unwrap(),
+                trigger_price: Some(
+                    Price::from_ticks(49_000_000_000, Some("BTC-USDT".into())).unwrap(),
+                ),
                 trigger_price_source: None,
                 order_type: Some(CreateOrderType::Limit),
                 limit_price: Some(
                     Price::from_ticks(48_900_000_000, Some("BTC-USDT".into())).unwrap(),
                 ),
+                state: None,
             }),
             trailing_stop: None,
             oco: true,
@@ -1520,11 +1573,12 @@ mod tests {
         let mut zero_distance = base.clone();
         zero_distance.attached_risk = Some(AttachedRisk {
             trailing_stop: Some(TrailingStop {
-                distance: TrailingDistance::Ticks(0),
+                distance: Some(TrailingDistance::Ticks(0)),
                 activation_price: None,
                 trigger_price_source: None,
                 order_type: None,
                 max_slippage: None,
+                state: None,
             }),
             ..Default::default()
         });
@@ -1540,11 +1594,12 @@ mod tests {
         let mut zero_slip = base.clone();
         zero_slip.attached_risk = Some(AttachedRisk {
             trailing_stop: Some(TrailingStop {
-                distance: TrailingDistance::Bps(25),
+                distance: Some(TrailingDistance::Bps(25)),
                 activation_price: None,
                 trigger_price_source: None,
                 order_type: None,
                 max_slippage: Some(MaxSlippage::Ticks(0)),
+                state: None,
             }),
             ..Default::default()
         });
@@ -1557,11 +1612,12 @@ mod tests {
         let mut with_source = base.clone();
         with_source.attached_risk = Some(AttachedRisk {
             trailing_stop: Some(TrailingStop {
-                distance: TrailingDistance::Bps(25),
+                distance: Some(TrailingDistance::Bps(25)),
                 activation_price: None,
                 trigger_price_source: Some(TriggerPriceSourceKind::IndexPrice),
                 order_type: None,
                 max_slippage: None,
+                state: None,
             }),
             ..Default::default()
         });
@@ -1574,11 +1630,12 @@ mod tests {
         let mut with_order_type = base;
         with_order_type.attached_risk = Some(AttachedRisk {
             trailing_stop: Some(TrailingStop {
-                distance: TrailingDistance::Bps(25),
+                distance: Some(TrailingDistance::Bps(25)),
                 activation_price: None,
                 trigger_price_source: None,
                 order_type: Some(CreateOrderType::Limit),
                 max_slippage: None,
+                state: None,
             }),
             ..Default::default()
         });
@@ -1587,6 +1644,291 @@ mod tests {
             .encode_create_params(&with_order_type)
             .unwrap_err();
         assert!(err.to_string().contains("always market"));
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn poly_4684_slippage_bps_boundaries_for_market_and_attached_trailing() {
+        let client = client();
+        let mut market = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        market.order_type = CreateOrderType::Market;
+        market.price = None;
+        market.post_only = None;
+
+        for bps in [1, 10_000] {
+            market.market_max_slippage = Some(MaxSlippage::Bps(bps));
+            assert!(
+                client.orders.encode_create_params(&market).is_ok(),
+                "market max_slippage_bps={bps} must be accepted"
+            );
+        }
+        for bps in [0, 10_001] {
+            market.market_max_slippage = Some(MaxSlippage::Bps(bps));
+            assert!(
+                client.orders.encode_create_params(&market).is_err(),
+                "market max_slippage_bps={bps} must be rejected"
+            );
+        }
+
+        let mut attached = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        for bps in [1, 10_000] {
+            attached.attached_risk = Some(AttachedRisk {
+                trailing_stop: Some(TrailingStop {
+                    distance: Some(TrailingDistance::Bps(25)),
+                    activation_price: None,
+                    trigger_price_source: None,
+                    order_type: None,
+                    max_slippage: Some(MaxSlippage::Bps(bps)),
+                    state: None,
+                }),
+                ..Default::default()
+            });
+            assert!(
+                client.orders.encode_create_params(&attached).is_ok(),
+                "attached max_slippage_bps={bps} must be accepted"
+            );
+        }
+        for bps in [0, 10_001] {
+            attached.attached_risk = Some(AttachedRisk {
+                trailing_stop: Some(TrailingStop {
+                    distance: Some(TrailingDistance::Bps(25)),
+                    activation_price: None,
+                    trigger_price_source: None,
+                    order_type: None,
+                    max_slippage: Some(MaxSlippage::Bps(bps)),
+                    state: None,
+                }),
+                ..Default::default()
+            });
+            assert!(
+                client.orders.encode_create_params(&attached).is_err(),
+                "attached max_slippage_bps={bps} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn poly_4689_attached_trailing_distance_bps_boundaries() {
+        let client = client();
+        let mut params = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        for bps in [1, 10_000] {
+            params.attached_risk = Some(AttachedRisk {
+                trailing_stop: Some(TrailingStop {
+                    distance: Some(TrailingDistance::Bps(bps)),
+                    activation_price: None,
+                    trigger_price_source: None,
+                    order_type: None,
+                    max_slippage: None,
+                    state: None,
+                }),
+                ..Default::default()
+            });
+            assert!(
+                client.orders.encode_create_params(&params).is_ok(),
+                "attached trailing_distance_bps={bps} must be accepted"
+            );
+        }
+        for bps in [0, 10_001] {
+            params.attached_risk = Some(AttachedRisk {
+                trailing_stop: Some(TrailingStop {
+                    distance: Some(TrailingDistance::Bps(bps)),
+                    activation_price: None,
+                    trigger_price_source: None,
+                    order_type: None,
+                    max_slippage: None,
+                    state: None,
+                }),
+                ..Default::default()
+            });
+            assert!(
+                client.orders.encode_create_params(&params).is_err(),
+                "attached trailing_distance_bps={bps} must be rejected"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn poly_4686_batch_create_rejects_duplicate_non_empty_client_order_ids_locally() {
+        let client = client();
+        client
+            .catalogs
+            .hydrate_zipper_config_json(json!({
+                "assets": [{
+                    "asset": "USDT",
+                    "ledger_id": 99,
+                    "quantity_scale": 6
+                }]
+            }))
+            .expect("hydrate zipper");
+        let item = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        let mut distinct = item.clone();
+        distinct.client_order_id = Some("order-distinct".into());
+        assert!(OrdersService::validate_batch_client_order_ids(&[item.clone(), distinct]).is_ok());
+        let err = client
+            .orders
+            .batch_create(vec![item.clone(), item], None, Some("batch-dup".into()))
+            .await
+            .expect_err("duplicate client_order_id must fail before transport");
+        assert!(
+            matches!(err, Error::Validation(_)),
+            "unexpected error: {err}"
+        );
+        assert!(
+            err.to_string().contains("duplicate client_order_id"),
+            "{err}"
+        );
+
+        let mut empty = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        empty.client_order_id = None;
+        let mut blank = empty.clone();
+        blank.client_order_id = Some(" ".into());
+        let err = client
+            .orders
+            .batch_create(vec![empty, blank], None, Some("batch-empty".into()))
+            .await
+            .expect_err("missing credentials should be reached for allowed empty ids");
+        assert!(matches!(err, Error::Auth(_)), "unexpected error: {err}");
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn poly_4690_oco_requires_take_profit_and_exactly_one_stop_leg() {
+        let client = client();
+        let base = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        let tp = RiskLeg {
+            trigger_price: Some(Price::from_ticks(51_000_000_000, None).unwrap()),
+            trigger_price_source: None,
+            order_type: Some(CreateOrderType::Market),
+            limit_price: None,
+            state: None,
+        };
+        let sl = RiskLeg {
+            trigger_price: Some(Price::from_ticks(49_000_000_000, None).unwrap()),
+            trigger_price_source: None,
+            order_type: Some(CreateOrderType::Market),
+            limit_price: None,
+            state: None,
+        };
+        let trailing = TrailingStop {
+            distance: Some(TrailingDistance::Bps(25)),
+            activation_price: None,
+            trigger_price_source: None,
+            order_type: None,
+            max_slippage: None,
+            state: None,
+        };
+
+        for risk in [
+            AttachedRisk {
+                take_profit: Some(tp.clone()),
+                oco: true,
+                ..Default::default()
+            },
+            AttachedRisk {
+                stop_loss: Some(sl.clone()),
+                oco: true,
+                ..Default::default()
+            },
+            AttachedRisk {
+                trailing_stop: Some(trailing.clone()),
+                oco: true,
+                ..Default::default()
+            },
+        ] {
+            let mut params = base.clone();
+            params.attached_risk = Some(risk);
+            let err = client.orders.encode_create_params(&params).unwrap_err();
+            assert!(err.to_string().contains("oco=true"), "{err}");
+        }
+
+        for risk in [
+            AttachedRisk {
+                take_profit: Some(tp.clone()),
+                stop_loss: Some(sl),
+                oco: true,
+                ..Default::default()
+            },
+            AttachedRisk {
+                take_profit: Some(tp),
+                trailing_stop: Some(trailing),
+                oco: true,
+                ..Default::default()
+            },
+        ] {
+            let mut params = base.clone();
+            params.attached_risk = Some(risk);
+            let wire = client.orders.encode_create_params(&params).unwrap();
+            assert!(
+                wire.order
+                    .as_option()
+                    .unwrap()
+                    .attached_risk
+                    .as_option()
+                    .unwrap()
+                    .oco
+            );
+        }
     }
 
     #[test]

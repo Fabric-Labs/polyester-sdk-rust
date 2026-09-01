@@ -231,6 +231,10 @@ the primary integration pattern.
 let client = polyester::Client::from_env()?;
 ```
 
+`api_url` / `POLYESTER_API_URL` must be an HTTP(S) base URL without a query
+string or fragment. Plain HTTP remains supported for localhost and test
+servers.
+
 ## Catalog readiness
 
 `Config::hydrate_catalogs` defaults to `true`. When constructed inside a Tokio
@@ -302,7 +306,8 @@ without it you cannot safely tell whether the first attempt admitted the order.
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
 `-`. Batch create accepts at most 20 orders. Treat a cancel response as an
 admission acknowledgement and reconcile with `list_open` before releasing local
-state.
+state. Within one batch, non-empty client order IDs must be unique; omitted and
+blank IDs remain allowed.
 
 Create sizing is explicit: set exactly one of base `quantity` or
 `max_quote_debit_scaled` (a typed hard all-in quote-debit budget). Construct the
@@ -430,12 +435,24 @@ list). Response `status` uses the same labels (British spelling `cancelled`).
 `orders.get_with(GetOrderOpts { key: OrderKey::OrderId(id), include_attached_risk: true, subaccount_id: None, include_attached_risk_state: false })`
 returns policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
 Identify orders with `OrderKey::OrderId` or `OrderKey::ClientOrderId` (exclusive oneOf).
+Set `include_attached_risk_state: true` to populate each decoded leg's optional
+`state` (`status`, `armed_ts_ns`, `terminal_ts_ns`, `trigger_id`, and
+`child_order_id`). Public trigger/order IDs use the SDK's normal base58 string
+format, and nanosecond timestamps use decimal strings. State-only responses
+remain visible even when policy fields were not requested: `RiskLeg.trigger_price`
+and `TrailingStop.distance` are then `None`, never fabricated zero values.
+Policy-only wrappers without a positive TP/SL trigger price or positive
+trailing distance are omitted when they have no meaningful runtime state.
+Order writes still require those policy fields and reject `None`.
+For writes, `oco=true` requires take-profit plus exactly one stop leg
+(`stop_loss` or `trailing_stop`); one-leg OCO policies are rejected locally.
 
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 `max_slippage_bps` to preserve the current values. Send an explicit zero
 (`Price::from_ticks(0)` or `Some(0)`) to clear an existing activation price
 or maximum-slippage cap. Create/modify `max_slippage_bps` must be 1–10000;
 modify still accepts `0` to clear.
+Standalone and attached `trailing_distance_bps` also require 1–10000.
 
 `ListOpenOrdersOpts.trigger_id` / `ListOrderHistoryOpts.trigger_id` filter
 child orders created by a standalone trigger (TWAP/ladder slices).
