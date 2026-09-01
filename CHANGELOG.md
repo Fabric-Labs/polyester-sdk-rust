@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Breaking
+- `RiskLeg.trigger_price` and `TrailingStop.distance` are now optional so
+  state-only attached-risk responses remain representable without fabricated
+  policy values. Both fields remain required for writes. `RiskLeg` and
+  `TrailingStop` also gain an optional `state` field; exhaustive struct
+  literals must initialize it (normally `None` for writes).
+
+### Added
+- Attached-risk take-profit, stop-loss, and trailing-stop legs expose typed
+  runtime state (`status`, armed/terminal nanosecond timestamps, trigger ID,
+  and child order ID). A decoded leg is retained when it has usable policy data
+  or meaningful runtime state, including state-only responses. Empty wrappers,
+  zero-price TP/SL policy, and missing/nonpositive trailing distance are
+  omitted when no state exists. Legacy responses containing both stop-loss and
+  trailing legs preserve both instead of hiding stop-loss.
+
+### Fixed
+- Market-IOC and attached trailing-stop `max_slippage_bps`, plus standalone and
+  attached `trailing_distance_bps`, enforce the inclusive 1–10000 range.
+  Standalone trigger modify retains `max_slippage_bps=0` as its explicit clear
+  sentinel.
+- Batch create rejects duplicate non-empty `client_order_id` values locally;
+  omitted and blank IDs remain allowed.
+- Stale or equal order-book reset deltas cannot clear or rewind a newer
+  snapshot. Newer/overlapping resets still replace the book, while malformed
+  resets request refresh without mutation.
+- `oco=true` attached risk requires take-profit plus exactly one stop-loss or
+  trailing-stop leg; invalid one-leg policies fail instead of being downgraded.
+- API base URLs containing a query string or fragment fail during client
+  construction, before Connect procedure joining or request signing.
+
 ## 0.1.0a40
 
 Package version: `0.1.0-alpha.40`. Git tag: `v0.1.0a40`.

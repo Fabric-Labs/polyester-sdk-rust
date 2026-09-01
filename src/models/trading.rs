@@ -191,7 +191,9 @@ pub enum TriggerPriceSourceKind {
 /// Take-profit or stop-loss leg (trigger + optional LIMIT child).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RiskLeg {
-    pub trigger_price: Price,
+    /// Trigger price when policy data was requested and supplied. State-only
+    /// order reads leave this absent rather than fabricating a zero price.
+    pub trigger_price: Option<Price>,
     /// Deprecated for attached risk: any supplied value is rejected because
     /// the wire contract always evaluates against last trade.
     #[deprecated(
@@ -200,6 +202,9 @@ pub struct RiskLeg {
     pub trigger_price_source: Option<TriggerPriceSourceKind>,
     pub order_type: Option<CreateOrderType>,
     pub limit_price: Option<Price>,
+    /// Runtime linkage/state returned when attached-risk state is requested.
+    /// This field is ignored when the leg is used in an order write.
+    pub state: Option<AttachedRiskLegState>,
 }
 
 /// Trailing-stop distance (exactly one of ticks or bps).
@@ -225,7 +230,9 @@ pub enum MaxSlippage {
 /// [`order_type`](Self::order_type) is rejected.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrailingStop {
-    pub distance: TrailingDistance,
+    /// Trailing distance when policy data was requested and supplied.
+    /// State-only order reads leave this absent.
+    pub distance: Option<TrailingDistance>,
     pub activation_price: Option<Price>,
     /// Deprecated for attached trailing: any supplied value is rejected because
     /// the wire contract always evaluates against last trade.
@@ -240,6 +247,24 @@ pub struct TrailingStop {
     )]
     pub order_type: Option<CreateOrderType>,
     pub max_slippage: Option<MaxSlippage>,
+    /// Runtime linkage/state returned when attached-risk state is requested.
+    /// This field is ignored when the leg is used in an order write.
+    pub state: Option<AttachedRiskLegState>,
+}
+
+/// Runtime lifecycle and child linkage for one attached-risk leg.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttachedRiskLegState {
+    /// Lowercase lifecycle label, or `UNKNOWN(<number>)` for a future enum.
+    pub status: String,
+    /// Nanoseconds since epoch as a decimal string; empty when not armed.
+    pub armed_ts_ns: String,
+    /// Nanoseconds since epoch as a decimal string; empty when not terminal.
+    pub terminal_ts_ns: String,
+    /// Public base58 trigger ID when supplied by the host.
+    pub trigger_id: Option<String>,
+    /// Public base58 child order ID when supplied by the host.
+    pub child_order_id: Option<String>,
 }
 
 /// Typed attached risk policy for order create/modify (TP/SL/trailing).

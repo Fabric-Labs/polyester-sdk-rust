@@ -26,16 +26,16 @@ use crate::proto::triggers::v1::{
 };
 use crate::types::{resolve_price_ticks, resolve_qty_scaled};
 
-const MAX_SLIPPAGE_BPS: i32 = 10_000;
+const MAX_BPS: i32 = 10_000;
 
-fn validate_slippage_bps(bps: i32, allow_clear: bool) -> Result<()> {
+fn validate_bps(field: &str, bps: i32, allow_clear: bool) -> Result<()> {
     if allow_clear && bps == 0 {
         return Ok(());
     }
-    if !(1..=MAX_SLIPPAGE_BPS).contains(&bps) {
-        return Err(Error::validation(
-            "max_slippage_bps must be between 1 and 10000",
-        ));
+    if !(1..=MAX_BPS).contains(&bps) {
+        return Err(Error::validation(format!(
+            "{field} must be between 1 and {MAX_BPS}"
+        )));
     }
     Ok(())
 }
@@ -229,9 +229,7 @@ impl TriggersService {
                     trailing.trailing_distance =
                         Some(trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(ticks));
                 } else if let Some(bps) = params.trailing_distance_bps {
-                    if bps <= 0 {
-                        return Err(Error::validation("trailing_distance_bps must be positive"));
-                    }
+                    validate_bps("trailing_distance_bps", bps, false)?;
                     trailing.trailing_distance =
                         Some(trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(bps));
                 } else {
@@ -250,7 +248,7 @@ impl TriggersService {
                     trailing.max_slippage =
                         Some(trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(ticks));
                 } else if let Some(bps) = params.max_slippage_bps {
-                    validate_slippage_bps(bps, false)?;
+                    validate_bps("max_slippage_bps", bps, false)?;
                     trailing.max_slippage =
                         Some(trailing_stop_trigger::MaxSlippage::MaxSlippageBps(bps));
                 }
@@ -457,9 +455,7 @@ impl TriggersService {
             req.trailing_distance =
                 Some(modify_trigger_request::TrailingDistance::TrailingDistanceTicks(ticks));
         } else if let Some(bps) = params.trailing_distance_bps {
-            if bps <= 0 {
-                return Err(Error::validation("trailing_distance_bps must be positive"));
-            }
+            validate_bps("trailing_distance_bps", bps, false)?;
             req.trailing_distance =
                 Some(modify_trigger_request::TrailingDistance::TrailingDistanceBps(bps));
         }
@@ -469,7 +465,7 @@ impl TriggersService {
             }
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageTicks(ticks));
         } else if let Some(bps) = params.max_slippage_bps {
-            validate_slippage_bps(bps, true)?;
+            validate_bps("max_slippage_bps", bps, true)?;
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageBps(bps));
         }
         Ok(req)
@@ -990,6 +986,102 @@ mod tests {
                 .encode_modify_params(&modify_too_high)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn poly_4684_standalone_trailing_slippage_bps_boundaries_preexisting() {
+        let client = client();
+        for bps in [1, 10_000] {
+            client
+                .triggers
+                .encode_create_params(&trailing_create(Some(bps)))
+                .unwrap();
+        }
+        for bps in [0, 10_001] {
+            assert!(
+                client
+                    .triggers
+                    .encode_create_params(&trailing_create(Some(bps)))
+                    .is_err(),
+                "standalone max_slippage_bps={bps} must be rejected"
+            );
+        }
+
+        let base = ModifyTriggerParams {
+            trigger_id: "1".into(),
+            symbol: Some("BTC-USDT".into()),
+            ..modify_params(None, None, None)
+        };
+        for bps in [1, 10_000] {
+            client
+                .triggers
+                .encode_modify_params(&ModifyTriggerParams {
+                    max_slippage_bps: Some(bps),
+                    ..base.clone()
+                })
+                .unwrap();
+        }
+        client
+            .triggers
+            .encode_modify_params(&ModifyTriggerParams {
+                max_slippage_bps: Some(0),
+                ..base.clone()
+            })
+            .expect("modify zero is the explicit clear sentinel");
+        assert!(
+            client
+                .triggers
+                .encode_modify_params(&ModifyTriggerParams {
+                    max_slippage_bps: Some(10_001),
+                    ..base
+                })
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn poly_4689_standalone_trailing_distance_bps_boundaries() {
+        let client = client();
+        for bps in [1, 10_000] {
+            let mut params = trailing_create(None);
+            params.trailing_distance_bps = Some(bps);
+            client.triggers.encode_create_params(&params).unwrap();
+        }
+        for bps in [0, 10_001] {
+            let mut params = trailing_create(None);
+            params.trailing_distance_bps = Some(bps);
+            assert!(
+                client.triggers.encode_create_params(&params).is_err(),
+                "create trailing_distance_bps={bps} must be rejected"
+            );
+        }
+
+        let base = ModifyTriggerParams {
+            trigger_id: "1".into(),
+            symbol: Some("BTC-USDT".into()),
+            ..modify_params(None, None, None)
+        };
+        for bps in [1, 10_000] {
+            client
+                .triggers
+                .encode_modify_params(&ModifyTriggerParams {
+                    trailing_distance_bps: Some(bps),
+                    ..base.clone()
+                })
+                .unwrap();
+        }
+        for bps in [0, 10_001] {
+            assert!(
+                client
+                    .triggers
+                    .encode_modify_params(&ModifyTriggerParams {
+                        trailing_distance_bps: Some(bps),
+                        ..base.clone()
+                    })
+                    .is_err(),
+                "modify trailing_distance_bps={bps} must be rejected"
+            );
+        }
     }
 
     #[test]

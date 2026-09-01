@@ -72,6 +72,13 @@ pub struct Factory {
 
 impl Factory {
     pub fn new(config: Config, credentials: Option<Credentials>) -> Result<Self> {
+        let parsed = url::Url::parse(&config.api_url)
+            .map_err(|e| Error::validation(format!("invalid api_url: {e}")))?;
+        if parsed.query().is_some() || parsed.fragment().is_some() {
+            return Err(Error::validation(
+                "api_url must not contain a query string or fragment",
+            ));
+        }
         let uri: Uri = config
             .api_url
             .parse()
@@ -208,5 +215,36 @@ mod tests {
             .to_str()
             .expect("ascii");
         assert_eq!(ua, user_agent());
+    }
+
+    #[test]
+    fn poly_4693_api_base_rejects_query_and_fragment_but_allows_local_http() {
+        for api_url in [
+            "https://api.example.test?x=1",
+            "https://api.example.test/base?x=1",
+            "https://api.example.test#fragment",
+            "https://api.example.test/base#fragment",
+        ] {
+            let err = match Factory::new(
+                Config {
+                    api_url: api_url.into(),
+                    ..Default::default()
+                },
+                None,
+            ) {
+                Ok(_) => panic!("query/fragment API base must fail before Connect joining"),
+                Err(err) => err,
+            };
+            assert!(matches!(err, Error::Validation(_)), "{api_url}: {err}");
+        }
+
+        Factory::new(
+            Config {
+                api_url: "http://127.0.0.1:9".into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .expect("localhost HTTP remains supported");
     }
 }
