@@ -3,6 +3,8 @@
 /// =============================================================================
 /// Shared Enums (used by both REST and binary messages)
 /// =============================================================================
+///
+/// Side identifies whether an order buys or sells the base asset.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum Side {
@@ -144,6 +146,7 @@ impl ::buffa::Enumeration for Side {
         &[Self::SIDE_UNSPECIFIED, Self::BUY, Self::SELL]
     }
 }
+/// OrderType identifies whether an order uses limit-price or market execution.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum OrderType {
@@ -289,6 +292,8 @@ impl ::buffa::Enumeration for OrderType {
         &[Self::ORDER_TYPE_UNSPECIFIED, Self::LIMIT, Self::MARKET]
     }
 }
+/// TimeInForce controls how long an order may remain active and whether it must
+/// fill completely.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum TimeInForce {
@@ -588,6 +593,8 @@ impl ::buffa::Enumeration for FeeAsset {
         &[Self::FEE_ASSET_UNSPECIFIED, Self::QUOTE, Self::BASE]
     }
 }
+/// SelfTradePreventionMode controls which orders expire when they would trade
+/// against another order from the same account.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum SelfTradePreventionMode {
@@ -795,9 +802,11 @@ pub enum ErrorCode {
     ERROR_CODE_UPSTREAM_ERROR = 14i32,
     /// Requested fee asset is not allowed for this order.
     ERROR_CODE_FEE_ASSET_NOT_ALLOWED = 15i32,
-    /// Additional domain-specific codes used by the Orders API.
+    /// Pair is disabled and does not accept orders.
     ERROR_CODE_PAIR_DISABLED = 16i32,
+    /// Referenced order could not be resolved.
     ERROR_CODE_ORDER_UNKNOWN = 17i32,
+    /// Order processing failed because of an unexpected error.
     ERROR_CODE_INTERNAL_ERROR = 18i32,
     /// Sub-account is present but not in an active state (disabled, deleted,
     /// etc.).

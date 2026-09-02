@@ -12171,6 +12171,18 @@ pub type OwnedGetUsernameHistoryRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetUsernameHistoryResponseView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::GetUsernameHistoryResponseView<'static>,
 >;
+///Shorthand for `OwnedView<GenerateUsernameOptionsRequestView<'static>>`.
+pub type OwnedGenerateUsernameOptionsRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GenerateUsernameOptionsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GenerateUsernameOptionsResponseView<'static>>`.
+pub type OwnedGenerateUsernameOptionsResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GenerateUsernameOptionsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ClaimGeneratedUsernameRequestView<'static>>`.
+pub type OwnedClaimGeneratedUsernameRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ClaimGeneratedUsernameRequestView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::auth::v1::UserProfile>
 for crate::proto::auth::v1::__buffa::view::UserProfileView<'_> {
     fn encode(
@@ -12211,6 +12223,26 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::auth::v1::GenerateUsernameOptionsResponse>
+for crate::proto::auth::v1::__buffa::view::GenerateUsernameOptionsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::GenerateUsernameOptionsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GenerateUsernameOptionsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const PROFILE_SERVICE_SERVICE_NAME: &str = "auth.v1.ProfileService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetProfile` RPC.
@@ -12237,6 +12269,24 @@ pub const PROFILE_SERVICE_UPDATE_PROFILE_SPEC: ::connectrpc::Spec = ::connectrpc
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const PROFILE_SERVICE_GET_USERNAME_HISTORY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/auth.v1.ProfileService/GetUsernameHistory",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GenerateUsernameOptions` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const PROFILE_SERVICE_GENERATE_USERNAME_OPTIONS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ProfileService/GenerateUsernameOptions",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ClaimGeneratedUsername` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const PROFILE_SERVICE_CLAIM_GENERATED_USERNAME_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ProfileService/ClaimGeneratedUsername",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -12362,6 +12412,54 @@ pub trait ProfileService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Generate five random username options for an account that has never
+    /// claimed a username. Calling this method again returns a fresh set.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn generate_username_options<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::GenerateUsernameOptionsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::GenerateUsernameOptionsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Claim one username by its position in a valid generated offer. The
+    /// selected value comes from the offer and cannot be supplied directly.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn claim_generated_username<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::ClaimGeneratedUsernameRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::UserProfile,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -12477,6 +12575,62 @@ impl<S: ProfileService> ProfileServiceExt for S {
                 },
             )
             .with_spec(PROFILE_SERVICE_GET_USERNAME_HISTORY_SPEC)
+            .route_view(
+                PROFILE_SERVICE_SERVICE_NAME,
+                "GenerateUsernameOptions",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::GenerateUsernameOptionsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::GenerateUsernameOptionsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.generate_username_options(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::GenerateUsernameOptionsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROFILE_SERVICE_GENERATE_USERNAME_OPTIONS_SPEC)
+            .route_view(
+                PROFILE_SERVICE_SERVICE_NAME,
+                "ClaimGeneratedUsername",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::ClaimGeneratedUsernameRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::ClaimGeneratedUsernameRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.claim_generated_username(ctx, sreq)
+                                .await?
+                                .encode::<crate::proto::auth::v1::UserProfile>(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(PROFILE_SERVICE_CLAIM_GENERATED_USERNAME_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -12547,6 +12701,18 @@ impl<T: ProfileService> ::connectrpc::Dispatcher for ProfileServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(PROFILE_SERVICE_GET_USERNAME_HISTORY_SPEC),
+                )
+            }
+            "GenerateUsernameOptions" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROFILE_SERVICE_GENERATE_USERNAME_OPTIONS_SPEC),
+                )
+            }
+            "ClaimGeneratedUsername" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(PROFILE_SERVICE_CLAIM_GENERATED_USERNAME_SPEC),
                 )
             }
             _ => None,
@@ -12621,6 +12787,46 @@ impl<T: ProfileService> ::connectrpc::Dispatcher for ProfileServiceServer<T> {
                         .encode::<
                             crate::proto::auth::v1::GetUsernameHistoryResponse,
                         >(format)
+                })
+            }
+            "GenerateUsernameOptions" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::GenerateUsernameOptionsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::GenerateUsernameOptionsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::GenerateUsernameOptionsRequest,
+                    >::from_parts(&req, &body);
+                    svc.generate_username_options(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::GenerateUsernameOptionsResponse,
+                        >(format)
+                })
+            }
+            "ClaimGeneratedUsername" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::ClaimGeneratedUsernameRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::ClaimGeneratedUsernameRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::ClaimGeneratedUsernameRequest,
+                    >::from_parts(&req, &body);
+                    svc.claim_generated_username(ctx, req)
+                        .await?
+                        .encode::<crate::proto::auth::v1::UserProfile>(format)
                 })
             }
             _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
@@ -12847,6 +13053,92 @@ where
                 &self.config,
                 PROFILE_SERVICE_SERVICE_NAME,
                 "GetUsernameHistory",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GenerateUsernameOptions RPC. Sends a request to /auth.v1.ProfileService/GenerateUsernameOptions.
+    pub async fn generate_username_options(
+        &self,
+        request: crate::proto::auth::v1::GenerateUsernameOptionsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::GenerateUsernameOptionsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.generate_username_options_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GenerateUsernameOptions RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn generate_username_options_with_options(
+        &self,
+        request: crate::proto::auth::v1::GenerateUsernameOptionsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::GenerateUsernameOptionsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROFILE_SERVICE_SERVICE_NAME,
+                "GenerateUsernameOptions",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ClaimGeneratedUsername RPC. Sends a request to /auth.v1.ProfileService/ClaimGeneratedUsername.
+    pub async fn claim_generated_username(
+        &self,
+        request: crate::proto::auth::v1::ClaimGeneratedUsernameRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::UserProfileView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.claim_generated_username_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ClaimGeneratedUsername RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn claim_generated_username_with_options(
+        &self,
+        request: crate::proto::auth::v1::ClaimGeneratedUsernameRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::UserProfileView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                PROFILE_SERVICE_SERVICE_NAME,
+                "ClaimGeneratedUsername",
                 request,
                 options,
             )
