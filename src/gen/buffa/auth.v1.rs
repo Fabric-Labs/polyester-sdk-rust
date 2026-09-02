@@ -8559,6 +8559,162 @@ pub const __SET_API_KEY_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAn
     from_json: ::buffa::type_registry::any_from_json::<SetApiKeyPolicyResponse>,
     is_wkt: false,
 };
+/// Public lifecycle status of a sub-account.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum SubaccountStatus {
+    /// No sub-account status was specified.
+    SUBACCOUNT_STATUS_UNSPECIFIED = 0i32,
+    /// The sub-account can be used normally.
+    SUBACCOUNT_STATUS_ACTIVE = 1i32,
+    /// The sub-account is disabled and cannot be used until re-enabled.
+    SUBACCOUNT_STATUS_DISABLED = 2i32,
+}
+impl SubaccountStatus {
+    ///Idiomatic alias for [`Self::SUBACCOUNT_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::SUBACCOUNT_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_STATUS_ACTIVE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Active: Self = Self::SUBACCOUNT_STATUS_ACTIVE;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_STATUS_DISABLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Disabled: Self = Self::SUBACCOUNT_STATUS_DISABLED;
+}
+impl ::core::default::Default for SubaccountStatus {
+    fn default() -> Self {
+        Self::SUBACCOUNT_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for SubaccountStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for SubaccountStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = SubaccountStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(SubaccountStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<SubaccountStatus, E> {
+                <SubaccountStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<SubaccountStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <SubaccountStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<SubaccountStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <SubaccountStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<SubaccountStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SubaccountStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for SubaccountStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_ACTIVE),
+            2i32 => ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_DISABLED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::SUBACCOUNT_STATUS_UNSPECIFIED => "SUBACCOUNT_STATUS_UNSPECIFIED",
+            Self::SUBACCOUNT_STATUS_ACTIVE => "SUBACCOUNT_STATUS_ACTIVE",
+            Self::SUBACCOUNT_STATUS_DISABLED => "SUBACCOUNT_STATUS_DISABLED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "SUBACCOUNT_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_UNSPECIFIED)
+            }
+            "SUBACCOUNT_STATUS_ACTIVE" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_ACTIVE)
+            }
+            "SUBACCOUNT_STATUS_DISABLED" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_DISABLED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::SUBACCOUNT_STATUS_UNSPECIFIED,
+            Self::SUBACCOUNT_STATUS_ACTIVE,
+            Self::SUBACCOUNT_STATUS_DISABLED,
+        ]
+    }
+}
 /// Role granted to a root account on a sub-account.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -11696,15 +11852,15 @@ pub struct Subaccount {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub color: ::buffa::alloc::string::String,
-    /// Current status of the sub-account, such as "active" or "disabled".
+    /// Current public lifecycle status of the sub-account.
     ///
     /// Field 4: `status`
     #[serde(
         rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub status: ::buffa::alloc::string::String,
+    pub status: ::buffa::EnumValue<SubaccountStatus>,
     /// Smart Account EVM address backing this sub-account.
     ///
     /// Field 5: `smart_account_address`
@@ -11876,8 +12032,11 @@ impl ::buffa::Message for Subaccount {
         if !self.label.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
         }
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         if !self.smart_account_address.is_empty() {
             size
@@ -11950,8 +12109,11 @@ impl ::buffa::Message for Subaccount {
         if !self.label.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.label, buf);
         }
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(4u32, &self.status, buf);
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
         }
         if !self.smart_account_address.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.smart_account_address, buf);
@@ -12028,9 +12190,11 @@ impl ::buffa::Message for Subaccount {
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -12129,7 +12293,7 @@ impl ::buffa::Message for Subaccount {
         self.id = 0u64;
         self.role = ::buffa::EnumValue::from(0);
         self.label.clear();
-        self.status.clear();
+        self.status = ::buffa::EnumValue::from(0);
         self.smart_account_address.clear();
         self.owner_username.clear();
         self.owner_avatar_url.clear();
@@ -12999,15 +13163,15 @@ pub struct SubaccountUpdateSpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub color: ::buffa::alloc::string::String,
-    /// Status for the sub-account, such as "active" or "disabled".
+    /// New lifecycle status. ACTIVE and DISABLED are accepted when selected by update_mask.
     ///
     /// Field 4: `status`
     #[serde(
         rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub status: ::buffa::alloc::string::String,
+    pub status: ::buffa::EnumValue<SubaccountStatus>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -13056,8 +13220,11 @@ impl ::buffa::Message for SubaccountUpdateSpec {
         if !self.color.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
         }
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -13078,8 +13245,11 @@ impl ::buffa::Message for SubaccountUpdateSpec {
         if !self.color.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.color, buf);
         }
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(4u32, &self.status, buf);
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -13118,9 +13288,11 @@ impl ::buffa::Message for SubaccountUpdateSpec {
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -13133,7 +13305,7 @@ impl ::buffa::Message for SubaccountUpdateSpec {
         self.label.clear();
         self.icon.clear();
         self.color.clear();
-        self.status.clear();
+        self.status = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -60761,10 +60933,10 @@ pub mod __buffa {
             ///
             /// Field 11: `color`
             pub color: &'a str,
-            /// Current status of the sub-account, such as "active" or "disabled".
+            /// Current public lifecycle status of the sub-account.
             ///
             /// Field 4: `status`
-            pub status: &'a str,
+            pub status: ::buffa::EnumValue<super::super::SubaccountStatus>,
             /// Smart Account EVM address backing this sub-account.
             ///
             /// Field 5: `smart_account_address`
@@ -60885,9 +61057,11 @@ pub mod __buffa {
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -61006,7 +61180,7 @@ pub mod __buffa {
                     label: self.label.to_string(),
                     icon: self.icon.to_string(),
                     color: self.color.to_string(),
-                    status: self.status.to_string(),
+                    status: self.status,
                     smart_account_address: self.smart_account_address.to_string(),
                     owner_username: self.owner_username.to_string(),
                     owner_avatar_url: self.owner_avatar_url.to_string(),
@@ -61052,10 +61226,11 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
                 }
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 if !self.smart_account_address.is_empty() {
                     size
@@ -61135,8 +61310,11 @@ pub mod __buffa {
                 if !self.label.is_empty() {
                     ::buffa::types::put_string_field(3u32, &self.label, buf);
                 }
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(4u32, &self.status, buf);
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
                 }
                 if !self.smart_account_address.is_empty() {
                     ::buffa::types::put_string_field(
@@ -61228,8 +61406,8 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.color) {
                     __map.serialize_entry("color", self.color)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(
                     self.smart_account_address,
@@ -61416,11 +61594,11 @@ pub mod __buffa {
             pub fn color(&self) -> &'_ str {
                 self.0.reborrow().color
             }
-            /// Current status of the sub-account, such as "active" or "disabled".
+            /// Current public lifecycle status of the sub-account.
             ///
             /// Field 4: `status`
             #[must_use]
-            pub fn status(&self) -> &'_ str {
+            pub fn status(&self) -> ::buffa::EnumValue<super::super::SubaccountStatus> {
                 self.0.reborrow().status
             }
             /// Smart Account EVM address backing this sub-account.
@@ -63035,10 +63213,10 @@ pub mod __buffa {
             ///
             /// Field 3: `color`
             pub color: &'a str,
-            /// Status for the sub-account, such as "active" or "disabled".
+            /// New lifecycle status. ACTIVE and DISABLED are accepted when selected by update_mask.
             ///
             /// Field 4: `status`
-            pub status: &'a str,
+            pub status: ::buffa::EnumValue<super::super::SubaccountStatus>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SubaccountUpdateSpecView<'a> {
@@ -63096,9 +63274,11 @@ pub mod __buffa {
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -63132,7 +63312,7 @@ pub mod __buffa {
                     label: self.label.to_string(),
                     icon: self.icon.to_string(),
                     color: self.color.to_string(),
-                    status: self.status.to_string(),
+                    status: self.status,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -63158,10 +63338,11 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
                 }
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -63183,8 +63364,11 @@ pub mod __buffa {
                 if !self.color.is_empty() {
                     ::buffa::types::put_string_field(3u32, &self.color, buf);
                 }
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(4u32, &self.status, buf);
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -63216,8 +63400,8 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.color) {
                     __map.serialize_entry("color", self.color)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
                 }
                 __map.end()
             }
@@ -63336,11 +63520,11 @@ pub mod __buffa {
             pub fn color(&self) -> &'_ str {
                 self.0.reborrow().color
             }
-            /// Status for the sub-account, such as "active" or "disabled".
+            /// New lifecycle status. ACTIVE and DISABLED are accepted when selected by update_mask.
             ///
             /// Field 4: `status`
             #[must_use]
-            pub fn status(&self) -> &'_ str {
+            pub fn status(&self) -> ::buffa::EnumValue<super::super::SubaccountStatus> {
                 self.0.reborrow().status
             }
         }
