@@ -396,8 +396,10 @@ impl SubAccountsService {
         subaccount_id: u64,
         opts: GetSubaccountOpts,
     ) -> crate::errors::Result<crate::models::GetSubaccountResult> {
-        use crate::codecs::decode::get_subaccount_from_proto;
+        use crate::codecs::decode::{get_subaccount_from_proto, invite_direction_from_label};
         use crate::proto::auth::v1::GetSubaccountRequest;
+        let invites_direction = invite_direction_from_label(&opts.invites_direction)
+            .map_err(crate::errors::Error::validation)?;
         let req = GetSubaccountRequest {
             subaccount_id,
             include_api_keys: opts.include_api_keys,
@@ -405,7 +407,7 @@ impl SubAccountsService {
             include_invites: opts.include_invites,
             include_policy: opts.include_policy,
             include_balances: opts.include_balances,
-            invites_direction: opts.invites_direction,
+            invites_direction: invites_direction.into(),
             ..Default::default()
         };
         let client = crate::connect::auth::v1::SubaccountViewServiceClient::new(

@@ -2634,7 +2634,7 @@ async fn l2_batch_cancel_rejects_inconsistent_server_counts_through_public_servi
 
     let response = BatchCancelOrdersResponse {
         results: vec![ProtoItem {
-            status: "accepted".into(),
+            status: polyester::proto::orders::v1::batch_cancel_result_item::Status::Accepted.into(),
             order_id: 9,
             ..Default::default()
         }],
@@ -2676,11 +2676,14 @@ async fn l2_batch_cancel_rejects_inconsistent_server_counts_through_public_servi
 
 #[tokio::test]
 async fn l2_cancel_all_rejects_empty_and_unknown_status_through_public_service() {
-    use polyester::proto::orders::v1::CancelAllOrdersResponse;
+    use polyester::proto::orders::v1::{CancelAllOrdersResponse, cancel_all_orders_response};
 
-    for status in ["", "ok", "maybe"] {
+    for status in [
+        cancel_all_orders_response::Status::StatusUnspecified.into(),
+        buffa::EnumValue::from(99),
+    ] {
         let response = CancelAllOrdersResponse {
-            status: status.into(),
+            status,
             matched_orders: 1,
             submitted_cancels: 1,
             ..Default::default()
@@ -2713,11 +2716,14 @@ async fn l2_cancel_all_rejects_empty_and_unknown_status_through_public_service()
 
 #[tokio::test]
 async fn l2_cancel_all_after_rejects_empty_and_unknown_status_through_public_service() {
-    use polyester::proto::orders::v1::CancelAllAfterResponse;
+    use polyester::proto::orders::v1::{CancelAllAfterResponse, cancel_all_after_response};
 
-    for status in ["", "submitted", "maybe"] {
+    for status in [
+        cancel_all_after_response::Status::StatusUnspecified.into(),
+        buffa::EnumValue::from(99),
+    ] {
         let response = CancelAllAfterResponse {
-            status: status.into(),
+            status,
             effective_timeout_sec: 15,
             ..Default::default()
         };
