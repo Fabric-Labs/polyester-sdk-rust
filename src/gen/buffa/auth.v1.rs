@@ -8559,6 +8559,162 @@ pub const __SET_API_KEY_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAn
     from_json: ::buffa::type_registry::any_from_json::<SetApiKeyPolicyResponse>,
     is_wkt: false,
 };
+/// Public lifecycle status of a sub-account.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum SubaccountStatus {
+    /// No sub-account status was specified.
+    SUBACCOUNT_STATUS_UNSPECIFIED = 0i32,
+    /// The sub-account can be used normally.
+    SUBACCOUNT_STATUS_ACTIVE = 1i32,
+    /// The sub-account is disabled and cannot be used until re-enabled.
+    SUBACCOUNT_STATUS_DISABLED = 2i32,
+}
+impl SubaccountStatus {
+    ///Idiomatic alias for [`Self::SUBACCOUNT_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::SUBACCOUNT_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_STATUS_ACTIVE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Active: Self = Self::SUBACCOUNT_STATUS_ACTIVE;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_STATUS_DISABLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Disabled: Self = Self::SUBACCOUNT_STATUS_DISABLED;
+}
+impl ::core::default::Default for SubaccountStatus {
+    fn default() -> Self {
+        Self::SUBACCOUNT_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for SubaccountStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for SubaccountStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = SubaccountStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(SubaccountStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<SubaccountStatus, E> {
+                <SubaccountStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<SubaccountStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <SubaccountStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<SubaccountStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <SubaccountStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<SubaccountStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SubaccountStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for SubaccountStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_ACTIVE),
+            2i32 => ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_DISABLED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::SUBACCOUNT_STATUS_UNSPECIFIED => "SUBACCOUNT_STATUS_UNSPECIFIED",
+            Self::SUBACCOUNT_STATUS_ACTIVE => "SUBACCOUNT_STATUS_ACTIVE",
+            Self::SUBACCOUNT_STATUS_DISABLED => "SUBACCOUNT_STATUS_DISABLED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "SUBACCOUNT_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_UNSPECIFIED)
+            }
+            "SUBACCOUNT_STATUS_ACTIVE" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_ACTIVE)
+            }
+            "SUBACCOUNT_STATUS_DISABLED" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_STATUS_DISABLED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::SUBACCOUNT_STATUS_UNSPECIFIED,
+            Self::SUBACCOUNT_STATUS_ACTIVE,
+            Self::SUBACCOUNT_STATUS_DISABLED,
+        ]
+    }
+}
 /// Role granted to a root account on a sub-account.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -9498,6 +9654,155 @@ impl ::buffa::Enumeration for SubaccountInviteStatus {
             Self::SUBACCOUNT_INVITE_STATUS_DECLINED,
             Self::SUBACCOUNT_INVITE_STATUS_CANCELLED,
         ]
+    }
+}
+/// Direction used to filter invitations relative to the caller.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum SubaccountInviteDirection {
+    /// Include both incoming and outgoing invitations.
+    DIRECTION_UNSPECIFIED = 0i32,
+    /// Include invitations where the caller is the grantee.
+    INCOMING = 1i32,
+    /// Include invitations for sub-accounts the caller owns or administers.
+    OUTGOING = 2i32,
+}
+impl SubaccountInviteDirection {
+    ///Idiomatic alias for [`Self::DIRECTION_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DirectionUnspecified: Self = Self::DIRECTION_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::INCOMING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Incoming: Self = Self::INCOMING;
+    ///Idiomatic alias for [`Self::OUTGOING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Outgoing: Self = Self::OUTGOING;
+}
+impl ::core::default::Default for SubaccountInviteDirection {
+    fn default() -> Self {
+        Self::DIRECTION_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for SubaccountInviteDirection {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for SubaccountInviteDirection {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = SubaccountInviteDirection;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(SubaccountInviteDirection)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<SubaccountInviteDirection, E> {
+                <SubaccountInviteDirection as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<SubaccountInviteDirection, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <SubaccountInviteDirection as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<SubaccountInviteDirection, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <SubaccountInviteDirection as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<SubaccountInviteDirection, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SubaccountInviteDirection {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for SubaccountInviteDirection {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::DIRECTION_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::INCOMING),
+            2i32 => ::core::option::Option::Some(Self::OUTGOING),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::DIRECTION_UNSPECIFIED => "DIRECTION_UNSPECIFIED",
+            Self::INCOMING => "INCOMING",
+            Self::OUTGOING => "OUTGOING",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "DIRECTION_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::DIRECTION_UNSPECIFIED)
+            }
+            "INCOMING" => ::core::option::Option::Some(Self::INCOMING),
+            "OUTGOING" => ::core::option::Option::Some(Self::OUTGOING),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::DIRECTION_UNSPECIFIED, Self::INCOMING, Self::OUTGOING]
     }
 }
 /// Action to take on a sub-account invitation.
@@ -11696,15 +12001,15 @@ pub struct Subaccount {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub color: ::buffa::alloc::string::String,
-    /// Current status of the sub-account, such as "active" or "disabled".
+    /// Current public lifecycle status of the sub-account.
     ///
     /// Field 4: `status`
     #[serde(
         rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub status: ::buffa::alloc::string::String,
+    pub status: ::buffa::EnumValue<SubaccountStatus>,
     /// Smart Account EVM address backing this sub-account.
     ///
     /// Field 5: `smart_account_address`
@@ -11876,8 +12181,11 @@ impl ::buffa::Message for Subaccount {
         if !self.label.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
         }
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         if !self.smart_account_address.is_empty() {
             size
@@ -11950,8 +12258,11 @@ impl ::buffa::Message for Subaccount {
         if !self.label.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.label, buf);
         }
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(4u32, &self.status, buf);
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
         }
         if !self.smart_account_address.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.smart_account_address, buf);
@@ -12028,9 +12339,11 @@ impl ::buffa::Message for Subaccount {
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -12129,7 +12442,7 @@ impl ::buffa::Message for Subaccount {
         self.id = 0u64;
         self.role = ::buffa::EnumValue::from(0);
         self.label.clear();
-        self.status.clear();
+        self.status = ::buffa::EnumValue::from(0);
         self.smart_account_address.clear();
         self.owner_username.clear();
         self.owner_avatar_url.clear();
@@ -12999,15 +13312,15 @@ pub struct SubaccountUpdateSpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub color: ::buffa::alloc::string::String,
-    /// Status for the sub-account, such as "active" or "disabled".
+    /// New lifecycle status. ACTIVE and DISABLED are accepted when selected by update_mask.
     ///
     /// Field 4: `status`
     #[serde(
         rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub status: ::buffa::alloc::string::String,
+    pub status: ::buffa::EnumValue<SubaccountStatus>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -13056,8 +13369,11 @@ impl ::buffa::Message for SubaccountUpdateSpec {
         if !self.color.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
         }
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -13078,8 +13394,11 @@ impl ::buffa::Message for SubaccountUpdateSpec {
         if !self.color.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.color, buf);
         }
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(4u32, &self.status, buf);
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -13118,9 +13437,11 @@ impl ::buffa::Message for SubaccountUpdateSpec {
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -13133,7 +13454,7 @@ impl ::buffa::Message for SubaccountUpdateSpec {
         self.label.clear();
         self.icon.clear();
         self.color.clear();
-        self.status.clear();
+        self.status = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -15699,17 +16020,15 @@ pub const __INVITE_SUBACCOUNT_MEMBER_RESPONSE_JSON_ANY: ::buffa::type_registry::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListSubaccountInvitesRequest {
-    /// Optional direction filter. Use "incoming" for invites where the caller is grantee,
-    /// "outgoing" for all invites on sub-accounts the caller currently owns or administers,
-    /// or empty for both scopes.
+    /// Optional direction filter. An omitted value includes both scopes.
     ///
     /// Field 1: `direction`
     #[serde(
         rename = "direction",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub direction: ::buffa::alloc::string::String,
+    pub direction: ::buffa::EnumValue<SubaccountInviteDirection>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -15746,8 +16065,11 @@ impl ::buffa::Message for ListSubaccountInvitesRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.direction.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.direction) as u32;
+        {
+            let val = self.direction.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -15759,8 +16081,11 @@ impl ::buffa::Message for ListSubaccountInvitesRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.direction.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.direction, buf);
+        {
+            let val = self.direction.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -15778,9 +16103,11 @@ impl ::buffa::Message for ListSubaccountInvitesRequest {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.direction, buf)?;
+                self.direction = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -15790,7 +16117,7 @@ impl ::buffa::Message for ListSubaccountInvitesRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.direction.clear();
+        self.direction = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -16322,16 +16649,16 @@ pub struct GetSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub include_balances: bool,
-    /// Optional invitation direction filter. Use "incoming", "outgoing", or empty for both.
+    /// Optional invitation direction filter. An omitted value includes both scopes.
     ///
     /// Field 7: `invites_direction`
     #[serde(
         rename = "invitesDirection",
         alias = "invites_direction",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub invites_direction: ::buffa::alloc::string::String,
+    pub invites_direction: ::buffa::EnumValue<SubaccountInviteDirection>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -16392,10 +16719,11 @@ impl ::buffa::Message for GetSubaccountRequest {
         if self.include_balances {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
-        if !self.invites_direction.is_empty() {
-            size
-                += 1u32
-                    + ::buffa::types::string_encoded_len(&self.invites_direction) as u32;
+        {
+            let val = self.invites_direction.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -16425,8 +16753,11 @@ impl ::buffa::Message for GetSubaccountRequest {
         if self.include_balances {
             ::buffa::types::put_bool_field(6u32, self.include_balances, buf);
         }
-        if !self.invites_direction.is_empty() {
-            ::buffa::types::put_string_field(7u32, &self.invites_direction, buf);
+        {
+            let val = self.invites_direction.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -16486,9 +16817,11 @@ impl ::buffa::Message for GetSubaccountRequest {
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.invites_direction, buf)?;
+                self.invites_direction = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -16504,7 +16837,7 @@ impl ::buffa::Message for GetSubaccountRequest {
         self.include_invites = false;
         self.include_policy = false;
         self.include_balances = false;
-        self.invites_direction.clear();
+        self.invites_direction = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -37432,16 +37765,17 @@ pub struct MeResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub account_id: u64,
-    /// When present, indicates the request is authenticated via an API key.
+    /// Stable public identifier of the API key that authenticated this request,
+    /// formatted as "ak_" followed by 32 lowercase hexadecimal characters.
+    /// Absent when the request was not authenticated with an API key.
     ///
     /// Field 10: `api_key_id`
     #[serde(
         rename = "apiKeyId",
         alias = "api_key_id",
-        with = "::buffa::json_helpers::opt_uint64",
         skip_serializing_if = "::core::option::Option::is_none"
     )]
-    pub api_key_id: ::core::option::Option<u64>,
+    pub api_key_id: ::core::option::Option<::buffa::alloc::string::String>,
     /// Optional current username for the root account (empty if not set).
     ///
     /// Field 11: `username`
@@ -37496,8 +37830,11 @@ impl MeResponse {
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::api_key_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_api_key_id(mut self, value: u64) -> Self {
-        self.api_key_id = Some(value);
+    pub fn with_api_key_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.api_key_id = Some(value.into());
         self
     }
 }
@@ -37522,8 +37859,8 @@ impl ::buffa::Message for MeResponse {
         if self.account_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if self.api_key_id.is_some() {
-            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        if let Some(ref v) = self.api_key_id {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
         if !self.username.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.username) as u32;
@@ -37556,8 +37893,8 @@ impl ::buffa::Message for MeResponse {
         if self.account_id != 0u64 {
             ::buffa::types::put_fixed64_field(1u32, self.account_id, buf);
         }
-        if let Some(v) = self.api_key_id {
-            ::buffa::types::put_fixed64_field(10u32, v, buf);
+        if let Some(ref v) = self.api_key_id {
+            ::buffa::types::put_string_field(10u32, v, buf);
         }
         if !self.username.is_empty() {
             ::buffa::types::put_string_field(11u32, &self.username, buf);
@@ -37596,11 +37933,14 @@ impl ::buffa::Message for MeResponse {
             10u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::Fixed64,
+                    ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                self.api_key_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_fixed64(buf)?,
-                );
+                ::buffa::types::merge_string(
+                    self
+                        .api_key_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
             }
             11u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -39617,6 +39957,448 @@ pub const __GET_USERNAME_HISTORY_RESPONSE_JSON_ANY: ::buffa::type_registry::Json
     from_json: ::buffa::type_registry::any_from_json::<GetUsernameHistoryResponse>,
     is_wkt: false,
 };
+/// GenerateUsernameOptionsRequest requests a fresh set of generated usernames.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GenerateUsernameOptionsRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GenerateUsernameOptionsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GenerateUsernameOptionsRequest").finish()
+    }
+}
+impl GenerateUsernameOptionsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GenerateUsernameOptionsRequest";
+}
+::buffa::impl_default_instance!(GenerateUsernameOptionsRequest);
+impl ::buffa::MessageName for GenerateUsernameOptionsRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "GenerateUsernameOptionsRequest";
+    const FULL_NAME: &'static str = "auth.v1.GenerateUsernameOptionsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GenerateUsernameOptionsRequest";
+}
+impl ::buffa::Message for GenerateUsernameOptionsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GenerateUsernameOptionsRequest {
+    const PROTO_FQN: &'static str = "auth.v1.GenerateUsernameOptionsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GenerateUsernameOptionsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GENERATE_USERNAME_OPTIONS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.GenerateUsernameOptionsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GenerateUsernameOptionsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GenerateUsernameOptionsRequest>,
+    is_wkt: false,
+};
+/// GenerateUsernameOptionsResponse contains five generated usernames that the
+/// caller may claim before the offer expires.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GenerateUsernameOptionsResponse {
+    /// Five distinct generated usernames available when this offer was created.
+    ///
+    /// Field 1: `usernames`
+    #[serde(
+        rename = "usernames",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub usernames: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Opaque proof required to claim one of the returned usernames.
+    ///
+    /// Field 2: `offer_token`
+    #[serde(
+        rename = "offerToken",
+        alias = "offer_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub offer_token: ::buffa::alloc::string::String,
+    /// Time in UTC after which this offer can no longer be claimed.
+    ///
+    /// Field 3: `expires_at`
+    #[serde(
+        rename = "expiresAt",
+        alias = "expires_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GenerateUsernameOptionsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GenerateUsernameOptionsResponse")
+            .field("usernames", &self.usernames)
+            .field("offer_token", &self.offer_token)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
+}
+impl GenerateUsernameOptionsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GenerateUsernameOptionsResponse";
+}
+::buffa::impl_default_instance!(GenerateUsernameOptionsResponse);
+impl ::buffa::MessageName for GenerateUsernameOptionsResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "GenerateUsernameOptionsResponse";
+    const FULL_NAME: &'static str = "auth.v1.GenerateUsernameOptionsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GenerateUsernameOptionsResponse";
+}
+impl ::buffa::Message for GenerateUsernameOptionsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.usernames {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if !self.offer_token.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.offer_token) as u32;
+        }
+        if self.expires_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expires_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.usernames {
+            ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        if !self.offer_token.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.offer_token, buf);
+        }
+        if self.expires_at.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.expires_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.usernames.push(::buffa::types::decode_string(buf)?);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.offer_token, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expires_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.usernames.clear();
+        self.offer_token.clear();
+        self.expires_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GenerateUsernameOptionsResponse {
+    const PROTO_FQN: &'static str = "auth.v1.GenerateUsernameOptionsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GenerateUsernameOptionsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GENERATE_USERNAME_OPTIONS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.GenerateUsernameOptionsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GenerateUsernameOptionsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GenerateUsernameOptionsResponse>,
+    is_wkt: false,
+};
+/// ClaimGeneratedUsernameRequest selects one username from a generated offer.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ClaimGeneratedUsernameRequest {
+    /// Opaque proof returned with the generated username options.
+    ///
+    /// Field 1: `offer_token`
+    #[serde(
+        rename = "offerToken",
+        alias = "offer_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub offer_token: ::buffa::alloc::string::String,
+    /// Zero-based position in the five returned username options.
+    ///
+    /// Field 2: `option_index`
+    #[serde(
+        rename = "optionIndex",
+        alias = "option_index",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub option_index: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ClaimGeneratedUsernameRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ClaimGeneratedUsernameRequest")
+            .field("offer_token", &self.offer_token)
+            .field("option_index", &self.option_index)
+            .finish()
+    }
+}
+impl ClaimGeneratedUsernameRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ClaimGeneratedUsernameRequest";
+}
+::buffa::impl_default_instance!(ClaimGeneratedUsernameRequest);
+impl ::buffa::MessageName for ClaimGeneratedUsernameRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ClaimGeneratedUsernameRequest";
+    const FULL_NAME: &'static str = "auth.v1.ClaimGeneratedUsernameRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ClaimGeneratedUsernameRequest";
+}
+impl ::buffa::Message for ClaimGeneratedUsernameRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.offer_token.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.offer_token) as u32;
+        }
+        if self.option_index != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.option_index) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.offer_token.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.offer_token, buf);
+        }
+        if self.option_index != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.option_index, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.offer_token, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.option_index = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.offer_token.clear();
+        self.option_index = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ClaimGeneratedUsernameRequest {
+    const PROTO_FQN: &'static str = "auth.v1.ClaimGeneratedUsernameRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ClaimGeneratedUsernameRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CLAIM_GENERATED_USERNAME_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ClaimGeneratedUsernameRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ClaimGeneratedUsernameRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ClaimGeneratedUsernameRequest>,
+    is_wkt: false,
+};
 /// ResolveHint controls how ResolveAccount interprets the query.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -39791,15 +40573,15 @@ pub struct ResolvedAccount {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
-    /// Kind of account that owns this address: "root" or "sub".
+    /// Category of account that owns this address.
     ///
     /// Field 2: `kind`
     #[serde(
         rename = "kind",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub kind: ::buffa::alloc::string::String,
+    pub kind: ::buffa::EnumValue<resolved_account::Kind>,
     /// Root account username for the result. For sub-account results, this is the
     /// parent root account username. Empty means the root account has no username.
     ///
@@ -39811,7 +40593,7 @@ pub struct ResolvedAccount {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub root_username: ::buffa::alloc::string::String,
-    /// Optional sub-account label when kind == "sub".
+    /// Optional sub-account label when kind is SUB.
     ///
     /// Field 4: `subaccount_label`
     #[serde(
@@ -39878,8 +40660,11 @@ impl ::buffa::Message for ResolvedAccount {
                     + ::buffa::types::string_encoded_len(&self.smart_account_address)
                         as u32;
         }
-        if !self.kind.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.kind) as u32;
+        {
+            let val = self.kind.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         if !self.root_username.is_empty() {
             size
@@ -39906,8 +40691,11 @@ impl ::buffa::Message for ResolvedAccount {
         if !self.smart_account_address.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.smart_account_address, buf);
         }
-        if !self.kind.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.kind, buf);
+        {
+            let val = self.kind.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
         }
         if !self.root_username.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.root_username, buf);
@@ -39941,9 +40729,9 @@ impl ::buffa::Message for ResolvedAccount {
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.kind, buf)?;
+                self.kind = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -39975,7 +40763,7 @@ impl ::buffa::Message for ResolvedAccount {
     }
     fn clear(&mut self) {
         self.smart_account_address.clear();
-        self.kind.clear();
+        self.kind = ::buffa::EnumValue::from(0);
         self.root_username.clear();
         self.subaccount_label.clear();
         self.account_id = 0u64;
@@ -40011,6 +40799,156 @@ pub const __RESOLVED_ACCOUNT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     from_json: ::buffa::type_registry::any_from_json::<ResolvedAccount>,
     is_wkt: false,
 };
+pub mod resolved_account {
+    #[allow(unused_imports)]
+    use super::*;
+    /// Category of account that owns the resolved smart-account address.
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum Kind {
+        /// Account kind was not provided.
+        KIND_UNSPECIFIED = 0i32,
+        /// Root account.
+        ROOT = 1i32,
+        /// Sub-account.
+        SUB = 2i32,
+    }
+    impl Kind {
+        ///Idiomatic alias for [`Self::KIND_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const KindUnspecified: Self = Self::KIND_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::ROOT`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Root: Self = Self::ROOT;
+        ///Idiomatic alias for [`Self::SUB`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Sub: Self = Self::SUB;
+    }
+    impl ::core::default::Default for Kind {
+        fn default() -> Self {
+            Self::KIND_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for Kind {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Kind {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = Kind;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!("a string, integer, or null for ", stringify!(Kind)),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<Kind, E> {
+                    <Kind as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<Kind, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Kind as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<Kind, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Kind as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<Kind, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for Kind {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for Kind {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::KIND_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::ROOT),
+                2i32 => ::core::option::Option::Some(Self::SUB),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::KIND_UNSPECIFIED => "KIND_UNSPECIFIED",
+                Self::ROOT => "ROOT",
+                Self::SUB => "SUB",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "KIND_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::KIND_UNSPECIFIED)
+                }
+                "ROOT" => ::core::option::Option::Some(Self::ROOT),
+                "SUB" => ::core::option::Option::Some(Self::SUB),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[Self::KIND_UNSPECIFIED, Self::ROOT, Self::SUB]
+        }
+    }
+}
 /// ResolveAccountRequest searches for a transfer or sharing destination by
 /// username, account ID, or smart-account address.
 #[derive(Clone, PartialEq, Default)]
@@ -60761,10 +61699,10 @@ pub mod __buffa {
             ///
             /// Field 11: `color`
             pub color: &'a str,
-            /// Current status of the sub-account, such as "active" or "disabled".
+            /// Current public lifecycle status of the sub-account.
             ///
             /// Field 4: `status`
-            pub status: &'a str,
+            pub status: ::buffa::EnumValue<super::super::SubaccountStatus>,
             /// Smart Account EVM address backing this sub-account.
             ///
             /// Field 5: `smart_account_address`
@@ -60885,9 +61823,11 @@ pub mod __buffa {
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -61006,7 +61946,7 @@ pub mod __buffa {
                     label: self.label.to_string(),
                     icon: self.icon.to_string(),
                     color: self.color.to_string(),
-                    status: self.status.to_string(),
+                    status: self.status,
                     smart_account_address: self.smart_account_address.to_string(),
                     owner_username: self.owner_username.to_string(),
                     owner_avatar_url: self.owner_avatar_url.to_string(),
@@ -61052,10 +61992,11 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
                 }
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 if !self.smart_account_address.is_empty() {
                     size
@@ -61135,8 +62076,11 @@ pub mod __buffa {
                 if !self.label.is_empty() {
                     ::buffa::types::put_string_field(3u32, &self.label, buf);
                 }
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(4u32, &self.status, buf);
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
                 }
                 if !self.smart_account_address.is_empty() {
                     ::buffa::types::put_string_field(
@@ -61228,8 +62172,8 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.color) {
                     __map.serialize_entry("color", self.color)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(
                     self.smart_account_address,
@@ -61416,11 +62360,11 @@ pub mod __buffa {
             pub fn color(&self) -> &'_ str {
                 self.0.reborrow().color
             }
-            /// Current status of the sub-account, such as "active" or "disabled".
+            /// Current public lifecycle status of the sub-account.
             ///
             /// Field 4: `status`
             #[must_use]
-            pub fn status(&self) -> &'_ str {
+            pub fn status(&self) -> ::buffa::EnumValue<super::super::SubaccountStatus> {
                 self.0.reborrow().status
             }
             /// Smart Account EVM address backing this sub-account.
@@ -63035,10 +63979,10 @@ pub mod __buffa {
             ///
             /// Field 3: `color`
             pub color: &'a str,
-            /// Status for the sub-account, such as "active" or "disabled".
+            /// New lifecycle status. ACTIVE and DISABLED are accepted when selected by update_mask.
             ///
             /// Field 4: `status`
-            pub status: &'a str,
+            pub status: ::buffa::EnumValue<super::super::SubaccountStatus>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SubaccountUpdateSpecView<'a> {
@@ -63096,9 +64040,11 @@ pub mod __buffa {
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -63132,7 +64078,7 @@ pub mod __buffa {
                     label: self.label.to_string(),
                     icon: self.icon.to_string(),
                     color: self.color.to_string(),
-                    status: self.status.to_string(),
+                    status: self.status,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -63158,10 +64104,11 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
                 }
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -63183,8 +64130,11 @@ pub mod __buffa {
                 if !self.color.is_empty() {
                     ::buffa::types::put_string_field(3u32, &self.color, buf);
                 }
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(4u32, &self.status, buf);
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -63216,8 +64166,8 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.color) {
                     __map.serialize_entry("color", self.color)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
                 }
                 __map.end()
             }
@@ -63336,11 +64286,11 @@ pub mod __buffa {
             pub fn color(&self) -> &'_ str {
                 self.0.reborrow().color
             }
-            /// Status for the sub-account, such as "active" or "disabled".
+            /// New lifecycle status. ACTIVE and DISABLED are accepted when selected by update_mask.
             ///
             /// Field 4: `status`
             #[must_use]
-            pub fn status(&self) -> &'_ str {
+            pub fn status(&self) -> ::buffa::EnumValue<super::super::SubaccountStatus> {
                 self.0.reborrow().status
             }
         }
@@ -68452,12 +69402,10 @@ pub mod __buffa {
         /// Request to list sub-account invitations.
         #[derive(Clone, Debug, Default)]
         pub struct ListSubaccountInvitesRequestView<'a> {
-            /// Optional direction filter. Use "incoming" for invites where the caller is grantee,
-            /// "outgoing" for all invites on sub-accounts the caller currently owns or administers,
-            /// or empty for both scopes.
+            /// Optional direction filter. An omitted value includes both scopes.
             ///
             /// Field 1: `direction`
-            pub direction: &'a str,
+            pub direction: ::buffa::EnumValue<super::super::SubaccountInviteDirection>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListSubaccountInvitesRequestView<'a> {
@@ -68494,9 +69442,11 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.direction = ::buffa::types::borrow_str(&mut cur)?;
+                        view.direction = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -68527,7 +69477,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListSubaccountInvitesRequest {
-                    direction: self.direction.to_string(),
+                    direction: self.direction,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -68542,10 +69492,11 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.direction.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.direction) as u32;
+                {
+                    let val = self.direction.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -68558,8 +69509,11 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.direction.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.direction, buf);
+                {
+                    let val = self.direction.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -68582,8 +69536,10 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.direction) {
-                    __map.serialize_entry("direction", self.direction)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.direction,
+                ) {
+                    __map.serialize_entry("direction", &self.direction)?;
                 }
                 __map.end()
             }
@@ -68685,13 +69641,13 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional direction filter. Use "incoming" for invites where the caller is grantee,
-            /// "outgoing" for all invites on sub-accounts the caller currently owns or administers,
-            /// or empty for both scopes.
+            /// Optional direction filter. An omitted value includes both scopes.
             ///
             /// Field 1: `direction`
             #[must_use]
-            pub fn direction(&self) -> &'_ str {
+            pub fn direction(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::SubaccountInviteDirection> {
                 self.0.reborrow().direction
             }
         }
@@ -69705,10 +70661,12 @@ pub mod __buffa {
             ///
             /// Field 6: `include_balances`
             pub include_balances: bool,
-            /// Optional invitation direction filter. Use "incoming", "outgoing", or empty for both.
+            /// Optional invitation direction filter. An omitted value includes both scopes.
             ///
             /// Field 7: `invites_direction`
-            pub invites_direction: &'a str,
+            pub invites_direction: ::buffa::EnumValue<
+                super::super::SubaccountInviteDirection,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetSubaccountRequestView<'a> {
@@ -69787,9 +70745,11 @@ pub mod __buffa {
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.invites_direction = ::buffa::types::borrow_str(&mut cur)?;
+                        view.invites_direction = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -69826,7 +70786,7 @@ pub mod __buffa {
                     include_invites: self.include_invites,
                     include_policy: self.include_policy,
                     include_balances: self.include_balances,
-                    invites_direction: self.invites_direction.to_string(),
+                    invites_direction: self.invites_direction,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -69859,11 +70819,11 @@ pub mod __buffa {
                 if self.include_balances {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
-                if !self.invites_direction.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.invites_direction)
-                                as u32;
+                {
+                    let val = self.invites_direction.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -69894,8 +70854,11 @@ pub mod __buffa {
                 if self.include_balances {
                     ::buffa::types::put_bool_field(6u32, self.include_balances, buf);
                 }
-                if !self.invites_direction.is_empty() {
-                    ::buffa::types::put_string_field(7u32, &self.invites_direction, buf);
+                {
+                    let val = self.invites_direction.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(7u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -69940,10 +70903,10 @@ pub mod __buffa {
                 if self.include_balances {
                     __map.serialize_entry("includeBalances", &self.include_balances)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(
-                    self.invites_direction,
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.invites_direction,
                 ) {
-                    __map.serialize_entry("invitesDirection", self.invites_direction)?;
+                    __map.serialize_entry("invitesDirection", &self.invites_direction)?;
                 }
                 __map.end()
             }
@@ -70083,11 +71046,13 @@ pub mod __buffa {
             pub fn include_balances(&self) -> bool {
                 self.0.reborrow().include_balances
             }
-            /// Optional invitation direction filter. Use "incoming", "outgoing", or empty for both.
+            /// Optional invitation direction filter. An omitted value includes both scopes.
             ///
             /// Field 7: `invites_direction`
             #[must_use]
-            pub fn invites_direction(&self) -> &'_ str {
+            pub fn invites_direction(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::SubaccountInviteDirection> {
                 self.0.reborrow().invites_direction
             }
         }
@@ -105940,10 +106905,12 @@ pub mod __buffa {
             ///
             /// Field 1: `account_id`
             pub account_id: u64,
-            /// When present, indicates the request is authenticated via an API key.
+            /// Stable public identifier of the API key that authenticated this request,
+            /// formatted as "ak_" followed by 32 lowercase hexadecimal characters.
+            /// Absent when the request was not authenticated with an API key.
             ///
             /// Field 10: `api_key_id`
-            pub api_key_id: ::core::option::Option<u64>,
+            pub api_key_id: ::core::option::Option<&'a str>,
             /// Optional current username for the root account (empty if not set).
             ///
             /// Field 11: `username`
@@ -106002,11 +106969,9 @@ pub mod __buffa {
                     10u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::Fixed64,
+                            ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.api_key_id = Some(
-                            ::buffa::types::decode_fixed64(&mut cur)?,
-                        );
+                        view.api_key_id = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
                     11u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -106073,7 +107038,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::MeResponse {
                     account_id: self.account_id,
-                    api_key_id: self.api_key_id,
+                    api_key_id: self.api_key_id.map(|s| s.to_string()),
                     username: self.username.to_string(),
                     root_smart_account_address: self
                         .root_smart_account_address
@@ -106103,8 +107068,8 @@ pub mod __buffa {
                 if self.account_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if self.api_key_id.is_some() {
-                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                if let Some(ref v) = self.api_key_id {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
                 if !self.username.is_empty() {
                     size
@@ -106140,8 +107105,8 @@ pub mod __buffa {
                 if self.account_id != 0u64 {
                     ::buffa::types::put_fixed64_field(1u32, self.account_id, buf);
                 }
-                if let Some(v) = self.api_key_id {
-                    ::buffa::types::put_fixed64_field(10u32, v, buf);
+                if let Some(ref v) = self.api_key_id {
+                    ::buffa::types::put_string_field(10u32, v, buf);
                 }
                 if !self.username.is_empty() {
                     ::buffa::types::put_string_field(11u32, &self.username, buf);
@@ -106190,11 +107155,7 @@ pub mod __buffa {
                         )?;
                 }
                 if let ::core::option::Option::Some(__v) = self.api_key_id {
-                    __map
-                        .serialize_entry(
-                            "apiKeyId",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
+                    __map.serialize_entry("apiKeyId", __v)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.username) {
                     __map.serialize_entry("username", self.username)?;
@@ -106311,11 +107272,13 @@ pub mod __buffa {
             pub fn account_id(&self) -> u64 {
                 self.0.reborrow().account_id
             }
-            /// When present, indicates the request is authenticated via an API key.
+            /// Stable public identifier of the API key that authenticated this request,
+            /// formatted as "ak_" followed by 32 lowercase hexadecimal characters.
+            /// Absent when the request was not authenticated with an API key.
             ///
             /// Field 10: `api_key_id`
             #[must_use]
-            pub fn api_key_id(&self) -> ::core::option::Option<u64> {
+            pub fn api_key_id(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().api_key_id
             }
             /// Optional current username for the root account (empty if not set).
@@ -109619,6 +110582,950 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// GenerateUsernameOptionsRequest requests a fresh set of generated usernames.
+        #[derive(Clone, Debug, Default)]
+        pub struct GenerateUsernameOptionsRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GenerateUsernameOptionsRequestView<'a> {
+            type Owned = super::super::GenerateUsernameOptionsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GenerateUsernameOptionsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GenerateUsernameOptionsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GenerateUsernameOptionsRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GenerateUsernameOptionsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GenerateUsernameOptionsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GenerateUsernameOptionsRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "GenerateUsernameOptionsRequest";
+            const FULL_NAME: &'static str = "auth.v1.GenerateUsernameOptionsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GenerateUsernameOptionsRequest";
+        }
+        ::buffa::impl_default_view_instance!(GenerateUsernameOptionsRequestView);
+        ::buffa::impl_view_reborrow!(GenerateUsernameOptionsRequestView);
+        /** Self-contained, `'static` owned view of a `GenerateUsernameOptionsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GenerateUsernameOptionsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GenerateUsernameOptionsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GenerateUsernameOptionsRequestOwnedView(
+            ::buffa::OwnedView<GenerateUsernameOptionsRequestView<'static>>,
+        );
+        impl GenerateUsernameOptionsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GenerateUsernameOptionsRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GenerateUsernameOptionsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GenerateUsernameOptionsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GenerateUsernameOptionsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GenerateUsernameOptionsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GenerateUsernameOptionsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GenerateUsernameOptionsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GenerateUsernameOptionsRequestView<'static>>,
+        > for GenerateUsernameOptionsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GenerateUsernameOptionsRequestView<'static>>,
+            ) -> Self {
+                GenerateUsernameOptionsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GenerateUsernameOptionsRequestOwnedView>
+        for ::buffa::OwnedView<GenerateUsernameOptionsRequestView<'static>> {
+            fn from(wrapper: GenerateUsernameOptionsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GenerateUsernameOptionsRequestView<'static>>,
+        > for GenerateUsernameOptionsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GenerateUsernameOptionsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GenerateUsernameOptionsRequest {
+            type View<'a> = GenerateUsernameOptionsRequestView<'a>;
+            type ViewHandle = GenerateUsernameOptionsRequestOwnedView;
+        }
+        impl ::serde::Serialize for GenerateUsernameOptionsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GenerateUsernameOptionsResponse contains five generated usernames that the
+        /// caller may claim before the offer expires.
+        #[derive(Clone, Debug, Default)]
+        pub struct GenerateUsernameOptionsResponseView<'a> {
+            /// Five distinct generated usernames available when this offer was created.
+            ///
+            /// Field 1: `usernames`
+            pub usernames: ::buffa::RepeatedView<'a, &'a str>,
+            /// Opaque proof required to claim one of the returned usernames.
+            ///
+            /// Field 2: `offer_token`
+            pub offer_token: &'a str,
+            /// Time in UTC after which this offer can no longer be claimed.
+            ///
+            /// Field 3: `expires_at`
+            pub expires_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GenerateUsernameOptionsResponseView<'a> {
+            type Owned = super::super::GenerateUsernameOptionsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.offer_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expires_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expires_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.usernames.push(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GenerateUsernameOptionsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GenerateUsernameOptionsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GenerateUsernameOptionsResponse {
+                    usernames: self.usernames.iter().map(|s| s.to_string()).collect(),
+                    offer_token: self.offer_token.to_string(),
+                    expires_at: match self.expires_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GenerateUsernameOptionsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.usernames {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if !self.offer_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.offer_token)
+                                as u32;
+                }
+                if self.expires_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expires_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.usernames {
+                    ::buffa::types::put_string_field(1u32, v, buf);
+                }
+                if !self.offer_token.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.offer_token, buf);
+                }
+                if self.expires_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expires_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GenerateUsernameOptionsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.usernames.is_empty() {
+                    __map.serialize_entry("usernames", &*self.usernames)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.offer_token) {
+                    __map.serialize_entry("offerToken", self.offer_token)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expires_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("expiresAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GenerateUsernameOptionsResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "GenerateUsernameOptionsResponse";
+            const FULL_NAME: &'static str = "auth.v1.GenerateUsernameOptionsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GenerateUsernameOptionsResponse";
+        }
+        ::buffa::impl_default_view_instance!(GenerateUsernameOptionsResponseView);
+        ::buffa::impl_view_reborrow!(GenerateUsernameOptionsResponseView);
+        /** Self-contained, `'static` owned view of a `GenerateUsernameOptionsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GenerateUsernameOptionsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GenerateUsernameOptionsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GenerateUsernameOptionsResponseOwnedView(
+            ::buffa::OwnedView<GenerateUsernameOptionsResponseView<'static>>,
+        );
+        impl GenerateUsernameOptionsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GenerateUsernameOptionsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GenerateUsernameOptionsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GenerateUsernameOptionsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GenerateUsernameOptionsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GenerateUsernameOptionsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GenerateUsernameOptionsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GenerateUsernameOptionsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Five distinct generated usernames available when this offer was created.
+            ///
+            /// Field 1: `usernames`
+            #[must_use]
+            pub fn usernames(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().usernames
+            }
+            /// Opaque proof required to claim one of the returned usernames.
+            ///
+            /// Field 2: `offer_token`
+            #[must_use]
+            pub fn offer_token(&self) -> &'_ str {
+                self.0.reborrow().offer_token
+            }
+            /// Time in UTC after which this offer can no longer be claimed.
+            ///
+            /// Field 3: `expires_at`
+            #[must_use]
+            pub fn expires_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expires_at
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GenerateUsernameOptionsResponseView<'static>>,
+        > for GenerateUsernameOptionsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GenerateUsernameOptionsResponseView<'static>>,
+            ) -> Self {
+                GenerateUsernameOptionsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GenerateUsernameOptionsResponseOwnedView>
+        for ::buffa::OwnedView<GenerateUsernameOptionsResponseView<'static>> {
+            fn from(wrapper: GenerateUsernameOptionsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GenerateUsernameOptionsResponseView<'static>>,
+        > for GenerateUsernameOptionsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GenerateUsernameOptionsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GenerateUsernameOptionsResponse {
+            type View<'a> = GenerateUsernameOptionsResponseView<'a>;
+            type ViewHandle = GenerateUsernameOptionsResponseOwnedView;
+        }
+        impl ::serde::Serialize for GenerateUsernameOptionsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ClaimGeneratedUsernameRequest selects one username from a generated offer.
+        #[derive(Clone, Debug, Default)]
+        pub struct ClaimGeneratedUsernameRequestView<'a> {
+            /// Opaque proof returned with the generated username options.
+            ///
+            /// Field 1: `offer_token`
+            pub offer_token: &'a str,
+            /// Zero-based position in the five returned username options.
+            ///
+            /// Field 2: `option_index`
+            pub option_index: u32,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ClaimGeneratedUsernameRequestView<'a> {
+            type Owned = super::super::ClaimGeneratedUsernameRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.offer_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.option_index = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ClaimGeneratedUsernameRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ClaimGeneratedUsernameRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ClaimGeneratedUsernameRequest {
+                    offer_token: self.offer_token.to_string(),
+                    option_index: self.option_index,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ClaimGeneratedUsernameRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.offer_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.offer_token)
+                                as u32;
+                }
+                if self.option_index != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.option_index)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.offer_token.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.offer_token, buf);
+                }
+                if self.option_index != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.option_index, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ClaimGeneratedUsernameRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.offer_token) {
+                    __map.serialize_entry("offerToken", self.offer_token)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.option_index) {
+                    __map
+                        .serialize_entry(
+                            "optionIndex",
+                            &::buffa::json_helpers::ProtoJson(&self.option_index),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ClaimGeneratedUsernameRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ClaimGeneratedUsernameRequest";
+            const FULL_NAME: &'static str = "auth.v1.ClaimGeneratedUsernameRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ClaimGeneratedUsernameRequest";
+        }
+        ::buffa::impl_default_view_instance!(ClaimGeneratedUsernameRequestView);
+        ::buffa::impl_view_reborrow!(ClaimGeneratedUsernameRequestView);
+        /** Self-contained, `'static` owned view of a `ClaimGeneratedUsernameRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ClaimGeneratedUsernameRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ClaimGeneratedUsernameRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ClaimGeneratedUsernameRequestOwnedView(
+            ::buffa::OwnedView<ClaimGeneratedUsernameRequestView<'static>>,
+        );
+        impl ClaimGeneratedUsernameRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ClaimGeneratedUsernameRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ClaimGeneratedUsernameRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ClaimGeneratedUsernameRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ClaimGeneratedUsernameRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ClaimGeneratedUsernameRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ClaimGeneratedUsernameRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ClaimGeneratedUsernameRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Opaque proof returned with the generated username options.
+            ///
+            /// Field 1: `offer_token`
+            #[must_use]
+            pub fn offer_token(&self) -> &'_ str {
+                self.0.reborrow().offer_token
+            }
+            /// Zero-based position in the five returned username options.
+            ///
+            /// Field 2: `option_index`
+            #[must_use]
+            pub fn option_index(&self) -> u32 {
+                self.0.reborrow().option_index
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ClaimGeneratedUsernameRequestView<'static>>,
+        > for ClaimGeneratedUsernameRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ClaimGeneratedUsernameRequestView<'static>>,
+            ) -> Self {
+                ClaimGeneratedUsernameRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ClaimGeneratedUsernameRequestOwnedView>
+        for ::buffa::OwnedView<ClaimGeneratedUsernameRequestView<'static>> {
+            fn from(wrapper: ClaimGeneratedUsernameRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ClaimGeneratedUsernameRequestView<'static>>,
+        > for ClaimGeneratedUsernameRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ClaimGeneratedUsernameRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ClaimGeneratedUsernameRequest {
+            type View<'a> = ClaimGeneratedUsernameRequestView<'a>;
+            type ViewHandle = ClaimGeneratedUsernameRequestOwnedView;
+        }
+        impl ::serde::Serialize for ClaimGeneratedUsernameRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// ResolvedAccount represents a lightweight view of a destination account for
         /// sharing or internal transfers.
         #[derive(Clone, Debug, Default)]
@@ -109629,16 +111536,16 @@ pub mod __buffa {
             ///
             /// Field 1: `smart_account_address`
             pub smart_account_address: &'a str,
-            /// Kind of account that owns this address: "root" or "sub".
+            /// Category of account that owns this address.
             ///
             /// Field 2: `kind`
-            pub kind: &'a str,
+            pub kind: ::buffa::EnumValue<super::super::resolved_account::Kind>,
             /// Root account username for the result. For sub-account results, this is the
             /// parent root account username. Empty means the root account has no username.
             ///
             /// Field 3: `root_username`
             pub root_username: &'a str,
-            /// Optional sub-account label when kind == "sub".
+            /// Optional sub-account label when kind is SUB.
             ///
             /// Field 4: `subaccount_label`
             pub subaccount_label: &'a str,
@@ -109692,9 +111599,11 @@ pub mod __buffa {
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.kind = ::buffa::types::borrow_str(&mut cur)?;
+                        view.kind = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -109747,7 +111656,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ResolvedAccount {
                     smart_account_address: self.smart_account_address.to_string(),
-                    kind: self.kind.to_string(),
+                    kind: self.kind,
                     root_username: self.root_username.to_string(),
                     subaccount_label: self.subaccount_label.to_string(),
                     account_id: self.account_id,
@@ -109772,8 +111681,11 @@ pub mod __buffa {
                                 &self.smart_account_address,
                             ) as u32;
                 }
-                if !self.kind.is_empty() {
-                    size += 1u32 + ::buffa::types::string_encoded_len(&self.kind) as u32;
+                {
+                    let val = self.kind.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 if !self.root_username.is_empty() {
                     size
@@ -109808,8 +111720,11 @@ pub mod __buffa {
                         buf,
                     );
                 }
-                if !self.kind.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.kind, buf);
+                {
+                    let val = self.kind.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
                 }
                 if !self.root_username.is_empty() {
                     ::buffa::types::put_string_field(3u32, &self.root_username, buf);
@@ -109850,8 +111765,8 @@ pub mod __buffa {
                             self.smart_account_address,
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.kind) {
-                    __map.serialize_entry("kind", self.kind)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.kind) {
+                    __map.serialize_entry("kind", &self.kind)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.root_username) {
                     __map.serialize_entry("rootUsername", self.root_username)?;
@@ -109971,11 +111886,13 @@ pub mod __buffa {
             pub fn smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().smart_account_address
             }
-            /// Kind of account that owns this address: "root" or "sub".
+            /// Category of account that owns this address.
             ///
             /// Field 2: `kind`
             #[must_use]
-            pub fn kind(&self) -> &'_ str {
+            pub fn kind(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::resolved_account::Kind> {
                 self.0.reborrow().kind
             }
             /// Root account username for the result. For sub-account results, this is the
@@ -109986,7 +111903,7 @@ pub mod __buffa {
             pub fn root_username(&self) -> &'_ str {
                 self.0.reborrow().root_username
             }
-            /// Optional sub-account label when kind == "sub".
+            /// Optional sub-account label when kind is SUB.
             ///
             /// Field 4: `subaccount_label`
             #[must_use]
@@ -114065,6 +115982,9 @@ pub mod __buffa {
         reg.register_json_any(super::__USERNAME_HISTORY_ENTRY_JSON_ANY);
         reg.register_json_any(super::__GET_USERNAME_HISTORY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_USERNAME_HISTORY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GENERATE_USERNAME_OPTIONS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GENERATE_USERNAME_OPTIONS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CLAIM_GENERATED_USERNAME_REQUEST_JSON_ANY);
         reg.register_json_any(super::__RESOLVED_ACCOUNT_JSON_ANY);
         reg.register_json_any(super::__RESOLVE_ACCOUNT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__RESOLVE_ACCOUNT_RESPONSE_JSON_ANY);
@@ -114773,6 +116693,18 @@ pub use self::__buffa::view::GetUsernameHistoryRequestOwnedView;
 pub use self::__buffa::view::GetUsernameHistoryResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetUsernameHistoryResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GenerateUsernameOptionsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GenerateUsernameOptionsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GenerateUsernameOptionsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GenerateUsernameOptionsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ClaimGeneratedUsernameRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ClaimGeneratedUsernameRequestOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ResolvedAccountView;
 #[doc(inline)]

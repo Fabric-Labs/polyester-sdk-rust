@@ -3,6 +3,8 @@
 /// =============================================================================
 /// Shared Enums (used by both REST and binary messages)
 /// =============================================================================
+///
+/// Side identifies whether an order buys or sells the base asset.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum Side {
@@ -144,6 +146,7 @@ impl ::buffa::Enumeration for Side {
         &[Self::SIDE_UNSPECIFIED, Self::BUY, Self::SELL]
     }
 }
+/// OrderType identifies whether an order uses limit-price or market execution.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum OrderType {
@@ -289,6 +292,8 @@ impl ::buffa::Enumeration for OrderType {
         &[Self::ORDER_TYPE_UNSPECIFIED, Self::LIMIT, Self::MARKET]
     }
 }
+/// TimeInForce controls how long an order may remain active and whether it must
+/// fill completely.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum TimeInForce {
@@ -588,6 +593,8 @@ impl ::buffa::Enumeration for FeeAsset {
         &[Self::FEE_ASSET_UNSPECIFIED, Self::QUOTE, Self::BASE]
     }
 }
+/// SelfTradePreventionMode controls which orders expire when they would trade
+/// against another order from the same account.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum SelfTradePreventionMode {
@@ -795,9 +802,11 @@ pub enum ErrorCode {
     ERROR_CODE_UPSTREAM_ERROR = 14i32,
     /// Requested fee asset is not allowed for this order.
     ERROR_CODE_FEE_ASSET_NOT_ALLOWED = 15i32,
-    /// Additional domain-specific codes used by the Orders API.
+    /// Pair is disabled and does not accept orders.
     ERROR_CODE_PAIR_DISABLED = 16i32,
+    /// Referenced order could not be resolved.
     ERROR_CODE_ORDER_UNKNOWN = 17i32,
+    /// Order processing failed because of an unexpected error.
     ERROR_CODE_INTERNAL_ERROR = 18i32,
     /// Sub-account is present but not in an active state (disabled, deleted,
     /// etc.).
@@ -5659,15 +5668,15 @@ pub mod cancel_order_request {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CancelOrderResponse {
-    /// Status indicator, e.g., "accepted".
+    /// Cancellation submission outcome.
     ///
     /// Field 1: `status`
     #[serde(
         rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub status: ::buffa::alloc::string::String,
+    pub status: ::buffa::EnumValue<cancel_order_response::Status>,
     /// Order ID as fixed64.
     ///
     /// Field 2: `order_id`
@@ -5735,8 +5744,11 @@ impl ::buffa::Message for CancelOrderResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         if self.order_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
@@ -5762,8 +5774,11 @@ impl ::buffa::Message for CancelOrderResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.status, buf);
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
         }
         if self.order_id != 0u64 {
             ::buffa::types::put_fixed64_field(2u32, self.order_id, buf);
@@ -5791,9 +5806,11 @@ impl ::buffa::Message for CancelOrderResponse {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -5828,7 +5845,7 @@ impl ::buffa::Message for CancelOrderResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.status.clear();
+        self.status = ::buffa::EnumValue::from(0);
         self.order_id = 0u64;
         self.ts = ::buffa::MessageField::none();
         self.ts_ns = 0u64;
@@ -5864,6 +5881,148 @@ pub const __CANCEL_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     from_json: ::buffa::type_registry::any_from_json::<CancelOrderResponse>,
     is_wkt: false,
 };
+pub mod cancel_order_response {
+    #[allow(unused_imports)]
+    use super::*;
+    /// Cancellation submission outcome.
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum Status {
+        /// Cancellation status was not provided.
+        STATUS_UNSPECIFIED = 0i32,
+        /// The cancellation request was accepted for processing.
+        ACCEPTED = 1i32,
+    }
+    impl Status {
+        ///Idiomatic alias for [`Self::STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const StatusUnspecified: Self = Self::STATUS_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::ACCEPTED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Accepted: Self = Self::ACCEPTED;
+    }
+    impl ::core::default::Default for Status {
+        fn default() -> Self {
+            Self::STATUS_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for Status {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Status {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = Status;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!("a string, integer, or null for ", stringify!(Status)),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<Status, E> {
+                    <Status as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<Status, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for Status {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for Status {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::STATUS_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::ACCEPTED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::STATUS_UNSPECIFIED => "STATUS_UNSPECIFIED",
+                Self::ACCEPTED => "ACCEPTED",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "STATUS_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::STATUS_UNSPECIFIED)
+                }
+                "ACCEPTED" => ::core::option::Option::Some(Self::ACCEPTED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[Self::STATUS_UNSPECIFIED, Self::ACCEPTED]
+        }
+    }
+}
 /// FieldViolation describes one actionable request validation failure.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -8132,15 +8291,15 @@ pub const __CANCEL_ALL_ORDERS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyE
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CancelAllOrdersResponse {
-    /// "submitted" or "dry_run".
+    /// Cancel-all submission outcome.
     ///
     /// Field 1: `status`
     #[serde(
         rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub status: ::buffa::alloc::string::String,
+    pub status: ::buffa::EnumValue<cancel_all_orders_response::Status>,
     /// Number of orders that matched the filter.
     ///
     /// Field 2: `matched_orders`
@@ -8230,8 +8389,11 @@ impl ::buffa::Message for CancelAllOrdersResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         if self.matched_orders != 0u32 {
             size
@@ -8267,8 +8429,11 @@ impl ::buffa::Message for CancelAllOrdersResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.status, buf);
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
         }
         if self.matched_orders != 0u32 {
             ::buffa::types::put_uint32_field(2u32, self.matched_orders, buf);
@@ -8302,9 +8467,11 @@ impl ::buffa::Message for CancelAllOrdersResponse {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -8353,7 +8520,7 @@ impl ::buffa::Message for CancelAllOrdersResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.status.clear();
+        self.status = ::buffa::EnumValue::from(0);
         self.matched_orders = 0u32;
         self.submitted_cancels = 0u32;
         self.failed_cancels = 0u32;
@@ -8391,6 +8558,156 @@ pub const __CANCEL_ALL_ORDERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
     from_json: ::buffa::type_registry::any_from_json::<CancelAllOrdersResponse>,
     is_wkt: false,
 };
+pub mod cancel_all_orders_response {
+    #[allow(unused_imports)]
+    use super::*;
+    /// Cancel-all submission outcome.
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum Status {
+        /// Cancel-all status was not provided.
+        STATUS_UNSPECIFIED = 0i32,
+        /// Matching cancellation requests were submitted for processing.
+        SUBMITTED = 1i32,
+        /// The request only counted matching orders and submitted no cancellations.
+        DRY_RUN = 2i32,
+    }
+    impl Status {
+        ///Idiomatic alias for [`Self::STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const StatusUnspecified: Self = Self::STATUS_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::SUBMITTED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Submitted: Self = Self::SUBMITTED;
+        ///Idiomatic alias for [`Self::DRY_RUN`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const DryRun: Self = Self::DRY_RUN;
+    }
+    impl ::core::default::Default for Status {
+        fn default() -> Self {
+            Self::STATUS_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for Status {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Status {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = Status;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!("a string, integer, or null for ", stringify!(Status)),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<Status, E> {
+                    <Status as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<Status, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for Status {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for Status {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::STATUS_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::SUBMITTED),
+                2i32 => ::core::option::Option::Some(Self::DRY_RUN),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::STATUS_UNSPECIFIED => "STATUS_UNSPECIFIED",
+                Self::SUBMITTED => "SUBMITTED",
+                Self::DRY_RUN => "DRY_RUN",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "STATUS_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::STATUS_UNSPECIFIED)
+                }
+                "SUBMITTED" => ::core::option::Option::Some(Self::SUBMITTED),
+                "DRY_RUN" => ::core::option::Option::Some(Self::DRY_RUN),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[Self::STATUS_UNSPECIFIED, Self::SUBMITTED, Self::DRY_RUN]
+        }
+    }
+}
 /// =============================================================================
 /// CancelAllAfter: dead-man switch heartbeat
 /// =============================================================================
@@ -8647,15 +8964,15 @@ pub const __CANCEL_ALL_AFTER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEn
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CancelAllAfterResponse {
-    /// "armed" or "disabled".
+    /// Dead-man switch state after applying the request.
     ///
     /// Field 1: `status`
     #[serde(
         rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub status: ::buffa::alloc::string::String,
+    pub status: ::buffa::EnumValue<cancel_all_after_response::Status>,
     /// Effective timeout in seconds (0 when disabled).
     ///
     /// Field 2: `effective_timeout_sec`
@@ -8734,8 +9051,11 @@ impl ::buffa::Message for CancelAllAfterResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         if self.effective_timeout_sec != 0u32 {
             size
@@ -8769,8 +9089,11 @@ impl ::buffa::Message for CancelAllAfterResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.status, buf);
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
         }
         if self.effective_timeout_sec != 0u32 {
             ::buffa::types::put_uint32_field(2u32, self.effective_timeout_sec, buf);
@@ -8801,9 +9124,11 @@ impl ::buffa::Message for CancelAllAfterResponse {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -8845,7 +9170,7 @@ impl ::buffa::Message for CancelAllAfterResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.status.clear();
+        self.status = ::buffa::EnumValue::from(0);
         self.effective_timeout_sec = 0u32;
         self.expires_at_ts_ns = 0u64;
         self.ts = ::buffa::MessageField::none();
@@ -8882,6 +9207,156 @@ pub const __CANCEL_ALL_AFTER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyE
     from_json: ::buffa::type_registry::any_from_json::<CancelAllAfterResponse>,
     is_wkt: false,
 };
+pub mod cancel_all_after_response {
+    #[allow(unused_imports)]
+    use super::*;
+    /// Dead-man switch state after applying the request.
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum Status {
+        /// Dead-man switch status was not provided.
+        STATUS_UNSPECIFIED = 0i32,
+        /// The dead-man switch is armed or refreshed.
+        ARMED = 1i32,
+        /// The dead-man switch is disabled.
+        DISABLED = 2i32,
+    }
+    impl Status {
+        ///Idiomatic alias for [`Self::STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const StatusUnspecified: Self = Self::STATUS_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::ARMED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Armed: Self = Self::ARMED;
+        ///Idiomatic alias for [`Self::DISABLED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Disabled: Self = Self::DISABLED;
+    }
+    impl ::core::default::Default for Status {
+        fn default() -> Self {
+            Self::STATUS_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for Status {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Status {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = Status;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!("a string, integer, or null for ", stringify!(Status)),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<Status, E> {
+                    <Status as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<Status, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for Status {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for Status {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::STATUS_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::ARMED),
+                2i32 => ::core::option::Option::Some(Self::DISABLED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::STATUS_UNSPECIFIED => "STATUS_UNSPECIFIED",
+                Self::ARMED => "ARMED",
+                Self::DISABLED => "DISABLED",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "STATUS_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::STATUS_UNSPECIFIED)
+                }
+                "ARMED" => ::core::option::Option::Some(Self::ARMED),
+                "DISABLED" => ::core::option::Option::Some(Self::DISABLED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[Self::STATUS_UNSPECIFIED, Self::ARMED, Self::DISABLED]
+        }
+    }
+}
 /// =============================================================================
 /// BatchCreateOrders: best-effort batch order placement
 /// =============================================================================
@@ -12605,15 +13080,15 @@ pub const __BATCH_CANCEL_ITEM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct BatchCancelResultItem {
-    /// "accepted" or "rejected".
+    /// Per-item cancellation outcome.
     ///
     /// Field 1: `status`
     #[serde(
         rename = "status",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub status: ::buffa::alloc::string::String,
+    pub status: ::buffa::EnumValue<batch_cancel_result_item::Status>,
     /// Resolved order ID (populated on accept).
     ///
     /// Field 2: `order_id`
@@ -12691,8 +13166,11 @@ impl ::buffa::Message for BatchCancelResultItem {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.status.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.status) as u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         if self.order_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
@@ -12723,8 +13201,11 @@ impl ::buffa::Message for BatchCancelResultItem {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.status.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.status, buf);
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
         }
         if self.order_id != 0u64 {
             ::buffa::types::put_fixed64_field(2u32, self.order_id, buf);
@@ -12755,9 +13236,11 @@ impl ::buffa::Message for BatchCancelResultItem {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.status, buf)?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -12799,7 +13282,7 @@ impl ::buffa::Message for BatchCancelResultItem {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.status.clear();
+        self.status = ::buffa::EnumValue::from(0);
         self.order_id = 0u64;
         self.client_order_id.clear();
         self.code.clear();
@@ -12836,6 +13319,156 @@ pub const __BATCH_CANCEL_RESULT_ITEM_JSON_ANY: ::buffa::type_registry::JsonAnyEn
     from_json: ::buffa::type_registry::any_from_json::<BatchCancelResultItem>,
     is_wkt: false,
 };
+pub mod batch_cancel_result_item {
+    #[allow(unused_imports)]
+    use super::*;
+    /// Per-item cancellation outcome.
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum Status {
+        /// Batch cancellation outcome was not provided.
+        STATUS_UNSPECIFIED = 0i32,
+        /// The cancellation request was accepted for processing.
+        ACCEPTED = 1i32,
+        /// The cancellation request was rejected.
+        REJECTED = 2i32,
+    }
+    impl Status {
+        ///Idiomatic alias for [`Self::STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const StatusUnspecified: Self = Self::STATUS_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::ACCEPTED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Accepted: Self = Self::ACCEPTED;
+        ///Idiomatic alias for [`Self::REJECTED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Rejected: Self = Self::REJECTED;
+    }
+    impl ::core::default::Default for Status {
+        fn default() -> Self {
+            Self::STATUS_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for Status {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Status {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = Status;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!("a string, integer, or null for ", stringify!(Status)),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<Status, E> {
+                    <Status as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<Status, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for Status {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for Status {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::STATUS_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::ACCEPTED),
+                2i32 => ::core::option::Option::Some(Self::REJECTED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::STATUS_UNSPECIFIED => "STATUS_UNSPECIFIED",
+                Self::ACCEPTED => "ACCEPTED",
+                Self::REJECTED => "REJECTED",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "STATUS_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::STATUS_UNSPECIFIED)
+                }
+                "ACCEPTED" => ::core::option::Option::Some(Self::ACCEPTED),
+                "REJECTED" => ::core::option::Option::Some(Self::REJECTED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[Self::STATUS_UNSPECIFIED, Self::ACCEPTED, Self::REJECTED]
+        }
+    }
+}
 /// BatchCancelOrdersRequest cancels multiple orders by explicit ID.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -24509,10 +25142,10 @@ pub mod __buffa {
         /// CancelOrderResponse is the binary (protobuf) response after canceling an order.
         #[derive(Clone, Debug, Default)]
         pub struct CancelOrderResponseView<'a> {
-            /// Status indicator, e.g., "accepted".
+            /// Cancellation submission outcome.
             ///
             /// Field 1: `status`
-            pub status: &'a str,
+            pub status: ::buffa::EnumValue<super::super::cancel_order_response::Status>,
             /// Order ID as fixed64.
             ///
             /// Field 2: `order_id`
@@ -24563,9 +25196,11 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -24635,7 +25270,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CancelOrderResponse {
-                    status: self.status.to_string(),
+                    status: self.status,
                     order_id: self.order_id,
                     ts: match self.ts.as_option() {
                         Some(v) => {
@@ -24660,10 +25295,11 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 if self.order_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
@@ -24690,8 +25326,11 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.status, buf);
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
                 }
                 if self.order_id != 0u64 {
                     ::buffa::types::put_fixed64_field(2u32, self.order_id, buf);
@@ -24728,8 +25367,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.order_id) {
                     __map
@@ -24846,11 +25485,13 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Status indicator, e.g., "accepted".
+            /// Cancellation submission outcome.
             ///
             /// Field 1: `status`
             #[must_use]
-            pub fn status(&self) -> &'_ str {
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::cancel_order_response::Status> {
                 self.0.reborrow().status
             }
             /// Order ID as fixed64.
@@ -28670,10 +29311,12 @@ pub mod __buffa {
         /// CancelAllOrdersResponse returns the result of a cancel-all operation.
         #[derive(Clone, Debug, Default)]
         pub struct CancelAllOrdersResponseView<'a> {
-            /// "submitted" or "dry_run".
+            /// Cancel-all submission outcome.
             ///
             /// Field 1: `status`
-            pub status: &'a str,
+            pub status: ::buffa::EnumValue<
+                super::super::cancel_all_orders_response::Status,
+            >,
             /// Number of orders that matched the filter.
             ///
             /// Field 2: `matched_orders`
@@ -28732,9 +29375,11 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -28820,7 +29465,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CancelAllOrdersResponse {
-                    status: self.status.to_string(),
+                    status: self.status,
                     matched_orders: self.matched_orders,
                     submitted_cancels: self.submitted_cancels,
                     failed_cancels: self.failed_cancels,
@@ -28847,10 +29492,11 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 if self.matched_orders != 0u32 {
                     size
@@ -28892,8 +29538,11 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.status, buf);
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
                 }
                 if self.matched_orders != 0u32 {
                     ::buffa::types::put_uint32_field(2u32, self.matched_orders, buf);
@@ -28936,8 +29585,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(&self.matched_orders) {
                     __map
@@ -29072,11 +29721,13 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// "submitted" or "dry_run".
+            /// Cancel-all submission outcome.
             ///
             /// Field 1: `status`
             #[must_use]
-            pub fn status(&self) -> &'_ str {
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::cancel_all_orders_response::Status> {
                 self.0.reborrow().status
             }
             /// Number of orders that matched the filter.
@@ -29580,10 +30231,12 @@ pub mod __buffa {
         /// CancelAllAfterResponse returns dead-man switch arming/disable status.
         #[derive(Clone, Debug, Default)]
         pub struct CancelAllAfterResponseView<'a> {
-            /// "armed" or "disabled".
+            /// Dead-man switch state after applying the request.
             ///
             /// Field 1: `status`
-            pub status: &'a str,
+            pub status: ::buffa::EnumValue<
+                super::super::cancel_all_after_response::Status,
+            >,
             /// Effective timeout in seconds (0 when disabled).
             ///
             /// Field 2: `effective_timeout_sec`
@@ -29638,9 +30291,11 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -29719,7 +30374,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CancelAllAfterResponse {
-                    status: self.status.to_string(),
+                    status: self.status,
                     effective_timeout_sec: self.effective_timeout_sec,
                     expires_at_ts_ns: self.expires_at_ts_ns,
                     ts: match self.ts.as_option() {
@@ -29745,10 +30400,11 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 if self.effective_timeout_sec != 0u32 {
                     size
@@ -29785,8 +30441,11 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.status, buf);
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
                 }
                 if self.effective_timeout_sec != 0u32 {
                     ::buffa::types::put_uint32_field(
@@ -29830,8 +30489,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(
                     &self.effective_timeout_sec,
@@ -29959,11 +30618,13 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// "armed" or "disabled".
+            /// Dead-man switch state after applying the request.
             ///
             /// Field 1: `status`
             #[must_use]
-            pub fn status(&self) -> &'_ str {
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::cancel_all_after_response::Status> {
                 self.0.reborrow().status
             }
             /// Effective timeout in seconds (0 when disabled).
@@ -35699,10 +36360,12 @@ pub mod __buffa {
         /// BatchCancelResultItem contains the per-item result of a batch cancel.
         #[derive(Clone, Debug, Default)]
         pub struct BatchCancelResultItemView<'a> {
-            /// "accepted" or "rejected".
+            /// Per-item cancellation outcome.
             ///
             /// Field 1: `status`
-            pub status: &'a str,
+            pub status: ::buffa::EnumValue<
+                super::super::batch_cancel_result_item::Status,
+            >,
             /// Resolved order ID (populated on accept).
             ///
             /// Field 2: `order_id`
@@ -35757,9 +36420,11 @@ pub mod __buffa {
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.status = ::buffa::types::borrow_str(&mut cur)?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -35836,7 +36501,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::BatchCancelResultItem {
-                    status: self.status.to_string(),
+                    status: self.status,
                     order_id: self.order_id,
                     client_order_id: self.client_order_id.to_string(),
                     code: self.code.to_string(),
@@ -35862,10 +36527,11 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.status.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.status) as u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 if self.order_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
@@ -35898,8 +36564,11 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.status.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.status, buf);
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
                 }
                 if self.order_id != 0u64 {
                     ::buffa::types::put_fixed64_field(2u32, self.order_id, buf);
@@ -35939,8 +36608,8 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.status) {
-                    __map.serialize_entry("status", self.status)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.order_id) {
                     __map
@@ -36056,11 +36725,13 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// "accepted" or "rejected".
+            /// Per-item cancellation outcome.
             ///
             /// Field 1: `status`
             #[must_use]
-            pub fn status(&self) -> &'_ str {
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::batch_cancel_result_item::Status> {
                 self.0.reborrow().status
             }
             /// Resolved order ID (populated on accept).
