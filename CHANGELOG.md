@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.1.0a43
+
+Package version: `0.1.0-alpha.43`. Git tag: `v0.1.0a43`.
+
+### Fixed
+- Qty/price strings with trailing zeros past scale are accepted when the
+  value is exact after trim. `"1.500000000"` at scale 8 matches `"1.5"`;
+  `"1.500000001"` still rejects. This is the string path, not `Decimal`
+  (POLY-4685).
+
 ## 0.1.0a42
 
 Package version: `0.1.0-alpha.42`. Git tag: `v0.1.0a42`.

@@ -115,6 +115,24 @@ fn is_strict_decimal(text: &str) -> bool {
     !saw_dot || frac_digits > 0
 }
 
+fn trim_trailing_frac_zeros(raw: &str) -> String {
+    match raw.split_once('.') {
+        None => raw.to_owned(),
+        Some((int_part, frac_part)) => {
+            let frac_part = frac_part.trim_end_matches('0');
+            if frac_part.is_empty() {
+                if int_part.is_empty() {
+                    "0".to_owned()
+                } else {
+                    int_part.to_owned()
+                }
+            } else {
+                format!("{int_part}.{frac_part}")
+            }
+        }
+    }
+}
+
 /// Strict decimal→scaled. Never rounds; excess fractional digits fail.
 pub fn try_decimal_to_scaled(decimal: &str, scale: u32) -> std::result::Result<i128, &'static str> {
     if scale > MAX_PROTOCOL_SCALE {
@@ -124,9 +142,10 @@ pub fn try_decimal_to_scaled(decimal: &str, scale: u32) -> std::result::Result<i
     if !is_strict_decimal(raw) {
         return Err("invalid");
     }
+    let raw = trim_trailing_frac_zeros(raw);
     let (int_part, frac_part) = match raw.split_once('.') {
         Some((i, f)) => (i, f),
-        None => (raw, ""),
+        None => (raw.as_str(), ""),
     };
     if frac_part.len() as u32 > scale {
         return Err("precision");
@@ -405,6 +424,16 @@ mod tests {
     fn qty_rejects_excess_precision() {
         let err = parse_qty_scaled_str("1.123456789", 8, "qty").unwrap_err();
         assert!(err.to_string().contains("at most") || err.to_string().contains("precision"));
+    }
+
+    #[test]
+    fn qty_accepts_trailing_zeros_beyond_scale() {
+        // POLY-4685: extra zeros past scale are padding, not extra precision.
+        let padded = parse_qty_scaled_str("1.500000000", 8, "qty").unwrap();
+        let short = parse_qty_scaled_str("1.5", 8, "qty").unwrap();
+        assert_eq!(padded, short);
+        assert_eq!(padded, 150_000_000);
+        assert!(parse_qty_scaled_str("1.500000001", 8, "qty").is_err());
     }
 
     #[test]
