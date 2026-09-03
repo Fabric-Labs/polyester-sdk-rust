@@ -16,7 +16,12 @@ fn timestamp_ms(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> Option
 pub fn me_from_proto(msg: &MeResponse) -> MeResult {
     MeResult {
         account_id: format_uint64_id(msg.account_id),
-        api_key_id: msg.api_key_id.map(format_uint64_id),
+        api_key_id: msg
+            .api_key_id
+            .as_ref()
+            .map(|id| id.trim())
+            .filter(|id| !id.is_empty())
+            .map(str::to_owned),
         username: if msg.username.is_empty() {
             None
         } else {
@@ -79,7 +84,7 @@ mod tests {
     fn me_from_proto_formats_ids() {
         let msg = MeResponse {
             account_id: 42,
-            api_key_id: Some(99),
+            api_key_id: Some("ak_0123456789abcdef0123456789abcdef".into()),
             username: "alice".into(),
             root_smart_account_address: "0xabc".into(),
             ..Default::default()
@@ -88,7 +93,7 @@ mod tests {
         assert_eq!(me.account_id, format_uint64_id(42));
         assert_eq!(
             me.api_key_id.as_deref(),
-            Some(format_uint64_id(99).as_str())
+            Some("ak_0123456789abcdef0123456789abcdef")
         );
         assert_eq!(me.username.as_deref(), Some("alice"));
         assert_eq!(me.root_smart_account_address.as_deref(), Some("0xabc"));

@@ -11,13 +11,33 @@ use crate::proto::auth::v1::{
     CreateSubaccountResponse, GetSubaccountResponse, InviteSubaccountMemberResponse,
     ListSubaccountEventsResponse, ListSubaccountInvitesResponse, ListSubaccountMembersResponse,
     ListSubaccountsResponse, RespondSubaccountInviteResponse, Subaccount, SubaccountInvite,
-    SubaccountMemberView,
+    SubaccountInviteDirection, SubaccountMemberView, SubaccountStatus,
 };
 
 fn timestamp_ms(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> i64 {
     match ts {
         Some(t) => t.seconds.saturating_mul(1000) + (t.nanos as i64) / 1_000_000,
         None => 0,
+    }
+}
+
+fn subaccount_status_name(status: &buffa::EnumValue<SubaccountStatus>) -> String {
+    match status.as_known() {
+        Some(SubaccountStatus::Active) => "active".to_owned(),
+        Some(SubaccountStatus::Disabled) => "disabled".to_owned(),
+        Some(SubaccountStatus::Unspecified) => String::new(),
+        None => format!("UNKNOWN({})", status.to_i32()),
+    }
+}
+
+pub fn invite_direction_from_label(direction: &str) -> Result<SubaccountInviteDirection, String> {
+    match direction.trim().to_ascii_lowercase().as_str() {
+        "" | "unspecified" => Ok(SubaccountInviteDirection::DirectionUnspecified),
+        "incoming" => Ok(SubaccountInviteDirection::Incoming),
+        "outgoing" => Ok(SubaccountInviteDirection::Outgoing),
+        other => Err(format!(
+            "invites_direction must be incoming, outgoing, or empty; got {other:?}"
+        )),
     }
 }
 
@@ -34,7 +54,7 @@ pub fn subaccount_from_proto(msg: &Subaccount) -> SubAccount {
         subaccount_id: format_uint64_id(msg.id),
         label: msg.label.clone(),
         smart_account_address: msg.smart_account_address.clone(),
-        status: msg.status.clone(),
+        status: subaccount_status_name(&msg.status),
         updated_at: msg.updated_at.as_option().cloned(),
         revision: msg.revision,
     }
@@ -138,7 +158,7 @@ mod tests {
                 id: 12,
                 label: "trading".into(),
                 smart_account_address: "0xabc".into(),
-                status: "active".into(),
+                status: SubaccountStatus::Active.into(),
                 updated_at: Timestamp {
                     seconds: 3,
                     nanos: 123_456_000,
@@ -154,6 +174,7 @@ mod tests {
         assert_eq!(result.subaccounts.len(), 1);
         assert_eq!(result.subaccounts[0].subaccount_id, format_uint64_id(12));
         assert_eq!(result.subaccounts[0].smart_account_address, "0xabc");
+        assert_eq!(result.subaccounts[0].status, "active");
         assert_eq!(
             result.subaccounts[0].updated_at.as_ref().unwrap().nanos,
             123_456_000
@@ -202,5 +223,22 @@ mod tests {
         });
         assert_eq!(result.subaccount_id, format_uint64_id(42));
         assert_eq!(result.revision, 1);
+    }
+
+    #[test]
+    fn invite_direction_from_label_validates() {
+        assert_eq!(
+            invite_direction_from_label("").unwrap(),
+            SubaccountInviteDirection::DirectionUnspecified
+        );
+        assert_eq!(
+            invite_direction_from_label("incoming").unwrap(),
+            SubaccountInviteDirection::Incoming
+        );
+        assert_eq!(
+            invite_direction_from_label("OUTGOING").unwrap(),
+            SubaccountInviteDirection::Outgoing
+        );
+        assert!(invite_direction_from_label("sideways").is_err());
     }
 }

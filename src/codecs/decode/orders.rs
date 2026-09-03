@@ -27,7 +27,8 @@ use crate::proto::orders::v1::{
     ErrorDetail, GetBatchReplaceStatusResponse, GetOpenOrdersResponse, GetOrderHistoryResponse,
     GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse, Order as ProtoOrder,
     PreviewOrderResponse, RiskExecution, TrailingStopPolicy, UserTrade as ProtoUserTrade,
-    batch_create_result_item, risk_execution, trailing_stop_policy,
+    batch_cancel_result_item, batch_create_result_item, cancel_all_after_response,
+    cancel_all_orders_response, cancel_order_response, risk_execution, trailing_stop_policy,
 };
 use crate::proto::polyester::r#type::v1::U128;
 use buffa::Enumeration;
@@ -306,13 +307,24 @@ pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> Result<OrderMuta
 }
 
 pub fn order_mutation_from_cancel(msg: &CancelOrderResponse) -> Result<OrderMutationResult> {
-    if msg.order_id == 0 || msg.status.trim().is_empty() {
+    let status = cancel_order_status_name(&msg.status)
+        .ok_or_else(|| Error::response_contract("CancelOrder", "missing order_id or status"))?;
+    if msg.order_id == 0 {
         return Err(Error::response_contract(
             "CancelOrder",
             "missing order_id or status",
         ));
     }
-    Ok(order_mutation(&msg.status, msg.order_id, ""))
+    Ok(order_mutation(status, msg.order_id, ""))
+}
+
+fn cancel_order_status_name(
+    status: &buffa::EnumValue<cancel_order_response::Status>,
+) -> Option<&'static str> {
+    match status.as_known()? {
+        cancel_order_response::Status::Accepted => Some("accepted"),
+        cancel_order_response::Status::StatusUnspecified => None,
+    }
 }
 
 fn order_mutation(status: &str, order_id: u64, client_order_id: &str) -> OrderMutationResult {
@@ -415,16 +427,13 @@ fn modify_action_name(
 }
 
 pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllOrdersResult> {
-    let status = msg.status.trim();
-    if status.is_empty()
-        || !(status.eq_ignore_ascii_case("submitted") || status.eq_ignore_ascii_case("dry_run"))
-    {
-        return Err(Error::response_contract(
+    let status = cancel_all_status_name(&msg.status).ok_or_else(|| {
+        Error::response_contract(
             "CancelAllOrders",
-            format!("unknown status {:?}", msg.status),
-        ));
-    }
-    if status.eq_ignore_ascii_case("submitted")
+            format!("unknown status {}", msg.status.to_i32()),
+        )
+    })?;
+    if status == "submitted"
         && msg
             .submitted_cancels
             .checked_add(msg.failed_cancels)
@@ -439,9 +448,7 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllO
             ),
         ));
     }
-    if status.eq_ignore_ascii_case("dry_run")
-        && (msg.submitted_cancels != 0 || msg.failed_cancels != 0)
-    {
+    if status == "dry_run" && (msg.submitted_cancels != 0 || msg.failed_cancels != 0) {
         return Err(Error::response_contract(
             "CancelAllOrders",
             format!(
@@ -451,11 +458,21 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllO
         ));
     }
     Ok(CancelAllOrdersResult {
-        status: msg.status.clone(),
+        status: status.to_owned(),
         matched_orders: msg.matched_orders,
         submitted_cancels: msg.submitted_cancels,
         failed_cancels: msg.failed_cancels,
     })
+}
+
+fn cancel_all_status_name(
+    status: &buffa::EnumValue<cancel_all_orders_response::Status>,
+) -> Option<&'static str> {
+    match status.as_known()? {
+        cancel_all_orders_response::Status::Submitted => Some("submitted"),
+        cancel_all_orders_response::Status::DryRun => Some("dry_run"),
+        cancel_all_orders_response::Status::StatusUnspecified => None,
+    }
 }
 
 /// Per-item results now carry an `Accepted`/`Rejected` outcome oneof instead of
@@ -538,18 +555,19 @@ pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> Result<BatchC
     let mut rejected = 0u32;
     let mut results = Vec::with_capacity(msg.results.len());
     for item in &msg.results {
-        if item.status.eq_ignore_ascii_case("accepted") {
-            accepted += 1;
-        } else if item.status.eq_ignore_ascii_case("rejected") {
-            rejected += 1;
-        } else {
-            return Err(Error::response_contract(
+        let status = batch_cancel_item_status_name(&item.status).ok_or_else(|| {
+            Error::response_contract(
                 "BatchCancelOrders",
-                format!("unknown item status {:?}", item.status),
-            ));
+                format!("unknown item status {}", item.status.to_i32()),
+            )
+        })?;
+        match status {
+            "accepted" => accepted += 1,
+            "rejected" => rejected += 1,
+            _ => unreachable!("known batch cancel status"),
         }
         results.push(BatchCancelResultItem {
-            status: item.status.clone(),
+            status: status.to_owned(),
             order_id: format_uint64_id(item.order_id),
             client_order_id: item.client_order_id.clone(),
             code: item.code.clone(),
@@ -764,18 +782,35 @@ fn batch_replace_phase_name(phase: buffa::EnumValue<BatchReplacePhase>) -> Optio
     }
 }
 
-pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> Result<CancelAllAfterResult> {
-    let status = msg.status.trim();
-    if status.is_empty()
-        || !(status.eq_ignore_ascii_case("armed") || status.eq_ignore_ascii_case("disabled"))
-    {
-        return Err(Error::response_contract(
-            "CancelAllAfter",
-            format!("unknown status {:?}", msg.status),
-        ));
+fn batch_cancel_item_status_name(
+    status: &buffa::EnumValue<batch_cancel_result_item::Status>,
+) -> Option<&'static str> {
+    match status.as_known()? {
+        batch_cancel_result_item::Status::Accepted => Some("accepted"),
+        batch_cancel_result_item::Status::Rejected => Some("rejected"),
+        batch_cancel_result_item::Status::StatusUnspecified => None,
     }
+}
+
+fn cancel_all_after_status_name(
+    status: &buffa::EnumValue<cancel_all_after_response::Status>,
+) -> Option<&'static str> {
+    match status.as_known()? {
+        cancel_all_after_response::Status::Armed => Some("armed"),
+        cancel_all_after_response::Status::Disabled => Some("disabled"),
+        cancel_all_after_response::Status::StatusUnspecified => None,
+    }
+}
+
+pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> Result<CancelAllAfterResult> {
+    let status = cancel_all_after_status_name(&msg.status).ok_or_else(|| {
+        Error::response_contract(
+            "CancelAllAfter",
+            format!("unknown status {}", msg.status.to_i32()),
+        )
+    })?;
     Ok(CancelAllAfterResult {
-        status: msg.status.clone(),
+        status: status.to_owned(),
         effective_timeout_sec: msg.effective_timeout_sec,
         expires_at_ts_ns: TsNs::from_wire(msg.expires_at_ts_ns, "CancelAllAfter.expires_at_ts_ns")?
             .optional_string(),
@@ -1447,12 +1482,12 @@ mod tests {
         assert!(created_without_client_id.client_order_id.is_empty());
 
         let cancelled = order_mutation_from_cancel(&CancelOrderResponse {
-            status: "cancelled".into(),
+            status: cancel_order_response::Status::Accepted.into(),
             order_id: 42,
             ..Default::default()
         })
         .unwrap();
-        assert_eq!(cancelled.status, "cancelled");
+        assert_eq!(cancelled.status, "accepted");
         assert_eq!(cancelled.order_id, format_uint64_id(42));
         assert!(cancelled.client_order_id.is_empty());
     }
@@ -1696,7 +1731,7 @@ mod tests {
 
         let mismatch = BatchCancelOrdersResponse {
             results: vec![ProtoItem {
-                status: "accepted".into(),
+                status: batch_cancel_result_item::Status::Accepted.into(),
                 order_id: 9,
                 ..Default::default()
             }],
@@ -1712,7 +1747,7 @@ mod tests {
 
         let unknown = BatchCancelOrdersResponse {
             results: vec![ProtoItem {
-                status: "maybe".into(),
+                status: buffa::EnumValue::from(99),
                 ..Default::default()
             }],
             accepted_count: 1,
@@ -1830,7 +1865,7 @@ mod tests {
     #[test]
     fn cancel_all_requires_known_status() {
         let valid = CancelAllOrdersResponse {
-            status: "submitted".into(),
+            status: cancel_all_orders_response::Status::Submitted.into(),
             matched_orders: 2,
             submitted_cancels: 2,
             failed_cancels: 0,
@@ -1841,14 +1876,14 @@ mod tests {
         assert_eq!(decoded.matched_orders, 2);
 
         let dry_run = CancelAllOrdersResponse {
-            status: "dry_run".into(),
+            status: cancel_all_orders_response::Status::DryRun.into(),
             matched_orders: 3,
             ..Default::default()
         };
         assert!(cancel_all_from_proto(&dry_run).is_ok());
 
         let mismatched = CancelAllOrdersResponse {
-            status: "submitted".into(),
+            status: cancel_all_orders_response::Status::Submitted.into(),
             matched_orders: 3,
             submitted_cancels: 1,
             failed_cancels: 1,
@@ -1860,9 +1895,12 @@ mod tests {
         assert!(err.mutation_outcome_unknown());
         assert!(err.to_string().contains("response counts"));
 
-        for status in ["", "ok", "maybe", "accepted"] {
+        for status in [
+            cancel_all_orders_response::Status::StatusUnspecified.into(),
+            buffa::EnumValue::from(99),
+        ] {
             let bad = CancelAllOrdersResponse {
-                status: status.into(),
+                status,
                 matched_orders: 1,
                 ..Default::default()
             };
@@ -1877,7 +1915,7 @@ mod tests {
     #[test]
     fn cancel_all_after_requires_known_status() {
         let armed = CancelAllAfterResponse {
-            status: "armed".into(),
+            status: cancel_all_after_response::Status::Armed.into(),
             effective_timeout_sec: 30,
             expires_at_ts_ns: 99,
             ..Default::default()
@@ -1888,14 +1926,17 @@ mod tests {
         assert_eq!(decoded.expires_at_ts_ns, "99");
 
         let disabled = CancelAllAfterResponse {
-            status: "disabled".into(),
+            status: cancel_all_after_response::Status::Disabled.into(),
             ..Default::default()
         };
         assert!(cancel_all_after_from_proto(&disabled).is_ok());
 
-        for status in ["", "ok", "submitted", "maybe"] {
+        for status in [
+            cancel_all_after_response::Status::StatusUnspecified.into(),
+            buffa::EnumValue::from(99),
+        ] {
             let bad = CancelAllAfterResponse {
-                status: status.into(),
+                status,
                 effective_timeout_sec: 10,
                 ..Default::default()
             };

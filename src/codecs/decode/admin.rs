@@ -115,7 +115,7 @@ mod tests {
         let msg = ResolveAccountResponse {
             matches: vec![ProtoResolvedAccount {
                 smart_account_address: "0x123".into(),
-                kind: "subaccount".into(),
+                kind: crate::proto::auth::v1::resolved_account::Kind::Sub.into(),
                 account_id: 99,
                 ..Default::default()
             }],
