@@ -2437,6 +2437,170 @@ pub const __ASSET_GROUPING_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
     from_json: ::buffa::type_registry::any_from_json::<AssetGrouping>,
     is_wkt: false,
 };
+/// Logical account grouping used by root portfolio equity history.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PortfolioAccountGrouping {
+    /// Public account or subaccount ID. Its encoded entity type distinguishes
+    /// the master account from an owned subaccount. Omitted for Remaining.
+    ///
+    /// Field 1: `account_id`
+    #[serde(
+        rename = "accountId",
+        alias = "account_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub account_id: ::core::option::Option<u64>,
+    /// True when this series combines all non-selected owned subaccounts.
+    ///
+    /// Field 2: `remaining`
+    #[serde(
+        rename = "remaining",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub remaining: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PortfolioAccountGrouping {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PortfolioAccountGrouping")
+            .field("account_id", &self.account_id)
+            .field("remaining", &self.remaining)
+            .finish()
+    }
+}
+impl PortfolioAccountGrouping {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.PortfolioAccountGrouping";
+}
+impl PortfolioAccountGrouping {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::account_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_account_id(mut self, value: u64) -> Self {
+        self.account_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(PortfolioAccountGrouping);
+impl ::buffa::MessageName for PortfolioAccountGrouping {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "PortfolioAccountGrouping";
+    const FULL_NAME: &'static str = "ledger.read.v1.PortfolioAccountGrouping";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.PortfolioAccountGrouping";
+}
+impl ::buffa::Message for PortfolioAccountGrouping {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.account_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.remaining {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(v) = self.account_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
+        if self.remaining {
+            ::buffa::types::put_bool_field(2u32, self.remaining, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.account_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.remaining = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.account_id = ::core::option::Option::None;
+        self.remaining = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PortfolioAccountGrouping {
+    const PROTO_FQN: &'static str = "ledger.read.v1.PortfolioAccountGrouping";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PortfolioAccountGrouping {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PORTFOLIO_ACCOUNT_GROUPING_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.PortfolioAccountGrouping",
+    to_json: ::buffa::type_registry::any_to_json::<PortfolioAccountGrouping>,
+    from_json: ::buffa::type_registry::any_from_json::<PortfolioAccountGrouping>,
+    is_wkt: false,
+};
 /// Equity history in USDT (or BTC via client-side conversion using btc_prices).
 /// Values are derived from per-asset balances and market prices (close ticks).
 #[derive(Clone, PartialEq, Default)]
@@ -2791,6 +2955,14 @@ impl ::buffa::Message for EquitySeries {
                         += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::equity_series::Grouping::PortfolioAccount(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         if !self.equity_q.is_empty() {
@@ -2825,6 +2997,14 @@ impl ::buffa::Message for EquitySeries {
                 __buffa::oneof::equity_series::Grouping::Asset(x) => {
                     ::buffa::types::put_len_delimited_header(
                         3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::equity_series::Grouping::PortfolioAccount(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -2891,6 +3071,28 @@ impl ::buffa::Message for EquitySeries {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.grouping = ::core::option::Option::Some(
                         __buffa::oneof::equity_series::Grouping::Asset(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::equity_series::Grouping::PortfolioAccount(
+                        ref mut existing,
+                    ),
+                ) = self.grouping
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.grouping = ::core::option::Option::Some(
+                        __buffa::oneof::equity_series::Grouping::PortfolioAccount(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -3032,6 +3234,30 @@ impl<'de> serde::Deserialize<'de> for EquitySeries {
                                 }
                                 __oneof_grouping = Some(
                                     __buffa::oneof::equity_series::Grouping::Asset(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "portfolioAccount" | "portfolio_account" => {
+                            let v: ::core::option::Option<PortfolioAccountGrouping> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            PortfolioAccountGrouping,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_grouping.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'grouping'",
+                                        ),
+                                    );
+                                }
+                                __oneof_grouping = Some(
+                                    __buffa::oneof::equity_series::Grouping::PortfolioAccount(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -3433,6 +3659,1252 @@ pub const __GET_EQUITY_HISTORY_SERIES_RESPONSE_JSON_ANY: ::buffa::type_registry:
     type_url: "type.googleapis.com/ledger.read.v1.GetEquityHistorySeriesResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetEquityHistorySeriesResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetEquityHistorySeriesResponse>,
+    is_wkt: false,
+};
+/// Requests root portfolio equity history.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetPortfolioEquityHistorySeriesRequest {
+    /// History window to return. When unset/UNSPECIFIED, defaults to 1D.
+    ///
+    /// Field 1: `range`
+    #[serde(
+        rename = "range",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub range: ::buffa::EnumValue<BalanceRange>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetPortfolioEquityHistorySeriesRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetPortfolioEquityHistorySeriesRequest")
+            .field("range", &self.range)
+            .finish()
+    }
+}
+impl GetPortfolioEquityHistorySeriesRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquityHistorySeriesRequest";
+}
+::buffa::impl_default_instance!(GetPortfolioEquityHistorySeriesRequest);
+impl ::buffa::MessageName for GetPortfolioEquityHistorySeriesRequest {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "GetPortfolioEquityHistorySeriesRequest";
+    const FULL_NAME: &'static str = "ledger.read.v1.GetPortfolioEquityHistorySeriesRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquityHistorySeriesRequest";
+}
+impl ::buffa::Message for GetPortfolioEquityHistorySeriesRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.range.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.range.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.range = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.range = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetPortfolioEquityHistorySeriesRequest {
+    const PROTO_FQN: &'static str = "ledger.read.v1.GetPortfolioEquityHistorySeriesRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetPortfolioEquityHistorySeriesRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_PORTFOLIO_EQUITY_HISTORY_SERIES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.GetPortfolioEquityHistorySeriesRequest",
+    to_json: ::buffa::type_registry::any_to_json::<
+        GetPortfolioEquityHistorySeriesRequest,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetPortfolioEquityHistorySeriesRequest,
+    >,
+    is_wkt: false,
+};
+/// Root portfolio equity history with aligned, implicit timestamps.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetPortfolioEquityHistorySeriesResponse {
+    /// Resolved history window.
+    ///
+    /// Field 1: `range`
+    #[serde(
+        rename = "range",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub range: ::buffa::EnumValue<BalanceRange>,
+    /// Sampling interval between points, such as "5m" or "1h".
+    ///
+    /// Field 2: `bucket`
+    #[serde(
+        rename = "bucket",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bucket: ::buffa::alloc::string::String,
+    /// First point timestamp in seconds since epoch (UTC).
+    ///
+    /// Field 3: `start_ts_sec`
+    #[serde(
+        rename = "startTsSec",
+        alias = "start_ts_sec",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub start_ts_sec: u32,
+    /// Last point timestamp in seconds since epoch (UTC).
+    ///
+    /// Field 4: `end_ts_sec`
+    #[serde(
+        rename = "endTsSec",
+        alias = "end_ts_sec",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub end_ts_sec: u32,
+    /// Human-readable quote asset symbol (always "USDT").
+    ///
+    /// Field 5: `quote_asset`
+    #[serde(
+        rename = "quoteAsset",
+        alias = "quote_asset",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub quote_asset: ::buffa::alloc::string::String,
+    /// Number of aligned points in each returned series.
+    ///
+    /// Field 6: `points`
+    #[serde(
+        rename = "points",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub points: u32,
+    /// Master account first, followed by up to nine owned subaccounts ordered by
+    /// current equity descending, then Remaining when other subaccounts exist.
+    ///
+    /// Field 7: `series`
+    #[serde(
+        rename = "series",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub series: ::buffa::alloc::vec::Vec<EquitySeries>,
+    /// BTC-USDT close price at each timestamp, scaled by 1e6 (same as price_ticks).
+    /// Enables client-side conversion to BTC denomination without refetch.
+    ///
+    /// Field 8: `btc_prices_q`
+    #[serde(
+        rename = "btcPricesQ",
+        alias = "btc_prices_q",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub btc_prices_q: ::buffa::alloc::vec::Vec<i64>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetPortfolioEquityHistorySeriesResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetPortfolioEquityHistorySeriesResponse")
+            .field("range", &self.range)
+            .field("bucket", &self.bucket)
+            .field("start_ts_sec", &self.start_ts_sec)
+            .field("end_ts_sec", &self.end_ts_sec)
+            .field("quote_asset", &self.quote_asset)
+            .field("points", &self.points)
+            .field("series", &self.series)
+            .field("btc_prices_q", &self.btc_prices_q)
+            .finish()
+    }
+}
+impl GetPortfolioEquityHistorySeriesResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquityHistorySeriesResponse";
+}
+::buffa::impl_default_instance!(GetPortfolioEquityHistorySeriesResponse);
+impl ::buffa::MessageName for GetPortfolioEquityHistorySeriesResponse {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "GetPortfolioEquityHistorySeriesResponse";
+    const FULL_NAME: &'static str = "ledger.read.v1.GetPortfolioEquityHistorySeriesResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquityHistorySeriesResponse";
+}
+impl ::buffa::Message for GetPortfolioEquityHistorySeriesResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.range.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.bucket.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.bucket) as u32;
+        }
+        if self.start_ts_sec != 0u32 {
+            size += 1u32 + ::buffa::types::FIXED32_ENCODED_LEN as u32;
+        }
+        if self.end_ts_sec != 0u32 {
+            size += 1u32 + ::buffa::types::FIXED32_ENCODED_LEN as u32;
+        }
+        if !self.quote_asset.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.quote_asset) as u32;
+        }
+        if self.points != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.points) as u32;
+        }
+        for v in &self.series {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.btc_prices_q.is_empty() {
+            let payload: u32 = self
+                .btc_prices_q
+                .iter()
+                .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.range.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.bucket.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.bucket, buf);
+        }
+        if self.start_ts_sec != 0u32 {
+            ::buffa::types::put_fixed32_field(3u32, self.start_ts_sec, buf);
+        }
+        if self.end_ts_sec != 0u32 {
+            ::buffa::types::put_fixed32_field(4u32, self.end_ts_sec, buf);
+        }
+        if !self.quote_asset.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.quote_asset, buf);
+        }
+        if self.points != 0u32 {
+            ::buffa::types::put_uint32_field(6u32, self.points, buf);
+        }
+        for v in &self.series {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if !self.btc_prices_q.is_empty() {
+            let payload: u32 = self
+                .btc_prices_q
+                .iter()
+                .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(8u32, payload, buf);
+            for &v in &self.btc_prices_q {
+                ::buffa::types::encode_int64(v, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.range = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bucket, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed32,
+                )?;
+                self.start_ts_sec = ::buffa::types::decode_fixed32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed32,
+                )?;
+                self.end_ts_sec = ::buffa::types::decode_fixed32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.quote_asset, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.points = ::buffa::types::decode_uint32(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.series.push(elem);
+            }
+            8u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.btc_prices_q.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.btc_prices_q
+                            .push(::buffa::types::decode_int64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.btc_prices_q.push(::buffa::types::decode_int64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.range = ::buffa::EnumValue::from(0);
+        self.bucket.clear();
+        self.start_ts_sec = 0u32;
+        self.end_ts_sec = 0u32;
+        self.quote_asset.clear();
+        self.points = 0u32;
+        self.series.clear();
+        self.btc_prices_q.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetPortfolioEquityHistorySeriesResponse {
+    const PROTO_FQN: &'static str = "ledger.read.v1.GetPortfolioEquityHistorySeriesResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetPortfolioEquityHistorySeriesResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_PORTFOLIO_EQUITY_HISTORY_SERIES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.GetPortfolioEquityHistorySeriesResponse",
+    to_json: ::buffa::type_registry::any_to_json::<
+        GetPortfolioEquityHistorySeriesResponse,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetPortfolioEquityHistorySeriesResponse,
+    >,
+    is_wkt: false,
+};
+/// Current equity for one logical account in the root portfolio.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PortfolioAccountEquity {
+    /// Public master-account or subaccount ID.
+    ///
+    /// Field 1: `account_id`
+    #[serde(
+        rename = "accountId",
+        alias = "account_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub account_id: u64,
+    /// Current equity in USDT scaled by 1e4 (4 decimals).
+    ///
+    /// Field 2: `equity_q`
+    #[serde(
+        rename = "equityQ",
+        alias = "equity_q",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub equity_q: i64,
+    /// Up to three assets with the highest current equity value, ordered highest
+    /// first. Assets without a current value are omitted.
+    ///
+    /// Field 3: `top_asset_ids`
+    #[serde(
+        rename = "topAssetIds",
+        alias = "top_asset_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub top_asset_ids: ::buffa::alloc::vec::Vec<u32>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PortfolioAccountEquity {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PortfolioAccountEquity")
+            .field("account_id", &self.account_id)
+            .field("equity_q", &self.equity_q)
+            .field("top_asset_ids", &self.top_asset_ids)
+            .finish()
+    }
+}
+impl PortfolioAccountEquity {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.PortfolioAccountEquity";
+}
+::buffa::impl_default_instance!(PortfolioAccountEquity);
+impl ::buffa::MessageName for PortfolioAccountEquity {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "PortfolioAccountEquity";
+    const FULL_NAME: &'static str = "ledger.read.v1.PortfolioAccountEquity";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.PortfolioAccountEquity";
+}
+impl ::buffa::Message for PortfolioAccountEquity {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.account_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.equity_q != 0i64 {
+            size += 1u32 + ::buffa::types::sint64_encoded_len(self.equity_q) as u32;
+        }
+        if !self.top_asset_ids.is_empty() {
+            let payload: u32 = self
+                .top_asset_ids
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.account_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.account_id, buf);
+        }
+        if self.equity_q != 0i64 {
+            ::buffa::types::put_sint64_field(2u32, self.equity_q, buf);
+        }
+        if !self.top_asset_ids.is_empty() {
+            let payload: u32 = self
+                .top_asset_ids
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(3u32, payload, buf);
+            for &v in &self.top_asset_ids {
+                ::buffa::types::encode_uint32(v, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.account_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.equity_q = ::buffa::types::decode_sint64(buf)?;
+            }
+            3u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.top_asset_ids.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.top_asset_ids
+                            .push(::buffa::types::decode_uint32(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.top_asset_ids.push(::buffa::types::decode_uint32(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.account_id = 0u64;
+        self.equity_q = 0i64;
+        self.top_asset_ids.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PortfolioAccountEquity {
+    const PROTO_FQN: &'static str = "ledger.read.v1.PortfolioAccountEquity";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PortfolioAccountEquity {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PORTFOLIO_ACCOUNT_EQUITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.PortfolioAccountEquity",
+    to_json: ::buffa::type_registry::any_to_json::<PortfolioAccountEquity>,
+    from_json: ::buffa::type_registry::any_from_json::<PortfolioAccountEquity>,
+    is_wkt: false,
+};
+/// Current aggregate balance and equity for one asset in the root portfolio.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PortfolioAssetEquity {
+    /// Public unified asset ID.
+    ///
+    /// Field 1: `asset_id`
+    #[serde(
+        rename = "assetId",
+        alias = "asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub asset_id: u32,
+    /// Combined Funding and Trading balance in asset units scaled by 1e7
+    /// (7 decimals).
+    ///
+    /// Field 2: `balance_q`
+    #[serde(
+        rename = "balanceQ",
+        alias = "balance_q",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub balance_q: u64,
+    /// Current equity in USDT scaled by 1e4 (4 decimals).
+    ///
+    /// Field 3: `equity_q`
+    #[serde(
+        rename = "equityQ",
+        alias = "equity_q",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub equity_q: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PortfolioAssetEquity {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PortfolioAssetEquity")
+            .field("asset_id", &self.asset_id)
+            .field("balance_q", &self.balance_q)
+            .field("equity_q", &self.equity_q)
+            .finish()
+    }
+}
+impl PortfolioAssetEquity {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.PortfolioAssetEquity";
+}
+::buffa::impl_default_instance!(PortfolioAssetEquity);
+impl ::buffa::MessageName for PortfolioAssetEquity {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "PortfolioAssetEquity";
+    const FULL_NAME: &'static str = "ledger.read.v1.PortfolioAssetEquity";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.PortfolioAssetEquity";
+}
+impl ::buffa::Message for PortfolioAssetEquity {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.asset_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+        }
+        if self.balance_q != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.balance_q) as u32;
+        }
+        if self.equity_q != 0i64 {
+            size += 1u32 + ::buffa::types::sint64_encoded_len(self.equity_q) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+        }
+        if self.balance_q != 0u64 {
+            ::buffa::types::put_uint64_field(2u32, self.balance_q, buf);
+        }
+        if self.equity_q != 0i64 {
+            ::buffa::types::put_sint64_field(3u32, self.equity_q, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.balance_q = ::buffa::types::decode_uint64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.equity_q = ::buffa::types::decode_sint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.asset_id = 0u32;
+        self.balance_q = 0u64;
+        self.equity_q = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PortfolioAssetEquity {
+    const PROTO_FQN: &'static str = "ledger.read.v1.PortfolioAssetEquity";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PortfolioAssetEquity {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PORTFOLIO_ASSET_EQUITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.PortfolioAssetEquity",
+    to_json: ::buffa::type_registry::any_to_json::<PortfolioAssetEquity>,
+    from_json: ::buffa::type_registry::any_from_json::<PortfolioAssetEquity>,
+    is_wkt: false,
+};
+/// Requests a current root portfolio equity snapshot.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetPortfolioEquitySnapshotRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetPortfolioEquitySnapshotRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetPortfolioEquitySnapshotRequest").finish()
+    }
+}
+impl GetPortfolioEquitySnapshotRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquitySnapshotRequest";
+}
+::buffa::impl_default_instance!(GetPortfolioEquitySnapshotRequest);
+impl ::buffa::MessageName for GetPortfolioEquitySnapshotRequest {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "GetPortfolioEquitySnapshotRequest";
+    const FULL_NAME: &'static str = "ledger.read.v1.GetPortfolioEquitySnapshotRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquitySnapshotRequest";
+}
+impl ::buffa::Message for GetPortfolioEquitySnapshotRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetPortfolioEquitySnapshotRequest {
+    const PROTO_FQN: &'static str = "ledger.read.v1.GetPortfolioEquitySnapshotRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetPortfolioEquitySnapshotRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_PORTFOLIO_EQUITY_SNAPSHOT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.GetPortfolioEquitySnapshotRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetPortfolioEquitySnapshotRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetPortfolioEquitySnapshotRequest,
+    >,
+    is_wkt: false,
+};
+/// Current root portfolio equity, grouped by logical account and asset.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetPortfolioEquitySnapshotResponse {
+    /// Human-readable quote asset symbol (always "USDT").
+    ///
+    /// Field 1: `quote_asset`
+    #[serde(
+        rename = "quoteAsset",
+        alias = "quote_asset",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub quote_asset: ::buffa::alloc::string::String,
+    /// Current equity across the master account and all owned subaccounts in USDT,
+    /// scaled by 1e4 (4 decimals).
+    ///
+    /// Field 2: `total_equity_q`
+    #[serde(
+        rename = "totalEquityQ",
+        alias = "total_equity_q",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub total_equity_q: i64,
+    /// Master account first, followed by every owned subaccount ordered by current
+    /// equity descending and public ID ascending for ties.
+    ///
+    /// Field 3: `accounts`
+    #[serde(
+        rename = "accounts",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub accounts: ::buffa::alloc::vec::Vec<PortfolioAccountEquity>,
+    /// Non-zero asset balances ordered by current equity descending and public
+    /// asset ID ascending for ties.
+    ///
+    /// Field 4: `assets`
+    #[serde(
+        rename = "assets",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub assets: ::buffa::alloc::vec::Vec<PortfolioAssetEquity>,
+    /// Current BTC-USDT price scaled by 1e6. Zero when unavailable.
+    ///
+    /// Field 5: `btc_price_q`
+    #[serde(
+        rename = "btcPriceQ",
+        alias = "btc_price_q",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub btc_price_q: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetPortfolioEquitySnapshotResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetPortfolioEquitySnapshotResponse")
+            .field("quote_asset", &self.quote_asset)
+            .field("total_equity_q", &self.total_equity_q)
+            .field("accounts", &self.accounts)
+            .field("assets", &self.assets)
+            .field("btc_price_q", &self.btc_price_q)
+            .finish()
+    }
+}
+impl GetPortfolioEquitySnapshotResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquitySnapshotResponse";
+}
+::buffa::impl_default_instance!(GetPortfolioEquitySnapshotResponse);
+impl ::buffa::MessageName for GetPortfolioEquitySnapshotResponse {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "GetPortfolioEquitySnapshotResponse";
+    const FULL_NAME: &'static str = "ledger.read.v1.GetPortfolioEquitySnapshotResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquitySnapshotResponse";
+}
+impl ::buffa::Message for GetPortfolioEquitySnapshotResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.quote_asset.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.quote_asset) as u32;
+        }
+        if self.total_equity_q != 0i64 {
+            size
+                += 1u32 + ::buffa::types::sint64_encoded_len(self.total_equity_q) as u32;
+        }
+        for v in &self.accounts {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.assets {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.btc_price_q != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.btc_price_q) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.quote_asset.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.quote_asset, buf);
+        }
+        if self.total_equity_q != 0i64 {
+            ::buffa::types::put_sint64_field(2u32, self.total_equity_q, buf);
+        }
+        for v in &self.accounts {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        for v in &self.assets {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.btc_price_q != 0i64 {
+            ::buffa::types::put_int64_field(5u32, self.btc_price_q, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.quote_asset, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.total_equity_q = ::buffa::types::decode_sint64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.accounts.push(elem);
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.assets.push(elem);
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.btc_price_q = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.quote_asset.clear();
+        self.total_equity_q = 0i64;
+        self.accounts.clear();
+        self.assets.clear();
+        self.btc_price_q = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetPortfolioEquitySnapshotResponse {
+    const PROTO_FQN: &'static str = "ledger.read.v1.GetPortfolioEquitySnapshotResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetPortfolioEquitySnapshotResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_PORTFOLIO_EQUITY_SNAPSHOT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.GetPortfolioEquitySnapshotResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetPortfolioEquitySnapshotResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetPortfolioEquitySnapshotResponse,
+    >,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -8457,6 +9929,316 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// Logical account grouping used by root portfolio equity history.
+        #[derive(Clone, Debug, Default)]
+        pub struct PortfolioAccountGroupingView<'a> {
+            /// Public account or subaccount ID. Its encoded entity type distinguishes
+            /// the master account from an owned subaccount. Omitted for Remaining.
+            ///
+            /// Field 1: `account_id`
+            pub account_id: ::core::option::Option<u64>,
+            /// True when this series combines all non-selected owned subaccounts.
+            ///
+            /// Field 2: `remaining`
+            pub remaining: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PortfolioAccountGroupingView<'a> {
+            type Owned = super::super::PortfolioAccountGrouping;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.account_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.remaining = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PortfolioAccountGrouping,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PortfolioAccountGrouping,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PortfolioAccountGrouping {
+                    account_id: self.account_id,
+                    remaining: self.remaining,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PortfolioAccountGroupingView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.account_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.remaining {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(v) = self.account_id {
+                    ::buffa::types::put_fixed64_field(1u32, v, buf);
+                }
+                if self.remaining {
+                    ::buffa::types::put_bool_field(2u32, self.remaining, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PortfolioAccountGroupingView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.account_id {
+                    __map
+                        .serialize_entry(
+                            "accountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if self.remaining {
+                    __map.serialize_entry("remaining", &self.remaining)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PortfolioAccountGroupingView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "PortfolioAccountGrouping";
+            const FULL_NAME: &'static str = "ledger.read.v1.PortfolioAccountGrouping";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.PortfolioAccountGrouping";
+        }
+        ::buffa::impl_default_view_instance!(PortfolioAccountGroupingView);
+        ::buffa::impl_view_reborrow!(PortfolioAccountGroupingView);
+        /** Self-contained, `'static` owned view of a `PortfolioAccountGrouping` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PortfolioAccountGroupingView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PortfolioAccountGroupingView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PortfolioAccountGroupingOwnedView(
+            ::buffa::OwnedView<PortfolioAccountGroupingView<'static>>,
+        );
+        impl PortfolioAccountGroupingOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PortfolioAccountGroupingOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PortfolioAccountGroupingOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PortfolioAccountGrouping,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PortfolioAccountGroupingOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PortfolioAccountGroupingView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PortfolioAccountGroupingView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PortfolioAccountGrouping,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public account or subaccount ID. Its encoded entity type distinguishes
+            /// the master account from an owned subaccount. Omitted for Remaining.
+            ///
+            /// Field 1: `account_id`
+            #[must_use]
+            pub fn account_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().account_id
+            }
+            /// True when this series combines all non-selected owned subaccounts.
+            ///
+            /// Field 2: `remaining`
+            #[must_use]
+            pub fn remaining(&self) -> bool {
+                self.0.reborrow().remaining
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PortfolioAccountGroupingView<'static>>,
+        > for PortfolioAccountGroupingOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PortfolioAccountGroupingView<'static>>,
+            ) -> Self {
+                PortfolioAccountGroupingOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PortfolioAccountGroupingOwnedView>
+        for ::buffa::OwnedView<PortfolioAccountGroupingView<'static>> {
+            fn from(wrapper: PortfolioAccountGroupingOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PortfolioAccountGroupingView<'static>>,
+        > for PortfolioAccountGroupingOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<PortfolioAccountGroupingView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PortfolioAccountGrouping {
+            type View<'a> = PortfolioAccountGroupingView<'a>;
+            type ViewHandle = PortfolioAccountGroupingOwnedView;
+        }
+        impl ::serde::Serialize for PortfolioAccountGroupingOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// Equity history in USDT (or BTC via client-side conversion using btc_prices).
         /// Values are derived from per-asset balances and market prices (close ticks).
         #[derive(Clone, Debug, Default)]
@@ -9032,6 +10814,37 @@ pub mod __buffa {
                             );
                         }
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::equity_series::Grouping::PortfolioAccount(
+                                ref mut existing,
+                            ),
+                        ) = view.grouping
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.grouping = Some(
+                                super::super::__buffa::view::oneof::equity_series::Grouping::PortfolioAccount(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::PortfolioAccountGroupingView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -9084,6 +10897,15 @@ pub mod __buffa {
                                             ),
                                         )
                                     }
+                                    super::super::__buffa::view::oneof::equity_series::Grouping::PortfolioAccount(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::equity_series::Grouping::PortfolioAccount(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
                                 },
                             )
                         }
@@ -9116,6 +10938,16 @@ pub mod __buffa {
                                     + inner;
                         }
                         super::super::__buffa::view::oneof::equity_series::Grouping::Asset(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::equity_series::Grouping::PortfolioAccount(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -9165,6 +10997,16 @@ pub mod __buffa {
                         ) => {
                             ::buffa::types::put_len_delimited_header(
                                 3u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::equity_series::Grouping::PortfolioAccount(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                4u32,
                                 __cache.consume_next(),
                                 buf,
                             );
@@ -9222,6 +11064,11 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("asset", v)?;
+                        }
+                        super::super::__buffa::view::oneof::equity_series::Grouping::PortfolioAccount(
+                            v,
+                        ) => {
+                            __map.serialize_entry("portfolioAccount", v)?;
                         }
                     }
                 }
@@ -9927,6 +11774,2324 @@ pub mod __buffa {
             type ViewHandle = GetEquityHistorySeriesResponseOwnedView;
         }
         impl ::serde::Serialize for GetEquityHistorySeriesResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Requests root portfolio equity history.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetPortfolioEquityHistorySeriesRequestView<'a> {
+            /// History window to return. When unset/UNSPECIFIED, defaults to 1D.
+            ///
+            /// Field 1: `range`
+            pub range: ::buffa::EnumValue<super::super::BalanceRange>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for GetPortfolioEquityHistorySeriesRequestView<'a> {
+            type Owned = super::super::GetPortfolioEquityHistorySeriesRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.range = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquityHistorySeriesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquityHistorySeriesRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetPortfolioEquityHistorySeriesRequest {
+                    range: self.range,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for GetPortfolioEquityHistorySeriesRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.range.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.range.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for GetPortfolioEquityHistorySeriesRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.range) {
+                    __map.serialize_entry("range", &self.range)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for GetPortfolioEquityHistorySeriesRequestView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "GetPortfolioEquityHistorySeriesRequest";
+            const FULL_NAME: &'static str = "ledger.read.v1.GetPortfolioEquityHistorySeriesRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquityHistorySeriesRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetPortfolioEquityHistorySeriesRequestView);
+        ::buffa::impl_view_reborrow!(GetPortfolioEquityHistorySeriesRequestView);
+        /** Self-contained, `'static` owned view of a `GetPortfolioEquityHistorySeriesRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetPortfolioEquityHistorySeriesRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetPortfolioEquityHistorySeriesRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetPortfolioEquityHistorySeriesRequestOwnedView(
+            ::buffa::OwnedView<GetPortfolioEquityHistorySeriesRequestView<'static>>,
+        );
+        impl GetPortfolioEquityHistorySeriesRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquityHistorySeriesRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquityHistorySeriesRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetPortfolioEquityHistorySeriesRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquityHistorySeriesRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetPortfolioEquityHistorySeriesRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetPortfolioEquityHistorySeriesRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquityHistorySeriesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// History window to return. When unset/UNSPECIFIED, defaults to 1D.
+            ///
+            /// Field 1: `range`
+            #[must_use]
+            pub fn range(&self) -> ::buffa::EnumValue<super::super::BalanceRange> {
+                self.0.reborrow().range
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetPortfolioEquityHistorySeriesRequestView<'static>>,
+        > for GetPortfolioEquityHistorySeriesRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    GetPortfolioEquityHistorySeriesRequestView<'static>,
+                >,
+            ) -> Self {
+                GetPortfolioEquityHistorySeriesRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetPortfolioEquityHistorySeriesRequestOwnedView>
+        for ::buffa::OwnedView<GetPortfolioEquityHistorySeriesRequestView<'static>> {
+            fn from(wrapper: GetPortfolioEquityHistorySeriesRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetPortfolioEquityHistorySeriesRequestView<'static>>,
+        > for GetPortfolioEquityHistorySeriesRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                GetPortfolioEquityHistorySeriesRequestView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetPortfolioEquityHistorySeriesRequest {
+            type View<'a> = GetPortfolioEquityHistorySeriesRequestView<'a>;
+            type ViewHandle = GetPortfolioEquityHistorySeriesRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetPortfolioEquityHistorySeriesRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Root portfolio equity history with aligned, implicit timestamps.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetPortfolioEquityHistorySeriesResponseView<'a> {
+            /// Resolved history window.
+            ///
+            /// Field 1: `range`
+            pub range: ::buffa::EnumValue<super::super::BalanceRange>,
+            /// Sampling interval between points, such as "5m" or "1h".
+            ///
+            /// Field 2: `bucket`
+            pub bucket: &'a str,
+            /// First point timestamp in seconds since epoch (UTC).
+            ///
+            /// Field 3: `start_ts_sec`
+            pub start_ts_sec: u32,
+            /// Last point timestamp in seconds since epoch (UTC).
+            ///
+            /// Field 4: `end_ts_sec`
+            pub end_ts_sec: u32,
+            /// Human-readable quote asset symbol (always "USDT").
+            ///
+            /// Field 5: `quote_asset`
+            pub quote_asset: &'a str,
+            /// Number of aligned points in each returned series.
+            ///
+            /// Field 6: `points`
+            pub points: u32,
+            /// Master account first, followed by up to nine owned subaccounts ordered by
+            /// current equity descending, then Remaining when other subaccounts exist.
+            ///
+            /// Field 7: `series`
+            pub series: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::EquitySeriesView<'a>,
+            >,
+            /// BTC-USDT close price at each timestamp, scaled by 1e6 (same as price_ticks).
+            /// Enables client-side conversion to BTC denomination without refetch.
+            ///
+            /// Field 8: `btc_prices_q`
+            pub btc_prices_q: ::buffa::RepeatedView<'a, i64>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for GetPortfolioEquityHistorySeriesResponseView<'a> {
+            type Owned = super::super::GetPortfolioEquityHistorySeriesResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.range = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.bucket = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed32,
+                        )?;
+                        view.start_ts_sec = ::buffa::types::decode_fixed32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed32,
+                        )?;
+                        view.end_ts_sec = ::buffa::types::decode_fixed32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.quote_asset = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.points = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.series
+                            .push(
+                                <super::super::__buffa::view::EquitySeriesView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    8u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.btc_prices_q
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.btc_prices_q
+                                    .push(::buffa::types::decode_int64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.btc_prices_q
+                                .push(::buffa::types::decode_int64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquityHistorySeriesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquityHistorySeriesResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetPortfolioEquityHistorySeriesResponse {
+                    range: self.range,
+                    bucket: self.bucket.to_string(),
+                    start_ts_sec: self.start_ts_sec,
+                    end_ts_sec: self.end_ts_sec,
+                    quote_asset: self.quote_asset.to_string(),
+                    points: self.points,
+                    series: self
+                        .series
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    btc_prices_q: self.btc_prices_q.to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for GetPortfolioEquityHistorySeriesResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.range.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.bucket.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.bucket) as u32;
+                }
+                if self.start_ts_sec != 0u32 {
+                    size += 1u32 + ::buffa::types::FIXED32_ENCODED_LEN as u32;
+                }
+                if self.end_ts_sec != 0u32 {
+                    size += 1u32 + ::buffa::types::FIXED32_ENCODED_LEN as u32;
+                }
+                if !self.quote_asset.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.quote_asset)
+                                as u32;
+                }
+                if self.points != 0u32 {
+                    size
+                        += 1u32 + ::buffa::types::uint32_encoded_len(self.points) as u32;
+                }
+                for v in &self.series {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.btc_prices_q.is_empty() {
+                    let payload: u32 = self
+                        .btc_prices_q
+                        .iter()
+                        .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.range.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.bucket.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.bucket, buf);
+                }
+                if self.start_ts_sec != 0u32 {
+                    ::buffa::types::put_fixed32_field(3u32, self.start_ts_sec, buf);
+                }
+                if self.end_ts_sec != 0u32 {
+                    ::buffa::types::put_fixed32_field(4u32, self.end_ts_sec, buf);
+                }
+                if !self.quote_asset.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.quote_asset, buf);
+                }
+                if self.points != 0u32 {
+                    ::buffa::types::put_uint32_field(6u32, self.points, buf);
+                }
+                for v in &self.series {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if !self.btc_prices_q.is_empty() {
+                    let payload: u32 = self
+                        .btc_prices_q
+                        .iter()
+                        .map(|&v| ::buffa::types::int64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(8u32, payload, buf);
+                    for &v in &self.btc_prices_q {
+                        ::buffa::types::encode_int64(v, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for GetPortfolioEquityHistorySeriesResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.range) {
+                    __map.serialize_entry("range", &self.range)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.bucket) {
+                    __map.serialize_entry("bucket", self.bucket)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.start_ts_sec) {
+                    __map
+                        .serialize_entry(
+                            "startTsSec",
+                            &::buffa::json_helpers::ProtoJson(&self.start_ts_sec),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.end_ts_sec) {
+                    __map
+                        .serialize_entry(
+                            "endTsSec",
+                            &::buffa::json_helpers::ProtoJson(&self.end_ts_sec),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.quote_asset) {
+                    __map.serialize_entry("quoteAsset", self.quote_asset)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.points) {
+                    __map
+                        .serialize_entry(
+                            "points",
+                            &::buffa::json_helpers::ProtoJson(&self.points),
+                        )?;
+                }
+                if !self.series.is_empty() {
+                    __map.serialize_entry("series", &*self.series)?;
+                }
+                if !self.btc_prices_q.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "btcPricesQ",
+                            &::buffa::json_helpers::RepeatedJson(&self.btc_prices_q),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for GetPortfolioEquityHistorySeriesResponseView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "GetPortfolioEquityHistorySeriesResponse";
+            const FULL_NAME: &'static str = "ledger.read.v1.GetPortfolioEquityHistorySeriesResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquityHistorySeriesResponse";
+        }
+        ::buffa::impl_default_view_instance!(
+            GetPortfolioEquityHistorySeriesResponseView
+        );
+        ::buffa::impl_view_reborrow!(GetPortfolioEquityHistorySeriesResponseView);
+        /** Self-contained, `'static` owned view of a `GetPortfolioEquityHistorySeriesResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetPortfolioEquityHistorySeriesResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetPortfolioEquityHistorySeriesResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetPortfolioEquityHistorySeriesResponseOwnedView(
+            ::buffa::OwnedView<GetPortfolioEquityHistorySeriesResponseView<'static>>,
+        );
+        impl GetPortfolioEquityHistorySeriesResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquityHistorySeriesResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquityHistorySeriesResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetPortfolioEquityHistorySeriesResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquityHistorySeriesResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetPortfolioEquityHistorySeriesResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetPortfolioEquityHistorySeriesResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquityHistorySeriesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Resolved history window.
+            ///
+            /// Field 1: `range`
+            #[must_use]
+            pub fn range(&self) -> ::buffa::EnumValue<super::super::BalanceRange> {
+                self.0.reborrow().range
+            }
+            /// Sampling interval between points, such as "5m" or "1h".
+            ///
+            /// Field 2: `bucket`
+            #[must_use]
+            pub fn bucket(&self) -> &'_ str {
+                self.0.reborrow().bucket
+            }
+            /// First point timestamp in seconds since epoch (UTC).
+            ///
+            /// Field 3: `start_ts_sec`
+            #[must_use]
+            pub fn start_ts_sec(&self) -> u32 {
+                self.0.reborrow().start_ts_sec
+            }
+            /// Last point timestamp in seconds since epoch (UTC).
+            ///
+            /// Field 4: `end_ts_sec`
+            #[must_use]
+            pub fn end_ts_sec(&self) -> u32 {
+                self.0.reborrow().end_ts_sec
+            }
+            /// Human-readable quote asset symbol (always "USDT").
+            ///
+            /// Field 5: `quote_asset`
+            #[must_use]
+            pub fn quote_asset(&self) -> &'_ str {
+                self.0.reborrow().quote_asset
+            }
+            /// Number of aligned points in each returned series.
+            ///
+            /// Field 6: `points`
+            #[must_use]
+            pub fn points(&self) -> u32 {
+                self.0.reborrow().points
+            }
+            /// Master account first, followed by up to nine owned subaccounts ordered by
+            /// current equity descending, then Remaining when other subaccounts exist.
+            ///
+            /// Field 7: `series`
+            #[must_use]
+            pub fn series(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::EquitySeriesView<'_>,
+            > {
+                &self.0.reborrow().series
+            }
+            /// BTC-USDT close price at each timestamp, scaled by 1e6 (same as price_ticks).
+            /// Enables client-side conversion to BTC denomination without refetch.
+            ///
+            /// Field 8: `btc_prices_q`
+            #[must_use]
+            pub fn btc_prices_q(&self) -> &::buffa::RepeatedView<'_, i64> {
+                &self.0.reborrow().btc_prices_q
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetPortfolioEquityHistorySeriesResponseView<'static>>,
+        > for GetPortfolioEquityHistorySeriesResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    GetPortfolioEquityHistorySeriesResponseView<'static>,
+                >,
+            ) -> Self {
+                GetPortfolioEquityHistorySeriesResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetPortfolioEquityHistorySeriesResponseOwnedView>
+        for ::buffa::OwnedView<GetPortfolioEquityHistorySeriesResponseView<'static>> {
+            fn from(wrapper: GetPortfolioEquityHistorySeriesResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetPortfolioEquityHistorySeriesResponseView<'static>>,
+        > for GetPortfolioEquityHistorySeriesResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                GetPortfolioEquityHistorySeriesResponseView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetPortfolioEquityHistorySeriesResponse {
+            type View<'a> = GetPortfolioEquityHistorySeriesResponseView<'a>;
+            type ViewHandle = GetPortfolioEquityHistorySeriesResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetPortfolioEquityHistorySeriesResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Current equity for one logical account in the root portfolio.
+        #[derive(Clone, Debug, Default)]
+        pub struct PortfolioAccountEquityView<'a> {
+            /// Public master-account or subaccount ID.
+            ///
+            /// Field 1: `account_id`
+            pub account_id: u64,
+            /// Current equity in USDT scaled by 1e4 (4 decimals).
+            ///
+            /// Field 2: `equity_q`
+            pub equity_q: i64,
+            /// Up to three assets with the highest current equity value, ordered highest
+            /// first. Assets without a current value are omitted.
+            ///
+            /// Field 3: `top_asset_ids`
+            pub top_asset_ids: ::buffa::RepeatedView<'a, u32>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PortfolioAccountEquityView<'a> {
+            type Owned = super::super::PortfolioAccountEquity;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.account_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.equity_q = ::buffa::types::decode_sint64(&mut cur)?;
+                    }
+                    3u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.top_asset_ids
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.top_asset_ids
+                                    .push(::buffa::types::decode_uint32(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.top_asset_ids
+                                .push(::buffa::types::decode_uint32(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PortfolioAccountEquity,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PortfolioAccountEquity,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PortfolioAccountEquity {
+                    account_id: self.account_id,
+                    equity_q: self.equity_q,
+                    top_asset_ids: self.top_asset_ids.to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PortfolioAccountEquityView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.account_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.equity_q != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::sint64_encoded_len(self.equity_q) as u32;
+                }
+                if !self.top_asset_ids.is_empty() {
+                    let payload: u32 = self
+                        .top_asset_ids
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.account_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.account_id, buf);
+                }
+                if self.equity_q != 0i64 {
+                    ::buffa::types::put_sint64_field(2u32, self.equity_q, buf);
+                }
+                if !self.top_asset_ids.is_empty() {
+                    let payload: u32 = self
+                        .top_asset_ids
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(3u32, payload, buf);
+                    for &v in &self.top_asset_ids {
+                        ::buffa::types::encode_uint32(v, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PortfolioAccountEquityView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.account_id) {
+                    __map
+                        .serialize_entry(
+                            "accountId",
+                            &::buffa::json_helpers::ProtoJson(&self.account_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.equity_q) {
+                    __map
+                        .serialize_entry(
+                            "equityQ",
+                            &::buffa::json_helpers::ProtoJson(&self.equity_q),
+                        )?;
+                }
+                if !self.top_asset_ids.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "topAssetIds",
+                            &::buffa::json_helpers::RepeatedJson(&self.top_asset_ids),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PortfolioAccountEquityView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "PortfolioAccountEquity";
+            const FULL_NAME: &'static str = "ledger.read.v1.PortfolioAccountEquity";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.PortfolioAccountEquity";
+        }
+        ::buffa::impl_default_view_instance!(PortfolioAccountEquityView);
+        ::buffa::impl_view_reborrow!(PortfolioAccountEquityView);
+        /** Self-contained, `'static` owned view of a `PortfolioAccountEquity` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PortfolioAccountEquityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PortfolioAccountEquityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PortfolioAccountEquityOwnedView(
+            ::buffa::OwnedView<PortfolioAccountEquityView<'static>>,
+        );
+        impl PortfolioAccountEquityOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PortfolioAccountEquityOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PortfolioAccountEquityOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PortfolioAccountEquity,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PortfolioAccountEquityOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`PortfolioAccountEquityView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PortfolioAccountEquityView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PortfolioAccountEquity,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public master-account or subaccount ID.
+            ///
+            /// Field 1: `account_id`
+            #[must_use]
+            pub fn account_id(&self) -> u64 {
+                self.0.reborrow().account_id
+            }
+            /// Current equity in USDT scaled by 1e4 (4 decimals).
+            ///
+            /// Field 2: `equity_q`
+            #[must_use]
+            pub fn equity_q(&self) -> i64 {
+                self.0.reborrow().equity_q
+            }
+            /// Up to three assets with the highest current equity value, ordered highest
+            /// first. Assets without a current value are omitted.
+            ///
+            /// Field 3: `top_asset_ids`
+            #[must_use]
+            pub fn top_asset_ids(&self) -> &::buffa::RepeatedView<'_, u32> {
+                &self.0.reborrow().top_asset_ids
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PortfolioAccountEquityView<'static>>,
+        > for PortfolioAccountEquityOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PortfolioAccountEquityView<'static>>,
+            ) -> Self {
+                PortfolioAccountEquityOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PortfolioAccountEquityOwnedView>
+        for ::buffa::OwnedView<PortfolioAccountEquityView<'static>> {
+            fn from(wrapper: PortfolioAccountEquityOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PortfolioAccountEquityView<'static>>,
+        > for PortfolioAccountEquityOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<PortfolioAccountEquityView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PortfolioAccountEquity {
+            type View<'a> = PortfolioAccountEquityView<'a>;
+            type ViewHandle = PortfolioAccountEquityOwnedView;
+        }
+        impl ::serde::Serialize for PortfolioAccountEquityOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Current aggregate balance and equity for one asset in the root portfolio.
+        #[derive(Clone, Debug, Default)]
+        pub struct PortfolioAssetEquityView<'a> {
+            /// Public unified asset ID.
+            ///
+            /// Field 1: `asset_id`
+            pub asset_id: u32,
+            /// Combined Funding and Trading balance in asset units scaled by 1e7
+            /// (7 decimals).
+            ///
+            /// Field 2: `balance_q`
+            pub balance_q: u64,
+            /// Current equity in USDT scaled by 1e4 (4 decimals).
+            ///
+            /// Field 3: `equity_q`
+            pub equity_q: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PortfolioAssetEquityView<'a> {
+            type Owned = super::super::PortfolioAssetEquity;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.balance_q = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.equity_q = ::buffa::types::decode_sint64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PortfolioAssetEquity,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PortfolioAssetEquity,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PortfolioAssetEquity {
+                    asset_id: self.asset_id,
+                    balance_q: self.balance_q,
+                    equity_q: self.equity_q,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PortfolioAssetEquityView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+                }
+                if self.balance_q != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.balance_q) as u32;
+                }
+                if self.equity_q != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::sint64_encoded_len(self.equity_q) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+                }
+                if self.balance_q != 0u64 {
+                    ::buffa::types::put_uint64_field(2u32, self.balance_q, buf);
+                }
+                if self.equity_q != 0i64 {
+                    ::buffa::types::put_sint64_field(3u32, self.equity_q, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PortfolioAssetEquityView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
+                    __map
+                        .serialize_entry(
+                            "assetId",
+                            &::buffa::json_helpers::ProtoJson(&self.asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.balance_q) {
+                    __map
+                        .serialize_entry(
+                            "balanceQ",
+                            &::buffa::json_helpers::ProtoJson(&self.balance_q),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.equity_q) {
+                    __map
+                        .serialize_entry(
+                            "equityQ",
+                            &::buffa::json_helpers::ProtoJson(&self.equity_q),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PortfolioAssetEquityView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "PortfolioAssetEquity";
+            const FULL_NAME: &'static str = "ledger.read.v1.PortfolioAssetEquity";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.PortfolioAssetEquity";
+        }
+        ::buffa::impl_default_view_instance!(PortfolioAssetEquityView);
+        ::buffa::impl_view_reborrow!(PortfolioAssetEquityView);
+        /** Self-contained, `'static` owned view of a `PortfolioAssetEquity` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PortfolioAssetEquityView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PortfolioAssetEquityView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PortfolioAssetEquityOwnedView(
+            ::buffa::OwnedView<PortfolioAssetEquityView<'static>>,
+        );
+        impl PortfolioAssetEquityOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PortfolioAssetEquityOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PortfolioAssetEquityOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PortfolioAssetEquity,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PortfolioAssetEquityOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`PortfolioAssetEquityView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PortfolioAssetEquityView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PortfolioAssetEquity,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public unified asset ID.
+            ///
+            /// Field 1: `asset_id`
+            #[must_use]
+            pub fn asset_id(&self) -> u32 {
+                self.0.reborrow().asset_id
+            }
+            /// Combined Funding and Trading balance in asset units scaled by 1e7
+            /// (7 decimals).
+            ///
+            /// Field 2: `balance_q`
+            #[must_use]
+            pub fn balance_q(&self) -> u64 {
+                self.0.reborrow().balance_q
+            }
+            /// Current equity in USDT scaled by 1e4 (4 decimals).
+            ///
+            /// Field 3: `equity_q`
+            #[must_use]
+            pub fn equity_q(&self) -> i64 {
+                self.0.reborrow().equity_q
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<PortfolioAssetEquityView<'static>>>
+        for PortfolioAssetEquityOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PortfolioAssetEquityView<'static>>,
+            ) -> Self {
+                PortfolioAssetEquityOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PortfolioAssetEquityOwnedView>
+        for ::buffa::OwnedView<PortfolioAssetEquityView<'static>> {
+            fn from(wrapper: PortfolioAssetEquityOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PortfolioAssetEquityView<'static>>,
+        > for PortfolioAssetEquityOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<PortfolioAssetEquityView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PortfolioAssetEquity {
+            type View<'a> = PortfolioAssetEquityView<'a>;
+            type ViewHandle = PortfolioAssetEquityOwnedView;
+        }
+        impl ::serde::Serialize for PortfolioAssetEquityOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Requests a current root portfolio equity snapshot.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetPortfolioEquitySnapshotRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetPortfolioEquitySnapshotRequestView<'a> {
+            type Owned = super::super::GetPortfolioEquitySnapshotRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquitySnapshotRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquitySnapshotRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetPortfolioEquitySnapshotRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetPortfolioEquitySnapshotRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetPortfolioEquitySnapshotRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetPortfolioEquitySnapshotRequestView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "GetPortfolioEquitySnapshotRequest";
+            const FULL_NAME: &'static str = "ledger.read.v1.GetPortfolioEquitySnapshotRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquitySnapshotRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetPortfolioEquitySnapshotRequestView);
+        ::buffa::impl_view_reborrow!(GetPortfolioEquitySnapshotRequestView);
+        /** Self-contained, `'static` owned view of a `GetPortfolioEquitySnapshotRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetPortfolioEquitySnapshotRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetPortfolioEquitySnapshotRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetPortfolioEquitySnapshotRequestOwnedView(
+            ::buffa::OwnedView<GetPortfolioEquitySnapshotRequestView<'static>>,
+        );
+        impl GetPortfolioEquitySnapshotRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquitySnapshotRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquitySnapshotRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetPortfolioEquitySnapshotRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquitySnapshotRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetPortfolioEquitySnapshotRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetPortfolioEquitySnapshotRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquitySnapshotRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetPortfolioEquitySnapshotRequestView<'static>>,
+        > for GetPortfolioEquitySnapshotRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetPortfolioEquitySnapshotRequestView<'static>>,
+            ) -> Self {
+                GetPortfolioEquitySnapshotRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetPortfolioEquitySnapshotRequestOwnedView>
+        for ::buffa::OwnedView<GetPortfolioEquitySnapshotRequestView<'static>> {
+            fn from(wrapper: GetPortfolioEquitySnapshotRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetPortfolioEquitySnapshotRequestView<'static>>,
+        > for GetPortfolioEquitySnapshotRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetPortfolioEquitySnapshotRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetPortfolioEquitySnapshotRequest {
+            type View<'a> = GetPortfolioEquitySnapshotRequestView<'a>;
+            type ViewHandle = GetPortfolioEquitySnapshotRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetPortfolioEquitySnapshotRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Current root portfolio equity, grouped by logical account and asset.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetPortfolioEquitySnapshotResponseView<'a> {
+            /// Human-readable quote asset symbol (always "USDT").
+            ///
+            /// Field 1: `quote_asset`
+            pub quote_asset: &'a str,
+            /// Current equity across the master account and all owned subaccounts in USDT,
+            /// scaled by 1e4 (4 decimals).
+            ///
+            /// Field 2: `total_equity_q`
+            pub total_equity_q: i64,
+            /// Master account first, followed by every owned subaccount ordered by current
+            /// equity descending and public ID ascending for ties.
+            ///
+            /// Field 3: `accounts`
+            pub accounts: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::PortfolioAccountEquityView<'a>,
+            >,
+            /// Non-zero asset balances ordered by current equity descending and public
+            /// asset ID ascending for ties.
+            ///
+            /// Field 4: `assets`
+            pub assets: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::PortfolioAssetEquityView<'a>,
+            >,
+            /// Current BTC-USDT price scaled by 1e6. Zero when unavailable.
+            ///
+            /// Field 5: `btc_price_q`
+            pub btc_price_q: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for GetPortfolioEquitySnapshotResponseView<'a> {
+            type Owned = super::super::GetPortfolioEquitySnapshotResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.quote_asset = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.total_equity_q = ::buffa::types::decode_sint64(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.btc_price_q = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.accounts
+                            .push(
+                                <super::super::__buffa::view::PortfolioAccountEquityView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.assets
+                            .push(
+                                <super::super::__buffa::view::PortfolioAssetEquityView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquitySnapshotResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquitySnapshotResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetPortfolioEquitySnapshotResponse {
+                    quote_asset: self.quote_asset.to_string(),
+                    total_equity_q: self.total_equity_q,
+                    accounts: self
+                        .accounts
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    assets: self
+                        .assets
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    btc_price_q: self.btc_price_q,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetPortfolioEquitySnapshotResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.quote_asset.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.quote_asset)
+                                as u32;
+                }
+                if self.total_equity_q != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::sint64_encoded_len(self.total_equity_q)
+                                as u32;
+                }
+                for v in &self.accounts {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.assets {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.btc_price_q != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.btc_price_q) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.quote_asset.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.quote_asset, buf);
+                }
+                if self.total_equity_q != 0i64 {
+                    ::buffa::types::put_sint64_field(2u32, self.total_equity_q, buf);
+                }
+                for v in &self.accounts {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                for v in &self.assets {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.btc_price_q != 0i64 {
+                    ::buffa::types::put_int64_field(5u32, self.btc_price_q, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetPortfolioEquitySnapshotResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.quote_asset) {
+                    __map.serialize_entry("quoteAsset", self.quote_asset)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.total_equity_q) {
+                    __map
+                        .serialize_entry(
+                            "totalEquityQ",
+                            &::buffa::json_helpers::ProtoJson(&self.total_equity_q),
+                        )?;
+                }
+                if !self.accounts.is_empty() {
+                    __map.serialize_entry("accounts", &*self.accounts)?;
+                }
+                if !self.assets.is_empty() {
+                    __map.serialize_entry("assets", &*self.assets)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.btc_price_q) {
+                    __map
+                        .serialize_entry(
+                            "btcPriceQ",
+                            &::buffa::json_helpers::ProtoJson(&self.btc_price_q),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetPortfolioEquitySnapshotResponseView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "GetPortfolioEquitySnapshotResponse";
+            const FULL_NAME: &'static str = "ledger.read.v1.GetPortfolioEquitySnapshotResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetPortfolioEquitySnapshotResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetPortfolioEquitySnapshotResponseView);
+        ::buffa::impl_view_reborrow!(GetPortfolioEquitySnapshotResponseView);
+        /** Self-contained, `'static` owned view of a `GetPortfolioEquitySnapshotResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetPortfolioEquitySnapshotResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetPortfolioEquitySnapshotResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetPortfolioEquitySnapshotResponseOwnedView(
+            ::buffa::OwnedView<GetPortfolioEquitySnapshotResponseView<'static>>,
+        );
+        impl GetPortfolioEquitySnapshotResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquitySnapshotResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquitySnapshotResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetPortfolioEquitySnapshotResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPortfolioEquitySnapshotResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetPortfolioEquitySnapshotResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetPortfolioEquitySnapshotResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPortfolioEquitySnapshotResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Human-readable quote asset symbol (always "USDT").
+            ///
+            /// Field 1: `quote_asset`
+            #[must_use]
+            pub fn quote_asset(&self) -> &'_ str {
+                self.0.reborrow().quote_asset
+            }
+            /// Current equity across the master account and all owned subaccounts in USDT,
+            /// scaled by 1e4 (4 decimals).
+            ///
+            /// Field 2: `total_equity_q`
+            #[must_use]
+            pub fn total_equity_q(&self) -> i64 {
+                self.0.reborrow().total_equity_q
+            }
+            /// Master account first, followed by every owned subaccount ordered by current
+            /// equity descending and public ID ascending for ties.
+            ///
+            /// Field 3: `accounts`
+            #[must_use]
+            pub fn accounts(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::PortfolioAccountEquityView<'_>,
+            > {
+                &self.0.reborrow().accounts
+            }
+            /// Non-zero asset balances ordered by current equity descending and public
+            /// asset ID ascending for ties.
+            ///
+            /// Field 4: `assets`
+            #[must_use]
+            pub fn assets(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::PortfolioAssetEquityView<'_>,
+            > {
+                &self.0.reborrow().assets
+            }
+            /// Current BTC-USDT price scaled by 1e6. Zero when unavailable.
+            ///
+            /// Field 5: `btc_price_q`
+            #[must_use]
+            pub fn btc_price_q(&self) -> i64 {
+                self.0.reborrow().btc_price_q
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetPortfolioEquitySnapshotResponseView<'static>>,
+        > for GetPortfolioEquitySnapshotResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    GetPortfolioEquitySnapshotResponseView<'static>,
+                >,
+            ) -> Self {
+                GetPortfolioEquitySnapshotResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetPortfolioEquitySnapshotResponseOwnedView>
+        for ::buffa::OwnedView<GetPortfolioEquitySnapshotResponseView<'static>> {
+            fn from(wrapper: GetPortfolioEquitySnapshotResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetPortfolioEquitySnapshotResponseView<'static>>,
+        > for GetPortfolioEquitySnapshotResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetPortfolioEquitySnapshotResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetPortfolioEquitySnapshotResponse {
+            type View<'a> = GetPortfolioEquitySnapshotResponseView<'a>;
+            type ViewHandle = GetPortfolioEquitySnapshotResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetPortfolioEquitySnapshotResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -13347,6 +17512,13 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    PortfolioAccount(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::PortfolioAccountGroupingView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
         }
@@ -13357,13 +17529,18 @@ pub mod __buffa {
         pub mod equity_series {
             #[allow(unused_imports)]
             use super::*;
-            /// Grouping identifier: either account or asset, depending on request group_by.
+            /// Grouping identifier. The serving RPC documents which grouping is returned.
             #[derive(Clone, PartialEq, Debug)]
             pub enum Grouping {
                 Account(
                     ::buffa::alloc::boxed::Box<super::super::super::AccountGrouping>,
                 ),
                 Asset(::buffa::alloc::boxed::Box<super::super::super::AssetGrouping>),
+                PortfolioAccount(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::PortfolioAccountGrouping,
+                    >,
+                ),
             }
             impl ::buffa::Oneof for Grouping {}
             impl From<super::super::super::AccountGrouping> for Grouping {
@@ -13388,6 +17565,17 @@ pub mod __buffa {
                     Self::Some(Grouping::from(v))
                 }
             }
+            impl From<super::super::super::PortfolioAccountGrouping> for Grouping {
+                fn from(v: super::super::super::PortfolioAccountGrouping) -> Self {
+                    Self::PortfolioAccount(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::PortfolioAccountGrouping>
+            for ::core::option::Option<Grouping> {
+                fn from(v: super::super::super::PortfolioAccountGrouping) -> Self {
+                    Self::Some(Grouping::from(v))
+                }
+            }
             impl serde::Serialize for Grouping {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -13401,6 +17589,9 @@ pub mod __buffa {
                         }
                         Self::Asset(v) => {
                             map.serialize_entry("asset", v)?;
+                        }
+                        Self::PortfolioAccount(v) => {
+                            map.serialize_entry("portfolioAccount", v)?;
                         }
                     }
                     map.end()
@@ -13418,9 +17609,20 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_BALANCE_HISTORY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ACCOUNT_GROUPING_JSON_ANY);
         reg.register_json_any(super::__ASSET_GROUPING_JSON_ANY);
+        reg.register_json_any(super::__PORTFOLIO_ACCOUNT_GROUPING_JSON_ANY);
         reg.register_json_any(super::__GET_EQUITY_HISTORY_SERIES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__EQUITY_SERIES_JSON_ANY);
         reg.register_json_any(super::__GET_EQUITY_HISTORY_SERIES_RESPONSE_JSON_ANY);
+        reg.register_json_any(
+            super::__GET_PORTFOLIO_EQUITY_HISTORY_SERIES_REQUEST_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::__GET_PORTFOLIO_EQUITY_HISTORY_SERIES_RESPONSE_JSON_ANY,
+        );
+        reg.register_json_any(super::__PORTFOLIO_ACCOUNT_EQUITY_JSON_ANY);
+        reg.register_json_any(super::__PORTFOLIO_ASSET_EQUITY_JSON_ANY);
+        reg.register_json_any(super::__GET_PORTFOLIO_EQUITY_SNAPSHOT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_PORTFOLIO_EQUITY_SNAPSHOT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_TRANSFERS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__TRANSFER_SIDE_JSON_ANY);
         reg.register_json_any(super::__TRANSFER_ROW_JSON_ANY);
@@ -13464,6 +17666,10 @@ pub use self::__buffa::view::AssetGroupingView;
 #[doc(inline)]
 pub use self::__buffa::view::AssetGroupingOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::PortfolioAccountGroupingView;
+#[doc(inline)]
+pub use self::__buffa::view::PortfolioAccountGroupingOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::GetEquityHistorySeriesRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::GetEquityHistorySeriesRequestOwnedView;
@@ -13475,6 +17681,30 @@ pub use self::__buffa::view::EquitySeriesOwnedView;
 pub use self::__buffa::view::GetEquityHistorySeriesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetEquityHistorySeriesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPortfolioEquityHistorySeriesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPortfolioEquityHistorySeriesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPortfolioEquityHistorySeriesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPortfolioEquityHistorySeriesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PortfolioAccountEquityView;
+#[doc(inline)]
+pub use self::__buffa::view::PortfolioAccountEquityOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PortfolioAssetEquityView;
+#[doc(inline)]
+pub use self::__buffa::view::PortfolioAssetEquityOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPortfolioEquitySnapshotRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPortfolioEquitySnapshotRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPortfolioEquitySnapshotResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPortfolioEquitySnapshotResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListTransfersRequestView;
 #[doc(inline)]

@@ -20,6 +20,30 @@ pub type OwnedGetEquityHistorySeriesResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<GetPortfolioEquityHistorySeriesRequestView<'static>>`.
+pub type OwnedGetPortfolioEquityHistorySeriesRequestView = ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquityHistorySeriesRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetPortfolioEquityHistorySeriesResponseView<'static>>`.
+pub type OwnedGetPortfolioEquityHistorySeriesResponseView = ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquityHistorySeriesResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetPortfolioEquitySnapshotRequestView<'static>>`.
+pub type OwnedGetPortfolioEquitySnapshotRequestView = ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquitySnapshotRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetPortfolioEquitySnapshotResponseView<'static>>`.
+pub type OwnedGetPortfolioEquitySnapshotResponseView = ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquitySnapshotResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ListTransfersRequestView<'static>>`.
 pub type OwnedListTransfersRequestView = ::buffa::view::OwnedView<
     crate::proto::ledger::read::v1::__buffa::view::ListTransfersRequestView<'static>,
@@ -82,6 +106,62 @@ impl ::connectrpc::Encodable<
 >
 for ::buffa::view::OwnedView<
     crate::proto::ledger::read::v1::__buffa::view::GetEquityHistorySeriesResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesResponse,
+>
+for crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquityHistorySeriesResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquityHistorySeriesResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotResponse,
+>
+for crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquitySnapshotResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquitySnapshotResponseView<
         'static,
     >,
 > {
@@ -169,6 +249,24 @@ pub const LEDGER_READ_SERVICE_GET_BALANCE_HISTORY_SPEC: ::connectrpc::Spec = ::c
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const LEDGER_READ_SERVICE_GET_EQUITY_HISTORY_SERIES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/ledger.read.v1.LedgerReadService/GetEquityHistorySeries",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetPortfolioEquityHistorySeries` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const LEDGER_READ_SERVICE_GET_PORTFOLIO_EQUITY_HISTORY_SERIES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ledger.read.v1.LedgerReadService/GetPortfolioEquityHistorySeries",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetPortfolioEquitySnapshot` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const LEDGER_READ_SERVICE_GET_PORTFOLIO_EQUITY_SNAPSHOT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ledger.read.v1.LedgerReadService/GetPortfolioEquitySnapshot",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -295,6 +393,56 @@ pub trait LedgerReadService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::ledger::read::v1::GetEquityHistorySeriesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Retrieve root portfolio equity history as master, top owned subaccounts,
+    /// and an aggregate of the remaining owned subaccounts. Requires an
+    /// interactive root-account session; API keys are not supported.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_portfolio_equity_history_series<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Retrieve current root portfolio equity grouped by logical account and
+    /// asset. Requires an interactive root-account session; API keys are not
+    /// supported.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_portfolio_equity_snapshot<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -461,6 +609,64 @@ impl<S: LedgerReadService> LedgerReadServiceExt for S {
             .with_spec(LEDGER_READ_SERVICE_GET_EQUITY_HISTORY_SERIES_SPEC)
             .route_view(
                 LEDGER_READ_SERVICE_SERVICE_NAME,
+                "GetPortfolioEquityHistorySeries",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquityHistorySeriesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_portfolio_equity_history_series(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(LEDGER_READ_SERVICE_GET_PORTFOLIO_EQUITY_HISTORY_SERIES_SPEC)
+            .route_view(
+                LEDGER_READ_SERVICE_SERVICE_NAME,
+                "GetPortfolioEquitySnapshot",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquitySnapshotRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_portfolio_equity_snapshot(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(LEDGER_READ_SERVICE_GET_PORTFOLIO_EQUITY_SNAPSHOT_SPEC)
+            .route_view(
+                LEDGER_READ_SERVICE_SERVICE_NAME,
                 "ListTransfers",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -612,6 +818,22 @@ impl<T: LedgerReadService> ::connectrpc::Dispatcher for LedgerReadServiceServer<
                         .with_spec(LEDGER_READ_SERVICE_GET_EQUITY_HISTORY_SERIES_SPEC),
                 )
             }
+            "GetPortfolioEquityHistorySeries" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            LEDGER_READ_SERVICE_GET_PORTFOLIO_EQUITY_HISTORY_SERIES_SPEC,
+                        ),
+                )
+            }
+            "GetPortfolioEquitySnapshot" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            LEDGER_READ_SERVICE_GET_PORTFOLIO_EQUITY_SNAPSHOT_SPEC,
+                        ),
+                )
+            }
             "ListTransfers" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -684,6 +906,48 @@ impl<T: LedgerReadService> ::connectrpc::Dispatcher for LedgerReadServiceServer<
                         .await?
                         .encode::<
                             crate::proto::ledger::read::v1::GetEquityHistorySeriesResponse,
+                        >(format)
+                })
+            }
+            "GetPortfolioEquityHistorySeries" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquityHistorySeriesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_portfolio_equity_history_series(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesResponse,
+                        >(format)
+                })
+            }
+            "GetPortfolioEquitySnapshot" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquitySnapshotRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_portfolio_equity_snapshot(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotResponse,
                         >(format)
                 })
             }
@@ -937,6 +1201,96 @@ where
                 &self.config,
                 LEDGER_READ_SERVICE_SERVICE_NAME,
                 "GetEquityHistorySeries",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetPortfolioEquityHistorySeries RPC. Sends a request to /ledger.read.v1.LedgerReadService/GetPortfolioEquityHistorySeries.
+    pub async fn get_portfolio_equity_history_series(
+        &self,
+        request: crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquityHistorySeriesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_portfolio_equity_history_series_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetPortfolioEquityHistorySeries RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_portfolio_equity_history_series_with_options(
+        &self,
+        request: crate::proto::ledger::read::v1::GetPortfolioEquityHistorySeriesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquityHistorySeriesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                LEDGER_READ_SERVICE_SERVICE_NAME,
+                "GetPortfolioEquityHistorySeries",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetPortfolioEquitySnapshot RPC. Sends a request to /ledger.read.v1.LedgerReadService/GetPortfolioEquitySnapshot.
+    pub async fn get_portfolio_equity_snapshot(
+        &self,
+        request: crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquitySnapshotResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_portfolio_equity_snapshot_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetPortfolioEquitySnapshot RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_portfolio_equity_snapshot_with_options(
+        &self,
+        request: crate::proto::ledger::read::v1::GetPortfolioEquitySnapshotRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ledger::read::v1::__buffa::view::GetPortfolioEquitySnapshotResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                LEDGER_READ_SERVICE_SERVICE_NAME,
+                "GetPortfolioEquitySnapshot",
                 request,
                 options,
             )
