@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a44
+
+Package version: `0.1.0-alpha.44`. Git tag: `v0.1.0a44`.
+
 ### Changed
 - Generated Connect/protobuf bindings now include
   `GetPortfolioEquityHistorySeries` and `GetPortfolioEquitySnapshot`. Those
@@ -10,6 +14,8 @@
 - Equity history decode maps the additive `EquitySeries.portfolio_account`
   grouping (`account_id`, `remaining`) so the shared series type keeps
   portfolio identity instead of dropping it.
+- Trigger modify proto validation is stricter: trigger price and trailing
+  distance must be positive, and slippage / trailing BPS stay in 1–10000.
 
 ## 0.1.0a43
 
