@@ -43,6 +43,11 @@ pub struct EquityHistorySeries {
     pub account_name: String,
     pub asset_id: u32,
     pub asset_symbol: String,
+    /// Public master/subaccount ID when `grouping` is `portfolio_account`.
+    /// Empty for the Remaining aggregate, which omits `account_id`.
+    pub portfolio_account_id: String,
+    /// True when this series is the Remaining owned-subaccount aggregate.
+    pub portfolio_remaining: bool,
     pub equity_q: Vec<i64>,
 }
 

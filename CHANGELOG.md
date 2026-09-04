@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+- Generated Connect/protobuf bindings now include
+  `GetPortfolioEquityHistorySeries` and `GetPortfolioEquitySnapshot`. Those
+  LedgerRead RPCs stay JWT/session-only (interactive root-account session)
+  and are not wrapped in this API-key SDK.
+- Equity history decode maps the additive `EquitySeries.portfolio_account`
+  grouping (`account_id`, `remaining`) so the shared series type keeps
+  portfolio identity instead of dropping it.
+
 ## 0.1.0a43
 
 Package version: `0.1.0-alpha.43`. Git tag: `v0.1.0a43`.
