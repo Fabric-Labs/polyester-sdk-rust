@@ -90,6 +90,8 @@ pub fn equity_history_from_proto(
                     account_name: String::new(),
                     asset_id: 0,
                     asset_symbol: String::new(),
+                    portfolio_account_id: String::new(),
+                    portfolio_remaining: false,
                     equity_q: s.equity_q.clone(),
                 };
                 match s.grouping.as_ref() {
@@ -100,6 +102,11 @@ pub fn equity_history_from_proto(
                     Some(Grouping::Asset(a)) => {
                         row.asset_id = a.id;
                         row.asset_symbol = a.symbol.clone();
+                    }
+                    Some(Grouping::PortfolioAccount(a)) => {
+                        row.portfolio_account_id =
+                            a.account_id.map(format_uint64_id).unwrap_or_default();
+                        row.portfolio_remaining = a.remaining;
                     }
                     None => {}
                 }
@@ -191,7 +198,7 @@ mod tests {
     use crate::proto::ledger::read::v1::__buffa::oneof::equity_series::Grouping;
     use crate::proto::ledger::read::v1::{
         AccountGrouping, BalanceSeries, GetBalanceHistoryResponse, GetEquityHistorySeriesResponse,
-        ListHoldsResponse, ListTransfersResponse,
+        ListHoldsResponse, ListTransfersResponse, PortfolioAccountGrouping,
     };
 
     #[test]
@@ -306,6 +313,51 @@ mod tests {
         assert_eq!(result.series[0].account_code, 5);
         assert_eq!(result.series[0].account_name, "Trading");
         assert_eq!(result.series[0].equity_q, vec![999]);
+        assert!(result.series[0].portfolio_account_id.is_empty());
+        assert!(!result.series[0].portfolio_remaining);
+    }
+
+    #[test]
+    fn equity_history_maps_portfolio_account_grouping() {
+        let msg = GetEquityHistorySeriesResponse {
+            range: BalanceRange::Day7.into(),
+            quote_asset: "USDT".into(),
+            points: 2,
+            series: vec![
+                crate::proto::ledger::read::v1::EquitySeries {
+                    equity_q: vec![100, 200],
+                    grouping: Some(Grouping::PortfolioAccount(Box::new(
+                        PortfolioAccountGrouping {
+                            account_id: Some(42),
+                            remaining: false,
+                            ..Default::default()
+                        },
+                    ))),
+                    ..Default::default()
+                },
+                crate::proto::ledger::read::v1::EquitySeries {
+                    equity_q: vec![10, 20],
+                    grouping: Some(Grouping::PortfolioAccount(Box::new(
+                        PortfolioAccountGrouping {
+                            account_id: None,
+                            remaining: true,
+                            ..Default::default()
+                        },
+                    ))),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let result = equity_history_from_proto(&msg);
+        assert_eq!(result.series.len(), 2);
+        assert_eq!(result.series[0].portfolio_account_id, format_uint64_id(42));
+        assert!(!result.series[0].portfolio_remaining);
+        assert_eq!(result.series[0].account_code, 0);
+        assert!(result.series[1].portfolio_account_id.is_empty());
+        assert!(result.series[1].portfolio_remaining);
+        assert_eq!(result.series[0].equity_q[0], 100);
+        assert_eq!(result.series[1].equity_q[1], 20);
     }
 
     #[test]
