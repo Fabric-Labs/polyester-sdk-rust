@@ -43080,12 +43080,14 @@ pub const __GET_SOCIAL_VERIFICATION_REQUEST_JSON_ANY: ::buffa::type_registry::Js
     is_wkt: false,
 };
 /// GetSocialVerificationResponse contains the caller's current social
-/// verification state for one provider.
+/// verification state for one provider. A successful response with verification
+/// absent means the caller has not started verification for that provider.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetSocialVerificationResponse {
-    /// Current verification state for the requested provider.
+    /// Current verification state for the requested provider. Absent when no
+    /// verification has been started.
     ///
     /// Field 1: `verification`
     #[serde(
@@ -115143,10 +115145,12 @@ pub mod __buffa {
             }
         }
         /// GetSocialVerificationResponse contains the caller's current social
-        /// verification state for one provider.
+        /// verification state for one provider. A successful response with verification
+        /// absent means the caller has not started verification for that provider.
         #[derive(Clone, Debug, Default)]
         pub struct GetSocialVerificationResponseView<'a> {
-            /// Current verification state for the requested provider.
+            /// Current verification state for the requested provider. Absent when no
+            /// verification has been started.
             ///
             /// Field 1: `verification`
             pub verification: ::buffa::MessageFieldView<
@@ -115417,7 +115421,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Current verification state for the requested provider.
+            /// Current verification state for the requested provider. Absent when no
+            /// verification has been started.
             ///
             /// Field 1: `verification`
             #[must_use]

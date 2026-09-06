@@ -3339,16 +3339,22 @@ pub mod trailing_stop_trigger {
 }
 /// TwapMarketIoc configures server-priced market-IOC slices.
 #[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct TwapMarketIoc {
+    #[serde(flatten)]
+    pub max_slippage: ::core::option::Option<
+        __buffa::oneof::twap_market_ioc::MaxSlippage,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for TwapMarketIoc {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("TwapMarketIoc").finish()
+        f.debug_struct("TwapMarketIoc")
+            .field("max_slippage", &self.max_slippage)
+            .finish()
     }
 }
 impl TwapMarketIoc {
@@ -3376,6 +3382,16 @@ impl ::buffa::Message for TwapMarketIoc {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
+        if let ::core::option::Option::Some(ref v) = self.max_slippage {
+            match v {
+                __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(v) => {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                }
+                __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(v) => {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                }
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3386,6 +3402,16 @@ impl ::buffa::Message for TwapMarketIoc {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.max_slippage {
+            match v {
+                __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(x) => {
+                    ::buffa::types::put_int32_field(1u32, *x, buf);
+                }
+                __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(x) => {
+                    ::buffa::types::put_int32_field(2u32, *x, buf);
+                }
+            }
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -3399,6 +3425,28 @@ impl ::buffa::Message for TwapMarketIoc {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_slippage = ::core::option::Option::Some(
+                    __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
+                        ::buffa::types::decode_int32(buf)?,
+                    ),
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_slippage = ::core::option::Option::Some(
+                    __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(
+                        ::buffa::types::decode_int32(buf)?,
+                    ),
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3407,6 +3455,7 @@ impl ::buffa::Message for TwapMarketIoc {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
+        self.max_slippage = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3417,6 +3466,99 @@ impl ::buffa::ExtensionSet for TwapMarketIoc {
     }
     fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
         &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for TwapMarketIoc {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = TwapMarketIoc;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct TwapMarketIoc")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<TwapMarketIoc, A::Error> {
+                let mut __oneof_max_slippage: ::core::option::Option<
+                    __buffa::oneof::twap_market_ioc::MaxSlippage,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "maxSlippageTicks" | "max_slippage_ticks" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i32;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i32, D::Error> {
+                                    ::buffa::json_helpers::int32::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i32> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_max_slippage.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'max_slippage'",
+                                        ),
+                                    );
+                                }
+                                __oneof_max_slippage = Some(
+                                    __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "maxSlippageBps" | "max_slippage_bps" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i32;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i32, D::Error> {
+                                    ::buffa::json_helpers::int32::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i32> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_max_slippage.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'max_slippage'",
+                                        ),
+                                    );
+                                }
+                                __oneof_max_slippage = Some(
+                                    __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <TwapMarketIoc as ::core::default::Default>::default();
+                __r.max_slippage = __oneof_max_slippage;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for TwapMarketIoc {
@@ -3439,6 +3581,14 @@ pub const __TWAP_MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
     from_json: ::buffa::type_registry::any_from_json::<TwapMarketIoc>,
     is_wkt: false,
 };
+pub mod twap_market_ioc {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::twap_market_ioc::MaxSlippage;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::twap_market_ioc::MaxSlippage as MaxSlippageView;
+}
 /// TwapLimitGtc configures one resting limit slice at a time. A previous open
 /// slice is canceled before the next interval.
 #[derive(Clone, PartialEq, Default)]
@@ -10172,7 +10322,7 @@ pub const __TWAP_DETAILS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
     from_json: ::buffa::type_registry::any_from_json::<TwapDetails>,
     is_wkt: false,
 };
-/// LadderDetails contains configuration for LADDER triggers.
+/// LadderDetails contains configuration and aggregate execution progress for LADDER triggers.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -10217,6 +10367,30 @@ pub struct LadderDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub ladder_distribution: ::buffa::EnumValue<LadderDistribution>,
+    /// Cumulative filled child-order base quantity scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed,
+    /// including when the parent completed because all children were canceled.
+    ///
+    /// Field 5: `executed_qty_scaled`
+    #[serde(
+        rename = "executedQtyScaled",
+        alias = "executed_qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub executed_qty_scaled: i64,
+    /// Number of distinct ladder levels with at least one fill. A partially
+    /// filled level counts once, including across replacement child orders.
+    /// This is not the number of fully filled levels.
+    ///
+    /// Field 6: `executed_levels`
+    #[serde(
+        rename = "executedLevels",
+        alias = "executed_levels",
+        with = "::buffa::json_helpers::int32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
+    )]
+    pub executed_levels: i32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -10228,6 +10402,8 @@ impl ::core::fmt::Debug for LadderDetails {
             .field("ladder_price_max_ticks", &self.ladder_price_max_ticks)
             .field("ladder_levels", &self.ladder_levels)
             .field("ladder_distribution", &self.ladder_distribution)
+            .field("executed_qty_scaled", &self.executed_qty_scaled)
+            .field("executed_levels", &self.executed_levels)
             .finish()
     }
 }
@@ -10277,6 +10453,15 @@ impl ::buffa::Message for LadderDetails {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if self.executed_qty_scaled != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.executed_qty_scaled) as u32;
+        }
+        if self.executed_levels != 0i32 {
+            size
+                += 1u32 + ::buffa::types::int32_encoded_len(self.executed_levels) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -10301,6 +10486,12 @@ impl ::buffa::Message for LadderDetails {
             if val != 0 {
                 ::buffa::types::put_int32_field(4u32, val, buf);
             }
+        }
+        if self.executed_qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(5u32, self.executed_qty_scaled, buf);
+        }
+        if self.executed_levels != 0i32 {
+            ::buffa::types::put_int32_field(6u32, self.executed_levels, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -10345,6 +10536,20 @@ impl ::buffa::Message for LadderDetails {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.executed_qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.executed_levels = ::buffa::types::decode_int32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -10357,6 +10562,8 @@ impl ::buffa::Message for LadderDetails {
         self.ladder_price_max_ticks = 0i64;
         self.ladder_levels = 0i32;
         self.ladder_distribution = ::buffa::EnumValue::from(0);
+        self.executed_qty_scaled = 0i64;
+        self.executed_levels = 0i32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -14448,6 +14655,9 @@ pub mod __buffa {
         /// TwapMarketIoc configures server-priced market-IOC slices.
         #[derive(Clone, Debug, Default)]
         pub struct TwapMarketIocView<'a> {
+            pub max_slippage: ::core::option::Option<
+                super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for TwapMarketIocView<'a> {
@@ -14481,6 +14691,28 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_slippage = Some(
+                            super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_slippage = Some(
+                            super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -14510,6 +14742,25 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::TwapMarketIoc {
+                    max_slippage: self
+                        .max_slippage
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(
+                                    *v,
+                                )
+                            }
+                        }),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -14524,6 +14775,20 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
+                if let ::core::option::Option::Some(ref v) = self.max_slippage {
+                    match v {
+                        super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                        }
+                        super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                        }
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -14535,6 +14800,20 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
+                if let ::core::option::Option::Some(ref v) = self.max_slippage {
+                    match v {
+                        super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(1u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(2u32, *x, buf);
+                        }
+                    }
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -14556,6 +14835,28 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(ref __ov) = self.max_slippage {
+                    match __ov {
+                        super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "maxSlippageTicks",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "maxSlippageBps",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                    }
+                }
                 __map.end()
             }
         }
@@ -14651,6 +14952,15 @@ pub mod __buffa {
             #[must_use]
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
+            }
+            /// Oneof `max_slippage`.
+            #[must_use]
+            pub fn max_slippage(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage,
+            > {
+                self.0.reborrow().max_slippage.as_ref()
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<TwapMarketIocView<'static>>>
@@ -25015,7 +25325,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// LadderDetails contains configuration for LADDER triggers.
+        /// LadderDetails contains configuration and aggregate execution progress for LADDER triggers.
         #[derive(Clone, Debug, Default)]
         pub struct LadderDetailsView<'a> {
             /// Minimum price in quote units scaled by 1e6 for the ladder range.
@@ -25036,6 +25346,18 @@ pub mod __buffa {
             pub ladder_distribution: ::buffa::EnumValue<
                 super::super::LadderDistribution,
             >,
+            /// Cumulative filled child-order base quantity scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed,
+            /// including when the parent completed because all children were canceled.
+            ///
+            /// Field 5: `executed_qty_scaled`
+            pub executed_qty_scaled: i64,
+            /// Number of distinct ladder levels with at least one fill. A partially
+            /// filled level counts once, including across replacement child orders.
+            /// This is not the number of fully filled levels.
+            ///
+            /// Field 6: `executed_levels`
+            pub executed_levels: i32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LadderDetailsView<'a> {
@@ -25103,6 +25425,22 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.executed_qty_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.executed_levels = ::buffa::types::decode_int32(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -25136,6 +25474,8 @@ pub mod __buffa {
                     ladder_price_max_ticks: self.ladder_price_max_ticks,
                     ladder_levels: self.ladder_levels,
                     ladder_distribution: self.ladder_distribution,
+                    executed_qty_scaled: self.executed_qty_scaled,
+                    executed_levels: self.executed_levels,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -25176,6 +25516,18 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if self.executed_qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.executed_qty_scaled)
+                                as u32;
+                }
+                if self.executed_levels != 0i32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int32_encoded_len(self.executed_levels)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -25209,6 +25561,12 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(4u32, val, buf);
                     }
+                }
+                if self.executed_qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(5u32, self.executed_qty_scaled, buf);
+                }
+                if self.executed_levels != 0i32 {
+                    ::buffa::types::put_int32_field(6u32, self.executed_levels, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -25267,6 +25625,22 @@ pub mod __buffa {
                         .serialize_entry(
                             "ladderDistribution",
                             &self.ladder_distribution,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.executed_qty_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "executedQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(&self.executed_qty_scaled),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i32(&self.executed_levels) {
+                    __map
+                        .serialize_entry(
+                            "executedLevels",
+                            &::buffa::json_helpers::ProtoJson(&self.executed_levels),
                         )?;
                 }
                 __map.end()
@@ -25394,6 +25768,24 @@ pub mod __buffa {
                 &self,
             ) -> ::buffa::EnumValue<super::super::LadderDistribution> {
                 self.0.reborrow().ladder_distribution
+            }
+            /// Cumulative filled child-order base quantity scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed,
+            /// including when the parent completed because all children were canceled.
+            ///
+            /// Field 5: `executed_qty_scaled`
+            #[must_use]
+            pub fn executed_qty_scaled(&self) -> i64 {
+                self.0.reborrow().executed_qty_scaled
+            }
+            /// Number of distinct ladder levels with at least one fill. A partially
+            /// filled level counts once, including across replacement child orders.
+            /// This is not the number of fully filled levels.
+            ///
+            /// Field 6: `executed_levels`
+            #[must_use]
+            pub fn executed_levels(&self) -> i32 {
+                self.0.reborrow().executed_levels
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<LadderDetailsView<'static>>>
@@ -27084,6 +27476,15 @@ pub mod __buffa {
                     MaxSlippageBps(i32),
                 }
             }
+            pub mod twap_market_ioc {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum MaxSlippage {
+                    MaxSlippageTicks(i32),
+                    MaxSlippageBps(i32),
+                }
+            }
             pub mod twap_trigger {
                 #[allow(unused_imports)]
                 use super::*;
@@ -27392,6 +27793,44 @@ pub mod __buffa {
                 }
             }
             /// Optional protection applied when the market child fires.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum MaxSlippage {
+                MaxSlippageTicks(i32),
+                MaxSlippageBps(i32),
+            }
+            impl ::buffa::Oneof for MaxSlippage {}
+            impl serde::Serialize for MaxSlippage {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::MaxSlippageTicks(v) => {
+                            map.serialize_entry(
+                                "maxSlippageTicks",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                        Self::MaxSlippageBps(v) => {
+                            map.serialize_entry(
+                                "maxSlippageBps",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
+        pub mod twap_market_ioc {
+            #[allow(unused_imports)]
+            use super::*;
+            /// Optional protection for each slice, relative to the server-side reference
+            /// price at that slice's admission. If omitted, each slice uses the pair's
+            /// default market slippage. This does not bound price movement over the whole
+            /// TWAP duration or guarantee that every slice fills.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
                 MaxSlippageTicks(i32),
