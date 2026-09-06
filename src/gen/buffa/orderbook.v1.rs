@@ -526,7 +526,9 @@ pub const __PRICE_LEVEL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa
     is_wkt: false,
 };
 /// GetOrderBookResponse is a depth snapshot for the binary (protobuf) API (scaled integers).
-/// REST surfaces expose decimal strings via DTO conversion.
+/// REST surfaces expose decimal strings via DTO conversion. A configured symbol
+/// without an initialized book returns a successful snapshot with sequence zero
+/// and empty bid and ask collections.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -551,7 +553,7 @@ pub struct GetOrderBookResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub book_seq: u64,
-    /// Best bid first; descending price.
+    /// Best bid first; descending price. Empty when there is no current liquidity.
     ///
     /// Field 3: `bids`
     #[serde(
@@ -560,7 +562,7 @@ pub struct GetOrderBookResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub bids: ::buffa::alloc::vec::Vec<PriceLevel>,
-    /// Best ask first; ascending price.
+    /// Best ask first; ascending price. Empty when there is no current liquidity.
     ///
     /// Field 4: `asks`
     #[serde(
@@ -1714,7 +1716,9 @@ pub mod __buffa {
             }
         }
         /// GetOrderBookResponse is a depth snapshot for the binary (protobuf) API (scaled integers).
-        /// REST surfaces expose decimal strings via DTO conversion.
+        /// REST surfaces expose decimal strings via DTO conversion. A configured symbol
+        /// without an initialized book returns a successful snapshot with sequence zero
+        /// and empty bid and ask collections.
         #[derive(Clone, Debug, Default)]
         pub struct GetOrderBookResponseView<'a> {
             /// Numeric symbol identifier (client resolves to symbol string).
@@ -1725,14 +1729,14 @@ pub mod __buffa {
             ///
             /// Field 2: `book_seq`
             pub book_seq: u64,
-            /// Best bid first; descending price.
+            /// Best bid first; descending price. Empty when there is no current liquidity.
             ///
             /// Field 3: `bids`
             pub bids: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::PriceLevelView<'a>,
             >,
-            /// Best ask first; ascending price.
+            /// Best ask first; ascending price. Empty when there is no current liquidity.
             ///
             /// Field 4: `asks`
             pub asks: ::buffa::RepeatedView<
@@ -2141,7 +2145,7 @@ pub mod __buffa {
             pub fn book_seq(&self) -> u64 {
                 self.0.reborrow().book_seq
             }
-            /// Best bid first; descending price.
+            /// Best bid first; descending price. Empty when there is no current liquidity.
             ///
             /// Field 3: `bids`
             #[must_use]
@@ -2153,7 +2157,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().bids
             }
-            /// Best ask first; ascending price.
+            /// Best ask first; ascending price. Empty when there is no current liquidity.
             ///
             /// Field 4: `asks`
             #[must_use]
