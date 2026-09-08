@@ -239,7 +239,9 @@ pub const API_KEY_SERVICE_UPDATE_API_KEY_SPEC: ::connectrpc::Spec = ::connectrpc
 #[allow(clippy::type_complexity)]
 pub trait ApiKeyService: Send + Sync + 'static {
     /// Create a new API key for the caller. Account security settings may require
-    /// MFA enrollment or a fresh step-up proof.
+    /// MFA enrollment or a fresh step-up proof. The acting caller's root account
+    /// must have accepted the current terms, including when targeting a shared
+    /// subaccount; otherwise FailedPrecondition with AUTH_TERMS_NOT_ACCEPTED is returned.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -4323,7 +4325,9 @@ pub trait SubaccountService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Create a new sub-account under the caller's root account.
+    /// Create a new sub-account under the caller's root account. Requires current
+    /// terms acceptance; otherwise FailedPrecondition with AUTH_TERMS_NOT_ACCEPTED
+    /// is returned.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -11453,6 +11457,14 @@ pub type OwnedLoginWithWalletRequestView = ::buffa::view::OwnedView<
 pub type OwnedLoginWithWalletResponseView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::LoginWithWalletResponseView<'static>,
 >;
+///Shorthand for `OwnedView<AcceptTermsRequestView<'static>>`.
+pub type OwnedAcceptTermsRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::AcceptTermsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<AcceptTermsResponseView<'static>>`.
+pub type OwnedAcceptTermsResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::AcceptTermsResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<MeRequestView<'static>>`.
 pub type OwnedMeRequestView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::MeRequestView<'static>,
@@ -11501,6 +11513,26 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::auth::v1::AcceptTermsResponse>
+for crate::proto::auth::v1::__buffa::view::AcceptTermsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::AcceptTermsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::AcceptTermsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::auth::v1::MeResponse>
 for crate::proto::auth::v1::__buffa::view::MeResponseView<'_> {
     fn encode(
@@ -11541,6 +11573,15 @@ pub const AUTH_SERVICE_LOGIN_WITH_WALLET_SPEC: ::connectrpc::Spec = ::connectrpc
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `AcceptTerms` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const AUTH_SERVICE_ACCEPT_TERMS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.AuthService/AcceptTerms",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `Me` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -11550,7 +11591,7 @@ pub const AUTH_SERVICE_ME_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// AuthService manages wallet login and caller authentication context.
+/// AuthService manages wallet login, explicit terms consent, and caller authentication context.
 ///
 /// # Implementing handlers
 ///
@@ -11624,7 +11665,8 @@ pub trait AuthService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Verify a signed nonce and issue an access token.
+    /// Verify a signed nonce and issue an access token. Login and account creation
+    /// do not accept terms; explicit consent is recorded only by AcceptTerms.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -11644,6 +11686,33 @@ pub trait AuthService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::auth::v1::LoginWithWalletResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Explicitly accept the currently required terms for the caller's root account.
+    /// Requires an interactive JWT session; API keys are not allowed. No MFA is
+    /// required. Login, trading, reads, and use of existing resources remain available
+    /// without acceptance. Only CreateSubaccount, CreateApiKey, and
+    /// CreateDepositAddress require acceptance of the current version.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn accept_terms<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::AcceptTermsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::AcceptTermsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -11757,6 +11826,35 @@ impl<S: AuthService> AuthServiceExt for S {
             .with_spec(AUTH_SERVICE_LOGIN_WITH_WALLET_SPEC)
             .route_view(
                 AUTH_SERVICE_SERVICE_NAME,
+                "AcceptTerms",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::AcceptTermsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::AcceptTermsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.accept_terms(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::AcceptTermsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AUTH_SERVICE_ACCEPT_TERMS_SPEC)
+            .route_view(
+                AUTH_SERVICE_SERVICE_NAME,
                 "Me",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -11846,6 +11944,12 @@ impl<T: AuthService> ::connectrpc::Dispatcher for AuthServiceServer<T> {
                         .with_spec(AUTH_SERVICE_LOGIN_WITH_WALLET_SPEC),
                 )
             }
+            "AcceptTerms" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AUTH_SERVICE_ACCEPT_TERMS_SPEC),
+                )
+            }
             "Me" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -11905,6 +12009,25 @@ impl<T: AuthService> ::connectrpc::Dispatcher for AuthServiceServer<T> {
                         .encode::<
                             crate::proto::auth::v1::LoginWithWalletResponse,
                         >(format)
+                })
+            }
+            "AcceptTerms" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::AcceptTermsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::AcceptTermsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::AcceptTermsRequest,
+                    >::from_parts(&req, &body);
+                    svc.accept_terms(ctx, req)
+                        .await?
+                        .encode::<crate::proto::auth::v1::AcceptTermsResponse>(format)
                 })
             }
             "Me" => {
@@ -12107,6 +12230,47 @@ where
                 &self.config,
                 AUTH_SERVICE_SERVICE_NAME,
                 "LoginWithWallet",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AcceptTerms RPC. Sends a request to /auth.v1.AuthService/AcceptTerms.
+    pub async fn accept_terms(
+        &self,
+        request: crate::proto::auth::v1::AcceptTermsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::AcceptTermsResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.accept_terms_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AcceptTerms RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn accept_terms_with_options(
+        &self,
+        request: crate::proto::auth::v1::AcceptTermsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::AcceptTermsResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AUTH_SERVICE_SERVICE_NAME,
+                "AcceptTerms",
                 request,
                 options,
             )
