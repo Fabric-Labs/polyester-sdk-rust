@@ -2271,6 +2271,20 @@ mod tests {
         );
     }
 
+    #[test]
+    fn social_start_allows_discord_without_handle() {
+        let req = super::start_social_request("discord", "", "");
+        assert_eq!(
+            req.provider.as_known(),
+            Some(crate::proto::auth::v1::SocialProvider::DISCORD)
+        );
+        assert!(req.handle.is_empty());
+        assert_eq!(
+            req.method.as_known(),
+            Some(crate::proto::auth::v1::SocialVerificationMethod::METHOD_UNSPECIFIED)
+        );
+    }
+
     #[tokio::test]
     async fn internal_transfer_requires_destination_before_transport() {
         let client = crate::Client::new(crate::Config {

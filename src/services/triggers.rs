@@ -20,9 +20,9 @@ use crate::proto::triggers::v1::{
     CancelTriggerRequest, ConditionalChildExecution, ConditionalTrigger, CreateTriggerRequest,
     GetTriggerRequest, LadderTrigger, ListTriggerEventsRequest, ListTriggersRequest,
     ModifyTriggerRequest, PauseTriggerRequest, ResumeTriggerRequest, TrailingStopTrigger,
-    TriggerIntent, TriggerLimitFok, TriggerLimitGtc, TriggerLimitIoc, TwapLimitGtc, TwapTrigger,
-    conditional_child_execution, modify_trigger_request, trailing_stop_trigger, trigger_intent,
-    twap_trigger,
+    TriggerIntent, TriggerLimitFok, TriggerLimitGtc, TriggerLimitIoc, TwapLimitGtc, TwapMarketIoc,
+    TwapTrigger, conditional_child_execution, modify_trigger_request, trailing_stop_trigger,
+    trigger_intent, twap_market_ioc, twap_trigger,
 };
 use crate::types::{resolve_price_ticks, resolve_qty_scaled};
 
@@ -275,7 +275,27 @@ impl TriggersService {
                     ..Default::default()
                 };
                 twap.execution = Some(match params.order_type {
-                    CreateOrderType::Market => twap_trigger::Execution::MarketIoc(Box::default()),
+                    CreateOrderType::Market => {
+                        let mut ioc = TwapMarketIoc::default();
+                        match (params.max_slippage_ticks, params.max_slippage_bps) {
+                            (Some(_), Some(_)) => {
+                                return Err(Error::validation(
+                                    "twap market_ioc allows at most one of max_slippage_ticks or max_slippage_bps",
+                                ));
+                            }
+                            (Some(ticks), None) => {
+                                ioc.max_slippage =
+                                    Some(twap_market_ioc::MaxSlippage::MaxSlippageTicks(ticks));
+                            }
+                            (None, Some(bps)) => {
+                                validate_bps("max_slippage_bps", bps, false)?;
+                                ioc.max_slippage =
+                                    Some(twap_market_ioc::MaxSlippage::MaxSlippageBps(bps));
+                            }
+                            (None, None) => {}
+                        }
+                        twap_trigger::Execution::MarketIoc(Box::new(ioc))
+                    }
                     CreateOrderType::Limit => {
                         let price = params.limit_price.as_ref().ok_or_else(|| {
                             Error::validation("twap limit slices require limit_price")
@@ -986,6 +1006,39 @@ mod tests {
                 .encode_modify_params(&modify_too_high)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn twap_market_ioc_encodes_optional_slippage() {
+        let client = client();
+        let mut params = create_params(
+            crate::Quantity::from_decimal_str("1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+        params.trigger_type = CreateTriggerType::Twap;
+        params.side = CreateSide::Buy;
+        params.order_type = CreateOrderType::Market;
+        params.trigger_price = None;
+        params.limit_price = None;
+        params.twap_duration_ms = Some(60_000);
+        params.twap_slice_interval_ms = Some(5_000);
+        params.max_slippage_bps = Some(25);
+        let req = client.triggers.encode_create_params(&params).unwrap();
+        let intent = req.trigger.expect("trigger intent");
+        let Some(trigger_intent::Strategy::Twap(twap)) = intent.strategy.as_ref() else {
+            panic!("expected twap strategy");
+        };
+        let Some(twap_trigger::Execution::MarketIoc(ioc)) = twap.execution.as_ref() else {
+            panic!("expected market_ioc");
+        };
+        assert_eq!(
+            ioc.max_slippage,
+            Some(twap_market_ioc::MaxSlippage::MaxSlippageBps(25))
+        );
+
+        params.max_slippage_bps = Some(10_001);
+        assert!(client.triggers.encode_create_params(&params).is_err());
     }
 
     #[test]

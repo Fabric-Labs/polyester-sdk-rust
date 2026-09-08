@@ -917,6 +917,8 @@ pub enum ErrorCode {
     ERROR_CODE_POLICY_SPOT_READ_DENY = 71i32,
     /// API key policy does not allow reading spot data.
     ERROR_CODE_API_KEY_SPOT_READ_DENY = 72i32,
+    /// The cancel request exceeded its bounded internal replay window.
+    ERROR_CODE_CANCEL_REQUEST_EXPIRED = 73i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1129,6 +1131,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_API_KEY_SPOT_READ_DENY`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ApiKeySpotReadDeny: Self = Self::ERROR_CODE_API_KEY_SPOT_READ_DENY;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CancelRequestExpired: Self = Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -1348,6 +1353,9 @@ impl ::buffa::Enumeration for ErrorCode {
             72i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_SPOT_READ_DENY)
             }
+            73i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1467,6 +1475,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_POLICY_SPOT_READ_DENY => "ERROR_CODE_POLICY_SPOT_READ_DENY",
             Self::ERROR_CODE_API_KEY_SPOT_READ_DENY => {
                 "ERROR_CODE_API_KEY_SPOT_READ_DENY"
+            }
+            Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED => {
+                "ERROR_CODE_CANCEL_REQUEST_EXPIRED"
             }
         }
     }
@@ -1694,6 +1705,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_API_KEY_SPOT_READ_DENY" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_SPOT_READ_DENY)
             }
+            "ERROR_CODE_CANCEL_REQUEST_EXPIRED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1769,6 +1783,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN,
             Self::ERROR_CODE_POLICY_SPOT_READ_DENY,
             Self::ERROR_CODE_API_KEY_SPOT_READ_DENY,
+            Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED,
         ]
     }
 }
@@ -8056,17 +8071,17 @@ pub struct CancelAllOrdersRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Symbol ID filter. When set, only orders on this symbol are canceled.
-    /// When zero, all symbols are canceled.
+    /// Optional trading-pair IDs from GetSpotConfig. Empty matches all symbols.
+    /// At most 100 positive IDs; duplicates are ignored and ordering is immaterial.
     ///
-    /// Field 2: `symbol_id`
+    /// Field 2: `symbol_ids`
     #[serde(
-        rename = "symbolId",
-        alias = "symbol_id",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+        rename = "symbolIds",
+        alias = "symbol_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub symbol_id: u32,
+    pub symbol_ids: ::buffa::alloc::vec::Vec<u32>,
     /// Side filter. When set, only orders on this side are canceled.
     ///
     /// Field 3: `side`
@@ -8086,7 +8101,9 @@ pub struct CancelAllOrdersRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub dry_run: bool,
-    /// Idempotency key (required).
+    /// Idempotency key (required). Reuse the same key and criteria for retries.
+    /// Completed results are retained for at least two minutes. Use a fresh key
+    /// for a new cancellation; do not reuse a key after its replay window.
     ///
     /// Field 6: `request_id`
     #[serde(
@@ -8104,7 +8121,7 @@ impl ::core::fmt::Debug for CancelAllOrdersRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CancelAllOrdersRequest")
             .field("subaccount_id", &self.subaccount_id)
-            .field("symbol_id", &self.symbol_id)
+            .field("symbol_ids", &self.symbol_ids)
             .field("side", &self.side)
             .field("dry_run", &self.dry_run)
             .field("request_id", &self.request_id)
@@ -8148,8 +8165,14 @@ impl ::buffa::Message for CancelAllOrdersRequest {
         if self.subaccount_id.is_some() {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
-        if self.symbol_id != 0u32 {
-            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        if !self.symbol_ids.is_empty() {
+            let payload: u32 = self
+                .symbol_ids
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
         }
         {
             let val = self.side.to_i32();
@@ -8176,8 +8199,16 @@ impl ::buffa::Message for CancelAllOrdersRequest {
         if let Some(v) = self.subaccount_id {
             ::buffa::types::put_fixed64_field(1u32, v, buf);
         }
-        if self.symbol_id != 0u32 {
-            ::buffa::types::put_uint32_field(2u32, self.symbol_id, buf);
+        if !self.symbol_ids.is_empty() {
+            let payload: u32 = self
+                .symbol_ids
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+            for &v in &self.symbol_ids {
+                ::buffa::types::encode_uint32(v, buf);
+            }
         }
         {
             let val = self.side.to_i32();
@@ -8214,11 +8245,35 @@ impl ::buffa::Message for CancelAllOrdersRequest {
                 );
             }
             2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.symbol_ids.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.symbol_ids
+                            .push(::buffa::types::decode_uint32(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.symbol_ids.push(::buffa::types::decode_uint32(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -8250,7 +8305,7 @@ impl ::buffa::Message for CancelAllOrdersRequest {
     }
     fn clear(&mut self) {
         self.subaccount_id = ::core::option::Option::None;
-        self.symbol_id = 0u32;
+        self.symbol_ids.clear();
         self.side = ::buffa::EnumValue::from(0);
         self.dry_run = false;
         self.request_id.clear();
@@ -28906,11 +28961,11 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Symbol ID filter. When set, only orders on this symbol are canceled.
-            /// When zero, all symbols are canceled.
+            /// Optional trading-pair IDs from GetSpotConfig. Empty matches all symbols.
+            /// At most 100 positive IDs; duplicates are ignored and ordering is immaterial.
             ///
-            /// Field 2: `symbol_id`
-            pub symbol_id: u32,
+            /// Field 2: `symbol_ids`
+            pub symbol_ids: ::buffa::RepeatedView<'a, u32>,
             /// Side filter. When set, only orders on this side are canceled.
             ///
             /// Field 3: `side`
@@ -28919,7 +28974,9 @@ pub mod __buffa {
             ///
             /// Field 4: `dry_run`
             pub dry_run: bool,
-            /// Idempotency key (required).
+            /// Idempotency key (required). Reuse the same key and criteria for retries.
+            /// Completed results are retained for at least two minutes. Use a fresh key
+            /// for a new cancellation; do not reuse a key after its replay window.
             ///
             /// Field 6: `request_id`
             pub request_id: &'a str,
@@ -28965,13 +29022,6 @@ pub mod __buffa {
                             ::buffa::types::decode_fixed64(&mut cur)?,
                         );
                     }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
-                    }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -28994,6 +29044,31 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.symbol_ids
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.symbol_ids
+                                    .push(::buffa::types::decode_uint32(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.symbol_ids
+                                .push(::buffa::types::decode_uint32(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -29025,7 +29100,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::CancelAllOrdersRequest {
                     subaccount_id: self.subaccount_id,
-                    symbol_id: self.symbol_id,
+                    symbol_ids: self.symbol_ids.to_vec(),
                     side: self.side,
                     dry_run: self.dry_run,
                     request_id: self.request_id.to_string(),
@@ -29046,10 +29121,15 @@ pub mod __buffa {
                 if self.subaccount_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
-                if self.symbol_id != 0u32 {
+                if !self.symbol_ids.is_empty() {
+                    let payload: u32 = self
+                        .symbol_ids
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
                     size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
                 }
                 {
                     let val = self.side.to_i32();
@@ -29080,8 +29160,16 @@ pub mod __buffa {
                 if let Some(v) = self.subaccount_id {
                     ::buffa::types::put_fixed64_field(1u32, v, buf);
                 }
-                if self.symbol_id != 0u32 {
-                    ::buffa::types::put_uint32_field(2u32, self.symbol_id, buf);
+                if !self.symbol_ids.is_empty() {
+                    let payload: u32 = self
+                        .symbol_ids
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+                    for &v in &self.symbol_ids {
+                        ::buffa::types::encode_uint32(v, buf);
+                    }
                 }
                 {
                     let val = self.side.to_i32();
@@ -29123,11 +29211,11 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                if !self.symbol_ids.is_empty() {
                     __map
                         .serialize_entry(
-                            "symbolId",
-                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                            "symbolIds",
+                            &::buffa::json_helpers::RepeatedJson(&self.symbol_ids),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
@@ -29242,13 +29330,13 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Symbol ID filter. When set, only orders on this symbol are canceled.
-            /// When zero, all symbols are canceled.
+            /// Optional trading-pair IDs from GetSpotConfig. Empty matches all symbols.
+            /// At most 100 positive IDs; duplicates are ignored and ordering is immaterial.
             ///
-            /// Field 2: `symbol_id`
+            /// Field 2: `symbol_ids`
             #[must_use]
-            pub fn symbol_id(&self) -> u32 {
-                self.0.reborrow().symbol_id
+            pub fn symbol_ids(&self) -> &::buffa::RepeatedView<'_, u32> {
+                &self.0.reborrow().symbol_ids
             }
             /// Side filter. When set, only orders on this side are canceled.
             ///
@@ -29264,7 +29352,9 @@ pub mod __buffa {
             pub fn dry_run(&self) -> bool {
                 self.0.reborrow().dry_run
             }
-            /// Idempotency key (required).
+            /// Idempotency key (required). Reuse the same key and criteria for retries.
+            /// Completed results are retained for at least two minutes. Use a fresh key
+            /// for a new cancellation; do not reuse a key after its replay window.
             ///
             /// Field 6: `request_id`
             #[must_use]

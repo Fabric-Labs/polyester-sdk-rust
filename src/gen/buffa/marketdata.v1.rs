@@ -5015,7 +5015,7 @@ pub const __GET_CANDLES_COLUMNS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAn
 /// CandlePoint is one OHLCV bucket represented with scaled integers.
 ///
 /// REST responses render these values as decimal strings in tuple order:
-/// \[ts_sec, open, high, low, close, volume\].
+/// \[ts_sec, open, high, low, close, volume, quote_volume\].
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -5087,6 +5087,17 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_closed: bool,
+    /// Exact traded quote-asset volume as a human-readable decimal string.
+    /// This is sum(execution price × execution quantity), not close × base volume.
+    ///
+    /// Field 8: `quote_volume`
+    #[serde(
+        rename = "quoteVolume",
+        alias = "quote_volume",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub quote_volume: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5101,6 +5112,7 @@ impl ::core::fmt::Debug for CandlePoint {
             .field("close", &self.close)
             .field("volume", &self.volume)
             .field("is_closed", &self.is_closed)
+            .field("quote_volume", &self.quote_volume)
             .finish()
     }
 }
@@ -5150,6 +5162,9 @@ impl ::buffa::Message for CandlePoint {
         if self.is_closed {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
+        if !self.quote_volume.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.quote_volume) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5180,6 +5195,9 @@ impl ::buffa::Message for CandlePoint {
         }
         if self.is_closed {
             ::buffa::types::put_bool_field(7u32, self.is_closed, buf);
+        }
+        if !self.quote_volume.is_empty() {
+            ::buffa::types::put_string_field(8u32, &self.quote_volume, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5243,6 +5261,13 @@ impl ::buffa::Message for CandlePoint {
                 )?;
                 self.is_closed = ::buffa::types::decode_bool(buf)?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.quote_volume, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5258,6 +5283,7 @@ impl ::buffa::Message for CandlePoint {
         self.close = 0i64;
         self.volume = 0i64;
         self.is_closed = false;
+        self.quote_volume.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5702,6 +5728,16 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub next_page_token: ::buffa::alloc::string::String,
+    /// Exact traded quote-asset volumes, oldest-first and aligned with ts_sec.
+    ///
+    /// Field 16: `quote_volume`
+    #[serde(
+        rename = "quoteVolume",
+        alias = "quote_volume",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub quote_volume: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5724,6 +5760,7 @@ impl ::core::fmt::Debug for GetCandlesColumnsResponse {
             .field("reference_close", &self.reference_close)
             .field("reference_volume", &self.reference_volume)
             .field("next_page_token", &self.next_page_token)
+            .field("quote_volume", &self.quote_volume)
             .finish()
     }
 }
@@ -5873,6 +5910,9 @@ impl ::buffa::Message for GetCandlesColumnsResponse {
             size
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
+        }
+        for v in &self.quote_volume {
+            size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -6027,6 +6067,9 @@ impl ::buffa::Message for GetCandlesColumnsResponse {
         }
         if !self.next_page_token.is_empty() {
             ::buffa::types::put_string_field(15u32, &self.next_page_token, buf);
+        }
+        for v in &self.quote_volume {
+            ::buffa::types::put_string_field(16u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6430,6 +6473,13 @@ impl ::buffa::Message for GetCandlesColumnsResponse {
                 )?;
                 ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.quote_volume.push(::buffa::types::decode_string(buf)?);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6453,6 +6503,7 @@ impl ::buffa::Message for GetCandlesColumnsResponse {
         self.reference_close.clear();
         self.reference_volume.clear();
         self.next_page_token.clear();
+        self.quote_volume.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6569,6 +6620,16 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub volume: i64,
+    /// Exact traded quote-asset volume as a human-readable decimal string.
+    ///
+    /// Field 9: `quote_volume`
+    #[serde(
+        rename = "quoteVolume",
+        alias = "quote_volume",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub quote_volume: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -6584,6 +6645,7 @@ impl ::core::fmt::Debug for Candle {
             .field("low", &self.low)
             .field("close", &self.close)
             .field("volume", &self.volume)
+            .field("quote_volume", &self.quote_volume)
             .finish()
     }
 }
@@ -6639,6 +6701,9 @@ impl ::buffa::Message for Candle {
         if self.volume != 0i64 {
             size += 1u32 + ::buffa::types::int64_encoded_len(self.volume) as u32;
         }
+        if !self.quote_volume.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.quote_volume) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -6675,6 +6740,9 @@ impl ::buffa::Message for Candle {
         }
         if self.volume != 0i64 {
             ::buffa::types::put_int64_field(8u32, self.volume, buf);
+        }
+        if !self.quote_volume.is_empty() {
+            ::buffa::types::put_string_field(9u32, &self.quote_volume, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6747,6 +6815,13 @@ impl ::buffa::Message for Candle {
                 )?;
                 self.volume = ::buffa::types::decode_int64(buf)?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.quote_volume, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6763,6 +6838,7 @@ impl ::buffa::Message for Candle {
         self.low = 0i64;
         self.close = 0i64;
         self.volume = 0i64;
+        self.quote_volume.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -15222,7 +15298,7 @@ pub mod __buffa {
         /// CandlePoint is one OHLCV bucket represented with scaled integers.
         ///
         /// REST responses render these values as decimal strings in tuple order:
-        /// \[ts_sec, open, high, low, close, volume\].
+        /// \[ts_sec, open, high, low, close, volume, quote_volume\].
         #[derive(Clone, Debug, Default)]
         pub struct CandlePointView<'a> {
             /// Candle bucket start timestamp, in seconds since epoch (UTC).
@@ -15255,6 +15331,11 @@ pub mod __buffa {
             ///
             /// Field 7: `is_closed`
             pub is_closed: bool,
+            /// Exact traded quote-asset volume as a human-readable decimal string.
+            /// This is sum(execution price × execution quantity), not close × base volume.
+            ///
+            /// Field 8: `quote_volume`
+            pub quote_volume: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CandlePointView<'a> {
@@ -15337,6 +15418,13 @@ pub mod __buffa {
                         )?;
                         view.is_closed = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.quote_volume = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -15373,6 +15461,7 @@ pub mod __buffa {
                     close: self.close,
                     volume: self.volume,
                     is_closed: self.is_closed,
+                    quote_volume: self.quote_volume.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -15409,6 +15498,12 @@ pub mod __buffa {
                 if self.is_closed {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
+                if !self.quote_volume.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.quote_volume)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -15440,6 +15535,9 @@ pub mod __buffa {
                 }
                 if self.is_closed {
                     ::buffa::types::put_bool_field(7u32, self.is_closed, buf);
+                }
+                if !self.quote_volume.is_empty() {
+                    ::buffa::types::put_string_field(8u32, &self.quote_volume, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -15506,6 +15604,9 @@ pub mod __buffa {
                 }
                 if self.is_closed {
                     __map.serialize_entry("isClosed", &self.is_closed)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.quote_volume) {
+                    __map.serialize_entry("quoteVolume", self.quote_volume)?;
                 }
                 __map.end()
             }
@@ -15651,6 +15752,14 @@ pub mod __buffa {
             #[must_use]
             pub fn is_closed(&self) -> bool {
                 self.0.reborrow().is_closed
+            }
+            /// Exact traded quote-asset volume as a human-readable decimal string.
+            /// This is sum(execution price × execution quantity), not close × base volume.
+            ///
+            /// Field 8: `quote_volume`
+            #[must_use]
+            pub fn quote_volume(&self) -> &'_ str {
+                self.0.reborrow().quote_volume
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<CandlePointView<'static>>>
@@ -16216,6 +16325,10 @@ pub mod __buffa {
             ///
             /// Field 15: `next_page_token`
             pub next_page_token: &'a str,
+            /// Exact traded quote-asset volumes, oldest-first and aligned with ts_sec.
+            ///
+            /// Field 16: `quote_volume`
+            pub quote_volume: ::buffa::RepeatedView<'a, &'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetCandlesColumnsResponseView<'a> {
@@ -16557,6 +16670,13 @@ pub mod __buffa {
                             );
                         }
                     }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.quote_volume.push(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -16601,6 +16721,11 @@ pub mod __buffa {
                     reference_close: self.reference_close.to_vec(),
                     reference_volume: self.reference_volume.to_vec(),
                     next_page_token: self.next_page_token.to_string(),
+                    quote_volume: self
+                        .quote_volume
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -16751,6 +16876,9 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.next_page_token)
                                 as u32;
+                }
+                for v in &self.quote_volume {
+                    size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -16907,6 +17035,9 @@ pub mod __buffa {
                 if !self.next_page_token.is_empty() {
                     ::buffa::types::put_string_field(15u32, &self.next_page_token, buf);
                 }
+                for v in &self.quote_volume {
+                    ::buffa::types::put_string_field(16u32, v, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -17026,6 +17157,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
                     __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                if !self.quote_volume.is_empty() {
+                    __map.serialize_entry("quoteVolume", &*self.quote_volume)?;
                 }
                 __map.end()
             }
@@ -17235,6 +17369,13 @@ pub mod __buffa {
             pub fn next_page_token(&self) -> &'_ str {
                 self.0.reborrow().next_page_token
             }
+            /// Exact traded quote-asset volumes, oldest-first and aligned with ts_sec.
+            ///
+            /// Field 16: `quote_volume`
+            #[must_use]
+            pub fn quote_volume(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().quote_volume
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<GetCandlesColumnsResponseView<'static>>,
@@ -17312,6 +17453,10 @@ pub mod __buffa {
             ///
             /// Field 8: `volume`
             pub volume: i64,
+            /// Exact traded quote-asset volume as a human-readable decimal string.
+            ///
+            /// Field 9: `quote_volume`
+            pub quote_volume: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CandleView<'a> {
@@ -17403,6 +17548,13 @@ pub mod __buffa {
                         )?;
                         view.volume = ::buffa::types::decode_int64(&mut cur)?;
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.quote_volume = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -17434,6 +17586,7 @@ pub mod __buffa {
                     low: self.low,
                     close: self.close,
                     volume: self.volume,
+                    quote_volume: self.quote_volume.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -17478,6 +17631,12 @@ pub mod __buffa {
                 if self.volume != 0i64 {
                     size += 1u32 + ::buffa::types::int64_encoded_len(self.volume) as u32;
                 }
+                if !self.quote_volume.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.quote_volume)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -17515,6 +17674,9 @@ pub mod __buffa {
                 }
                 if self.volume != 0i64 {
                     ::buffa::types::put_int64_field(8u32, self.volume, buf);
+                }
+                if !self.quote_volume.is_empty() {
+                    ::buffa::types::put_string_field(9u32, &self.quote_volume, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -17590,6 +17752,9 @@ pub mod __buffa {
                             "volume",
                             &::buffa::json_helpers::ProtoJson(&self.volume),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.quote_volume) {
+                    __map.serialize_entry("quoteVolume", self.quote_volume)?;
                 }
                 __map.end()
             }
@@ -17738,6 +17903,13 @@ pub mod __buffa {
             #[must_use]
             pub fn volume(&self) -> i64 {
                 self.0.reborrow().volume
+            }
+            /// Exact traded quote-asset volume as a human-readable decimal string.
+            ///
+            /// Field 9: `quote_volume`
+            #[must_use]
+            pub fn quote_volume(&self) -> &'_ str {
+                self.0.reborrow().quote_volume
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<CandleView<'static>>>

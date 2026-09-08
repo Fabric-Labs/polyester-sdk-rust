@@ -46,6 +46,7 @@ pub struct Candle {
     pub low: String,
     pub close: String,
     pub volume: String,
+    pub quote_volume: String,
     pub symbol_id: u32,
     pub timeframe: String,
 }
@@ -80,6 +81,26 @@ pub struct MarketOverviewEntry {
     pub symbol: String,
     pub last_price: Option<Price>,
     pub index_price: Option<Price>,
+    pub volume_24h_base_scaled: Option<String>,
+    pub volume_24h_quote_scaled: Option<String>,
+    pub volume_24h_usd_scaled: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpotPairVolumeSeries {
+    pub symbol_id: u32,
+    pub symbol: String,
+    pub volume_usd_scaled: Vec<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpotVolumeHistory {
+    pub bucket: String,
+    pub start_ts_sec: u32,
+    pub end_ts_sec: u32,
+    pub points: u32,
+    pub pairs: Vec<SpotPairVolumeSeries>,
+    pub total_volume_usd_scaled: Vec<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

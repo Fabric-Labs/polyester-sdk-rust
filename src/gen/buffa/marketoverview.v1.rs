@@ -177,9 +177,8 @@ pub enum MarketOrderBy {
     MARKET_ORDER_BY_UNSPECIFIED = 0i32,
     /// Sort by absolute 24h change (basis points).
     ORDER_BY_CHANGE_24H_BPS = 1i32,
-    /// Sort by 24h quote volume scaled by the pair's quote_quantity_scale from
-    /// GetSpotConfig.
-    ORDER_BY_VOLUME_24H_QUOTE = 2i32,
+    /// Sort by canonical USD 24h volume. Unvalued markets sort last in either direction.
+    ORDER_BY_VOLUME_24H_USD = 2i32,
     /// Sort by last price in quote units scaled by 1e6.
     ORDER_BY_LAST_PRICE = 3i32,
     /// Sort by listing time (new listings first).
@@ -192,9 +191,9 @@ impl MarketOrderBy {
     ///Idiomatic alias for [`Self::ORDER_BY_CHANGE_24H_BPS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const OrderByChange24hBps: Self = Self::ORDER_BY_CHANGE_24H_BPS;
-    ///Idiomatic alias for [`Self::ORDER_BY_VOLUME_24H_QUOTE`]; `Debug` prints the variant name.
+    ///Idiomatic alias for [`Self::ORDER_BY_VOLUME_24H_USD`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const OrderByVolume24hQuote: Self = Self::ORDER_BY_VOLUME_24H_QUOTE;
+    pub const OrderByVolume24hUsd: Self = Self::ORDER_BY_VOLUME_24H_USD;
     ///Idiomatic alias for [`Self::ORDER_BY_LAST_PRICE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const OrderByLastPrice: Self = Self::ORDER_BY_LAST_PRICE;
@@ -298,7 +297,7 @@ impl ::buffa::Enumeration for MarketOrderBy {
         match value {
             0i32 => ::core::option::Option::Some(Self::MARKET_ORDER_BY_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::ORDER_BY_CHANGE_24H_BPS),
-            2i32 => ::core::option::Option::Some(Self::ORDER_BY_VOLUME_24H_QUOTE),
+            2i32 => ::core::option::Option::Some(Self::ORDER_BY_VOLUME_24H_USD),
             3i32 => ::core::option::Option::Some(Self::ORDER_BY_LAST_PRICE),
             4i32 => ::core::option::Option::Some(Self::ORDER_BY_DATE_ADDED),
             _ => ::core::option::Option::None,
@@ -311,7 +310,7 @@ impl ::buffa::Enumeration for MarketOrderBy {
         match self {
             Self::MARKET_ORDER_BY_UNSPECIFIED => "MARKET_ORDER_BY_UNSPECIFIED",
             Self::ORDER_BY_CHANGE_24H_BPS => "ORDER_BY_CHANGE_24H_BPS",
-            Self::ORDER_BY_VOLUME_24H_QUOTE => "ORDER_BY_VOLUME_24H_QUOTE",
+            Self::ORDER_BY_VOLUME_24H_USD => "ORDER_BY_VOLUME_24H_USD",
             Self::ORDER_BY_LAST_PRICE => "ORDER_BY_LAST_PRICE",
             Self::ORDER_BY_DATE_ADDED => "ORDER_BY_DATE_ADDED",
         }
@@ -324,8 +323,8 @@ impl ::buffa::Enumeration for MarketOrderBy {
             "ORDER_BY_CHANGE_24H_BPS" => {
                 ::core::option::Option::Some(Self::ORDER_BY_CHANGE_24H_BPS)
             }
-            "ORDER_BY_VOLUME_24H_QUOTE" => {
-                ::core::option::Option::Some(Self::ORDER_BY_VOLUME_24H_QUOTE)
+            "ORDER_BY_VOLUME_24H_USD" => {
+                ::core::option::Option::Some(Self::ORDER_BY_VOLUME_24H_USD)
             }
             "ORDER_BY_LAST_PRICE" => {
                 ::core::option::Option::Some(Self::ORDER_BY_LAST_PRICE)
@@ -340,7 +339,7 @@ impl ::buffa::Enumeration for MarketOrderBy {
         &[
             Self::MARKET_ORDER_BY_UNSPECIFIED,
             Self::ORDER_BY_CHANGE_24H_BPS,
-            Self::ORDER_BY_VOLUME_24H_QUOTE,
+            Self::ORDER_BY_VOLUME_24H_USD,
             Self::ORDER_BY_LAST_PRICE,
             Self::ORDER_BY_DATE_ADDED,
         ]
@@ -1067,27 +1066,41 @@ pub struct MarketOverview {
     )]
     pub low_24h_ticks: i64,
     /// Rolling 24h base volume scaled by the pair's base_quantity_scale from
-    /// GetSpotConfig.
+    /// GetSpotConfig. Omitted if the amount exceeds the signed 64-bit range.
     ///
     /// Field 8: `volume_24h_base_scaled`
     #[serde(
         rename = "volume24hBaseScaled",
         alias = "volume_24h_base_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
     )]
-    pub volume_24h_base_scaled: i64,
+    pub volume_24h_base_scaled: ::core::option::Option<i64>,
     /// Rolling 24h quote volume scaled by the pair's quote_quantity_scale from
-    /// GetSpotConfig.
+    /// GetSpotConfig. Omitted if the amount exceeds the signed 64-bit range.
     ///
     /// Field 14: `volume_24h_quote_scaled`
     #[serde(
         rename = "volume24hQuoteScaled",
         alias = "volume_24h_quote_scaled",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
     )]
-    pub volume_24h_quote_scaled: i64,
+    pub volume_24h_quote_scaled: ::core::option::Option<i64>,
+    /// Rolling 24h USD volume, scaled by 1e6 (one unit is 0.000001 USD).
+    /// Omitted if any contributing volume cannot be valued reliably. Quote volumes
+    /// use execution prices; USD conversion uses historical quarter-hour marks.
+    /// Covers the 24 hours ending at the latest completed UTC minute.
+    /// Refreshed every 15 seconds after completed minutes become available.
+    ///
+    /// Field 17: `volume_24h_usd_scaled`
+    #[serde(
+        rename = "volume24hUsdScaled",
+        alias = "volume_24h_usd_scaled",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub volume_24h_usd_scaled: ::core::option::Option<i64>,
     /// Listing timestamp in nanoseconds since epoch.
     ///
     /// Field 15: `listed_ts_ns`
@@ -1175,6 +1188,7 @@ impl ::core::fmt::Debug for MarketOverview {
             .field("low_24h_ticks", &self.low_24h_ticks)
             .field("volume_24h_base_scaled", &self.volume_24h_base_scaled)
             .field("volume_24h_quote_scaled", &self.volume_24h_quote_scaled)
+            .field("volume_24h_usd_scaled", &self.volume_24h_usd_scaled)
             .field("listed_ts_ns", &self.listed_ts_ns)
             .field("best_bid_ticks", &self.best_bid_ticks)
             .field("best_bid_qty_scaled", &self.best_bid_qty_scaled)
@@ -1191,6 +1205,29 @@ impl MarketOverview {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.MarketOverview";
+}
+impl MarketOverview {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::volume_24h_base_scaled`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_volume_24h_base_scaled(mut self, value: i64) -> Self {
+        self.volume_24h_base_scaled = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::volume_24h_quote_scaled`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_volume_24h_quote_scaled(mut self, value: i64) -> Self {
+        self.volume_24h_quote_scaled = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::volume_24h_usd_scaled`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_volume_24h_usd_scaled(mut self, value: i64) -> Self {
+        self.volume_24h_usd_scaled = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(MarketOverview);
 impl ::buffa::MessageName for MarketOverview {
@@ -1232,11 +1269,8 @@ impl ::buffa::Message for MarketOverview {
         if self.low_24h_ticks != 0i64 {
             size += 1u32 + ::buffa::types::int64_encoded_len(self.low_24h_ticks) as u32;
         }
-        if self.volume_24h_base_scaled != 0i64 {
-            size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(self.volume_24h_base_scaled)
-                        as u32;
+        if let Some(v) = self.volume_24h_base_scaled {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
         if self.best_bid_ticks != 0i64 {
             size += 1u32 + ::buffa::types::int64_encoded_len(self.best_bid_ticks) as u32;
@@ -1262,11 +1296,8 @@ impl ::buffa::Message for MarketOverview {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
-        if self.volume_24h_quote_scaled != 0i64 {
-            size
-                += 1u32
-                    + ::buffa::types::int64_encoded_len(self.volume_24h_quote_scaled)
-                        as u32;
+        if let Some(v) = self.volume_24h_quote_scaled {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
         if self.listed_ts_ns != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.listed_ts_ns) as u32;
@@ -1275,6 +1306,9 @@ impl ::buffa::Message for MarketOverview {
             size
                 += 2u32
                     + ::buffa::types::int64_encoded_len(self.index_price_ticks) as u32;
+        }
+        if let Some(v) = self.volume_24h_usd_scaled {
+            size += 2u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -1304,8 +1338,8 @@ impl ::buffa::Message for MarketOverview {
         if self.low_24h_ticks != 0i64 {
             ::buffa::types::put_int64_field(7u32, self.low_24h_ticks, buf);
         }
-        if self.volume_24h_base_scaled != 0i64 {
-            ::buffa::types::put_int64_field(8u32, self.volume_24h_base_scaled, buf);
+        if let Some(v) = self.volume_24h_base_scaled {
+            ::buffa::types::put_int64_field(8u32, v, buf);
         }
         if self.best_bid_ticks != 0i64 {
             ::buffa::types::put_int64_field(9u32, self.best_bid_ticks, buf);
@@ -1323,14 +1357,17 @@ impl ::buffa::Message for MarketOverview {
             ::buffa::types::put_len_delimited_header(13u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
         }
-        if self.volume_24h_quote_scaled != 0i64 {
-            ::buffa::types::put_int64_field(14u32, self.volume_24h_quote_scaled, buf);
+        if let Some(v) = self.volume_24h_quote_scaled {
+            ::buffa::types::put_int64_field(14u32, v, buf);
         }
         if self.listed_ts_ns != 0u64 {
             ::buffa::types::put_uint64_field(15u32, self.listed_ts_ns, buf);
         }
         if self.index_price_ticks != 0i64 {
             ::buffa::types::put_int64_field(16u32, self.index_price_ticks, buf);
+        }
+        if let Some(v) = self.volume_24h_usd_scaled {
+            ::buffa::types::put_int64_field(17u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1392,7 +1429,9 @@ impl ::buffa::Message for MarketOverview {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.volume_24h_base_scaled = ::buffa::types::decode_int64(buf)?;
+                self.volume_24h_base_scaled = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
             }
             9u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -1436,7 +1475,9 @@ impl ::buffa::Message for MarketOverview {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.volume_24h_quote_scaled = ::buffa::types::decode_int64(buf)?;
+                self.volume_24h_quote_scaled = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
             }
             15u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -1452,6 +1493,15 @@ impl ::buffa::Message for MarketOverview {
                 )?;
                 self.index_price_ticks = ::buffa::types::decode_int64(buf)?;
             }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.volume_24h_usd_scaled = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1466,15 +1516,16 @@ impl ::buffa::Message for MarketOverview {
         self.change_24h_bps = 0i32;
         self.high_24h_ticks = 0i64;
         self.low_24h_ticks = 0i64;
-        self.volume_24h_base_scaled = 0i64;
+        self.volume_24h_base_scaled = ::core::option::Option::None;
         self.best_bid_ticks = 0i64;
         self.best_bid_qty_scaled = 0i64;
         self.best_ask_ticks = 0i64;
         self.best_ask_qty_scaled = 0i64;
         self.sparklines.clear();
-        self.volume_24h_quote_scaled = 0i64;
+        self.volume_24h_quote_scaled = ::core::option::Option::None;
         self.listed_ts_ns = 0u64;
         self.index_price_ticks = 0i64;
+        self.volume_24h_usd_scaled = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1544,7 +1595,7 @@ pub struct ListMarketOverviewRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub page_token: ::buffa::alloc::string::String,
-    /// Sort key. When unset/UNSPECIFIED, defaults to 24h quote volume.
+    /// Sort key. When unset/UNSPECIFIED, defaults to descending 24h USD volume.
     ///
     /// Field 4: `order_by`
     #[serde(
@@ -2208,6 +2259,675 @@ pub const __MARKET_OVERVIEW_BATCH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     from_json: ::buffa::type_registry::any_from_json::<MarketOverviewBatch>,
     is_wkt: false,
 };
+/// A finite spot-volume chart request; no pagination or arbitrary time range.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetSpotVolumeHistoryRequest {
+    /// Pair IDs from GetSpotConfig; empty selects every configured pair separately.
+    /// At most 2000 distinct positive IDs. Unknown IDs are rejected. If the full
+    /// universe exceeds 2000 pairs, specify a filter; results are never truncated.
+    ///
+    /// Field 1: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub symbol_id: ::buffa::alloc::vec::Vec<u32>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetSpotVolumeHistoryRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetSpotVolumeHistoryRequest")
+            .field("symbol_id", &self.symbol_id)
+            .finish()
+    }
+}
+impl GetSpotVolumeHistoryRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetSpotVolumeHistoryRequest";
+}
+::buffa::impl_default_instance!(GetSpotVolumeHistoryRequest);
+impl ::buffa::MessageName for GetSpotVolumeHistoryRequest {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "GetSpotVolumeHistoryRequest";
+    const FULL_NAME: &'static str = "marketoverview.v1.GetSpotVolumeHistoryRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetSpotVolumeHistoryRequest";
+}
+impl ::buffa::Message for GetSpotVolumeHistoryRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.symbol_id.is_empty() {
+            let payload: u32 = self
+                .symbol_id
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.symbol_id.is_empty() {
+            let payload: u32 = self
+                .symbol_id
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(1u32, payload, buf);
+            for &v in &self.symbol_id {
+                ::buffa::types::encode_uint32(v, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.symbol_id.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.symbol_id
+                            .push(::buffa::types::decode_uint32(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.symbol_id.push(::buffa::types::decode_uint32(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.symbol_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetSpotVolumeHistoryRequest {
+    const PROTO_FQN: &'static str = "marketoverview.v1.GetSpotVolumeHistoryRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetSpotVolumeHistoryRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_SPOT_VOLUME_HISTORY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.GetSpotVolumeHistoryRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetSpotVolumeHistoryRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetSpotVolumeHistoryRequest>,
+    is_wkt: false,
+};
+/// One pair appears exactly once, regardless of its base and quote assets.
+/// REST renders the scaled amounts as decimal strings in volumeUsd.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SpotPairVolumeSeries {
+    /// Stable numeric pair ID; clients may group these series by base asset.
+    ///
+    /// Field 1: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
+    /// Trailing-24h USD amounts scaled by 1e6, oldest first. Exactly points values,
+    /// aligned with the shared response grid. Zero means no executed trades in
+    /// the window. USD values round down once per contributing 15-minute bucket.
+    ///
+    /// Field 2: `volume_usd_scaled`
+    #[serde(
+        rename = "volumeUsdScaled",
+        alias = "volume_usd_scaled",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub volume_usd_scaled: ::buffa::alloc::vec::Vec<i64>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SpotPairVolumeSeries {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SpotPairVolumeSeries")
+            .field("symbol_id", &self.symbol_id)
+            .field("volume_usd_scaled", &self.volume_usd_scaled)
+            .finish()
+    }
+}
+impl SpotPairVolumeSeries {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.SpotPairVolumeSeries";
+}
+::buffa::impl_default_instance!(SpotPairVolumeSeries);
+impl ::buffa::MessageName for SpotPairVolumeSeries {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "SpotPairVolumeSeries";
+    const FULL_NAME: &'static str = "marketoverview.v1.SpotPairVolumeSeries";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.SpotPairVolumeSeries";
+}
+impl ::buffa::Message for SpotPairVolumeSeries {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
+        if !self.volume_usd_scaled.is_empty() {
+            let payload: u32 = self
+                .volume_usd_scaled
+                .iter()
+                .map(|&v| ::buffa::types::sint64_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+        }
+        if !self.volume_usd_scaled.is_empty() {
+            let payload: u32 = self
+                .volume_usd_scaled
+                .iter()
+                .map(|&v| ::buffa::types::sint64_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+            for &v in &self.volume_usd_scaled {
+                ::buffa::types::encode_sint64(v, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.volume_usd_scaled.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.volume_usd_scaled
+                            .push(::buffa::types::decode_sint64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.volume_usd_scaled.push(::buffa::types::decode_sint64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.symbol_id = 0u32;
+        self.volume_usd_scaled.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SpotPairVolumeSeries {
+    const PROTO_FQN: &'static str = "marketoverview.v1.SpotPairVolumeSeries";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SpotPairVolumeSeries {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SPOT_PAIR_VOLUME_SERIES_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.SpotPairVolumeSeries",
+    to_json: ::buffa::type_registry::any_to_json::<SpotPairVolumeSeries>,
+    from_json: ::buffa::type_registry::any_from_json::<SpotPairVolumeSeries>,
+    is_wkt: false,
+};
+/// Aligned columnar trailing-24h USD series over the most recent 24 hours.
+/// The grid always contains 97 samples ending at the latest completed UTC
+/// quarter-hour. Index i maps to start_ts_sec + i * 900 seconds. Each sample
+/// covers \[sample time - 24h, sample time); only the preceding 48 hours contribute.
+/// USD conversion uses the latest trustworthy quote/USD mark at or before each
+/// bucket's start. Stablecoin quotes also require historical USD prices.
+/// If any contributing trade cannot be valued, or a USD amount overflows,
+/// the RPC fails as unavailable; partial or zero-filled valuations are not returned.
+/// Intervals without executed trades are zero. Results may be reused for 15 seconds.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetSpotVolumeHistoryResponse {
+    /// Sampling interval between points; currently always "15m".
+    ///
+    /// Field 1: `bucket`
+    #[serde(
+        rename = "bucket",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bucket: ::buffa::alloc::string::String,
+    /// First sample timestamp in seconds since Unix epoch (UTC), inclusive.
+    ///
+    /// Field 2: `start_ts_sec`
+    #[serde(
+        rename = "startTsSec",
+        alias = "start_ts_sec",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub start_ts_sec: u32,
+    /// Last sample timestamp in seconds since Unix epoch (UTC), inclusive.
+    ///
+    /// Field 3: `end_ts_sec`
+    #[serde(
+        rename = "endTsSec",
+        alias = "end_ts_sec",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub end_ts_sec: u32,
+    /// Number of aligned values in every pair array and the total array; always 97.
+    ///
+    /// Field 4: `points`
+    #[serde(
+        rename = "points",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub points: u32,
+    /// Pairs ordered by ascending symbol_id; at most 2000, each included once.
+    ///
+    /// Field 5: `pairs`
+    #[serde(
+        rename = "pairs",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub pairs: ::buffa::alloc::vec::Vec<SpotPairVolumeSeries>,
+    /// Sum across selected pairs, USD scaled by 1e6. Exactly points values,
+    /// oldest first. REST renders decimal strings in totalVolumeUsd.
+    /// Do not sum overlapping trailing-24h samples to obtain period traded volume.
+    ///
+    /// Field 6: `total_volume_usd_scaled`
+    #[serde(
+        rename = "totalVolumeUsdScaled",
+        alias = "total_volume_usd_scaled",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub total_volume_usd_scaled: ::buffa::alloc::vec::Vec<i64>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetSpotVolumeHistoryResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetSpotVolumeHistoryResponse")
+            .field("bucket", &self.bucket)
+            .field("start_ts_sec", &self.start_ts_sec)
+            .field("end_ts_sec", &self.end_ts_sec)
+            .field("points", &self.points)
+            .field("pairs", &self.pairs)
+            .field("total_volume_usd_scaled", &self.total_volume_usd_scaled)
+            .finish()
+    }
+}
+impl GetSpotVolumeHistoryResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetSpotVolumeHistoryResponse";
+}
+::buffa::impl_default_instance!(GetSpotVolumeHistoryResponse);
+impl ::buffa::MessageName for GetSpotVolumeHistoryResponse {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "GetSpotVolumeHistoryResponse";
+    const FULL_NAME: &'static str = "marketoverview.v1.GetSpotVolumeHistoryResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetSpotVolumeHistoryResponse";
+}
+impl ::buffa::Message for GetSpotVolumeHistoryResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.bucket.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.bucket) as u32;
+        }
+        if self.start_ts_sec != 0u32 {
+            size += 1u32 + ::buffa::types::FIXED32_ENCODED_LEN as u32;
+        }
+        if self.end_ts_sec != 0u32 {
+            size += 1u32 + ::buffa::types::FIXED32_ENCODED_LEN as u32;
+        }
+        if self.points != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.points) as u32;
+        }
+        for v in &self.pairs {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.total_volume_usd_scaled.is_empty() {
+            let payload: u32 = self
+                .total_volume_usd_scaled
+                .iter()
+                .map(|&v| ::buffa::types::sint64_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.bucket.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.bucket, buf);
+        }
+        if self.start_ts_sec != 0u32 {
+            ::buffa::types::put_fixed32_field(2u32, self.start_ts_sec, buf);
+        }
+        if self.end_ts_sec != 0u32 {
+            ::buffa::types::put_fixed32_field(3u32, self.end_ts_sec, buf);
+        }
+        if self.points != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.points, buf);
+        }
+        for v in &self.pairs {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if !self.total_volume_usd_scaled.is_empty() {
+            let payload: u32 = self
+                .total_volume_usd_scaled
+                .iter()
+                .map(|&v| ::buffa::types::sint64_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(6u32, payload, buf);
+            for &v in &self.total_volume_usd_scaled {
+                ::buffa::types::encode_sint64(v, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bucket, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed32,
+                )?;
+                self.start_ts_sec = ::buffa::types::decode_fixed32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed32,
+                )?;
+                self.end_ts_sec = ::buffa::types::decode_fixed32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.points = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.pairs.push(elem);
+            }
+            6u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.total_volume_usd_scaled.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.total_volume_usd_scaled
+                            .push(::buffa::types::decode_sint64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.total_volume_usd_scaled
+                        .push(::buffa::types::decode_sint64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.bucket.clear();
+        self.start_ts_sec = 0u32;
+        self.end_ts_sec = 0u32;
+        self.points = 0u32;
+        self.pairs.clear();
+        self.total_volume_usd_scaled.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetSpotVolumeHistoryResponse {
+    const PROTO_FQN: &'static str = "marketoverview.v1.GetSpotVolumeHistoryResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetSpotVolumeHistoryResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_SPOT_VOLUME_HISTORY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.GetSpotVolumeHistoryResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetSpotVolumeHistoryResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetSpotVolumeHistoryResponse>,
+    is_wkt: false,
+};
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -2857,15 +3577,23 @@ pub mod __buffa {
             /// Field 7: `low_24h_ticks`
             pub low_24h_ticks: i64,
             /// Rolling 24h base volume scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig.
+            /// GetSpotConfig. Omitted if the amount exceeds the signed 64-bit range.
             ///
             /// Field 8: `volume_24h_base_scaled`
-            pub volume_24h_base_scaled: i64,
+            pub volume_24h_base_scaled: ::core::option::Option<i64>,
             /// Rolling 24h quote volume scaled by the pair's quote_quantity_scale from
-            /// GetSpotConfig.
+            /// GetSpotConfig. Omitted if the amount exceeds the signed 64-bit range.
             ///
             /// Field 14: `volume_24h_quote_scaled`
-            pub volume_24h_quote_scaled: i64,
+            pub volume_24h_quote_scaled: ::core::option::Option<i64>,
+            /// Rolling 24h USD volume, scaled by 1e6 (one unit is 0.000001 USD).
+            /// Omitted if any contributing volume cannot be valued reliably. Quote volumes
+            /// use execution prices; USD conversion uses historical quarter-hour marks.
+            /// Covers the 24 hours ending at the latest completed UTC minute.
+            /// Refreshed every 15 seconds after completed minutes become available.
+            ///
+            /// Field 17: `volume_24h_usd_scaled`
+            pub volume_24h_usd_scaled: ::core::option::Option<i64>,
             /// Listing timestamp in nanoseconds since epoch.
             ///
             /// Field 15: `listed_ts_ns`
@@ -2980,18 +3708,27 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.volume_24h_base_scaled = ::buffa::types::decode_int64(
-                            &mut cur,
-                        )?;
+                        view.volume_24h_base_scaled = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
                     }
                     14u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.volume_24h_quote_scaled = ::buffa::types::decode_int64(
-                            &mut cur,
+                        view.volume_24h_quote_scaled = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
+                    17u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
+                        view.volume_24h_usd_scaled = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
                     }
                     15u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -3091,6 +3828,7 @@ pub mod __buffa {
                     low_24h_ticks: self.low_24h_ticks,
                     volume_24h_base_scaled: self.volume_24h_base_scaled,
                     volume_24h_quote_scaled: self.volume_24h_quote_scaled,
+                    volume_24h_usd_scaled: self.volume_24h_usd_scaled,
                     listed_ts_ns: self.listed_ts_ns,
                     best_bid_ticks: self.best_bid_ticks,
                     best_bid_qty_scaled: self.best_bid_qty_scaled,
@@ -3151,12 +3889,8 @@ pub mod __buffa {
                             + ::buffa::types::int64_encoded_len(self.low_24h_ticks)
                                 as u32;
                 }
-                if self.volume_24h_base_scaled != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.volume_24h_base_scaled,
-                            ) as u32;
+                if let Some(v) = self.volume_24h_base_scaled {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
                 if self.best_bid_ticks != 0i64 {
                     size
@@ -3190,12 +3924,8 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
-                if self.volume_24h_quote_scaled != 0i64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::int64_encoded_len(
-                                self.volume_24h_quote_scaled,
-                            ) as u32;
+                if let Some(v) = self.volume_24h_quote_scaled {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
                 if self.listed_ts_ns != 0u64 {
                     size
@@ -3208,6 +3938,9 @@ pub mod __buffa {
                         += 2u32
                             + ::buffa::types::int64_encoded_len(self.index_price_ticks)
                                 as u32;
+                }
+                if let Some(v) = self.volume_24h_usd_scaled {
+                    size += 2u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -3238,12 +3971,8 @@ pub mod __buffa {
                 if self.low_24h_ticks != 0i64 {
                     ::buffa::types::put_int64_field(7u32, self.low_24h_ticks, buf);
                 }
-                if self.volume_24h_base_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        8u32,
-                        self.volume_24h_base_scaled,
-                        buf,
-                    );
+                if let Some(v) = self.volume_24h_base_scaled {
+                    ::buffa::types::put_int64_field(8u32, v, buf);
                 }
                 if self.best_bid_ticks != 0i64 {
                     ::buffa::types::put_int64_field(9u32, self.best_bid_ticks, buf);
@@ -3273,18 +4002,17 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
-                if self.volume_24h_quote_scaled != 0i64 {
-                    ::buffa::types::put_int64_field(
-                        14u32,
-                        self.volume_24h_quote_scaled,
-                        buf,
-                    );
+                if let Some(v) = self.volume_24h_quote_scaled {
+                    ::buffa::types::put_int64_field(14u32, v, buf);
                 }
                 if self.listed_ts_ns != 0u64 {
                     ::buffa::types::put_uint64_field(15u32, self.listed_ts_ns, buf);
                 }
                 if self.index_price_ticks != 0i64 {
                     ::buffa::types::put_int64_field(16u32, self.index_price_ticks, buf);
+                }
+                if let Some(v) = self.volume_24h_usd_scaled {
+                    ::buffa::types::put_int64_field(17u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -3349,26 +4077,25 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.low_24h_ticks),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.volume_24h_base_scaled,
-                ) {
+                if let ::core::option::Option::Some(__v) = self.volume_24h_base_scaled {
                     __map
                         .serialize_entry(
                             "volume24hBaseScaled",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.volume_24h_base_scaled,
-                            ),
+                            &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i64(
-                    &self.volume_24h_quote_scaled,
-                ) {
+                if let ::core::option::Option::Some(__v) = self.volume_24h_quote_scaled {
                     __map
                         .serialize_entry(
                             "volume24hQuoteScaled",
-                            &::buffa::json_helpers::ProtoJson(
-                                &self.volume_24h_quote_scaled,
-                            ),
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.volume_24h_usd_scaled {
+                    __map
+                        .serialize_entry(
+                            "volume24hUsdScaled",
+                            &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(&self.listed_ts_ns) {
@@ -3562,20 +4289,31 @@ pub mod __buffa {
                 self.0.reborrow().low_24h_ticks
             }
             /// Rolling 24h base volume scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig.
+            /// GetSpotConfig. Omitted if the amount exceeds the signed 64-bit range.
             ///
             /// Field 8: `volume_24h_base_scaled`
             #[must_use]
-            pub fn volume_24h_base_scaled(&self) -> i64 {
+            pub fn volume_24h_base_scaled(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().volume_24h_base_scaled
             }
             /// Rolling 24h quote volume scaled by the pair's quote_quantity_scale from
-            /// GetSpotConfig.
+            /// GetSpotConfig. Omitted if the amount exceeds the signed 64-bit range.
             ///
             /// Field 14: `volume_24h_quote_scaled`
             #[must_use]
-            pub fn volume_24h_quote_scaled(&self) -> i64 {
+            pub fn volume_24h_quote_scaled(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().volume_24h_quote_scaled
+            }
+            /// Rolling 24h USD volume, scaled by 1e6 (one unit is 0.000001 USD).
+            /// Omitted if any contributing volume cannot be valued reliably. Quote volumes
+            /// use execution prices; USD conversion uses historical quarter-hour marks.
+            /// Covers the 24 hours ending at the latest completed UTC minute.
+            /// Refreshed every 15 seconds after completed minutes become available.
+            ///
+            /// Field 17: `volume_24h_usd_scaled`
+            #[must_use]
+            pub fn volume_24h_usd_scaled(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().volume_24h_usd_scaled
             }
             /// Listing timestamp in nanoseconds since epoch.
             ///
@@ -3683,7 +4421,7 @@ pub mod __buffa {
             ///
             /// Field 3: `page_token`
             pub page_token: &'a str,
-            /// Sort key. When unset/UNSPECIFIED, defaults to 24h quote volume.
+            /// Sort key. When unset/UNSPECIFIED, defaults to descending 24h USD volume.
             ///
             /// Field 4: `order_by`
             pub order_by: ::buffa::EnumValue<super::super::MarketOrderBy>,
@@ -4165,7 +4903,7 @@ pub mod __buffa {
             pub fn page_token(&self) -> &'_ str {
                 self.0.reborrow().page_token
             }
-            /// Sort key. When unset/UNSPECIFIED, defaults to 24h quote volume.
+            /// Sort key. When unset/UNSPECIFIED, defaults to descending 24h USD volume.
             ///
             /// Field 4: `order_by`
             #[must_use]
@@ -4903,6 +5641,1180 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// A finite spot-volume chart request; no pagination or arbitrary time range.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetSpotVolumeHistoryRequestView<'a> {
+            /// Pair IDs from GetSpotConfig; empty selects every configured pair separately.
+            /// At most 2000 distinct positive IDs. Unknown IDs are rejected. If the full
+            /// universe exceeds 2000 pairs, specify a filter; results are never truncated.
+            ///
+            /// Field 1: `symbol_id`
+            pub symbol_id: ::buffa::RepeatedView<'a, u32>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetSpotVolumeHistoryRequestView<'a> {
+            type Owned = super::super::GetSpotVolumeHistoryRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.symbol_id
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.symbol_id
+                                    .push(::buffa::types::decode_uint32(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.symbol_id
+                                .push(::buffa::types::decode_uint32(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetSpotVolumeHistoryRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetSpotVolumeHistoryRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetSpotVolumeHistoryRequest {
+                    symbol_id: self.symbol_id.to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetSpotVolumeHistoryRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.symbol_id.is_empty() {
+                    let payload: u32 = self
+                        .symbol_id
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.symbol_id.is_empty() {
+                    let payload: u32 = self
+                        .symbol_id
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(1u32, payload, buf);
+                    for &v in &self.symbol_id {
+                        ::buffa::types::encode_uint32(v, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetSpotVolumeHistoryRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.symbol_id.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::RepeatedJson(&self.symbol_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetSpotVolumeHistoryRequestView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "GetSpotVolumeHistoryRequest";
+            const FULL_NAME: &'static str = "marketoverview.v1.GetSpotVolumeHistoryRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetSpotVolumeHistoryRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetSpotVolumeHistoryRequestView);
+        ::buffa::impl_view_reborrow!(GetSpotVolumeHistoryRequestView);
+        /** Self-contained, `'static` owned view of a `GetSpotVolumeHistoryRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetSpotVolumeHistoryRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetSpotVolumeHistoryRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetSpotVolumeHistoryRequestOwnedView(
+            ::buffa::OwnedView<GetSpotVolumeHistoryRequestView<'static>>,
+        );
+        impl GetSpotVolumeHistoryRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetSpotVolumeHistoryRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetSpotVolumeHistoryRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetSpotVolumeHistoryRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetSpotVolumeHistoryRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetSpotVolumeHistoryRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetSpotVolumeHistoryRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetSpotVolumeHistoryRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Pair IDs from GetSpotConfig; empty selects every configured pair separately.
+            /// At most 2000 distinct positive IDs. Unknown IDs are rejected. If the full
+            /// universe exceeds 2000 pairs, specify a filter; results are never truncated.
+            ///
+            /// Field 1: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> &::buffa::RepeatedView<'_, u32> {
+                &self.0.reborrow().symbol_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetSpotVolumeHistoryRequestView<'static>>,
+        > for GetSpotVolumeHistoryRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetSpotVolumeHistoryRequestView<'static>>,
+            ) -> Self {
+                GetSpotVolumeHistoryRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetSpotVolumeHistoryRequestOwnedView>
+        for ::buffa::OwnedView<GetSpotVolumeHistoryRequestView<'static>> {
+            fn from(wrapper: GetSpotVolumeHistoryRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetSpotVolumeHistoryRequestView<'static>>,
+        > for GetSpotVolumeHistoryRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetSpotVolumeHistoryRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetSpotVolumeHistoryRequest {
+            type View<'a> = GetSpotVolumeHistoryRequestView<'a>;
+            type ViewHandle = GetSpotVolumeHistoryRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetSpotVolumeHistoryRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// One pair appears exactly once, regardless of its base and quote assets.
+        /// REST renders the scaled amounts as decimal strings in volumeUsd.
+        #[derive(Clone, Debug, Default)]
+        pub struct SpotPairVolumeSeriesView<'a> {
+            /// Stable numeric pair ID; clients may group these series by base asset.
+            ///
+            /// Field 1: `symbol_id`
+            pub symbol_id: u32,
+            /// Trailing-24h USD amounts scaled by 1e6, oldest first. Exactly points values,
+            /// aligned with the shared response grid. Zero means no executed trades in
+            /// the window. USD values round down once per contributing 15-minute bucket.
+            ///
+            /// Field 2: `volume_usd_scaled`
+            pub volume_usd_scaled: ::buffa::RepeatedView<'a, i64>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SpotPairVolumeSeriesView<'a> {
+            type Owned = super::super::SpotPairVolumeSeries;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.volume_usd_scaled
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.volume_usd_scaled
+                                    .push(::buffa::types::decode_sint64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.volume_usd_scaled
+                                .push(::buffa::types::decode_sint64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SpotPairVolumeSeries,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SpotPairVolumeSeries,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SpotPairVolumeSeries {
+                    symbol_id: self.symbol_id,
+                    volume_usd_scaled: self.volume_usd_scaled.to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SpotPairVolumeSeriesView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
+                if !self.volume_usd_scaled.is_empty() {
+                    let payload: u32 = self
+                        .volume_usd_scaled
+                        .iter()
+                        .map(|&v| ::buffa::types::sint64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+                }
+                if !self.volume_usd_scaled.is_empty() {
+                    let payload: u32 = self
+                        .volume_usd_scaled
+                        .iter()
+                        .map(|&v| ::buffa::types::sint64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+                    for &v in &self.volume_usd_scaled {
+                        ::buffa::types::encode_sint64(v, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SpotPairVolumeSeriesView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
+                }
+                if !self.volume_usd_scaled.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "volumeUsdScaled",
+                            &::buffa::json_helpers::RepeatedJson(&self.volume_usd_scaled),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SpotPairVolumeSeriesView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "SpotPairVolumeSeries";
+            const FULL_NAME: &'static str = "marketoverview.v1.SpotPairVolumeSeries";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.SpotPairVolumeSeries";
+        }
+        ::buffa::impl_default_view_instance!(SpotPairVolumeSeriesView);
+        ::buffa::impl_view_reborrow!(SpotPairVolumeSeriesView);
+        /** Self-contained, `'static` owned view of a `SpotPairVolumeSeries` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SpotPairVolumeSeriesView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SpotPairVolumeSeriesView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SpotPairVolumeSeriesOwnedView(
+            ::buffa::OwnedView<SpotPairVolumeSeriesView<'static>>,
+        );
+        impl SpotPairVolumeSeriesOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SpotPairVolumeSeriesOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SpotPairVolumeSeriesOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SpotPairVolumeSeries,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SpotPairVolumeSeriesOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`SpotPairVolumeSeriesView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SpotPairVolumeSeriesView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SpotPairVolumeSeries,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable numeric pair ID; clients may group these series by base asset.
+            ///
+            /// Field 1: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
+            }
+            /// Trailing-24h USD amounts scaled by 1e6, oldest first. Exactly points values,
+            /// aligned with the shared response grid. Zero means no executed trades in
+            /// the window. USD values round down once per contributing 15-minute bucket.
+            ///
+            /// Field 2: `volume_usd_scaled`
+            #[must_use]
+            pub fn volume_usd_scaled(&self) -> &::buffa::RepeatedView<'_, i64> {
+                &self.0.reborrow().volume_usd_scaled
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<SpotPairVolumeSeriesView<'static>>>
+        for SpotPairVolumeSeriesOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SpotPairVolumeSeriesView<'static>>,
+            ) -> Self {
+                SpotPairVolumeSeriesOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SpotPairVolumeSeriesOwnedView>
+        for ::buffa::OwnedView<SpotPairVolumeSeriesView<'static>> {
+            fn from(wrapper: SpotPairVolumeSeriesOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SpotPairVolumeSeriesView<'static>>,
+        > for SpotPairVolumeSeriesOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<SpotPairVolumeSeriesView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SpotPairVolumeSeries {
+            type View<'a> = SpotPairVolumeSeriesView<'a>;
+            type ViewHandle = SpotPairVolumeSeriesOwnedView;
+        }
+        impl ::serde::Serialize for SpotPairVolumeSeriesOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Aligned columnar trailing-24h USD series over the most recent 24 hours.
+        /// The grid always contains 97 samples ending at the latest completed UTC
+        /// quarter-hour. Index i maps to start_ts_sec + i * 900 seconds. Each sample
+        /// covers \[sample time - 24h, sample time); only the preceding 48 hours contribute.
+        /// USD conversion uses the latest trustworthy quote/USD mark at or before each
+        /// bucket's start. Stablecoin quotes also require historical USD prices.
+        /// If any contributing trade cannot be valued, or a USD amount overflows,
+        /// the RPC fails as unavailable; partial or zero-filled valuations are not returned.
+        /// Intervals without executed trades are zero. Results may be reused for 15 seconds.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetSpotVolumeHistoryResponseView<'a> {
+            /// Sampling interval between points; currently always "15m".
+            ///
+            /// Field 1: `bucket`
+            pub bucket: &'a str,
+            /// First sample timestamp in seconds since Unix epoch (UTC), inclusive.
+            ///
+            /// Field 2: `start_ts_sec`
+            pub start_ts_sec: u32,
+            /// Last sample timestamp in seconds since Unix epoch (UTC), inclusive.
+            ///
+            /// Field 3: `end_ts_sec`
+            pub end_ts_sec: u32,
+            /// Number of aligned values in every pair array and the total array; always 97.
+            ///
+            /// Field 4: `points`
+            pub points: u32,
+            /// Pairs ordered by ascending symbol_id; at most 2000, each included once.
+            ///
+            /// Field 5: `pairs`
+            pub pairs: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::SpotPairVolumeSeriesView<'a>,
+            >,
+            /// Sum across selected pairs, USD scaled by 1e6. Exactly points values,
+            /// oldest first. REST renders decimal strings in totalVolumeUsd.
+            /// Do not sum overlapping trailing-24h samples to obtain period traded volume.
+            ///
+            /// Field 6: `total_volume_usd_scaled`
+            pub total_volume_usd_scaled: ::buffa::RepeatedView<'a, i64>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetSpotVolumeHistoryResponseView<'a> {
+            type Owned = super::super::GetSpotVolumeHistoryResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.bucket = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed32,
+                        )?;
+                        view.start_ts_sec = ::buffa::types::decode_fixed32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed32,
+                        )?;
+                        view.end_ts_sec = ::buffa::types::decode_fixed32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.points = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.pairs
+                            .push(
+                                <super::super::__buffa::view::SpotPairVolumeSeriesView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    6u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.total_volume_usd_scaled
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.total_volume_usd_scaled
+                                    .push(::buffa::types::decode_sint64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.total_volume_usd_scaled
+                                .push(::buffa::types::decode_sint64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetSpotVolumeHistoryResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetSpotVolumeHistoryResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetSpotVolumeHistoryResponse {
+                    bucket: self.bucket.to_string(),
+                    start_ts_sec: self.start_ts_sec,
+                    end_ts_sec: self.end_ts_sec,
+                    points: self.points,
+                    pairs: self
+                        .pairs
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    total_volume_usd_scaled: self.total_volume_usd_scaled.to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetSpotVolumeHistoryResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.bucket.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.bucket) as u32;
+                }
+                if self.start_ts_sec != 0u32 {
+                    size += 1u32 + ::buffa::types::FIXED32_ENCODED_LEN as u32;
+                }
+                if self.end_ts_sec != 0u32 {
+                    size += 1u32 + ::buffa::types::FIXED32_ENCODED_LEN as u32;
+                }
+                if self.points != 0u32 {
+                    size
+                        += 1u32 + ::buffa::types::uint32_encoded_len(self.points) as u32;
+                }
+                for v in &self.pairs {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.total_volume_usd_scaled.is_empty() {
+                    let payload: u32 = self
+                        .total_volume_usd_scaled
+                        .iter()
+                        .map(|&v| ::buffa::types::sint64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.bucket.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.bucket, buf);
+                }
+                if self.start_ts_sec != 0u32 {
+                    ::buffa::types::put_fixed32_field(2u32, self.start_ts_sec, buf);
+                }
+                if self.end_ts_sec != 0u32 {
+                    ::buffa::types::put_fixed32_field(3u32, self.end_ts_sec, buf);
+                }
+                if self.points != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.points, buf);
+                }
+                for v in &self.pairs {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if !self.total_volume_usd_scaled.is_empty() {
+                    let payload: u32 = self
+                        .total_volume_usd_scaled
+                        .iter()
+                        .map(|&v| ::buffa::types::sint64_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(6u32, payload, buf);
+                    for &v in &self.total_volume_usd_scaled {
+                        ::buffa::types::encode_sint64(v, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetSpotVolumeHistoryResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.bucket) {
+                    __map.serialize_entry("bucket", self.bucket)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.start_ts_sec) {
+                    __map
+                        .serialize_entry(
+                            "startTsSec",
+                            &::buffa::json_helpers::ProtoJson(&self.start_ts_sec),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.end_ts_sec) {
+                    __map
+                        .serialize_entry(
+                            "endTsSec",
+                            &::buffa::json_helpers::ProtoJson(&self.end_ts_sec),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.points) {
+                    __map
+                        .serialize_entry(
+                            "points",
+                            &::buffa::json_helpers::ProtoJson(&self.points),
+                        )?;
+                }
+                if !self.pairs.is_empty() {
+                    __map.serialize_entry("pairs", &*self.pairs)?;
+                }
+                if !self.total_volume_usd_scaled.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "totalVolumeUsdScaled",
+                            &::buffa::json_helpers::RepeatedJson(
+                                &self.total_volume_usd_scaled,
+                            ),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetSpotVolumeHistoryResponseView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "GetSpotVolumeHistoryResponse";
+            const FULL_NAME: &'static str = "marketoverview.v1.GetSpotVolumeHistoryResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetSpotVolumeHistoryResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetSpotVolumeHistoryResponseView);
+        ::buffa::impl_view_reborrow!(GetSpotVolumeHistoryResponseView);
+        /** Self-contained, `'static` owned view of a `GetSpotVolumeHistoryResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetSpotVolumeHistoryResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetSpotVolumeHistoryResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetSpotVolumeHistoryResponseOwnedView(
+            ::buffa::OwnedView<GetSpotVolumeHistoryResponseView<'static>>,
+        );
+        impl GetSpotVolumeHistoryResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetSpotVolumeHistoryResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetSpotVolumeHistoryResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetSpotVolumeHistoryResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetSpotVolumeHistoryResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetSpotVolumeHistoryResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetSpotVolumeHistoryResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetSpotVolumeHistoryResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Sampling interval between points; currently always "15m".
+            ///
+            /// Field 1: `bucket`
+            #[must_use]
+            pub fn bucket(&self) -> &'_ str {
+                self.0.reborrow().bucket
+            }
+            /// First sample timestamp in seconds since Unix epoch (UTC), inclusive.
+            ///
+            /// Field 2: `start_ts_sec`
+            #[must_use]
+            pub fn start_ts_sec(&self) -> u32 {
+                self.0.reborrow().start_ts_sec
+            }
+            /// Last sample timestamp in seconds since Unix epoch (UTC), inclusive.
+            ///
+            /// Field 3: `end_ts_sec`
+            #[must_use]
+            pub fn end_ts_sec(&self) -> u32 {
+                self.0.reborrow().end_ts_sec
+            }
+            /// Number of aligned values in every pair array and the total array; always 97.
+            ///
+            /// Field 4: `points`
+            #[must_use]
+            pub fn points(&self) -> u32 {
+                self.0.reborrow().points
+            }
+            /// Pairs ordered by ascending symbol_id; at most 2000, each included once.
+            ///
+            /// Field 5: `pairs`
+            #[must_use]
+            pub fn pairs(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::SpotPairVolumeSeriesView<'_>,
+            > {
+                &self.0.reborrow().pairs
+            }
+            /// Sum across selected pairs, USD scaled by 1e6. Exactly points values,
+            /// oldest first. REST renders decimal strings in totalVolumeUsd.
+            /// Do not sum overlapping trailing-24h samples to obtain period traded volume.
+            ///
+            /// Field 6: `total_volume_usd_scaled`
+            #[must_use]
+            pub fn total_volume_usd_scaled(&self) -> &::buffa::RepeatedView<'_, i64> {
+                &self.0.reborrow().total_volume_usd_scaled
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetSpotVolumeHistoryResponseView<'static>>,
+        > for GetSpotVolumeHistoryResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetSpotVolumeHistoryResponseView<'static>>,
+            ) -> Self {
+                GetSpotVolumeHistoryResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetSpotVolumeHistoryResponseOwnedView>
+        for ::buffa::OwnedView<GetSpotVolumeHistoryResponseView<'static>> {
+            fn from(wrapper: GetSpotVolumeHistoryResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetSpotVolumeHistoryResponseView<'static>>,
+        > for GetSpotVolumeHistoryResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetSpotVolumeHistoryResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetSpotVolumeHistoryResponse {
+            type View<'a> = GetSpotVolumeHistoryResponseView<'a>;
+            type ViewHandle = GetSpotVolumeHistoryResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetSpotVolumeHistoryResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -4912,6 +6824,9 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_MARKET_OVERVIEW_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_MARKET_OVERVIEW_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MARKET_OVERVIEW_BATCH_JSON_ANY);
+        reg.register_json_any(super::__GET_SPOT_VOLUME_HISTORY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SPOT_PAIR_VOLUME_SERIES_JSON_ANY);
+        reg.register_json_any(super::__GET_SPOT_VOLUME_HISTORY_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -4938,5 +6853,17 @@ pub use self::__buffa::view::ListMarketOverviewResponseOwnedView;
 pub use self::__buffa::view::MarketOverviewBatchView;
 #[doc(inline)]
 pub use self::__buffa::view::MarketOverviewBatchOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSpotVolumeHistoryRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSpotVolumeHistoryRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SpotPairVolumeSeriesView;
+#[doc(inline)]
+pub use self::__buffa::view::SpotPairVolumeSeriesOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSpotVolumeHistoryResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSpotVolumeHistoryResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

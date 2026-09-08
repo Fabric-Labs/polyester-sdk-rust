@@ -153,7 +153,10 @@ pub const DEPOSIT_ADDRESS_SERVICE_LIST_DEPOSIT_ADDRESSES_SPEC: ::connectrpc::Spe
 #[allow(clippy::type_complexity)]
 pub trait DepositAddressService: Send + Sync + 'static {
     /// Create or return the assigned deposit address for one target and source
-    /// chain.
+    /// chain. The acting caller's root account must have accepted the current
+    /// terms, including requests using an API key or targeting a shared subaccount.
+    /// Otherwise FailedPrecondition is returned. Listing and using existing deposit
+    /// addresses remain available without acceptance.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

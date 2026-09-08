@@ -77,3 +77,7 @@ reason = "Root portfolio equity history requires an interactive root-account ses
 [[allowlist]]
 procedure = "/ledger.read.v1.LedgerReadService/GetPortfolioEquitySnapshot"
 reason = "Root portfolio equity snapshot requires an interactive root-account session; API keys and subaccount-scoped sessions are not supported."
+
+[[allowlist]]
+procedure = "/auth.v1.AuthService/AcceptTerms"
+reason = "Terms acceptance requires an interactive JWT session; API keys are not supported."

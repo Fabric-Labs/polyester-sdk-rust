@@ -8,8 +8,14 @@ use thiserror::Error;
 
 use crate::models::RateLimitDetail;
 use crate::proto::auth::v1::AuthErrorDetail;
+use crate::proto::chain::withdraw::v1::{
+    ErrorCode as WithdrawErrorCode, ErrorDetail as WithdrawErrorDetail,
+};
 use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail};
 use crate::proto::polyester::ratelimit::v1::RateLimitDetail as ProtoRateLimitDetail;
+use crate::proto::transfer::v1::{
+    ErrorCode as TransferErrorCode, ErrorDetail as TransferErrorDetail,
+};
 use crate::user_agent::{cloudflare_1010_message, is_cloudflare_browser_ban};
 
 /// Root result alias for the SDK.
@@ -190,6 +196,28 @@ fn decode_order_error_detail(detail: &ErrorDetail) -> Option<OrderErrorDetail> {
     OrderErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
+fn decode_withdraw_error_detail(detail: &ErrorDetail) -> Option<WithdrawErrorDetail> {
+    if !detail.type_url.ends_with("chain.withdraw.v1.ErrorDetail") {
+        return None;
+    }
+    WithdrawErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
+}
+
+fn decode_transfer_error_detail(detail: &ErrorDetail) -> Option<TransferErrorDetail> {
+    if !detail.type_url.ends_with("transfer.v1.ErrorDetail") {
+        return None;
+    }
+    TransferErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
+}
+
+fn is_auth_like_error_code(code: &str) -> bool {
+    code.contains("UNAUTHENTICATED")
+        || code.contains("PERMISSION")
+        || code.contains("API_KEY")
+        || code.contains("WALLET_BINDING")
+        || code.contains("POLICY")
+}
+
 fn decode_rate_limit_detail(detail: &ErrorDetail) -> Option<ProtoRateLimitDetail> {
     if !detail
         .type_url
@@ -306,6 +334,61 @@ pub fn map_connect_error(err: ConnectError) -> Error {
                     .map(rate_limit_detail_from_proto_local);
                 return rate_limit_error(fallback_message.clone(), detail, header_retry);
             }
+            let code = order_detail
+                .code
+                .as_known()
+                .map(|c| c.proto_name().to_owned())
+                .unwrap_or_else(|| "ERROR_CODE_UNSPECIFIED".to_owned());
+            if is_auth_like_error_code(&code) {
+                return Error::Auth(fallback_message.clone());
+            }
+            return Error::Api {
+                message: fallback_message.clone(),
+                code,
+                metadata: Vec::new(),
+            };
+        }
+        if let Some(withdraw_detail) = decode_withdraw_error_detail(detail) {
+            let code = withdraw_detail
+                .code
+                .as_known()
+                .map(|c| c.proto_name().to_owned())
+                .unwrap_or_else(|| "ERROR_CODE_UNSPECIFIED".to_owned());
+            if matches!(
+                withdraw_detail.code.as_known(),
+                Some(WithdrawErrorCode::RateLimitExceeded)
+            ) {
+                return rate_limit_error(fallback_message.clone(), None, header_retry);
+            }
+            if is_auth_like_error_code(&code) {
+                return Error::Auth(fallback_message.clone());
+            }
+            return Error::Api {
+                message: fallback_message.clone(),
+                code,
+                metadata: Vec::new(),
+            };
+        }
+        if let Some(transfer_detail) = decode_transfer_error_detail(detail) {
+            let code = transfer_detail
+                .code
+                .as_known()
+                .map(|c| c.proto_name().to_owned())
+                .unwrap_or_else(|| "ERROR_CODE_UNSPECIFIED".to_owned());
+            if matches!(
+                transfer_detail.code.as_known(),
+                Some(TransferErrorCode::RateLimitExceeded)
+            ) {
+                return rate_limit_error(fallback_message.clone(), None, header_retry);
+            }
+            if is_auth_like_error_code(&code) {
+                return Error::Auth(fallback_message.clone());
+            }
+            return Error::Api {
+                message: fallback_message.clone(),
+                code,
+                metadata: Vec::new(),
+            };
         }
     }
     let code = err.code;
@@ -542,6 +625,56 @@ mod tests {
                 }
                 assert!(!other_predicate(&mapped));
             }
+        }
+    }
+
+    #[test]
+    fn map_connect_error_surfaces_withdraw_and_transfer_details() {
+        let withdraw = crate::proto::chain::withdraw::v1::ErrorDetail {
+            code: EnumValue::Known(WithdrawErrorCode::InsufficientFunds),
+            ..Default::default()
+        };
+        match map_connect_error(
+            ConnectError::new(ErrorCode::FailedPrecondition, "insufficient").with_detail(
+                ErrorDetail::from_message("chain.withdraw.v1.ErrorDetail", &withdraw),
+            ),
+        ) {
+            Error::Api { code, .. } => assert_eq!(code, "ERROR_CODE_INSUFFICIENT_FUNDS"),
+            other => panic!("unexpected withdraw error: {other:?}"),
+        }
+
+        let transfer = TransferErrorDetail {
+            code: EnumValue::Known(TransferErrorCode::PermissionDenied),
+            ..Default::default()
+        };
+        match map_connect_error(ConnectError::permission_denied("denied").with_detail(
+            ErrorDetail::from_message("transfer.v1.ErrorDetail", &transfer),
+        )) {
+            Error::Auth(_) => {}
+            other => panic!("unexpected transfer error: {other:?}"),
+        }
+
+        let expired = OrderErrorDetail {
+            code: EnumValue::Known(OrderErrorCode::CancelRequestExpired),
+            ..Default::default()
+        };
+        match map_connect_error(
+            ConnectError::new(ErrorCode::FailedPrecondition, "expired")
+                .with_detail(ErrorDetail::from_message("orders.v1.ErrorDetail", &expired)),
+        ) {
+            Error::Api { code, .. } => assert_eq!(code, "ERROR_CODE_CANCEL_REQUEST_EXPIRED"),
+            other => panic!("unexpected expired error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn map_connect_error_surfaces_auth_terms_not_accepted() {
+        match map_auth(AuthErrorCode::AUTH_TERMS_NOT_ACCEPTED, "terms") {
+            Error::Api { message, code, .. } => {
+                assert_eq!(code, "AUTH_TERMS_NOT_ACCEPTED");
+                assert_eq!(message, "terms");
+            }
+            other => panic!("unexpected error: {other:?}"),
         }
     }
 

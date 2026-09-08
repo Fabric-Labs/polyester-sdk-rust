@@ -36325,6 +36325,8 @@ pub enum AuthErrorCode {
     AUTH_MFA_LAST_FACTOR_REQUIRED = 39i32,
     /// An unexpected internal failure prevented the auth mutation from completing.
     AUTH_INTERNAL_ERROR = 40i32,
+    /// The caller has not explicitly accepted the currently required terms.
+    AUTH_TERMS_NOT_ACCEPTED = 41i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -36447,6 +36449,9 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_INTERNAL_ERROR`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthInternalError: Self = Self::AUTH_INTERNAL_ERROR;
+    ///Idiomatic alias for [`Self::AUTH_TERMS_NOT_ACCEPTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthTermsNotAccepted: Self = Self::AUTH_TERMS_NOT_ACCEPTED;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -36592,6 +36597,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             38i32 => ::core::option::Option::Some(Self::AUTH_MFA_ELEVATION_REQUIRED),
             39i32 => ::core::option::Option::Some(Self::AUTH_MFA_LAST_FACTOR_REQUIRED),
             40i32 => ::core::option::Option::Some(Self::AUTH_INTERNAL_ERROR),
+            41i32 => ::core::option::Option::Some(Self::AUTH_TERMS_NOT_ACCEPTED),
             _ => ::core::option::Option::None,
         }
     }
@@ -36648,6 +36654,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_MFA_ELEVATION_REQUIRED => "AUTH_MFA_ELEVATION_REQUIRED",
             Self::AUTH_MFA_LAST_FACTOR_REQUIRED => "AUTH_MFA_LAST_FACTOR_REQUIRED",
             Self::AUTH_INTERNAL_ERROR => "AUTH_INTERNAL_ERROR",
+            Self::AUTH_TERMS_NOT_ACCEPTED => "AUTH_TERMS_NOT_ACCEPTED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -36770,6 +36777,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_INTERNAL_ERROR" => {
                 ::core::option::Option::Some(Self::AUTH_INTERNAL_ERROR)
             }
+            "AUTH_TERMS_NOT_ACCEPTED" => {
+                ::core::option::Option::Some(Self::AUTH_TERMS_NOT_ACCEPTED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -36815,6 +36825,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_MFA_ELEVATION_REQUIRED,
             Self::AUTH_MFA_LAST_FACTOR_REQUIRED,
             Self::AUTH_INTERNAL_ERROR,
+            Self::AUTH_TERMS_NOT_ACCEPTED,
         ]
     }
 }
@@ -38169,6 +38180,211 @@ pub const __AUTH_ERROR_DETAIL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     from_json: ::buffa::type_registry::any_from_json::<AuthErrorDetail>,
     is_wkt: false,
 };
+/// AcceptTermsRequest records explicit consent to the currently required terms.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AcceptTermsRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AcceptTermsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AcceptTermsRequest").finish()
+    }
+}
+impl AcceptTermsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AcceptTermsRequest";
+}
+::buffa::impl_default_instance!(AcceptTermsRequest);
+impl ::buffa::MessageName for AcceptTermsRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "AcceptTermsRequest";
+    const FULL_NAME: &'static str = "auth.v1.AcceptTermsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AcceptTermsRequest";
+}
+impl ::buffa::Message for AcceptTermsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AcceptTermsRequest {
+    const PROTO_FQN: &'static str = "auth.v1.AcceptTermsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AcceptTermsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ACCEPT_TERMS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.AcceptTermsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<AcceptTermsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<AcceptTermsRequest>,
+    is_wkt: false,
+};
+/// AcceptTermsResponse confirms acceptance. Repeated acceptance of the current
+/// version succeeds and preserves the first acceptance time.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AcceptTermsResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AcceptTermsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AcceptTermsResponse").finish()
+    }
+}
+impl AcceptTermsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AcceptTermsResponse";
+}
+::buffa::impl_default_instance!(AcceptTermsResponse);
+impl ::buffa::MessageName for AcceptTermsResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "AcceptTermsResponse";
+    const FULL_NAME: &'static str = "auth.v1.AcceptTermsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AcceptTermsResponse";
+}
+impl ::buffa::Message for AcceptTermsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AcceptTermsResponse {
+    const PROTO_FQN: &'static str = "auth.v1.AcceptTermsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AcceptTermsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ACCEPT_TERMS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.AcceptTermsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<AcceptTermsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<AcceptTermsResponse>,
+    is_wkt: false,
+};
 /// --- Typed errors for ProfileService ---
 ///
 /// High-level error codes for profile domain errors (ProfileService).
@@ -38685,6 +38901,17 @@ pub struct UserProfile {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub username_unlocked: bool,
+    /// Whether the caller's root account explicitly accepted the currently required terms.
+    /// False for new or existing accounts without current acceptance.
+    ///
+    /// Field 13: `current_terms_accepted`
+    #[serde(
+        rename = "currentTermsAccepted",
+        alias = "current_terms_accepted",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub current_terms_accepted: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -38704,6 +38931,7 @@ impl ::core::fmt::Debug for UserProfile {
             .field("next_username_change_at", &self.next_username_change_at)
             .field("vip_tier", &self.vip_tier)
             .field("username_unlocked", &self.username_unlocked)
+            .field("current_terms_accepted", &self.current_terms_accepted)
             .finish()
     }
 }
@@ -38778,6 +39006,9 @@ impl ::buffa::Message for UserProfile {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.current_terms_accepted {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -38825,6 +39056,9 @@ impl ::buffa::Message for UserProfile {
         if self.created_at.is_set() {
             ::buffa::types::put_len_delimited_header(12u32, __cache.consume_next(), buf);
             self.created_at.write_to(__cache, buf);
+        }
+        if self.current_terms_accepted {
+            ::buffa::types::put_bool_field(13u32, self.current_terms_accepted, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -38931,6 +39165,13 @@ impl ::buffa::Message for UserProfile {
                     ctx,
                 )?;
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.current_terms_accepted = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -38951,6 +39192,7 @@ impl ::buffa::Message for UserProfile {
         self.discord_verified = false;
         self.username_unlocked = false;
         self.created_at = ::buffa::MessageField::none();
+        self.current_terms_accepted = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -41811,8 +42053,8 @@ pub struct SocialVerification {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub provider: ::buffa::EnumValue<SocialProvider>,
-    /// Method used for this verification. If unspecified at start time, profile
-    /// verification is used.
+    /// Method used for this verification. If unspecified at start time, the
+    /// provider default is used.
     ///
     /// Field 11: `method`
     #[serde(
@@ -41841,8 +42083,9 @@ pub struct SocialVerification {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub provider_user_id: ::buffa::alloc::string::String,
-    /// Challenge code the user must place according to the verification method.
-    /// Codes start with "poly_" and expire after 15 minutes.
+    /// Challenge code the user must submit according to the verification method.
+    /// Discord codes are returned only when a challenge is issued. Codes expire
+    /// after 15 minutes.
     ///
     /// Field 13: `challenge_code`
     #[serde(
@@ -42293,7 +42536,8 @@ pub struct StartSocialVerificationRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub provider: ::buffa::EnumValue<SocialProvider>,
-    /// Verification method. If unspecified, profile verification is used.
+    /// Verification method. If unspecified, profile verification is used for
+    /// X/Twitter and channel verification is used for Discord.
     ///
     /// Field 3: `method`
     #[serde(
@@ -42302,9 +42546,9 @@ pub struct StartSocialVerificationRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub method: ::buffa::EnumValue<SocialVerificationMethod>,
-    /// Provider handle the user claims. A leading "@" is accepted and removed.
-    /// X/Twitter handles must be 1 to 15 letters, digits, or underscores.
-    /// Other provider handles can be up to 64 characters.
+    /// Provider handle the user claims. Required for X/Twitter and omitted for
+    /// Discord, where the authenticated bot supplies the provider identity.
+    /// A leading "@" is accepted and removed from X/Twitter handles.
     ///
     /// Field 2: `handle`
     #[serde(
@@ -42477,7 +42721,8 @@ pub const __START_SOCIAL_VERIFICATION_REQUEST_JSON_ANY: ::buffa::type_registry::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct StartSocialVerificationResponse {
-    /// Challenge code the user must place according to the verification method.
+    /// Newly issued challenge code the user must submit according to the
+    /// verification method.
     ///
     /// Field 1: `challenge_code`
     #[serde(
@@ -43080,12 +43325,14 @@ pub const __GET_SOCIAL_VERIFICATION_REQUEST_JSON_ANY: ::buffa::type_registry::Js
     is_wkt: false,
 };
 /// GetSocialVerificationResponse contains the caller's current social
-/// verification state for one provider.
+/// verification state for one provider. A successful response with verification
+/// absent means the caller has not started verification for that provider.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetSocialVerificationResponse {
-    /// Current verification state for the requested provider.
+    /// Current verification state for the requested provider. Absent when no
+    /// verification has been started.
     ///
     /// Field 1: `verification`
     #[serde(
@@ -107642,6 +107889,485 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// AcceptTermsRequest records explicit consent to the currently required terms.
+        #[derive(Clone, Debug, Default)]
+        pub struct AcceptTermsRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AcceptTermsRequestView<'a> {
+            type Owned = super::super::AcceptTermsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AcceptTermsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AcceptTermsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AcceptTermsRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AcceptTermsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AcceptTermsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AcceptTermsRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "AcceptTermsRequest";
+            const FULL_NAME: &'static str = "auth.v1.AcceptTermsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AcceptTermsRequest";
+        }
+        ::buffa::impl_default_view_instance!(AcceptTermsRequestView);
+        ::buffa::impl_view_reborrow!(AcceptTermsRequestView);
+        /** Self-contained, `'static` owned view of a `AcceptTermsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AcceptTermsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AcceptTermsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AcceptTermsRequestOwnedView(
+            ::buffa::OwnedView<AcceptTermsRequestView<'static>>,
+        );
+        impl AcceptTermsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptTermsRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptTermsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AcceptTermsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptTermsRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`AcceptTermsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AcceptTermsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AcceptTermsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<AcceptTermsRequestView<'static>>>
+        for AcceptTermsRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<AcceptTermsRequestView<'static>>) -> Self {
+                AcceptTermsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AcceptTermsRequestOwnedView>
+        for ::buffa::OwnedView<AcceptTermsRequestView<'static>> {
+            fn from(wrapper: AcceptTermsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<AcceptTermsRequestView<'static>>>
+        for AcceptTermsRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<AcceptTermsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AcceptTermsRequest {
+            type View<'a> = AcceptTermsRequestView<'a>;
+            type ViewHandle = AcceptTermsRequestOwnedView;
+        }
+        impl ::serde::Serialize for AcceptTermsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// AcceptTermsResponse confirms acceptance. Repeated acceptance of the current
+        /// version succeeds and preserves the first acceptance time.
+        #[derive(Clone, Debug, Default)]
+        pub struct AcceptTermsResponseView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AcceptTermsResponseView<'a> {
+            type Owned = super::super::AcceptTermsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AcceptTermsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AcceptTermsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AcceptTermsResponse {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AcceptTermsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AcceptTermsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AcceptTermsResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "AcceptTermsResponse";
+            const FULL_NAME: &'static str = "auth.v1.AcceptTermsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AcceptTermsResponse";
+        }
+        ::buffa::impl_default_view_instance!(AcceptTermsResponseView);
+        ::buffa::impl_view_reborrow!(AcceptTermsResponseView);
+        /** Self-contained, `'static` owned view of a `AcceptTermsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AcceptTermsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AcceptTermsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AcceptTermsResponseOwnedView(
+            ::buffa::OwnedView<AcceptTermsResponseView<'static>>,
+        );
+        impl AcceptTermsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptTermsResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptTermsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AcceptTermsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcceptTermsResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`AcceptTermsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AcceptTermsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AcceptTermsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<AcceptTermsResponseView<'static>>>
+        for AcceptTermsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AcceptTermsResponseView<'static>>,
+            ) -> Self {
+                AcceptTermsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AcceptTermsResponseOwnedView>
+        for ::buffa::OwnedView<AcceptTermsResponseView<'static>> {
+            fn from(wrapper: AcceptTermsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<AcceptTermsResponseView<'static>>>
+        for AcceptTermsResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<AcceptTermsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AcceptTermsResponse {
+            type View<'a> = AcceptTermsResponseView<'a>;
+            type ViewHandle = AcceptTermsResponseOwnedView;
+        }
+        impl ::serde::Serialize for AcceptTermsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// AccountIdentity is a lightweight identity view for a root account.
         #[derive(Clone, Debug, Default)]
         pub struct AccountIdentityView<'a> {
@@ -108081,6 +108807,11 @@ pub mod __buffa {
             ///
             /// Field 11: `username_unlocked`
             pub username_unlocked: bool,
+            /// Whether the caller's root account explicitly accepted the currently required terms.
+            /// False for new or existing accounts without current acceptance.
+            ///
+            /// Field 13: `current_terms_accepted`
+            pub current_terms_accepted: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UserProfileView<'a> {
@@ -108234,6 +108965,15 @@ pub mod __buffa {
                         )?;
                         view.username_unlocked = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.current_terms_accepted = ::buffa::types::decode_bool(
+                            &mut cur,
+                        )?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -108292,6 +109032,7 @@ pub mod __buffa {
                     },
                     vip_tier: self.vip_tier,
                     username_unlocked: self.username_unlocked,
+                    current_terms_accepted: self.current_terms_accepted,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -108365,6 +109106,9 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.current_terms_accepted {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -108421,6 +109165,13 @@ pub mod __buffa {
                         buf,
                     );
                     self.created_at.write_to(__cache, buf);
+                }
+                if self.current_terms_accepted {
+                    ::buffa::types::put_bool_field(
+                        13u32,
+                        self.current_terms_accepted,
+                        buf,
+                    );
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -108492,6 +109243,13 @@ pub mod __buffa {
                 }
                 if self.username_unlocked {
                     __map.serialize_entry("usernameUnlocked", &self.username_unlocked)?;
+                }
+                if self.current_terms_accepted {
+                    __map
+                        .serialize_entry(
+                            "currentTermsAccepted",
+                            &self.current_terms_accepted,
+                        )?;
                 }
                 __map.end()
             }
@@ -108683,6 +109441,14 @@ pub mod __buffa {
             #[must_use]
             pub fn username_unlocked(&self) -> bool {
                 self.0.reborrow().username_unlocked
+            }
+            /// Whether the caller's root account explicitly accepted the currently required terms.
+            /// False for new or existing accounts without current acceptance.
+            ///
+            /// Field 13: `current_terms_accepted`
+            #[must_use]
+            pub fn current_terms_accepted(&self) -> bool {
+                self.0.reborrow().current_terms_accepted
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<UserProfileView<'static>>>
@@ -112623,8 +113389,8 @@ pub mod __buffa {
             ///
             /// Field 1: `provider`
             pub provider: ::buffa::EnumValue<super::super::SocialProvider>,
-            /// Method used for this verification. If unspecified at start time, profile
-            /// verification is used.
+            /// Method used for this verification. If unspecified at start time, the
+            /// provider default is used.
             ///
             /// Field 11: `method`
             pub method: ::buffa::EnumValue<super::super::SocialVerificationMethod>,
@@ -112637,8 +113403,9 @@ pub mod __buffa {
             ///
             /// Field 3: `provider_user_id`
             pub provider_user_id: &'a str,
-            /// Challenge code the user must place according to the verification method.
-            /// Codes start with "poly_" and expire after 15 minutes.
+            /// Challenge code the user must submit according to the verification method.
+            /// Discord codes are returned only when a challenge is issued. Codes expire
+            /// after 15 minutes.
             ///
             /// Field 13: `challenge_code`
             pub challenge_code: &'a str,
@@ -113325,8 +114092,8 @@ pub mod __buffa {
             pub fn provider(&self) -> ::buffa::EnumValue<super::super::SocialProvider> {
                 self.0.reborrow().provider
             }
-            /// Method used for this verification. If unspecified at start time, profile
-            /// verification is used.
+            /// Method used for this verification. If unspecified at start time, the
+            /// provider default is used.
             ///
             /// Field 11: `method`
             #[must_use]
@@ -113350,8 +114117,9 @@ pub mod __buffa {
             pub fn provider_user_id(&self) -> &'_ str {
                 self.0.reborrow().provider_user_id
             }
-            /// Challenge code the user must place according to the verification method.
-            /// Codes start with "poly_" and expire after 15 minutes.
+            /// Challenge code the user must submit according to the verification method.
+            /// Discord codes are returned only when a challenge is issued. Codes expire
+            /// after 15 minutes.
             ///
             /// Field 13: `challenge_code`
             #[must_use]
@@ -113465,13 +114233,14 @@ pub mod __buffa {
             ///
             /// Field 1: `provider`
             pub provider: ::buffa::EnumValue<super::super::SocialProvider>,
-            /// Verification method. If unspecified, profile verification is used.
+            /// Verification method. If unspecified, profile verification is used for
+            /// X/Twitter and channel verification is used for Discord.
             ///
             /// Field 3: `method`
             pub method: ::buffa::EnumValue<super::super::SocialVerificationMethod>,
-            /// Provider handle the user claims. A leading "@" is accepted and removed.
-            /// X/Twitter handles must be 1 to 15 letters, digits, or underscores.
-            /// Other provider handles can be up to 64 characters.
+            /// Provider handle the user claims. Required for X/Twitter and omitted for
+            /// Discord, where the authenticated bot supplies the provider identity.
+            /// A leading "@" is accepted and removed from X/Twitter handles.
             ///
             /// Field 2: `handle`
             pub handle: &'a str,
@@ -113761,7 +114530,8 @@ pub mod __buffa {
             pub fn provider(&self) -> ::buffa::EnumValue<super::super::SocialProvider> {
                 self.0.reborrow().provider
             }
-            /// Verification method. If unspecified, profile verification is used.
+            /// Verification method. If unspecified, profile verification is used for
+            /// X/Twitter and channel verification is used for Discord.
             ///
             /// Field 3: `method`
             #[must_use]
@@ -113770,9 +114540,9 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::SocialVerificationMethod> {
                 self.0.reborrow().method
             }
-            /// Provider handle the user claims. A leading "@" is accepted and removed.
-            /// X/Twitter handles must be 1 to 15 letters, digits, or underscores.
-            /// Other provider handles can be up to 64 characters.
+            /// Provider handle the user claims. Required for X/Twitter and omitted for
+            /// Discord, where the authenticated bot supplies the provider identity.
+            /// A leading "@" is accepted and removed from X/Twitter handles.
             ///
             /// Field 2: `handle`
             #[must_use]
@@ -113819,7 +114589,8 @@ pub mod __buffa {
         /// Response returned after starting social account verification.
         #[derive(Clone, Debug, Default)]
         pub struct StartSocialVerificationResponseView<'a> {
-            /// Challenge code the user must place according to the verification method.
+            /// Newly issued challenge code the user must submit according to the
+            /// verification method.
             ///
             /// Field 1: `challenge_code`
             pub challenge_code: &'a str,
@@ -114178,7 +114949,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Challenge code the user must place according to the verification method.
+            /// Newly issued challenge code the user must submit according to the
+            /// verification method.
             ///
             /// Field 1: `challenge_code`
             #[must_use]
@@ -115143,10 +115915,12 @@ pub mod __buffa {
             }
         }
         /// GetSocialVerificationResponse contains the caller's current social
-        /// verification state for one provider.
+        /// verification state for one provider. A successful response with verification
+        /// absent means the caller has not started verification for that provider.
         #[derive(Clone, Debug, Default)]
         pub struct GetSocialVerificationResponseView<'a> {
-            /// Current verification state for the requested provider.
+            /// Current verification state for the requested provider. Absent when no
+            /// verification has been started.
             ///
             /// Field 1: `verification`
             pub verification: ::buffa::MessageFieldView<
@@ -115417,7 +116191,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Current verification state for the requested provider.
+            /// Current verification state for the requested provider. Absent when no
+            /// verification has been started.
             ///
             /// Field 1: `verification`
             #[must_use]
@@ -115974,6 +116749,8 @@ pub mod __buffa {
         reg.register_json_any(super::__ME_REQUEST_JSON_ANY);
         reg.register_json_any(super::__ME_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__AUTH_ERROR_DETAIL_JSON_ANY);
+        reg.register_json_any(super::__ACCEPT_TERMS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ACCEPT_TERMS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ACCOUNT_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__USER_PROFILE_JSON_ANY);
         reg.register_json_any(super::__USER_PROFILE_PATCH_JSON_ANY);
@@ -116661,6 +117438,14 @@ pub use self::__buffa::view::MeResponseOwnedView;
 pub use self::__buffa::view::AuthErrorDetailView;
 #[doc(inline)]
 pub use self::__buffa::view::AuthErrorDetailOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AcceptTermsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::AcceptTermsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AcceptTermsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::AcceptTermsResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::AccountIdentityView;
 #[doc(inline)]

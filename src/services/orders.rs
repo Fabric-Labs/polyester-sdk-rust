@@ -1116,15 +1116,23 @@ impl OrdersService {
     /// A `request_id` is generated when omitted or blank. Provide a stable non-empty value when
     /// retrying the same logical bulk cancellation.
     pub async fn cancel_all_with(&self, opts: CancelAllOpts) -> Result<CancelAllOrdersResult> {
-        if opts.symbol.is_some() || opts.symbol_id.is_some() {
+        if opts.symbol.is_some() || !opts.symbols.is_empty() {
             self.ctx.wait_for_catalogs().await?;
         }
         let mut req = CancelAllOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
-            symbol_id: self
-                .ctx
-                .catalogs
-                .optional_symbol_id(opts.symbol.as_deref(), opts.symbol_id)?,
+            symbol_ids: {
+                let mut ids = opts.symbol_ids.clone();
+                if let Some(symbol_id) = opts.symbol_id {
+                    ids.insert(0, symbol_id);
+                }
+                self.ctx.catalogs.resolve_cancel_all_symbol_ids(
+                    opts.symbol.as_deref(),
+                    Some(opts.symbols.as_slice()),
+                    Some(ids.as_slice()),
+                    "orders.cancel_all",
+                )?
+            },
             dry_run: opts.dry_run,
             request_id: Self::coalesce_request_id(opts.request_id, "cancel-all")?,
             ..Default::default()

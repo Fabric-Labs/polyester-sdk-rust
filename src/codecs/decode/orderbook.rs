@@ -123,4 +123,21 @@ mod tests {
         };
         assert!(orderbook_from_proto(&missing_qty, "ETH-USDT", 1, 8).is_err());
     }
+
+    #[test]
+    fn empty_orderbook_with_zero_sequence_is_success() {
+        let book = orderbook_from_proto(
+            &GetOrderBookResponse {
+                symbol_id: 1,
+                book_seq: 0,
+                ..Default::default()
+            },
+            "BTC-USDT",
+            50,
+            8,
+        )
+        .expect("empty book");
+        assert!(book.bids.is_empty());
+        assert!(book.asks.is_empty());
+    }
 }
