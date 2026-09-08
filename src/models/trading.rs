@@ -487,7 +487,9 @@ pub struct CancelOrderParams {
 #[derive(Debug, Clone, Default)]
 pub struct CancelAllOpts {
     pub symbol: Option<String>,
+    pub symbols: Vec<String>,
     pub symbol_id: Option<u32>,
+    pub symbol_ids: Vec<u32>,
     pub dry_run: bool,
     pub subaccount_id: Option<u64>,
     pub side: Option<String>,

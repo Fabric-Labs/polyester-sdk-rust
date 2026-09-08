@@ -137,6 +137,8 @@ pub struct TriggerLadderDetails {
     pub ladder_price_max: Option<Price>,
     pub ladder_levels: i32,
     pub ladder_distribution: String,
+    pub executed_levels: i32,
+    pub executed_qty: Option<Quantity>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

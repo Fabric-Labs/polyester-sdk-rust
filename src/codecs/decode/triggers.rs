@@ -236,6 +236,13 @@ fn trigger_details_from_proto(
                 },
                 ladder_levels: ladder.ladder_levels,
                 ladder_distribution: ladder_distribution_label(ladder.ladder_distribution),
+                executed_levels: ladder.executed_levels,
+                executed_qty: decode_qty_scaled(
+                    ladder.executed_qty_scaled,
+                    None,
+                    symbol.clone(),
+                    symbol_id_opt,
+                ),
             }))
         }
         None => None,
@@ -695,6 +702,45 @@ mod tests {
         assert_eq!(twap.slice_idx, 2);
         assert_eq!(twap.slice_count, 12);
         assert_eq!(twap.executed_qty.as_ref().unwrap().as_scaled(), 25_000_000);
+    }
+
+    #[test]
+    fn trigger_from_proto_projects_ladder_executed_fields() {
+        use crate::proto::triggers::v1::{LadderDetails, LadderTrigger};
+
+        let msg = ProtoTrigger {
+            trigger_id: 9,
+            symbol_id: 1,
+            status: TriggerStatus::StatusRunning.into(),
+            qty_scaled: 100_000_000,
+            configuration: Some(trigger::Configuration::Ladder(Box::new(LadderTrigger {
+                side: Side::Buy.into(),
+                price_min_ticks: 1,
+                price_max_ticks: 2,
+                levels: 4,
+                ..Default::default()
+            }))),
+            runtime_details: Some(trigger::RuntimeDetails::LadderState(Box::new(
+                LadderDetails {
+                    ladder_price_min_ticks: 1,
+                    ladder_price_max_ticks: 2,
+                    ladder_levels: 4,
+                    executed_qty_scaled: 25_000_000,
+                    executed_levels: 2,
+                    ..Default::default()
+                },
+            ))),
+            ..Default::default()
+        };
+        let t = trigger_from_proto(&msg);
+        let Some(TriggerDetails::Ladder(ladder)) = t.details.as_ref() else {
+            panic!("expected ladder details");
+        };
+        assert_eq!(ladder.executed_levels, 2);
+        assert_eq!(
+            ladder.executed_qty.as_ref().unwrap().as_scaled(),
+            25_000_000
+        );
     }
 
     #[test]

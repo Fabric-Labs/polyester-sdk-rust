@@ -116,6 +116,7 @@ pub fn candle_point_from_proto(
         close: format_price_ticks(msg.close),
         volume: format_qty_scaled(msg.volume, volume_scale)
             .map_err(|e| Error::validation(format!("candle volume scale invalid: {e}")))?,
+        quote_volume: msg.quote_volume.clone(),
         symbol_id,
         timeframe: timeframe.to_owned(),
     })
@@ -154,14 +155,17 @@ pub fn candles_columns_from_proto(
         ("close", msg.close.len()),
         ("volume", msg.volume.len()),
     ];
-    if lengths.iter().any(|(_, len)| *len != rows) {
+    if lengths.iter().any(|(_, len)| *len != rows)
+        || (!msg.quote_volume.is_empty() && msg.quote_volume.len() != rows)
+    {
         return Err(Error::transport(format!(
-            "invalid GetCandlesColumns response lengths: ts_sec={rows}, open={}, high={}, low={}, close={}, volume={}",
+            "invalid GetCandlesColumns response lengths: ts_sec={rows}, open={}, high={}, low={}, close={}, volume={}, quote_volume={}",
             msg.open.len(),
             msg.high.len(),
             msg.low.len(),
             msg.close.len(),
-            msg.volume.len()
+            msg.volume.len(),
+            msg.quote_volume.len()
         )));
     }
 
@@ -178,6 +182,7 @@ pub fn candles_columns_from_proto(
             low: format_price_ticks(msg.low[i]),
             close: format_price_ticks(msg.close[i]),
             volume,
+            quote_volume: msg.quote_volume.get(i).cloned().unwrap_or_default(),
             symbol_id,
             timeframe: timeframe.clone(),
         });
@@ -280,6 +285,7 @@ mod tests {
                 low: 500_000,
                 close: 1_500_000,
                 volume: 100_000_000,
+                quote_volume: "150.25".into(),
                 ..Default::default()
             }],
             ..Default::default()
@@ -295,6 +301,7 @@ mod tests {
         assert_eq!(c.low, "0.5");
         assert_eq!(c.close, "1.5");
         assert_eq!(c.volume, "1");
+        assert_eq!(c.quote_volume, "150.25");
     }
 
     #[test]

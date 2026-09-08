@@ -3,7 +3,7 @@ use super::unary;
 use crate::codecs::decode::{
     candles_columns_from_proto, candles_from_proto, depth_enum_for_levels,
     market_overview_list_from_proto, market_trades_from_proto, orderbook_from_proto,
-    spot_config_from_proto,
+    spot_config_from_proto, spot_volume_history_from_proto,
 };
 use crate::connect::marketdata::v1::MarketDataServiceClient;
 use crate::connect::marketoverview::v1::MarketOverviewServiceClient;
@@ -11,13 +11,13 @@ use crate::connect::orderbook::v1::OrderbookServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::{
     Candle, CandlesResult, GetCandlesOpts, GetTradesOpts, MarketOverviewList, MarketTradesResult,
-    OrderbookData, SpotConfig,
+    OrderbookData, SpotConfig, SpotVolumeHistory,
 };
 use crate::models::{MarketOverviewEntry, MarketTrade, OrderBookDeltaUpdate};
 use crate::proto::marketdata::v1::{
     GetCandlesColumnsRequest, GetCandlesRequest, GetSpotConfigRequest, GetTradesRequest, Timeframe,
 };
-use crate::proto::marketoverview::v1::ListMarketOverviewRequest;
+use crate::proto::marketoverview::v1::{GetSpotVolumeHistoryRequest, ListMarketOverviewRequest};
 use crate::proto::orderbook::v1::GetOrderBookRequest;
 use buffa_types::google::protobuf::Timestamp;
 
@@ -377,6 +377,71 @@ impl MarketOverviewService {
             }
         }
         Ok(list)
+    }
+
+    /// Trailing 24-hour USD volume samples for configured spot pairs.
+    ///
+    /// Omit both filters to select every configured pair. Send at most 2,000
+    /// distinct positive pair IDs. Do not sum the overlapping samples.
+    pub async fn get_spot_volume_history(
+        &self,
+        symbols: Option<&[String]>,
+        symbol_ids: Option<&[u32]>,
+    ) -> Result<SpotVolumeHistory> {
+        const MAX_SYMBOL_IDS: usize = 2000;
+        if symbols.is_some_and(|items| !items.is_empty())
+            && symbol_ids.is_some_and(|items| !items.is_empty())
+        {
+            return Err(Error::validation(
+                "market_overview.get_spot_volume_history accepts only one of symbols or symbol_ids",
+            ));
+        }
+        let mut resolved = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        if let Some(ids) = symbol_ids {
+            for id in ids {
+                if *id == 0 {
+                    return Err(Error::validation(
+                        "market_overview.get_spot_volume_history symbol_ids must be positive",
+                    ));
+                }
+                if seen.insert(*id) {
+                    resolved.push(*id);
+                }
+            }
+        } else if let Some(symbols) = symbols {
+            if !symbols.is_empty() {
+                self.ctx.wait_for_catalogs().await?;
+            }
+            for id in self.ctx.catalogs.resolve_symbol_ids(Some(symbols))? {
+                if seen.insert(id) {
+                    resolved.push(id);
+                }
+            }
+        }
+        if resolved.len() > MAX_SYMBOL_IDS {
+            return Err(Error::validation(
+                "market_overview.get_spot_volume_history accepts at most 2000 symbol_ids",
+            ));
+        }
+        let req = GetSpotVolumeHistoryRequest {
+            symbol_id: resolved,
+            ..Default::default()
+        };
+        let client = MarketOverviewServiceClient::new(
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
+        );
+        let resp = unary::await_public(client.get_spot_volume_history(req))
+            .await?
+            .into_owned();
+        let mut history = spot_volume_history_from_proto(&resp);
+        for pair in &mut history.pairs {
+            if pair.symbol.is_empty() {
+                pair.symbol = self.ctx.catalogs.display_symbol(pair.symbol_id);
+            }
+        }
+        Ok(history)
     }
 
     /// Subscribe to public market overview batches.
@@ -884,6 +949,7 @@ mod tests {
             low: "1".into(),
             close: "1".into(),
             volume: "1".into(),
+            quote_volume: String::new(),
             symbol_id: 1,
             timeframe: "1m".into(),
         };

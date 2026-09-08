@@ -387,6 +387,62 @@ impl Manager {
             .collect()
     }
 
+    /// Resolve cancel-all Connect `symbol_ids`.
+    ///
+    /// Empty means all symbols. Duplicates are ignored. At most 100 positive IDs
+    /// are accepted. `symbol`, `symbols`, and `symbol_ids` are mutually exclusive
+    /// once any of them selects at least one pair.
+    pub fn resolve_cancel_all_symbol_ids(
+        &self,
+        symbol: Option<&str>,
+        symbols: Option<&[String]>,
+        symbol_ids: Option<&[u32]>,
+        label: &str,
+    ) -> Result<Vec<u32>> {
+        const MAX_CANCEL_ALL_SYMBOL_IDS: usize = 100;
+        let normalized_symbol = Self::normalize_raw_symbol_filter(symbol);
+        let normalized_symbols = Self::normalize_raw_symbol_filters(symbols);
+        let raw_ids = symbol_ids.unwrap_or_default();
+        let selected = usize::from(normalized_symbol.is_some())
+            + usize::from(!normalized_symbols.is_empty())
+            + usize::from(!raw_ids.is_empty());
+        if selected > 1 {
+            return Err(Error::validation(format!(
+                "{label} accepts only one of symbol, symbols, or symbol_ids"
+            )));
+        }
+
+        let mut resolved = Vec::new();
+        if !raw_ids.is_empty() {
+            for id in raw_ids {
+                if *id == 0 {
+                    return Err(Error::validation(format!(
+                        "{label} symbol_ids must be positive"
+                    )));
+                }
+                resolved.push(*id);
+            }
+        } else if let Some(symbol) = normalized_symbol {
+            resolved.push(self.require_symbol_id(&symbol)?);
+        } else {
+            resolved.extend(self.resolve_symbol_ids(Some(normalized_symbols.as_slice()))?);
+        }
+
+        let mut unique = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for id in resolved {
+            if seen.insert(id) {
+                unique.push(id);
+            }
+        }
+        if unique.len() > MAX_CANCEL_ALL_SYMBOL_IDS {
+            return Err(Error::validation(format!(
+                "{label} accepts at most {MAX_CANCEL_ALL_SYMBOL_IDS} symbol_ids"
+            )));
+        }
+        Ok(unique)
+    }
+
     /// Trim an optional display symbol before catalog resolution.
     ///
     /// Empty/whitespace values remain omitted. These helpers only normalize
@@ -562,6 +618,48 @@ mod tests {
         assert_eq!(
             mgr.orderbook_price_buckets_for_symbol("BTC-USDT"),
             vec!["0.01".to_owned(), "0.1".to_owned(), "1.0".to_owned()]
+        );
+    }
+
+    #[test]
+    fn resolve_cancel_all_symbol_ids_is_mutually_exclusive() {
+        let mgr = Manager::new();
+        mgr.hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .expect("hydrate");
+        assert_eq!(
+            mgr.resolve_cancel_all_symbol_ids(Some("BTC-USDT"), None, None, "orders.cancel_all")
+                .unwrap(),
+            vec![1]
+        );
+        assert_eq!(
+            mgr.resolve_cancel_all_symbol_ids(
+                None,
+                Some(&["BTC-USDT".into(), "BTC-USDT".into()]),
+                None,
+                "orders.cancel_all"
+            )
+            .unwrap(),
+            vec![1]
+        );
+        assert_eq!(
+            mgr.resolve_cancel_all_symbol_ids(None, None, Some(&[2, 2, 5]), "orders.cancel_all")
+                .unwrap(),
+            vec![2, 5]
+        );
+        assert!(
+            mgr.resolve_cancel_all_symbol_ids(
+                Some("BTC-USDT"),
+                None,
+                Some(&[2]),
+                "orders.cancel_all"
+            )
+            .is_err()
         );
     }
 
