@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a45
+
+Package version: `0.1.0-alpha.45`. Git tag: `v0.1.0a45`.
+
 ### Breaking
 - `OrdersService::cancel_all_with` now sends repeated Connect `symbol_ids`
   instead of a single `symbol_id`. `CancelAllOpts` accepts `symbol`,
