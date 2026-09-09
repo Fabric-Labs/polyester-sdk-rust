@@ -1249,7 +1249,7 @@ async fn l2_jsonrpc_headers_then_stalled_body_times_out() {
         stall,
     })
     .await;
-    let rpc = JsonRpcClient::new(http.base_url(), timeout);
+    let rpc = JsonRpcClient::new(http.base_url(), timeout).expect("rpc");
     let started = Instant::now();
     let err = rpc
         .request("eth_chainId", json!([]))
@@ -1266,7 +1266,7 @@ async fn l2_jsonrpc_no_headers_times_out() {
         stall: Duration::from_secs(30),
     })
     .await;
-    let rpc = JsonRpcClient::new(http.base_url(), timeout);
+    let rpc = JsonRpcClient::new(http.base_url(), timeout).expect("rpc");
     let started = Instant::now();
     let err = rpc
         .request("eth_chainId", json!([]))
@@ -1290,7 +1290,7 @@ async fn l2_jsonrpc_slow_drip_obeys_one_overall_deadline() {
         inter_chunk_delay: Duration::from_millis(30),
     })
     .await;
-    let rpc = JsonRpcClient::new(http.base_url(), timeout);
+    let rpc = JsonRpcClient::new(http.base_url(), timeout).expect("rpc");
     let started = Instant::now();
     let err = rpc
         .request("eth_chainId", json!([]))
@@ -1335,25 +1335,29 @@ async fn l2_jsonrpc_rejects_oversized_and_bad_envelope() {
         }
     })
     .await;
-    let rpc = JsonRpcClient::new(format!("{}/ok", http.base_url()), Duration::from_secs(2));
+    let rpc =
+        JsonRpcClient::new(format!("{}/ok", http.base_url()), Duration::from_secs(2)).expect("rpc");
     let err = rpc.request("eth_call", json!([])).await.unwrap_err();
     assert!(err.to_string().contains("both result and error"), "{err}");
 
-    let big = JsonRpcClient::new(format!("{}/big", http.base_url()), Duration::from_secs(2));
+    let big = JsonRpcClient::new(format!("{}/big", http.base_url()), Duration::from_secs(2))
+        .expect("rpc");
     let err = big.request("eth_call", json!([])).await.unwrap_err();
     assert!(
         err.to_string().contains("exceeds") || err.to_string().contains("read body"),
         "{err}"
     );
 
-    let ver = JsonRpcClient::new(format!("{}/ver", http.base_url()), Duration::from_secs(2));
+    let ver = JsonRpcClient::new(format!("{}/ver", http.base_url()), Duration::from_secs(2))
+        .expect("rpc");
     let err = ver.request("eth_call", json!([])).await.unwrap_err();
     assert!(
         err.to_string().to_ascii_lowercase().contains("jsonrpc") || err.to_string().contains("2.0"),
         "{err}"
     );
 
-    let noid = JsonRpcClient::new(format!("{}/noid", http.base_url()), Duration::from_secs(2));
+    let noid = JsonRpcClient::new(format!("{}/noid", http.base_url()), Duration::from_secs(2))
+        .expect("rpc");
     let err = noid.request("eth_call", json!([])).await.unwrap_err();
     assert!(err.to_string().to_ascii_lowercase().contains("id"), "{err}");
 }
@@ -1378,7 +1382,8 @@ async fn l2_jsonrpc_rejects_all_remaining_invalid_envelopes() {
         let rpc = JsonRpcClient::new(
             format!("{}/{path}", http.base_url()),
             Duration::from_secs(2),
-        );
+        )
+        .expect("rpc");
         let err = rpc.request("eth_call", json!([])).await.expect_err(path);
         let message = err.to_string().to_ascii_lowercase();
         match path {
@@ -1448,7 +1453,7 @@ async fn l2_jsonrpc_25_concurrent_reordered_responses_succeed() {
         }
     });
 
-    let rpc = JsonRpcClient::new(format!("http://{addr}"), Duration::from_secs(5));
+    let rpc = JsonRpcClient::new(format!("http://{addr}"), Duration::from_secs(5)).expect("rpc");
     let mut tasks = Vec::new();
     for _ in 0..25 {
         let rpc = rpc.clone();
@@ -1472,7 +1477,7 @@ async fn l2_jsonrpc_success_path_still_works() {
         body: br#"{"jsonrpc":"2.0","id":1,"result":"0x1"}"#.to_vec(),
     })
     .await;
-    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(2));
+    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(2)).expect("rpc");
     let result = rpc.request("eth_chainId", json!([])).await.expect("ok");
     assert_eq!(result, json!("0x1"));
 }
@@ -1485,7 +1490,7 @@ async fn l2_jsonrpc_chunked_over_1mib_rejected() {
         chunk_size: 16_384,
     })
     .await;
-    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(5));
+    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(5)).expect("rpc");
     let err = rpc
         .request("eth_chainId", json!([]))
         .await
@@ -1505,7 +1510,7 @@ async fn l2_jsonrpc_malformed_json_rejected() {
         body: b"{broken".to_vec(),
     })
     .await;
-    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(2));
+    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(2)).expect("rpc");
     let err = rpc.request("eth_chainId", json!([])).await.unwrap_err();
     assert!(
         err.to_string().to_ascii_lowercase().contains("json"),
@@ -1520,7 +1525,7 @@ async fn l2_jsonrpc_error_object_returns_transport_error() {
         body: br#"{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"boom"}}"#.to_vec(),
     })
     .await;
-    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(2));
+    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(2)).expect("rpc");
     let err = rpc.request("eth_call", json!([])).await.unwrap_err();
     assert!(err.to_string().contains("boom"), "{err}");
 }
@@ -1532,7 +1537,7 @@ async fn l2_jsonrpc_null_result_is_preserved() {
         body: br#"{"jsonrpc":"2.0","id":1,"result":null}"#.to_vec(),
     })
     .await;
-    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(2));
+    let rpc = JsonRpcClient::new(http.base_url(), Duration::from_secs(2)).expect("rpc");
     let result = rpc.request("eth_call", json!([])).await.expect("null ok");
     assert!(result.is_null(), "expected null result, got {result}");
 }

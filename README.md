@@ -8,7 +8,7 @@ on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Conne
 **Status:** Alpha (`0.1.0-alpha.45`, git tag `v0.1.0a45`). Proprietary license
 (not open source). API-key only; no browser login or JWT flows.
 
-**MSRV:** Rust 1.88+
+**MSRV:** Rust 1.90+
 
 ## Supported surface
 
@@ -224,16 +224,19 @@ let client = Client::new(Config {
 
 **Scripts and local tests only:** `Client::from_env()` loads
 `POLYESTER_API_KEY_ID`, `POLYESTER_API_PRIVATE_KEY`, and optionally
-`POLYESTER_ACCOUNT_ID` / `POLYESTER_API_URL`. This is a convenience helper, not
-the primary integration pattern.
+`POLYESTER_ACCOUNT_ID` / `POLYESTER_API_URL` / `POLYESTER_WS_URL`. This is a
+convenience helper, not the primary integration pattern.
 
 ```rust,no_run
 let client = polyester::Client::from_env()?;
 ```
 
 `api_url` / `POLYESTER_API_URL` must be an HTTP(S) base URL without a query
-string or fragment. Plain HTTP remains supported for localhost and test
-servers.
+string or fragment. `ws_url` / `POLYESTER_WS_URL` must be `wss://` or `ws://`.
+Remote plaintext (`http://` / `ws://` to a non-loopback host) is rejected
+unless `Config::allow_insecure_http` is set, or `from_env` sees
+`POLYESTER_ALLOW_INSECURE_HTTP=1`. Loopback plaintext stays allowed for local
+tests.
 
 ## Catalog readiness
 
@@ -300,9 +303,13 @@ client
 ```
 
 `client_order_id` is **optional** (matches the API). Pass `None` for one-shot
-creates. **Set a stable non-empty value when you may retry** after an ambiguous
-transport/server failure, and reuse that same id on retry / reconciliation -
-without it you cannot safely tell whether the first attempt admitted the order.
+creates. **Set a stable non-empty value when you may need to reconcile** after
+an ambiguous transport/server failure. Without it you cannot tell whether the
+first attempt admitted the order. After an unknown outcome, look up that id
+(`get` / `list_open`) before creating again. A second create with the same id
+is rejected (`CONFLICT_DUPLICATE_CLIENT_ORDER_ID`) even when the payload
+matches. Only create again with that id if reconciliation shows the first
+attempt did not admit.
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
 `-`. Batch create accepts at most 20 orders. Treat a cancel response as an
 admission acknowledgement and reconcile with `list_open` before releasing local
@@ -592,13 +599,13 @@ async fn create_with_reconciliation(client: &Client, params: CreateOrderParams) 
         Ok(order) => println!("{}", order.order_id),
         Err(error) if error.is_retryable() => {
             if error.mutation_outcome_unknown() {
-                // Reconcile by client_order_id before deciding whether to retry.
-                // This only works if params.client_order_id was set on the first attempt.
+                // Look up params.client_order_id (get / list_open) before create again.
+                // A second create with the same id is rejected if the first attempt admitted.
             }
             if let Some(seconds) = error.retry_after() {
                 tokio::time::sleep(std::time::Duration::from_secs_f64(seconds)).await;
             }
-            // If reconciliation permits a retry, reuse the same params.client_order_id.
+            // Only create again with the same client_order_id if no order was admitted.
         }
         Err(error) => return Err(error),
     }

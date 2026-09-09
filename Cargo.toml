@@ -2,7 +2,7 @@
 name = "polyester-sdk"
 version = "0.1.0-alpha.45"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.90"
 description = "Official Rust SDK for Polyester APIs."
 readme = "README.md"
 license-file = "LICENSE"

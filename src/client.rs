@@ -32,6 +32,8 @@ pub struct Config {
     pub timeout: Duration,
     pub wire_format: WireFormat,
     pub hydrate_catalogs: bool,
+    /// Allow non-loopback `http://` / `ws://` endpoints.
+    pub allow_insecure_http: bool,
 }
 
 impl std::fmt::Debug for Config {
@@ -49,6 +51,7 @@ impl std::fmt::Debug for Config {
             .field("timeout", &self.timeout)
             .field("wire_format", &self.wire_format)
             .field("hydrate_catalogs", &self.hydrate_catalogs)
+            .field("allow_insecure_http", &self.allow_insecure_http)
             .finish()
     }
 }
@@ -65,6 +68,7 @@ impl Default for Config {
             timeout: Duration::from_secs(10),
             wire_format: WireFormat::Binary,
             hydrate_catalogs: true,
+            allow_insecure_http: false,
         }
     }
 }
@@ -126,6 +130,7 @@ impl Client {
             ws_url: config.ws_url.clone(),
             timeout: config.timeout,
             wire_format: config.wire_format,
+            allow_insecure_http: config.allow_insecure_http,
         };
         let factory = Factory::new(transport_cfg, credentials.clone())?;
         let catalogs = Arc::new(CatalogManager::new());
@@ -136,7 +141,8 @@ impl Client {
             credentials,
             None,
             config.timeout,
-        );
+        )
+        .allow_insecure_http(config.allow_insecure_http);
 
         let catalog_ready = Arc::new(OnceCell::new());
         let catalog_hydrate_lock = Arc::new(tokio::sync::Mutex::new(()));
@@ -214,6 +220,7 @@ impl Client {
         {
             config.ws_url = url;
         }
+        config.allow_insecure_http = crate::transport::env_allow_insecure_http();
         // Force from_env credential loading
         let credentials = Credentials::load(None, None, true)?;
         let transport_cfg = TransportConfig {
@@ -221,6 +228,7 @@ impl Client {
             ws_url: config.ws_url.clone(),
             timeout: config.timeout,
             wire_format: config.wire_format,
+            allow_insecure_http: config.allow_insecure_http,
         };
         let factory = Factory::new(transport_cfg, credentials.clone())?;
         let catalogs = Arc::new(CatalogManager::new());
@@ -230,7 +238,8 @@ impl Client {
             credentials,
             None,
             config.timeout,
-        );
+        )
+        .allow_insecure_http(config.allow_insecure_http);
         let catalog_ready = Arc::new(OnceCell::new());
         let catalog_hydrate_lock = Arc::new(tokio::sync::Mutex::new(()));
         let catalog_last_error = Arc::new(std::sync::Mutex::new(None));
@@ -466,6 +475,28 @@ mod tests {
             client.catalogs_last_error().map(|error| error.to_string()),
             Some("recovered".to_owned())
         );
+    }
+
+    #[test]
+    fn client_rejects_remote_plaintext_api_url() {
+        let err = match Client::new(Config {
+            api_url: "http://api.example.test".into(),
+            hydrate_catalogs: false,
+            ..Default::default()
+        }) {
+            Ok(_) => panic!("remote http"),
+            Err(err) => err,
+        };
+        assert!(matches!(err, Error::Validation(_)), "{err}");
+
+        Client::new(Config {
+            api_url: "http://api.example.test".into(),
+            ws_url: "ws://api.example.test".into(),
+            allow_insecure_http: true,
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .expect("insecure opt-in");
     }
 
     #[test]

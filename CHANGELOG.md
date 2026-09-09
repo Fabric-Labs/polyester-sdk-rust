@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Breaking
+- `JsonRpcClient::new` now returns `Result` and rejects remote `http://`
+  endpoints. Use loopback HTTP, HTTPS, or `JsonRpcClient::new_insecure`.
+- Remote `http://` API bases and `ws://` realtime URLs are rejected unless
+  `Config::allow_insecure_http` is set (or `POLYESTER_ALLOW_INSECURE_HTTP=1`
+  for `Client::from_env`). Loopback plaintext is unchanged.
+
+### Changed
+- Document that a reused `client_order_id` on create is a conflict after the
+  first admission (`CONFLICT_DUPLICATE_CLIENT_ORDER_ID`). Reconcile with
+  `get` / `list_open` before creating again.
+- Address-book live create uses a generated external destination (not the
+  internal-transfer account-id fixture) and treats `write denied` as a
+  missing `MANAGE_ADDRESS_BOOK` scope.
+- MSRV is Rust 1.90 (was 1.88).
+
+### Security
+- Close SDK01-011 through SDK01-014: Connect, realtime token exchange,
+  websocket, and chain JSON-RPC no longer silently use remote plaintext.
+- Bump lockfile `h2` to 0.4.19 (RUSTSEC-2026-0258) and `ruint` to 1.20.0
+  (RUSTSEC-2026-0220). `derivative`, `paste`, and `rkyv` remain transitive
+  and unmaintained.
+
 ## 0.1.0a45
 
 Package version: `0.1.0-alpha.45`. Git tag: `v0.1.0a45`.

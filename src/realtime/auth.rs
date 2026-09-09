@@ -44,9 +44,18 @@ pub async fn fetch_connection_token(
     creds: &Credentials,
     api_url: &str,
     timeout: Duration,
+    allow_insecure: bool,
 ) -> Result<String> {
+    crate::transport::validate_http_url(api_url, allow_insecure)?;
     let url = connection_token_url(api_url);
-    fetch_rt_token(creds, &url, "realtime connection token", timeout).await
+    fetch_rt_token(
+        creds,
+        &url,
+        "realtime connection token",
+        timeout,
+        allow_insecure,
+    )
+    .await
 }
 
 pub async fn fetch_subscription_token(
@@ -54,13 +63,16 @@ pub async fn fetch_subscription_token(
     api_url: &str,
     channel: &str,
     timeout: Duration,
+    allow_insecure: bool,
 ) -> Result<String> {
+    crate::transport::validate_http_url(api_url, allow_insecure)?;
     let url = subscription_token_url(api_url, channel);
     fetch_rt_token(
         creds,
         &url,
         &format!("realtime subscription token for {channel}"),
         timeout,
+        allow_insecure,
     )
     .await
 }
@@ -70,13 +82,14 @@ async fn fetch_rt_token(
     url: &str,
     label: &str,
     timeout: Duration,
+    allow_insecure: bool,
 ) -> Result<String> {
     let timeout = if timeout.is_zero() {
         DEFAULT_TOKEN_REQUEST_TIMEOUT
     } else {
         timeout
     };
-    let client = build_http_client()?;
+    let client = build_http_client(url, allow_insecure)?;
     let headers = creds.sign_request_async("GET", url, b"", None).await?;
     let uri: hyper::Uri = url
         .parse()
@@ -194,21 +207,23 @@ fn content_length_exceeds_limit(headers: &http::HeaderMap, max_bytes: usize) -> 
         .is_some_and(|length| length > max_bytes)
 }
 
-fn build_http_client() -> Result<HyperClient> {
+fn build_http_client(url: &str, allow_insecure: bool) -> Result<HyperClient> {
     static INIT: std::sync::Once = std::sync::Once::new();
     INIT.call_once(|| {
         let _ = rustls::crypto::ring::default_provider().install_default();
     });
+    let parsed = crate::transport::validate_http_url(url, allow_insecure)?;
     let mut roots = connectrpc::rustls::RootCertStore::empty();
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     let tls = connectrpc::rustls::ClientConfig::builder()
         .with_root_certificates(roots)
         .with_no_client_auth();
-    let https = hyper_rustls::HttpsConnectorBuilder::new()
-        .with_tls_config(tls)
-        .https_or_http()
-        .enable_http1()
-        .build();
+    let builder = hyper_rustls::HttpsConnectorBuilder::new().with_tls_config(tls);
+    let https = if parsed.scheme() == "http" {
+        builder.https_or_http().enable_http1().build()
+    } else {
+        builder.https_only().enable_http1().build()
+    };
     Ok(Client::builder(TokioExecutor::new())
         .pool_idle_timeout(Duration::from_secs(30))
         .build(https))

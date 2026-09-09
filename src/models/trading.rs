@@ -517,9 +517,10 @@ pub struct CreateOrderParams {
     pub time_in_force: Option<CreateTimeInForce>,
     /// Optional client order id (API-optional).
     ///
-    /// Set a stable non-empty value when you may retry after an ambiguous failure
-    /// (`Error::mutation_outcome_unknown`), and reuse that same value on retry.
-    /// Omit (`None`) for one-shot creates where you will not reconcile by client id.
+    /// Set a stable non-empty value so you can reconcile after an ambiguous
+    /// failure (`Error::mutation_outcome_unknown`). Look up that id before
+    /// creating again; a second create with the same id is a conflict if the
+    /// first attempt admitted. Omit (`None`) for one-shot creates.
     pub client_order_id: Option<String>,
     pub subaccount_id: Option<u64>,
     pub post_only: Option<bool>,

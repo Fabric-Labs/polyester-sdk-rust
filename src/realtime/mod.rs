@@ -177,6 +177,7 @@ pub struct Client {
     max_queue: usize,
     /// Deadline for private-channel HTTP token exchange (request + body).
     timeout: Duration,
+    allow_insecure_http: bool,
 }
 
 impl Client {
@@ -212,7 +213,14 @@ impl Client {
             } else {
                 timeout
             },
+            allow_insecure_http: false,
         }
+    }
+
+    /// Permit remote `http://` / `ws://` endpoints for this realtime client.
+    pub fn allow_insecure_http(mut self, allow: bool) -> Self {
+        self.allow_insecure_http = allow;
+        self
     }
 
     pub(crate) fn request_timeout(&self) -> Duration {
@@ -391,11 +399,22 @@ impl Client {
                 .credentials
                 .as_ref()
                 .ok_or_else(|| Error::auth("private channel requires credentials"))?;
-            let connection_token =
-                auth::fetch_connection_token(creds, &self.api_url, self.timeout).await?;
+            let connection_token = auth::fetch_connection_token(
+                creds,
+                &self.api_url,
+                self.timeout,
+                self.allow_insecure_http,
+            )
+            .await?;
             centrifugo_connect(write, read, Some(&connection_token)).await?;
-            let subscription_token =
-                auth::fetch_subscription_token(creds, &self.api_url, channel, self.timeout).await?;
+            let subscription_token = auth::fetch_subscription_token(
+                creds,
+                &self.api_url,
+                channel,
+                self.timeout,
+                self.allow_insecure_http,
+            )
+            .await?;
             centrifugo_subscribe(write, read, channel, Some(&subscription_token)).await?;
         } else {
             centrifugo_connect(write, read, None).await?;
@@ -414,6 +433,7 @@ impl Client {
     where
         F: Fn(&[u8]) -> Result<T>,
     {
+        crate::transport::validate_ws_url(&self.ws_url, self.allow_insecure_http)?;
         let url = self.ws_endpoint();
         let mut request = url
             .into_client_request()

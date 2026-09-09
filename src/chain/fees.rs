@@ -45,7 +45,7 @@ pub async fn quote_zipper_fee(
     let client = match rpc {
         Some(c) => c,
         None => {
-            owned_client = JsonRpcClient::new(env.rpc_url, std::time::Duration::from_secs(60));
+            owned_client = JsonRpcClient::new(env.rpc_url, std::time::Duration::from_secs(60))?;
             &owned_client
         }
     };

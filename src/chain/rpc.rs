@@ -21,10 +21,12 @@ type HyperClient = Client<
 /// Maximum accepted JSON-RPC HTTP response body.
 pub const MAX_JSONRPC_RESPONSE_BYTES: usize = 1024 * 1024;
 
-static HTTP: OnceCell<HyperClient> = OnceCell::const_new();
+static HTTPS: OnceCell<HyperClient> = OnceCell::const_new();
+static HTTP_OR_HTTPS: OnceCell<HyperClient> = OnceCell::const_new();
 
-async fn http_client() -> Result<&'static HyperClient> {
-    HTTP.get_or_try_init(|| async {
+async fn http_client(allow_http: bool) -> Result<&'static HyperClient> {
+    let cell = if allow_http { &HTTP_OR_HTTPS } else { &HTTPS };
+    cell.get_or_try_init(|| async move {
         static INIT: std::sync::Once = std::sync::Once::new();
         INIT.call_once(|| {
             let _ = rustls::crypto::ring::default_provider().install_default();
@@ -34,11 +36,12 @@ async fn http_client() -> Result<&'static HyperClient> {
         let tls = connectrpc::rustls::ClientConfig::builder()
             .with_root_certificates(roots)
             .with_no_client_auth();
-        let https = hyper_rustls::HttpsConnectorBuilder::new()
-            .with_tls_config(tls)
-            .https_or_http()
-            .enable_http1()
-            .build();
+        let builder = hyper_rustls::HttpsConnectorBuilder::new().with_tls_config(tls);
+        let https = if allow_http {
+            builder.https_or_http().enable_http1().build()
+        } else {
+            builder.https_only().enable_http1().build()
+        };
         Ok::<_, Error>(
             Client::builder(TokioExecutor::new())
                 .pool_idle_timeout(Duration::from_secs(30))
@@ -67,12 +70,27 @@ impl Clone for JsonRpcClient {
 }
 
 impl JsonRpcClient {
-    pub fn new(url: impl Into<String>, timeout: Duration) -> Self {
-        Self {
-            url: url.into(),
+    pub fn new(url: impl Into<String>, timeout: Duration) -> Result<Self> {
+        Self::new_with_policy(url, timeout, false)
+    }
+
+    /// Same as [`Self::new`] but permits a remote `http://` endpoint.
+    pub fn new_insecure(url: impl Into<String>, timeout: Duration) -> Result<Self> {
+        Self::new_with_policy(url, timeout, true)
+    }
+
+    fn new_with_policy(
+        url: impl Into<String>,
+        timeout: Duration,
+        allow_insecure: bool,
+    ) -> Result<Self> {
+        let url = url.into();
+        crate::transport::validate_http_url(&url, allow_insecure)?;
+        Ok(Self {
+            url,
             timeout,
             next_id: Arc::new(AtomicU64::new(0)),
-        }
+        })
     }
 
     pub async fn request(&self, method: &str, params: Value) -> Result<Value> {
@@ -97,7 +115,8 @@ impl JsonRpcClient {
             .body(Full::new(Bytes::from(body)))
             .map_err(|e| Error::transport(format!("jsonrpc request build: {e}")))?;
 
-        let client = http_client().await?;
+        let allow_http = self.url.starts_with("http://");
+        let client = http_client(allow_http).await?;
         let timeout = self.timeout;
         let (status, bytes) = tokio::time::timeout(timeout, async {
             let resp = client
@@ -233,5 +252,16 @@ mod tests {
             parse_jsonrpc_result(&body, 1, "eth_call").unwrap(),
             Value::Null
         );
+    }
+
+    #[test]
+    fn new_rejects_remote_plaintext() {
+        let err = JsonRpcClient::new("http://rpc.example.test", Duration::from_secs(1))
+            .expect_err("remote http");
+        assert!(matches!(err, Error::Validation(_)), "{err}");
+        JsonRpcClient::new("http://127.0.0.1:8545", Duration::from_secs(1)).expect("loopback");
+        JsonRpcClient::new("https://rpc.example.test", Duration::from_secs(1)).expect("https");
+        JsonRpcClient::new_insecure("http://rpc.example.test", Duration::from_secs(1))
+            .expect("opt-in");
     }
 }

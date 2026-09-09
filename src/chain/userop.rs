@@ -283,9 +283,9 @@ impl PolyesterSmartAccount {
         let aa = &environment.account_abstraction;
         Ok(Self {
             signing_key,
-            rpc: JsonRpcClient::new(environment.rpc_url, timeout),
-            bundler: JsonRpcClient::new(aa.bundler_url, timeout),
-            paymaster: JsonRpcClient::new(aa.paymaster_url, timeout),
+            rpc: JsonRpcClient::new(environment.rpc_url, timeout)?,
+            bundler: JsonRpcClient::new(aa.bundler_url, timeout)?,
+            paymaster: JsonRpcClient::new(aa.paymaster_url, timeout)?,
             environment,
             salt_nonce,
             address: predicted.address,

@@ -8,7 +8,7 @@ use polyester::Error;
 use polyester::codecs::scalars::id_to_u64;
 use polyester::proto::auth::v1::{
     AddressBookTagInput, CreateAddressBookEntryRequest, DeleteAddressBookEntryRequest,
-    ListAddressBooksRequest, ListSubaccountsRequest, RequestedInternalTransferAccount,
+    ExternalWithdrawAddress, ListAddressBooksRequest, ListSubaccountsRequest,
 };
 use polyester::services::AddressBookService;
 
@@ -79,8 +79,10 @@ async fn address_book_create_update_new_tags_and_delete() {
         return;
     };
 
-    let dest = crate::support::internal_transfer_dest()
-        .unwrap_or_else(|| "0x0000000000000000000000000000000000000001".into());
+    let Some(chain_id) = live_external_chain_id(&client).await else {
+        eprintln!("skip: no zipper chain id for address-book create");
+        return;
+    };
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
@@ -93,8 +95,9 @@ async fn address_book_create_update_new_tags_and_delete() {
             ..Default::default()
         }],
         entry: Some(
-            RequestedInternalTransferAccount {
-                smart_account_address: dest,
+            ExternalWithdrawAddress {
+                polychain_chain_id: chain_id,
+                address: unique_hex_address(stamp),
                 ..Default::default()
             }
             .into(),
@@ -167,6 +170,21 @@ async fn address_book_create_update_new_tags_and_delete() {
             })
     })
     .await;
+}
+
+async fn live_external_chain_id(client: &polyester::Client) -> Option<u32> {
+    let cfg = client.zipper.get_deposit_withdraw_config().await.ok()?;
+    cfg.chains
+        .iter()
+        .find(|c| {
+            c.chain_id != 0 && (cfg.polyester_chain_id == 0 || c.chain_id != cfg.polyester_chain_id)
+        })
+        .or_else(|| cfg.chains.iter().find(|c| c.chain_id != 0))
+        .map(|c| c.chain_id)
+}
+
+fn unique_hex_address(stamp: u128) -> String {
+    format!("0x{stamp:032x}{stamp:08x}")
 }
 
 fn skip_address_book_write(err: &Error) -> bool {

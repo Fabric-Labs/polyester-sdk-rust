@@ -139,15 +139,20 @@ pub fn is_permission_denied(err: &Error) -> bool {
         return true;
     }
     let msg = err.to_string().to_ascii_lowercase();
-    let auth_permission = matches!(err, Error::Auth(_))
-        && (msg.contains("permission denied")
-            || msg.contains("permission_denied")
-            || msg.contains("http 403"));
-    let api_permission = matches!(
+    if msg.contains("write denied")
+        || msg.contains("permission denied")
+        || msg.contains("permission_denied")
+        || msg.contains("http 403")
+    {
+        return true;
+    }
+    matches!(
         err,
-        Error::Api { code, .. } if code.to_ascii_lowercase().contains("permission_denied")
-    );
-    auth_permission || api_permission
+        Error::Api { code, .. } if {
+            let c = code.to_ascii_lowercase();
+            c.contains("permission_denied") || c.contains("permissiondenied")
+        }
+    )
 }
 
 /// Run an optional live RPC; soft-skip (None) when unavailable.
@@ -194,6 +199,21 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn address_book_write_denied_is_permission_denied_not_jwt_only() {
+        let err = Error::auth("address book write denied");
+        assert!(is_permission_denied(&err));
+        assert!(!jwt_session_only(&err));
+
+        let api = Error::Api {
+            message: "address book write denied".into(),
+            code: "AUTH_UNSPECIFIED".into(),
+            metadata: Vec::new(),
+        };
+        assert!(is_permission_denied(&api));
+        assert!(!jwt_session_only(&api));
+    }
 
     #[test]
     fn private_proto_channel_auth_error_is_not_a_proto_mismatch() {

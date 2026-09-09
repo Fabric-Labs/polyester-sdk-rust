@@ -45,6 +45,9 @@ pub struct Config {
     pub ws_url: String,
     pub timeout: Duration,
     pub wire_format: WireFormat,
+    /// Allow non-loopback `http://` / `ws://` endpoints. Loopback plaintext
+    /// stays allowed without this flag.
+    pub allow_insecure_http: bool,
 }
 
 impl Default for Config {
@@ -54,7 +57,87 @@ impl Default for Config {
             ws_url: DEFAULT_WS_URL.to_owned(),
             timeout: Duration::from_secs(10),
             wire_format: WireFormat::Binary,
+            allow_insecure_http: false,
         }
+    }
+}
+
+/// Environment variable that opts `Client::from_env` into remote plaintext.
+pub const ALLOW_INSECURE_HTTP_ENV: &str = "POLYESTER_ALLOW_INSECURE_HTTP";
+
+/// True when `POLYESTER_ALLOW_INSECURE_HTTP` is `1`, `true`, or `yes`.
+pub fn env_allow_insecure_http() -> bool {
+    match std::env::var(ALLOW_INSECURE_HTTP_ENV) {
+        Ok(value) => matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes"
+        ),
+        Err(_) => false,
+    }
+}
+
+/// Whether `url` targets localhost / 127.0.0.0/8 / ::1.
+pub fn host_is_loopback(url: &url::Url) -> bool {
+    match url.host() {
+        Some(url::Host::Domain(host)) => {
+            let host = host.trim_end_matches('.').to_ascii_lowercase();
+            host == "localhost"
+        }
+        Some(url::Host::Ipv4(addr)) => addr.is_loopback(),
+        Some(url::Host::Ipv6(addr)) => addr.is_loopback(),
+        None => false,
+    }
+}
+
+fn redact_url_for_log(url: &url::Url) -> String {
+    let mut redacted = url.clone();
+    let _ = redacted.set_username("");
+    let _ = redacted.set_password(None);
+    redacted.to_string()
+}
+
+fn accept_plaintext(url: &url::Url, allow_insecure: bool, kind: &str) -> Result<()> {
+    if allow_insecure || host_is_loopback(url) {
+        tracing::warn!(
+            url = %redact_url_for_log(url),
+            "{kind} is plaintext; credentials or tokens may travel in the clear"
+        );
+        return Ok(());
+    }
+    Err(Error::validation(format!(
+        "{kind} must use a TLS scheme unless the host is loopback or allow_insecure_http is set"
+    )))
+}
+
+/// Validate an HTTP(S) endpoint. Remote `http://` requires `allow_insecure`.
+pub fn validate_http_url(raw: &str, allow_insecure: bool) -> Result<url::Url> {
+    let parsed =
+        url::Url::parse(raw).map_err(|e| Error::validation(format!("invalid URL: {e}")))?;
+    match parsed.scheme() {
+        "https" => Ok(parsed),
+        "http" => {
+            accept_plaintext(&parsed, allow_insecure, "http URL")?;
+            Ok(parsed)
+        }
+        other => Err(Error::validation(format!(
+            "URL must start with http:// or https://, got {other}"
+        ))),
+    }
+}
+
+/// Validate a WebSocket endpoint. Remote `ws://` requires `allow_insecure`.
+pub fn validate_ws_url(raw: &str, allow_insecure: bool) -> Result<url::Url> {
+    let parsed =
+        url::Url::parse(raw).map_err(|e| Error::validation(format!("invalid ws_url: {e}")))?;
+    match parsed.scheme() {
+        "wss" => Ok(parsed),
+        "ws" => {
+            accept_plaintext(&parsed, allow_insecure, "ws_url")?;
+            Ok(parsed)
+        }
+        other => Err(Error::validation(format!(
+            "ws_url must start with ws:// or wss://, got {other}"
+        ))),
     }
 }
 
@@ -72,13 +155,13 @@ pub struct Factory {
 
 impl Factory {
     pub fn new(config: Config, credentials: Option<Credentials>) -> Result<Self> {
-        let parsed = url::Url::parse(&config.api_url)
-            .map_err(|e| Error::validation(format!("invalid api_url: {e}")))?;
+        let parsed = validate_http_url(&config.api_url, config.allow_insecure_http)?;
         if parsed.query().is_some() || parsed.fragment().is_some() {
             return Err(Error::validation(
                 "api_url must not contain a query string or fragment",
             ));
         }
+        validate_ws_url(&config.ws_url, config.allow_insecure_http)?;
         let uri: Uri = config
             .api_url
             .parse()
@@ -246,5 +329,44 @@ mod tests {
             None,
         )
         .expect("localhost HTTP remains supported");
+    }
+
+    #[test]
+    fn factory_rejects_remote_plaintext_unless_opted_in() {
+        let err = match Factory::new(
+            Config {
+                api_url: "http://api.example.test".into(),
+                ..Default::default()
+            },
+            None,
+        ) {
+            Ok(_) => panic!("remote http must fail"),
+            Err(err) => err,
+        };
+        assert!(matches!(err, Error::Validation(_)), "{err}");
+
+        let err = match Factory::new(
+            Config {
+                api_url: "https://api.example.test".into(),
+                ws_url: "ws://api.example.test".into(),
+                ..Default::default()
+            },
+            None,
+        ) {
+            Ok(_) => panic!("remote ws must fail"),
+            Err(err) => err,
+        };
+        assert!(matches!(err, Error::Validation(_)), "{err}");
+
+        Factory::new(
+            Config {
+                api_url: "http://api.example.test".into(),
+                ws_url: "ws://api.example.test".into(),
+                allow_insecure_http: true,
+                ..Default::default()
+            },
+            None,
+        )
+        .expect("explicit insecure opt-in");
     }
 }
