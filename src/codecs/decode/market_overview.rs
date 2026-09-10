@@ -7,9 +7,9 @@ use crate::models::{
     SpotVolumeHistory, StablecoinConversionRate,
 };
 use crate::proto::marketoverview::v1::{
-    CurrencyMetadata as ProtoCurrencyMetadata, FiatConversionSnapshot as ProtoFiatConversionSnapshot,
-    GetCurrencyConversionConfigResponse, GetCurrencyConversionRatesResponse,
-    GetSpotVolumeHistoryResponse, ListMarketOverviewResponse,
+    CurrencyMetadata as ProtoCurrencyMetadata,
+    FiatConversionSnapshot as ProtoFiatConversionSnapshot, GetCurrencyConversionConfigResponse,
+    GetCurrencyConversionRatesResponse, GetSpotVolumeHistoryResponse, ListMarketOverviewResponse,
     MarketOverview as ProtoMarketOverview, MarketOverviewBatch,
 };
 
