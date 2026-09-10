@@ -110,6 +110,48 @@ pub struct MarketOverviewList {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrencyMetadata {
+    pub code: String,
+    pub default_english_name: String,
+    pub symbol: String,
+    pub fraction_digits: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrencyConversionConfig {
+    pub fiat: Vec<CurrencyMetadata>,
+    pub stablecoins: Vec<CurrencyMetadata>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FiatConversionRate {
+    pub code: String,
+    pub units_per_usd_e8: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FiatConversionSnapshot {
+    pub rates: Vec<FiatConversionRate>,
+    pub source_ts_sec: u64,
+    pub stale: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StablecoinConversionRate {
+    pub code: String,
+    pub usd_per_unit_e8: i64,
+    pub source_ts_sec: u64,
+    pub stale: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrencyConversionRates {
+    pub fiat: Option<FiatConversionSnapshot>,
+    pub stablecoins: Vec<StablecoinConversionRate>,
+    pub snapshot_ts_sec: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderbookLevel {
     pub price: Option<Price>,
     pub qty: Option<Quantity>,

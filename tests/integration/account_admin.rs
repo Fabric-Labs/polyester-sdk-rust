@@ -176,10 +176,7 @@ async fn live_external_chain_id(client: &polyester::Client) -> Option<u32> {
     let cfg = client.zipper.get_deposit_withdraw_config().await.ok()?;
     cfg.chains
         .iter()
-        .find(|c| {
-            c.chain_id != 0 && (cfg.polyester_chain_id == 0 || c.chain_id != cfg.polyester_chain_id)
-        })
-        .or_else(|| cfg.chains.iter().find(|c| c.chain_id != 0))
+        .find(|c| c.chain_id != 0)
         .map(|c| c.chain_id)
 }
 

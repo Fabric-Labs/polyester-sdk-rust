@@ -2517,7 +2517,6 @@ fn zipper_config_fixture() -> polyester::proto::chain::zipper::v1::GetDepositWit
 {
     use polyester::proto::chain::zipper::v1::{AssetConfig, GetDepositWithdrawConfigResponse};
     GetDepositWithdrawConfigResponse {
-        polyester_chain_id: 1,
         ts_sec: 1,
         assets: vec![AssetConfig {
             asset: "USDT".into(),

@@ -61,7 +61,6 @@ pub struct DepositWithdrawConfig {
     pub chains: Vec<ZipperChainConfig>,
     pub assets: Vec<ZipperAssetConfig>,
     pub contracts: Vec<ZipperChainContractConfig>,
-    pub polyester_chain_id: u32,
     pub ts_ms: i64,
 }
 

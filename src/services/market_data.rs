@@ -1,23 +1,28 @@
 use super::ServiceContext;
 use super::unary;
 use crate::codecs::decode::{
-    candles_columns_from_proto, candles_from_proto, depth_enum_for_levels,
-    market_overview_list_from_proto, market_trades_from_proto, orderbook_from_proto,
-    spot_config_from_proto, spot_volume_history_from_proto,
+    candles_columns_from_proto, candles_from_proto, currency_conversion_config_from_proto,
+    currency_conversion_rates_from_proto, depth_enum_for_levels, market_overview_list_from_proto,
+    market_trades_from_proto, orderbook_from_proto, spot_config_from_proto,
+    spot_volume_history_from_proto,
 };
 use crate::connect::marketdata::v1::MarketDataServiceClient;
 use crate::connect::marketoverview::v1::MarketOverviewServiceClient;
 use crate::connect::orderbook::v1::OrderbookServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::{
-    Candle, CandlesResult, GetCandlesOpts, GetTradesOpts, MarketOverviewList, MarketTradesResult,
-    OrderbookData, SpotConfig, SpotVolumeHistory,
+    Candle, CandlesResult, CurrencyConversionConfig, CurrencyConversionRates, GetCandlesOpts,
+    GetTradesOpts, MarketOverviewList, MarketTradesResult, OrderbookData, SpotConfig,
+    SpotVolumeHistory,
 };
 use crate::models::{MarketOverviewEntry, MarketTrade, OrderBookDeltaUpdate};
 use crate::proto::marketdata::v1::{
     GetCandlesColumnsRequest, GetCandlesRequest, GetSpotConfigRequest, GetTradesRequest, Timeframe,
 };
-use crate::proto::marketoverview::v1::{GetSpotVolumeHistoryRequest, ListMarketOverviewRequest};
+use crate::proto::marketoverview::v1::{
+    GetCurrencyConversionConfigRequest, GetCurrencyConversionRatesRequest,
+    GetSpotVolumeHistoryRequest, ListMarketOverviewRequest,
+};
 use crate::proto::orderbook::v1::GetOrderBookRequest;
 use buffa_types::google::protobuf::Timestamp;
 
@@ -442,6 +447,44 @@ impl MarketOverviewService {
             }
         }
         Ok(history)
+    }
+
+    /// Supported fiat and stablecoin display metadata.
+    ///
+    /// Entries are ordered by code. Names, symbols, and fraction digits are
+    /// presentation defaults; fraction digits do not specify rate precision.
+    /// Configuration remains available before rates are observed.
+    pub async fn get_currency_conversion_config(&self) -> Result<CurrencyConversionConfig> {
+        let client = MarketOverviewServiceClient::new(
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
+        );
+        let resp = unary::await_public(
+            client.get_currency_conversion_config(GetCurrencyConversionConfigRequest::default()),
+        )
+        .await?
+        .into_owned();
+        Ok(currency_conversion_config_from_proto(&resp))
+    }
+
+    /// Fiat units per USD and USD per stablecoin unit.
+    ///
+    /// Fiat `units_per_usd_e8` is currency units per 1 USD at 1e8 scale (USD
+    /// identity is 100_000_000). Stablecoin `usd_per_unit_e8` is observed USD
+    /// per unit at the same scale. A missing fiat snapshot or omitted
+    /// stablecoin is unobserved, not zero. The request fails with unavailable
+    /// (HTTP 503) before any observation exists.
+    pub async fn get_currency_conversion_rates(&self) -> Result<CurrencyConversionRates> {
+        let client = MarketOverviewServiceClient::new(
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
+        );
+        let resp = unary::await_public(
+            client.get_currency_conversion_rates(GetCurrencyConversionRatesRequest::default()),
+        )
+        .await?
+        .into_owned();
+        Ok(currency_conversion_rates_from_proto(&resp))
     }
 
     /// Subscribe to public market overview batches.
