@@ -3,11 +3,23 @@
 ## Unreleased
 
 ### Breaking
+- `DepositWithdrawConfig.polyester_chain_id` is removed. The zipper config
+  no longer publishes a dedicated Polyester chain id.
 - `JsonRpcClient::new` now returns `Result` and rejects remote `http://`
   endpoints. Use loopback HTTP, HTTPS, or `JsonRpcClient::new_insecure`.
 - Remote `http://` API bases and `ws://` realtime URLs are rejected unless
   `Config::allow_insecure_http` is set (or `POLYESTER_ALLOW_INSECURE_HTTP=1`
   for `Client::from_env`). Loopback plaintext is unchanged.
+
+### Added
+- `MarketOverviewService::get_currency_conversion_config` and
+  `get_currency_conversion_rates` wrap the public currency-conversion RPCs.
+  Fiat `units_per_usd_e8` is currency units per 1 USD at 1e8 scale (USD
+  identity is 100_000_000). Stablecoin `usd_per_unit_e8` is observed USD
+  per unit at the same scale. A missing fiat snapshot or omitted
+  stablecoin is unobserved, not zero. Rates fail with unavailable
+  (HTTP 503) before any observation exists. Fraction digits are
+  presentation defaults, not rate precision.
 
 ### Changed
 - Document that a reused `client_order_id` on create is a conflict after the

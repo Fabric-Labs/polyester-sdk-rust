@@ -16,7 +16,6 @@ pub fn deposit_withdraw_config_from_proto(
     msg: &GetDepositWithdrawConfigResponse,
 ) -> DepositWithdrawConfig {
     DepositWithdrawConfig {
-        polyester_chain_id: msg.polyester_chain_id,
         ts_ms: (msg.ts_sec as i64).saturating_mul(1000),
         chains: msg
             .chains
@@ -123,7 +122,6 @@ mod tests {
     #[test]
     fn zipper_config_maps_assets_and_ts() {
         let msg = GetDepositWithdrawConfigResponse {
-            polyester_chain_id: 9,
             ts_sec: 1_700_000_000,
             chains: vec![ChainConfig {
                 chain_id: 1,
@@ -140,7 +138,6 @@ mod tests {
             ..Default::default()
         };
         let cfg = deposit_withdraw_config_from_proto(&msg);
-        assert_eq!(cfg.polyester_chain_id, 9);
         assert_eq!(cfg.ts_ms, 1_700_000_000_000);
         assert_eq!(cfg.chains[0].code, "ethereum");
         assert_eq!(cfg.assets[0].asset, "USDT");

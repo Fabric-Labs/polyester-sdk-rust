@@ -2,10 +2,14 @@
 
 use super::money::decode_price_ticks;
 use crate::models::{
-    MarketOverviewEntry, MarketOverviewList, SpotPairVolumeSeries, SpotVolumeHistory,
+    CurrencyConversionConfig, CurrencyConversionRates, CurrencyMetadata, FiatConversionRate,
+    FiatConversionSnapshot, MarketOverviewEntry, MarketOverviewList, SpotPairVolumeSeries,
+    SpotVolumeHistory, StablecoinConversionRate,
 };
 use crate::proto::marketoverview::v1::{
-    GetSpotVolumeHistoryResponse, ListMarketOverviewResponse,
+    CurrencyMetadata as ProtoCurrencyMetadata,
+    FiatConversionSnapshot as ProtoFiatConversionSnapshot, GetCurrencyConversionConfigResponse,
+    GetCurrencyConversionRatesResponse, GetSpotVolumeHistoryResponse, ListMarketOverviewResponse,
     MarketOverview as ProtoMarketOverview, MarketOverviewBatch,
 };
 
@@ -48,6 +52,67 @@ pub fn market_overview_list_from_proto(msg: &ListMarketOverviewResponse) -> Mark
             .map(market_overview_entry_from_proto)
             .collect(),
         next_page_token: msg.next_page_token.clone(),
+    }
+}
+
+pub fn currency_metadata_from_proto(msg: &ProtoCurrencyMetadata) -> CurrencyMetadata {
+    CurrencyMetadata {
+        code: msg.code.clone(),
+        default_english_name: msg.default_english_name.clone(),
+        symbol: msg.symbol.clone(),
+        fraction_digits: msg.fraction_digits,
+    }
+}
+
+pub fn currency_conversion_config_from_proto(
+    msg: &GetCurrencyConversionConfigResponse,
+) -> CurrencyConversionConfig {
+    CurrencyConversionConfig {
+        fiat: msg.fiat.iter().map(currency_metadata_from_proto).collect(),
+        stablecoins: msg
+            .stablecoins
+            .iter()
+            .map(currency_metadata_from_proto)
+            .collect(),
+    }
+}
+
+fn fiat_conversion_snapshot_from_proto(
+    msg: &ProtoFiatConversionSnapshot,
+) -> FiatConversionSnapshot {
+    FiatConversionSnapshot {
+        rates: msg
+            .rates
+            .iter()
+            .map(|item| FiatConversionRate {
+                code: item.code.clone(),
+                units_per_usd_e8: item.units_per_usd_e8,
+            })
+            .collect(),
+        source_ts_sec: msg.source_ts_sec,
+        stale: msg.stale,
+    }
+}
+
+pub fn currency_conversion_rates_from_proto(
+    msg: &GetCurrencyConversionRatesResponse,
+) -> CurrencyConversionRates {
+    CurrencyConversionRates {
+        fiat: msg
+            .fiat
+            .as_option()
+            .map(fiat_conversion_snapshot_from_proto),
+        stablecoins: msg
+            .stablecoins
+            .iter()
+            .map(|item| StablecoinConversionRate {
+                code: item.code.clone(),
+                usd_per_unit_e8: item.usd_per_unit_e8,
+                source_ts_sec: item.source_ts_sec,
+                stale: item.stale,
+            })
+            .collect(),
+        snapshot_ts_sec: msg.snapshot_ts_sec,
     }
 }
 
@@ -135,5 +200,67 @@ mod tests {
         assert_eq!(result.pairs[0].symbol_id, 7);
         assert_eq!(result.pairs[0].volume_usd_scaled, vec![1, 2]);
         assert_eq!(result.total_volume_usd_scaled, vec![3, 4]);
+    }
+
+    #[test]
+    fn currency_conversion_config_from_proto_maps_metadata() {
+        let result = currency_conversion_config_from_proto(&GetCurrencyConversionConfigResponse {
+            fiat: vec![ProtoCurrencyMetadata {
+                code: "EUR".into(),
+                default_english_name: "Euro".into(),
+                symbol: "€".into(),
+                fraction_digits: 2,
+                ..Default::default()
+            }],
+            stablecoins: vec![ProtoCurrencyMetadata {
+                code: "USDT".into(),
+                default_english_name: "Tether".into(),
+                symbol: "USDT".into(),
+                fraction_digits: 2,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        assert_eq!(result.fiat[0].code, "EUR");
+        assert_eq!(result.fiat[0].symbol, "€");
+        assert_eq!(result.stablecoins[0].code, "USDT");
+    }
+
+    #[test]
+    fn currency_conversion_rates_preserve_e8_and_absent_fiat() {
+        let present = currency_conversion_rates_from_proto(&GetCurrencyConversionRatesResponse {
+            fiat: crate::proto::marketoverview::v1::FiatConversionSnapshot {
+                rates: vec![crate::proto::marketoverview::v1::FiatConversionRate {
+                    code: "USD".into(),
+                    units_per_usd_e8: 100_000_000,
+                    ..Default::default()
+                }],
+                source_ts_sec: 1_700_000_000,
+                stale: true,
+                ..Default::default()
+            }
+            .into(),
+            stablecoins: vec![crate::proto::marketoverview::v1::StablecoinConversionRate {
+                code: "USDT".into(),
+                usd_per_unit_e8: 99_990_000,
+                source_ts_sec: 1_700_000_005,
+                stale: false,
+                ..Default::default()
+            }],
+            snapshot_ts_sec: 1_700_000_010,
+            ..Default::default()
+        });
+        let fiat = present.fiat.expect("fiat snapshot");
+        assert!(fiat.stale);
+        assert_eq!(fiat.rates[0].units_per_usd_e8, 100_000_000);
+        assert_eq!(present.stablecoins[0].usd_per_unit_e8, 99_990_000);
+
+        let absent = currency_conversion_rates_from_proto(&GetCurrencyConversionRatesResponse {
+            snapshot_ts_sec: 7,
+            ..Default::default()
+        });
+        assert!(absent.fiat.is_none());
+        assert!(absent.stablecoins.is_empty());
+        assert_eq!(absent.snapshot_ts_sec, 7);
     }
 }
