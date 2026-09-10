@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a46
+
+Package version: `0.1.0-alpha.46`. Git tag: `v0.1.0a46`.
+
 ### Breaking
 - `DepositWithdrawConfig.polyester_chain_id` is removed. The zipper config
   no longer publishes a dedicated Polyester chain id.
