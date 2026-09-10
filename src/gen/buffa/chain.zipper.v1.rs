@@ -2712,16 +2712,6 @@ pub struct GetDepositWithdrawConfigResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// Polyester chain id used by all zToken addresses in `assets.variants`.
-    ///
-    /// Field 4: `polyester_chain_id`
-    #[serde(
-        rename = "polyesterChainId",
-        alias = "polyester_chain_id",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub polyester_chain_id: u32,
     /// Active Polyester-chain contracts ordered by contract name.
     ///
     /// Field 5: `contracts`
@@ -2741,7 +2731,6 @@ impl ::core::fmt::Debug for GetDepositWithdrawConfigResponse {
             .field("chains", &self.chains)
             .field("assets", &self.assets)
             .field("ts_sec", &self.ts_sec)
-            .field("polyester_chain_id", &self.polyester_chain_id)
             .field("contracts", &self.contracts)
             .finish()
     }
@@ -2790,11 +2779,6 @@ impl ::buffa::Message for GetDepositWithdrawConfigResponse {
         if self.ts_sec != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_sec) as u32;
         }
-        if self.polyester_chain_id != 0u32 {
-            size
-                += 1u32
-                    + ::buffa::types::uint32_encoded_len(self.polyester_chain_id) as u32;
-        }
         for v in &self.contracts {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
@@ -2823,9 +2807,6 @@ impl ::buffa::Message for GetDepositWithdrawConfigResponse {
         }
         if self.ts_sec != 0u64 {
             ::buffa::types::put_uint64_field(3u32, self.ts_sec, buf);
-        }
-        if self.polyester_chain_id != 0u32 {
-            ::buffa::types::put_uint32_field(4u32, self.polyester_chain_id, buf);
         }
         for v in &self.contracts {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
@@ -2869,13 +2850,6 @@ impl ::buffa::Message for GetDepositWithdrawConfigResponse {
                 )?;
                 self.ts_sec = ::buffa::types::decode_uint64(buf)?;
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.polyester_chain_id = ::buffa::types::decode_uint32(buf)?;
-            }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -2896,7 +2870,6 @@ impl ::buffa::Message for GetDepositWithdrawConfigResponse {
         self.chains.clear();
         self.assets.clear();
         self.ts_sec = 0u64;
-        self.polyester_chain_id = 0u32;
         self.contracts.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -6380,10 +6353,6 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: u64,
-            /// Polyester chain id used by all zToken addresses in `assets.variants`.
-            ///
-            /// Field 4: `polyester_chain_id`
-            pub polyester_chain_id: u32,
             /// Active Polyester-chain contracts ordered by contract name.
             ///
             /// Field 5: `contracts`
@@ -6430,15 +6399,6 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.ts_sec = ::buffa::types::decode_uint64(&mut cur)?;
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.polyester_chain_id = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -6525,7 +6485,6 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     ts_sec: self.ts_sec,
-                    polyester_chain_id: self.polyester_chain_id,
                     contracts: self
                         .contracts
                         .iter()
@@ -6565,12 +6524,6 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_sec) as u32;
                 }
-                if self.polyester_chain_id != 0u32 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.polyester_chain_id)
-                                as u32;
-                }
                 for v in &self.contracts {
                     let __slot = __cache.reserve();
                     let inner_size = v.compute_size(__cache);
@@ -6608,9 +6561,6 @@ pub mod __buffa {
                 }
                 if self.ts_sec != 0u64 {
                     ::buffa::types::put_uint64_field(3u32, self.ts_sec, buf);
-                }
-                if self.polyester_chain_id != 0u32 {
-                    ::buffa::types::put_uint32_field(4u32, self.polyester_chain_id, buf);
                 }
                 for v in &self.contracts {
                     ::buffa::types::put_len_delimited_header(
@@ -6652,15 +6602,6 @@ pub mod __buffa {
                         .serialize_entry(
                             "tsSec",
                             &::buffa::json_helpers::ProtoJson(&self.ts_sec),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.polyester_chain_id,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "polyesterChainId",
-                            &::buffa::json_helpers::ProtoJson(&self.polyester_chain_id),
                         )?;
                 }
                 if !self.contracts.is_empty() {
@@ -6796,13 +6737,6 @@ pub mod __buffa {
             #[must_use]
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
-            }
-            /// Polyester chain id used by all zToken addresses in `assets.variants`.
-            ///
-            /// Field 4: `polyester_chain_id`
-            #[must_use]
-            pub fn polyester_chain_id(&self) -> u32 {
-                self.0.reborrow().polyester_chain_id
             }
             /// Active Polyester-chain contracts ordered by contract name.
             ///

@@ -1088,10 +1088,9 @@ pub struct MarketOverview {
     )]
     pub volume_24h_quote_scaled: ::core::option::Option<i64>,
     /// Rolling 24h USD volume, scaled by 1e6 (one unit is 0.000001 USD).
-    /// Omitted if any contributing volume cannot be valued reliably. Quote volumes
-    /// use execution prices; USD conversion uses historical quarter-hour marks.
-    /// Covers the 24 hours ending at the latest completed UTC minute.
-    /// Refreshed every 15 seconds after completed minutes become available.
+    /// Applies the current quote/USD conversion to the rolling quote volume.
+    /// When conversion is unavailable, USDT and USDC are valued at USD parity.
+    /// Omitted for other quote assets when a current conversion is unavailable.
     ///
     /// Field 17: `volume_24h_usd_scaled`
     #[serde(
@@ -2625,8 +2624,8 @@ pub const __SPOT_PAIR_VOLUME_SERIES_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 /// The grid always contains 97 samples ending at the latest completed UTC
 /// quarter-hour. Index i maps to start_ts_sec + i * 900 seconds. Each sample
 /// covers \[sample time - 24h, sample time); only the preceding 48 hours contribute.
-/// USD conversion uses the latest trustworthy quote/USD mark at or before each
-/// bucket's start. Stablecoin quotes also require historical USD prices.
+/// USD conversion uses historical quote/USD prices at each completed bucket
+/// boundary. When conversion is unavailable, USDT and USDC are valued at USD parity.
 /// If any contributing trade cannot be valued, or a USD amount overflows,
 /// the RPC fails as unavailable; partial or zero-filled valuations are not returned.
 /// Intervals without executed trades are zero. Results may be reused for 15 seconds.
@@ -2926,6 +2925,1332 @@ pub const __GET_SPOT_VOLUME_HISTORY_RESPONSE_JSON_ANY: ::buffa::type_registry::J
     type_url: "type.googleapis.com/marketoverview.v1.GetSpotVolumeHistoryResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetSpotVolumeHistoryResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetSpotVolumeHistoryResponse>,
+    is_wkt: false,
+};
+/// CurrencyMetadata supplies stable defaults for display conversion. Clients may
+/// localize names, symbols, and number formatting for the user's locale.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CurrencyMetadata {
+    /// Uppercase currency or stablecoin code, such as EUR or USDT.
+    ///
+    /// Field 1: `code`
+    #[serde(
+        rename = "code",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub code: ::buffa::alloc::string::String,
+    /// Default English display name.
+    ///
+    /// Field 2: `default_english_name`
+    #[serde(
+        rename = "defaultEnglishName",
+        alias = "default_english_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub default_english_name: ::buffa::alloc::string::String,
+    /// Default English display symbol; the code is used where no distinct symbol exists.
+    ///
+    /// Field 3: `symbol`
+    #[serde(
+        rename = "symbol",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub symbol: ::buffa::alloc::string::String,
+    /// Default display fraction digits, including zero for currencies such as JPY.
+    /// This is a formatting default, not rate precision, token decimals, or cash rounding.
+    /// Stablecoins use two display fraction digits.
+    ///
+    /// Field 4: `fraction_digits`
+    #[serde(
+        rename = "fractionDigits",
+        alias = "fraction_digits",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub fraction_digits: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CurrencyMetadata {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CurrencyMetadata")
+            .field("code", &self.code)
+            .field("default_english_name", &self.default_english_name)
+            .field("symbol", &self.symbol)
+            .field("fraction_digits", &self.fraction_digits)
+            .finish()
+    }
+}
+impl CurrencyMetadata {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.CurrencyMetadata";
+}
+::buffa::impl_default_instance!(CurrencyMetadata);
+impl ::buffa::MessageName for CurrencyMetadata {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "CurrencyMetadata";
+    const FULL_NAME: &'static str = "marketoverview.v1.CurrencyMetadata";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.CurrencyMetadata";
+}
+impl ::buffa::Message for CurrencyMetadata {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.code.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
+        }
+        if !self.default_english_name.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.default_english_name)
+                        as u32;
+        }
+        if !self.symbol.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+        }
+        if self.fraction_digits != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.fraction_digits) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.code.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.code, buf);
+        }
+        if !self.default_english_name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.default_english_name, buf);
+        }
+        if !self.symbol.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.symbol, buf);
+        }
+        if self.fraction_digits != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.fraction_digits, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.code, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.default_english_name, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.symbol, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fraction_digits = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.code.clear();
+        self.default_english_name.clear();
+        self.symbol.clear();
+        self.fraction_digits = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CurrencyMetadata {
+    const PROTO_FQN: &'static str = "marketoverview.v1.CurrencyMetadata";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CurrencyMetadata {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CURRENCY_METADATA_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.CurrencyMetadata",
+    to_json: ::buffa::type_registry::any_to_json::<CurrencyMetadata>,
+    from_json: ::buffa::type_registry::any_from_json::<CurrencyMetadata>,
+    is_wkt: false,
+};
+/// GetCurrencyConversionConfigRequest has no parameters.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetCurrencyConversionConfigRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetCurrencyConversionConfigRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetCurrencyConversionConfigRequest").finish()
+    }
+}
+impl GetCurrencyConversionConfigRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionConfigRequest";
+}
+::buffa::impl_default_instance!(GetCurrencyConversionConfigRequest);
+impl ::buffa::MessageName for GetCurrencyConversionConfigRequest {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "GetCurrencyConversionConfigRequest";
+    const FULL_NAME: &'static str = "marketoverview.v1.GetCurrencyConversionConfigRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionConfigRequest";
+}
+impl ::buffa::Message for GetCurrencyConversionConfigRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetCurrencyConversionConfigRequest {
+    const PROTO_FQN: &'static str = "marketoverview.v1.GetCurrencyConversionConfigRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetCurrencyConversionConfigRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_CURRENCY_CONVERSION_CONFIG_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.GetCurrencyConversionConfigRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetCurrencyConversionConfigRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetCurrencyConversionConfigRequest,
+    >,
+    is_wkt: false,
+};
+/// GetCurrencyConversionConfigResponse contains finite, cacheable display metadata.
+/// It remains available before any rates have been observed.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetCurrencyConversionConfigResponse {
+    /// Supported fiat currencies, including USD, ordered by code.
+    ///
+    /// Field 1: `fiat`
+    #[serde(
+        rename = "fiat",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub fiat: ::buffa::alloc::vec::Vec<CurrencyMetadata>,
+    /// Supported stablecoins (USDC and USDT), ordered by code.
+    ///
+    /// Field 2: `stablecoins`
+    #[serde(
+        rename = "stablecoins",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub stablecoins: ::buffa::alloc::vec::Vec<CurrencyMetadata>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetCurrencyConversionConfigResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetCurrencyConversionConfigResponse")
+            .field("fiat", &self.fiat)
+            .field("stablecoins", &self.stablecoins)
+            .finish()
+    }
+}
+impl GetCurrencyConversionConfigResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionConfigResponse";
+}
+::buffa::impl_default_instance!(GetCurrencyConversionConfigResponse);
+impl ::buffa::MessageName for GetCurrencyConversionConfigResponse {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "GetCurrencyConversionConfigResponse";
+    const FULL_NAME: &'static str = "marketoverview.v1.GetCurrencyConversionConfigResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionConfigResponse";
+}
+impl ::buffa::Message for GetCurrencyConversionConfigResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.fiat {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.stablecoins {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.fiat {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        for v in &self.stablecoins {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.fiat.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.stablecoins.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.fiat.clear();
+        self.stablecoins.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetCurrencyConversionConfigResponse {
+    const PROTO_FQN: &'static str = "marketoverview.v1.GetCurrencyConversionConfigResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetCurrencyConversionConfigResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_CURRENCY_CONVERSION_CONFIG_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.GetCurrencyConversionConfigResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetCurrencyConversionConfigResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetCurrencyConversionConfigResponse,
+    >,
+    is_wkt: false,
+};
+/// FiatConversionRate states the fiat currency units equal to one US dollar.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct FiatConversionRate {
+    /// Supported fiat currency code.
+    ///
+    /// Field 1: `code`
+    #[serde(
+        rename = "code",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub code: ::buffa::alloc::string::String,
+    /// Fiat currency units per 1 USD, scaled by 1e8. USD has the identity value 1e8.
+    ///
+    /// Field 2: `units_per_usd_e8`
+    #[serde(
+        rename = "unitsPerUsdE8",
+        alias = "units_per_usd_e8",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub units_per_usd_e8: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for FiatConversionRate {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("FiatConversionRate")
+            .field("code", &self.code)
+            .field("units_per_usd_e8", &self.units_per_usd_e8)
+            .finish()
+    }
+}
+impl FiatConversionRate {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.FiatConversionRate";
+}
+::buffa::impl_default_instance!(FiatConversionRate);
+impl ::buffa::MessageName for FiatConversionRate {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "FiatConversionRate";
+    const FULL_NAME: &'static str = "marketoverview.v1.FiatConversionRate";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.FiatConversionRate";
+}
+impl ::buffa::Message for FiatConversionRate {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.code.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
+        }
+        if self.units_per_usd_e8 != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.units_per_usd_e8) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.code.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.code, buf);
+        }
+        if self.units_per_usd_e8 != 0i64 {
+            ::buffa::types::put_int64_field(2u32, self.units_per_usd_e8, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.code, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.units_per_usd_e8 = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.code.clear();
+        self.units_per_usd_e8 = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for FiatConversionRate {
+    const PROTO_FQN: &'static str = "marketoverview.v1.FiatConversionRate";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for FiatConversionRate {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __FIAT_CONVERSION_RATE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.FiatConversionRate",
+    to_json: ::buffa::type_registry::any_to_json::<FiatConversionRate>,
+    from_json: ::buffa::type_registry::any_from_json::<FiatConversionRate>,
+    is_wkt: false,
+};
+/// FiatConversionSnapshot contains all supported fiat rates from one observation.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct FiatConversionSnapshot {
+    /// Complete fiat rates, including USD, ordered by code.
+    ///
+    /// Field 1: `rates`
+    #[serde(
+        rename = "rates",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub rates: ::buffa::alloc::vec::Vec<FiatConversionRate>,
+    /// Shared source observation time in seconds since the Unix epoch (UTC).
+    ///
+    /// Field 2: `source_ts_sec`
+    #[serde(
+        rename = "sourceTsSec",
+        alias = "source_ts_sec",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub source_ts_sec: u64,
+    /// True once the source observation is at least two hours old.
+    ///
+    /// Field 3: `stale`
+    #[serde(
+        rename = "stale",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub stale: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for FiatConversionSnapshot {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("FiatConversionSnapshot")
+            .field("rates", &self.rates)
+            .field("source_ts_sec", &self.source_ts_sec)
+            .field("stale", &self.stale)
+            .finish()
+    }
+}
+impl FiatConversionSnapshot {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.FiatConversionSnapshot";
+}
+::buffa::impl_default_instance!(FiatConversionSnapshot);
+impl ::buffa::MessageName for FiatConversionSnapshot {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "FiatConversionSnapshot";
+    const FULL_NAME: &'static str = "marketoverview.v1.FiatConversionSnapshot";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.FiatConversionSnapshot";
+}
+impl ::buffa::Message for FiatConversionSnapshot {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.rates {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.source_ts_sec != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.source_ts_sec) as u32;
+        }
+        if self.stale {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.rates {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.source_ts_sec != 0u64 {
+            ::buffa::types::put_uint64_field(2u32, self.source_ts_sec, buf);
+        }
+        if self.stale {
+            ::buffa::types::put_bool_field(3u32, self.stale, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.rates.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.source_ts_sec = ::buffa::types::decode_uint64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.stale = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.rates.clear();
+        self.source_ts_sec = 0u64;
+        self.stale = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for FiatConversionSnapshot {
+    const PROTO_FQN: &'static str = "marketoverview.v1.FiatConversionSnapshot";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for FiatConversionSnapshot {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __FIAT_CONVERSION_SNAPSHOT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.FiatConversionSnapshot",
+    to_json: ::buffa::type_registry::any_to_json::<FiatConversionSnapshot>,
+    from_json: ::buffa::type_registry::any_from_json::<FiatConversionSnapshot>,
+    is_wkt: false,
+};
+/// StablecoinConversionRate states the observed USD value of one stablecoin unit.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct StablecoinConversionRate {
+    /// Supported stablecoin code (USDC or USDT).
+    ///
+    /// Field 1: `code`
+    #[serde(
+        rename = "code",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub code: ::buffa::alloc::string::String,
+    /// USD per 1 stablecoin unit, scaled by 1e8. This is an observed price, not a fixed peg.
+    ///
+    /// Field 2: `usd_per_unit_e8`
+    #[serde(
+        rename = "usdPerUnitE8",
+        alias = "usd_per_unit_e8",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub usd_per_unit_e8: i64,
+    /// This stablecoin's source observation time in seconds since the Unix epoch (UTC).
+    ///
+    /// Field 3: `source_ts_sec`
+    #[serde(
+        rename = "sourceTsSec",
+        alias = "source_ts_sec",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub source_ts_sec: u64,
+    /// True once this stablecoin's source observation is at least five seconds old.
+    ///
+    /// Field 4: `stale`
+    #[serde(
+        rename = "stale",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub stale: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for StablecoinConversionRate {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("StablecoinConversionRate")
+            .field("code", &self.code)
+            .field("usd_per_unit_e8", &self.usd_per_unit_e8)
+            .field("source_ts_sec", &self.source_ts_sec)
+            .field("stale", &self.stale)
+            .finish()
+    }
+}
+impl StablecoinConversionRate {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.StablecoinConversionRate";
+}
+::buffa::impl_default_instance!(StablecoinConversionRate);
+impl ::buffa::MessageName for StablecoinConversionRate {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "StablecoinConversionRate";
+    const FULL_NAME: &'static str = "marketoverview.v1.StablecoinConversionRate";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.StablecoinConversionRate";
+}
+impl ::buffa::Message for StablecoinConversionRate {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.code.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
+        }
+        if self.usd_per_unit_e8 != 0i64 {
+            size
+                += 1u32 + ::buffa::types::int64_encoded_len(self.usd_per_unit_e8) as u32;
+        }
+        if self.source_ts_sec != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.source_ts_sec) as u32;
+        }
+        if self.stale {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.code.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.code, buf);
+        }
+        if self.usd_per_unit_e8 != 0i64 {
+            ::buffa::types::put_int64_field(2u32, self.usd_per_unit_e8, buf);
+        }
+        if self.source_ts_sec != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.source_ts_sec, buf);
+        }
+        if self.stale {
+            ::buffa::types::put_bool_field(4u32, self.stale, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.code, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.usd_per_unit_e8 = ::buffa::types::decode_int64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.source_ts_sec = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.stale = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.code.clear();
+        self.usd_per_unit_e8 = 0i64;
+        self.source_ts_sec = 0u64;
+        self.stale = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for StablecoinConversionRate {
+    const PROTO_FQN: &'static str = "marketoverview.v1.StablecoinConversionRate";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for StablecoinConversionRate {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __STABLECOIN_CONVERSION_RATE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.StablecoinConversionRate",
+    to_json: ::buffa::type_registry::any_to_json::<StablecoinConversionRate>,
+    from_json: ::buffa::type_registry::any_from_json::<StablecoinConversionRate>,
+    is_wkt: false,
+};
+/// GetCurrencyConversionRatesRequest has no parameters.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetCurrencyConversionRatesRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetCurrencyConversionRatesRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetCurrencyConversionRatesRequest").finish()
+    }
+}
+impl GetCurrencyConversionRatesRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionRatesRequest";
+}
+::buffa::impl_default_instance!(GetCurrencyConversionRatesRequest);
+impl ::buffa::MessageName for GetCurrencyConversionRatesRequest {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "GetCurrencyConversionRatesRequest";
+    const FULL_NAME: &'static str = "marketoverview.v1.GetCurrencyConversionRatesRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionRatesRequest";
+}
+impl ::buffa::Message for GetCurrencyConversionRatesRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetCurrencyConversionRatesRequest {
+    const PROTO_FQN: &'static str = "marketoverview.v1.GetCurrencyConversionRatesRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetCurrencyConversionRatesRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_CURRENCY_CONVERSION_RATES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.GetCurrencyConversionRatesRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetCurrencyConversionRatesRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetCurrencyConversionRatesRequest,
+    >,
+    is_wkt: false,
+};
+/// GetCurrencyConversionRatesResponse groups rates by their USD conversion direction.
+/// Last-known observations remain available with staleness indicated. Before any
+/// observation is available, the request fails with unavailable (HTTP 503).
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetCurrencyConversionRatesResponse {
+    /// Complete fiat snapshot; absent until a complete snapshot has been observed.
+    ///
+    /// Field 1: `fiat`
+    #[serde(
+        rename = "fiat",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub fiat: ::buffa::MessageField<FiatConversionSnapshot>,
+    /// Observed stablecoin rates ordered by code. Unobserved stablecoins are omitted.
+    ///
+    /// Field 2: `stablecoins`
+    #[serde(
+        rename = "stablecoins",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub stablecoins: ::buffa::alloc::vec::Vec<StablecoinConversionRate>,
+    /// Response construction time in seconds since the Unix epoch (UTC).
+    ///
+    /// Field 3: `snapshot_ts_sec`
+    #[serde(
+        rename = "snapshotTsSec",
+        alias = "snapshot_ts_sec",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub snapshot_ts_sec: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetCurrencyConversionRatesResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetCurrencyConversionRatesResponse")
+            .field("fiat", &self.fiat)
+            .field("stablecoins", &self.stablecoins)
+            .field("snapshot_ts_sec", &self.snapshot_ts_sec)
+            .finish()
+    }
+}
+impl GetCurrencyConversionRatesResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionRatesResponse";
+}
+::buffa::impl_default_instance!(GetCurrencyConversionRatesResponse);
+impl ::buffa::MessageName for GetCurrencyConversionRatesResponse {
+    const PACKAGE: &'static str = "marketoverview.v1";
+    const NAME: &'static str = "GetCurrencyConversionRatesResponse";
+    const FULL_NAME: &'static str = "marketoverview.v1.GetCurrencyConversionRatesResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionRatesResponse";
+}
+impl ::buffa::Message for GetCurrencyConversionRatesResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.fiat.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.fiat.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.stablecoins {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.snapshot_ts_sec != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.snapshot_ts_sec) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.fiat.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.fiat.write_to(__cache, buf);
+        }
+        for v in &self.stablecoins {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.snapshot_ts_sec != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.snapshot_ts_sec, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.fiat.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.stablecoins.push(elem);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.snapshot_ts_sec = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.fiat = ::buffa::MessageField::none();
+        self.stablecoins.clear();
+        self.snapshot_ts_sec = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetCurrencyConversionRatesResponse {
+    const PROTO_FQN: &'static str = "marketoverview.v1.GetCurrencyConversionRatesResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetCurrencyConversionRatesResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_CURRENCY_CONVERSION_RATES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketoverview.v1.GetCurrencyConversionRatesResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetCurrencyConversionRatesResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetCurrencyConversionRatesResponse,
+    >,
     is_wkt: false,
 };
 #[allow(
@@ -3587,10 +4912,9 @@ pub mod __buffa {
             /// Field 14: `volume_24h_quote_scaled`
             pub volume_24h_quote_scaled: ::core::option::Option<i64>,
             /// Rolling 24h USD volume, scaled by 1e6 (one unit is 0.000001 USD).
-            /// Omitted if any contributing volume cannot be valued reliably. Quote volumes
-            /// use execution prices; USD conversion uses historical quarter-hour marks.
-            /// Covers the 24 hours ending at the latest completed UTC minute.
-            /// Refreshed every 15 seconds after completed minutes become available.
+            /// Applies the current quote/USD conversion to the rolling quote volume.
+            /// When conversion is unavailable, USDT and USDC are valued at USD parity.
+            /// Omitted for other quote assets when a current conversion is unavailable.
             ///
             /// Field 17: `volume_24h_usd_scaled`
             pub volume_24h_usd_scaled: ::core::option::Option<i64>,
@@ -4305,10 +5629,9 @@ pub mod __buffa {
                 self.0.reborrow().volume_24h_quote_scaled
             }
             /// Rolling 24h USD volume, scaled by 1e6 (one unit is 0.000001 USD).
-            /// Omitted if any contributing volume cannot be valued reliably. Quote volumes
-            /// use execution prices; USD conversion uses historical quarter-hour marks.
-            /// Covers the 24 hours ending at the latest completed UTC minute.
-            /// Refreshed every 15 seconds after completed minutes become available.
+            /// Applies the current quote/USD conversion to the rolling quote volume.
+            /// When conversion is unavailable, USDT and USDC are valued at USD parity.
+            /// Omitted for other quote assets when a current conversion is unavailable.
             ///
             /// Field 17: `volume_24h_usd_scaled`
             #[must_use]
@@ -6307,8 +7630,8 @@ pub mod __buffa {
         /// The grid always contains 97 samples ending at the latest completed UTC
         /// quarter-hour. Index i maps to start_ts_sec + i * 900 seconds. Each sample
         /// covers \[sample time - 24h, sample time); only the preceding 48 hours contribute.
-        /// USD conversion uses the latest trustworthy quote/USD mark at or before each
-        /// bucket's start. Stablecoin quotes also require historical USD prices.
+        /// USD conversion uses historical quote/USD prices at each completed bucket
+        /// boundary. When conversion is unavailable, USDT and USDC are valued at USD parity.
         /// If any contributing trade cannot be valued, or a USD amount overflows,
         /// the RPC fails as unavailable; partial or zero-filled valuations are not returned.
         /// Intervals without executed trades are zero. Results may be reused for 15 seconds.
@@ -6815,6 +8138,2713 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// CurrencyMetadata supplies stable defaults for display conversion. Clients may
+        /// localize names, symbols, and number formatting for the user's locale.
+        #[derive(Clone, Debug, Default)]
+        pub struct CurrencyMetadataView<'a> {
+            /// Uppercase currency or stablecoin code, such as EUR or USDT.
+            ///
+            /// Field 1: `code`
+            pub code: &'a str,
+            /// Default English display name.
+            ///
+            /// Field 2: `default_english_name`
+            pub default_english_name: &'a str,
+            /// Default English display symbol; the code is used where no distinct symbol exists.
+            ///
+            /// Field 3: `symbol`
+            pub symbol: &'a str,
+            /// Default display fraction digits, including zero for currencies such as JPY.
+            /// This is a formatting default, not rate precision, token decimals, or cash rounding.
+            /// Stablecoins use two display fraction digits.
+            ///
+            /// Field 4: `fraction_digits`
+            pub fraction_digits: u32,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CurrencyMetadataView<'a> {
+            type Owned = super::super::CurrencyMetadata;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.code = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.default_english_name = ::buffa::types::borrow_str(
+                            &mut cur,
+                        )?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.symbol = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fraction_digits = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CurrencyMetadata,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CurrencyMetadata,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CurrencyMetadata {
+                    code: self.code.to_string(),
+                    default_english_name: self.default_english_name.to_string(),
+                    symbol: self.symbol.to_string(),
+                    fraction_digits: self.fraction_digits,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CurrencyMetadataView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.code.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
+                }
+                if !self.default_english_name.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.default_english_name,
+                            ) as u32;
+                }
+                if !self.symbol.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.symbol) as u32;
+                }
+                if self.fraction_digits != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.fraction_digits)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.code.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.code, buf);
+                }
+                if !self.default_english_name.is_empty() {
+                    ::buffa::types::put_string_field(
+                        2u32,
+                        &self.default_english_name,
+                        buf,
+                    );
+                }
+                if !self.symbol.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.symbol, buf);
+                }
+                if self.fraction_digits != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.fraction_digits, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CurrencyMetadataView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.code) {
+                    __map.serialize_entry("code", self.code)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.default_english_name,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "defaultEnglishName",
+                            self.default_english_name,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.symbol) {
+                    __map.serialize_entry("symbol", self.symbol)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.fraction_digits) {
+                    __map
+                        .serialize_entry(
+                            "fractionDigits",
+                            &::buffa::json_helpers::ProtoJson(&self.fraction_digits),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CurrencyMetadataView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "CurrencyMetadata";
+            const FULL_NAME: &'static str = "marketoverview.v1.CurrencyMetadata";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.CurrencyMetadata";
+        }
+        ::buffa::impl_default_view_instance!(CurrencyMetadataView);
+        ::buffa::impl_view_reborrow!(CurrencyMetadataView);
+        /** Self-contained, `'static` owned view of a `CurrencyMetadata` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CurrencyMetadataView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CurrencyMetadataView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CurrencyMetadataOwnedView(
+            ::buffa::OwnedView<CurrencyMetadataView<'static>>,
+        );
+        impl CurrencyMetadataOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CurrencyMetadataOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CurrencyMetadataOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CurrencyMetadata,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CurrencyMetadataOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CurrencyMetadataView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CurrencyMetadataView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CurrencyMetadata,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Uppercase currency or stablecoin code, such as EUR or USDT.
+            ///
+            /// Field 1: `code`
+            #[must_use]
+            pub fn code(&self) -> &'_ str {
+                self.0.reborrow().code
+            }
+            /// Default English display name.
+            ///
+            /// Field 2: `default_english_name`
+            #[must_use]
+            pub fn default_english_name(&self) -> &'_ str {
+                self.0.reborrow().default_english_name
+            }
+            /// Default English display symbol; the code is used where no distinct symbol exists.
+            ///
+            /// Field 3: `symbol`
+            #[must_use]
+            pub fn symbol(&self) -> &'_ str {
+                self.0.reborrow().symbol
+            }
+            /// Default display fraction digits, including zero for currencies such as JPY.
+            /// This is a formatting default, not rate precision, token decimals, or cash rounding.
+            /// Stablecoins use two display fraction digits.
+            ///
+            /// Field 4: `fraction_digits`
+            #[must_use]
+            pub fn fraction_digits(&self) -> u32 {
+                self.0.reborrow().fraction_digits
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<CurrencyMetadataView<'static>>>
+        for CurrencyMetadataOwnedView {
+            fn from(inner: ::buffa::OwnedView<CurrencyMetadataView<'static>>) -> Self {
+                CurrencyMetadataOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CurrencyMetadataOwnedView>
+        for ::buffa::OwnedView<CurrencyMetadataView<'static>> {
+            fn from(wrapper: CurrencyMetadataOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<CurrencyMetadataView<'static>>>
+        for CurrencyMetadataOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CurrencyMetadataView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CurrencyMetadata {
+            type View<'a> = CurrencyMetadataView<'a>;
+            type ViewHandle = CurrencyMetadataOwnedView;
+        }
+        impl ::serde::Serialize for CurrencyMetadataOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetCurrencyConversionConfigRequest has no parameters.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetCurrencyConversionConfigRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for GetCurrencyConversionConfigRequestView<'a> {
+            type Owned = super::super::GetCurrencyConversionConfigRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionConfigRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionConfigRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetCurrencyConversionConfigRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetCurrencyConversionConfigRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetCurrencyConversionConfigRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetCurrencyConversionConfigRequestView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "GetCurrencyConversionConfigRequest";
+            const FULL_NAME: &'static str = "marketoverview.v1.GetCurrencyConversionConfigRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionConfigRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetCurrencyConversionConfigRequestView);
+        ::buffa::impl_view_reborrow!(GetCurrencyConversionConfigRequestView);
+        /** Self-contained, `'static` owned view of a `GetCurrencyConversionConfigRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetCurrencyConversionConfigRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetCurrencyConversionConfigRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetCurrencyConversionConfigRequestOwnedView(
+            ::buffa::OwnedView<GetCurrencyConversionConfigRequestView<'static>>,
+        );
+        impl GetCurrencyConversionConfigRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionConfigRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionConfigRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetCurrencyConversionConfigRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionConfigRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetCurrencyConversionConfigRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetCurrencyConversionConfigRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionConfigRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetCurrencyConversionConfigRequestView<'static>>,
+        > for GetCurrencyConversionConfigRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    GetCurrencyConversionConfigRequestView<'static>,
+                >,
+            ) -> Self {
+                GetCurrencyConversionConfigRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetCurrencyConversionConfigRequestOwnedView>
+        for ::buffa::OwnedView<GetCurrencyConversionConfigRequestView<'static>> {
+            fn from(wrapper: GetCurrencyConversionConfigRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetCurrencyConversionConfigRequestView<'static>>,
+        > for GetCurrencyConversionConfigRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetCurrencyConversionConfigRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetCurrencyConversionConfigRequest {
+            type View<'a> = GetCurrencyConversionConfigRequestView<'a>;
+            type ViewHandle = GetCurrencyConversionConfigRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetCurrencyConversionConfigRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetCurrencyConversionConfigResponse contains finite, cacheable display metadata.
+        /// It remains available before any rates have been observed.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetCurrencyConversionConfigResponseView<'a> {
+            /// Supported fiat currencies, including USD, ordered by code.
+            ///
+            /// Field 1: `fiat`
+            pub fiat: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::CurrencyMetadataView<'a>,
+            >,
+            /// Supported stablecoins (USDC and USDT), ordered by code.
+            ///
+            /// Field 2: `stablecoins`
+            pub stablecoins: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::CurrencyMetadataView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for GetCurrencyConversionConfigResponseView<'a> {
+            type Owned = super::super::GetCurrencyConversionConfigResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.fiat
+                            .push(
+                                <super::super::__buffa::view::CurrencyMetadataView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.stablecoins
+                            .push(
+                                <super::super::__buffa::view::CurrencyMetadataView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionConfigResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionConfigResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetCurrencyConversionConfigResponse {
+                    fiat: self
+                        .fiat
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    stablecoins: self
+                        .stablecoins
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for GetCurrencyConversionConfigResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.fiat {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.stablecoins {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.fiat {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                for v in &self.stablecoins {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetCurrencyConversionConfigResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.fiat.is_empty() {
+                    __map.serialize_entry("fiat", &*self.fiat)?;
+                }
+                if !self.stablecoins.is_empty() {
+                    __map.serialize_entry("stablecoins", &*self.stablecoins)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetCurrencyConversionConfigResponseView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "GetCurrencyConversionConfigResponse";
+            const FULL_NAME: &'static str = "marketoverview.v1.GetCurrencyConversionConfigResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionConfigResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetCurrencyConversionConfigResponseView);
+        ::buffa::impl_view_reborrow!(GetCurrencyConversionConfigResponseView);
+        /** Self-contained, `'static` owned view of a `GetCurrencyConversionConfigResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetCurrencyConversionConfigResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetCurrencyConversionConfigResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetCurrencyConversionConfigResponseOwnedView(
+            ::buffa::OwnedView<GetCurrencyConversionConfigResponseView<'static>>,
+        );
+        impl GetCurrencyConversionConfigResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionConfigResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionConfigResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetCurrencyConversionConfigResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionConfigResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetCurrencyConversionConfigResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetCurrencyConversionConfigResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionConfigResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Supported fiat currencies, including USD, ordered by code.
+            ///
+            /// Field 1: `fiat`
+            #[must_use]
+            pub fn fiat(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::CurrencyMetadataView<'_>,
+            > {
+                &self.0.reborrow().fiat
+            }
+            /// Supported stablecoins (USDC and USDT), ordered by code.
+            ///
+            /// Field 2: `stablecoins`
+            #[must_use]
+            pub fn stablecoins(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::CurrencyMetadataView<'_>,
+            > {
+                &self.0.reborrow().stablecoins
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetCurrencyConversionConfigResponseView<'static>>,
+        > for GetCurrencyConversionConfigResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    GetCurrencyConversionConfigResponseView<'static>,
+                >,
+            ) -> Self {
+                GetCurrencyConversionConfigResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetCurrencyConversionConfigResponseOwnedView>
+        for ::buffa::OwnedView<GetCurrencyConversionConfigResponseView<'static>> {
+            fn from(wrapper: GetCurrencyConversionConfigResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetCurrencyConversionConfigResponseView<'static>>,
+        > for GetCurrencyConversionConfigResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetCurrencyConversionConfigResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetCurrencyConversionConfigResponse {
+            type View<'a> = GetCurrencyConversionConfigResponseView<'a>;
+            type ViewHandle = GetCurrencyConversionConfigResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetCurrencyConversionConfigResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// FiatConversionRate states the fiat currency units equal to one US dollar.
+        #[derive(Clone, Debug, Default)]
+        pub struct FiatConversionRateView<'a> {
+            /// Supported fiat currency code.
+            ///
+            /// Field 1: `code`
+            pub code: &'a str,
+            /// Fiat currency units per 1 USD, scaled by 1e8. USD has the identity value 1e8.
+            ///
+            /// Field 2: `units_per_usd_e8`
+            pub units_per_usd_e8: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for FiatConversionRateView<'a> {
+            type Owned = super::super::FiatConversionRate;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.code = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.units_per_usd_e8 = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::FiatConversionRate,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::FiatConversionRate,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::FiatConversionRate {
+                    code: self.code.to_string(),
+                    units_per_usd_e8: self.units_per_usd_e8,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for FiatConversionRateView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.code.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
+                }
+                if self.units_per_usd_e8 != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.units_per_usd_e8)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.code.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.code, buf);
+                }
+                if self.units_per_usd_e8 != 0i64 {
+                    ::buffa::types::put_int64_field(2u32, self.units_per_usd_e8, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for FiatConversionRateView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.code) {
+                    __map.serialize_entry("code", self.code)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.units_per_usd_e8) {
+                    __map
+                        .serialize_entry(
+                            "unitsPerUsdE8",
+                            &::buffa::json_helpers::ProtoJson(&self.units_per_usd_e8),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for FiatConversionRateView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "FiatConversionRate";
+            const FULL_NAME: &'static str = "marketoverview.v1.FiatConversionRate";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.FiatConversionRate";
+        }
+        ::buffa::impl_default_view_instance!(FiatConversionRateView);
+        ::buffa::impl_view_reborrow!(FiatConversionRateView);
+        /** Self-contained, `'static` owned view of a `FiatConversionRate` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`FiatConversionRateView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`FiatConversionRateView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct FiatConversionRateOwnedView(
+            ::buffa::OwnedView<FiatConversionRateView<'static>>,
+        );
+        impl FiatConversionRateOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FiatConversionRateOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FiatConversionRateOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::FiatConversionRate,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FiatConversionRateOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`FiatConversionRateView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &FiatConversionRateView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::FiatConversionRate,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Supported fiat currency code.
+            ///
+            /// Field 1: `code`
+            #[must_use]
+            pub fn code(&self) -> &'_ str {
+                self.0.reborrow().code
+            }
+            /// Fiat currency units per 1 USD, scaled by 1e8. USD has the identity value 1e8.
+            ///
+            /// Field 2: `units_per_usd_e8`
+            #[must_use]
+            pub fn units_per_usd_e8(&self) -> i64 {
+                self.0.reborrow().units_per_usd_e8
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<FiatConversionRateView<'static>>>
+        for FiatConversionRateOwnedView {
+            fn from(inner: ::buffa::OwnedView<FiatConversionRateView<'static>>) -> Self {
+                FiatConversionRateOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<FiatConversionRateOwnedView>
+        for ::buffa::OwnedView<FiatConversionRateView<'static>> {
+            fn from(wrapper: FiatConversionRateOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<FiatConversionRateView<'static>>>
+        for FiatConversionRateOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<FiatConversionRateView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::FiatConversionRate {
+            type View<'a> = FiatConversionRateView<'a>;
+            type ViewHandle = FiatConversionRateOwnedView;
+        }
+        impl ::serde::Serialize for FiatConversionRateOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// FiatConversionSnapshot contains all supported fiat rates from one observation.
+        #[derive(Clone, Debug, Default)]
+        pub struct FiatConversionSnapshotView<'a> {
+            /// Complete fiat rates, including USD, ordered by code.
+            ///
+            /// Field 1: `rates`
+            pub rates: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::FiatConversionRateView<'a>,
+            >,
+            /// Shared source observation time in seconds since the Unix epoch (UTC).
+            ///
+            /// Field 2: `source_ts_sec`
+            pub source_ts_sec: u64,
+            /// True once the source observation is at least two hours old.
+            ///
+            /// Field 3: `stale`
+            pub stale: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for FiatConversionSnapshotView<'a> {
+            type Owned = super::super::FiatConversionSnapshot;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.source_ts_sec = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.stale = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.rates
+                            .push(
+                                <super::super::__buffa::view::FiatConversionRateView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::FiatConversionSnapshot,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::FiatConversionSnapshot,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::FiatConversionSnapshot {
+                    rates: self
+                        .rates
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    source_ts_sec: self.source_ts_sec,
+                    stale: self.stale,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for FiatConversionSnapshotView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.rates {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.source_ts_sec != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.source_ts_sec)
+                                as u32;
+                }
+                if self.stale {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.rates {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.source_ts_sec != 0u64 {
+                    ::buffa::types::put_uint64_field(2u32, self.source_ts_sec, buf);
+                }
+                if self.stale {
+                    ::buffa::types::put_bool_field(3u32, self.stale, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for FiatConversionSnapshotView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.rates.is_empty() {
+                    __map.serialize_entry("rates", &*self.rates)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.source_ts_sec) {
+                    __map
+                        .serialize_entry(
+                            "sourceTsSec",
+                            &::buffa::json_helpers::ProtoJson(&self.source_ts_sec),
+                        )?;
+                }
+                if self.stale {
+                    __map.serialize_entry("stale", &self.stale)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for FiatConversionSnapshotView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "FiatConversionSnapshot";
+            const FULL_NAME: &'static str = "marketoverview.v1.FiatConversionSnapshot";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.FiatConversionSnapshot";
+        }
+        ::buffa::impl_default_view_instance!(FiatConversionSnapshotView);
+        ::buffa::impl_view_reborrow!(FiatConversionSnapshotView);
+        /** Self-contained, `'static` owned view of a `FiatConversionSnapshot` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`FiatConversionSnapshotView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`FiatConversionSnapshotView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct FiatConversionSnapshotOwnedView(
+            ::buffa::OwnedView<FiatConversionSnapshotView<'static>>,
+        );
+        impl FiatConversionSnapshotOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FiatConversionSnapshotOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FiatConversionSnapshotOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::FiatConversionSnapshot,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    FiatConversionSnapshotOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`FiatConversionSnapshotView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &FiatConversionSnapshotView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::FiatConversionSnapshot,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Complete fiat rates, including USD, ordered by code.
+            ///
+            /// Field 1: `rates`
+            #[must_use]
+            pub fn rates(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::FiatConversionRateView<'_>,
+            > {
+                &self.0.reborrow().rates
+            }
+            /// Shared source observation time in seconds since the Unix epoch (UTC).
+            ///
+            /// Field 2: `source_ts_sec`
+            #[must_use]
+            pub fn source_ts_sec(&self) -> u64 {
+                self.0.reborrow().source_ts_sec
+            }
+            /// True once the source observation is at least two hours old.
+            ///
+            /// Field 3: `stale`
+            #[must_use]
+            pub fn stale(&self) -> bool {
+                self.0.reborrow().stale
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<FiatConversionSnapshotView<'static>>,
+        > for FiatConversionSnapshotOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<FiatConversionSnapshotView<'static>>,
+            ) -> Self {
+                FiatConversionSnapshotOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<FiatConversionSnapshotOwnedView>
+        for ::buffa::OwnedView<FiatConversionSnapshotView<'static>> {
+            fn from(wrapper: FiatConversionSnapshotOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<FiatConversionSnapshotView<'static>>,
+        > for FiatConversionSnapshotOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<FiatConversionSnapshotView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::FiatConversionSnapshot {
+            type View<'a> = FiatConversionSnapshotView<'a>;
+            type ViewHandle = FiatConversionSnapshotOwnedView;
+        }
+        impl ::serde::Serialize for FiatConversionSnapshotOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// StablecoinConversionRate states the observed USD value of one stablecoin unit.
+        #[derive(Clone, Debug, Default)]
+        pub struct StablecoinConversionRateView<'a> {
+            /// Supported stablecoin code (USDC or USDT).
+            ///
+            /// Field 1: `code`
+            pub code: &'a str,
+            /// USD per 1 stablecoin unit, scaled by 1e8. This is an observed price, not a fixed peg.
+            ///
+            /// Field 2: `usd_per_unit_e8`
+            pub usd_per_unit_e8: i64,
+            /// This stablecoin's source observation time in seconds since the Unix epoch (UTC).
+            ///
+            /// Field 3: `source_ts_sec`
+            pub source_ts_sec: u64,
+            /// True once this stablecoin's source observation is at least five seconds old.
+            ///
+            /// Field 4: `stale`
+            pub stale: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for StablecoinConversionRateView<'a> {
+            type Owned = super::super::StablecoinConversionRate;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.code = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.usd_per_unit_e8 = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.source_ts_sec = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.stale = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::StablecoinConversionRate,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::StablecoinConversionRate,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::StablecoinConversionRate {
+                    code: self.code.to_string(),
+                    usd_per_unit_e8: self.usd_per_unit_e8,
+                    source_ts_sec: self.source_ts_sec,
+                    stale: self.stale,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for StablecoinConversionRateView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.code.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
+                }
+                if self.usd_per_unit_e8 != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.usd_per_unit_e8)
+                                as u32;
+                }
+                if self.source_ts_sec != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.source_ts_sec)
+                                as u32;
+                }
+                if self.stale {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.code.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.code, buf);
+                }
+                if self.usd_per_unit_e8 != 0i64 {
+                    ::buffa::types::put_int64_field(2u32, self.usd_per_unit_e8, buf);
+                }
+                if self.source_ts_sec != 0u64 {
+                    ::buffa::types::put_uint64_field(3u32, self.source_ts_sec, buf);
+                }
+                if self.stale {
+                    ::buffa::types::put_bool_field(4u32, self.stale, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for StablecoinConversionRateView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.code) {
+                    __map.serialize_entry("code", self.code)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.usd_per_unit_e8) {
+                    __map
+                        .serialize_entry(
+                            "usdPerUnitE8",
+                            &::buffa::json_helpers::ProtoJson(&self.usd_per_unit_e8),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.source_ts_sec) {
+                    __map
+                        .serialize_entry(
+                            "sourceTsSec",
+                            &::buffa::json_helpers::ProtoJson(&self.source_ts_sec),
+                        )?;
+                }
+                if self.stale {
+                    __map.serialize_entry("stale", &self.stale)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for StablecoinConversionRateView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "StablecoinConversionRate";
+            const FULL_NAME: &'static str = "marketoverview.v1.StablecoinConversionRate";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.StablecoinConversionRate";
+        }
+        ::buffa::impl_default_view_instance!(StablecoinConversionRateView);
+        ::buffa::impl_view_reborrow!(StablecoinConversionRateView);
+        /** Self-contained, `'static` owned view of a `StablecoinConversionRate` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`StablecoinConversionRateView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`StablecoinConversionRateView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct StablecoinConversionRateOwnedView(
+            ::buffa::OwnedView<StablecoinConversionRateView<'static>>,
+        );
+        impl StablecoinConversionRateOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    StablecoinConversionRateOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    StablecoinConversionRateOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::StablecoinConversionRate,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    StablecoinConversionRateOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`StablecoinConversionRateView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &StablecoinConversionRateView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::StablecoinConversionRate,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Supported stablecoin code (USDC or USDT).
+            ///
+            /// Field 1: `code`
+            #[must_use]
+            pub fn code(&self) -> &'_ str {
+                self.0.reborrow().code
+            }
+            /// USD per 1 stablecoin unit, scaled by 1e8. This is an observed price, not a fixed peg.
+            ///
+            /// Field 2: `usd_per_unit_e8`
+            #[must_use]
+            pub fn usd_per_unit_e8(&self) -> i64 {
+                self.0.reborrow().usd_per_unit_e8
+            }
+            /// This stablecoin's source observation time in seconds since the Unix epoch (UTC).
+            ///
+            /// Field 3: `source_ts_sec`
+            #[must_use]
+            pub fn source_ts_sec(&self) -> u64 {
+                self.0.reborrow().source_ts_sec
+            }
+            /// True once this stablecoin's source observation is at least five seconds old.
+            ///
+            /// Field 4: `stale`
+            #[must_use]
+            pub fn stale(&self) -> bool {
+                self.0.reborrow().stale
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<StablecoinConversionRateView<'static>>,
+        > for StablecoinConversionRateOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<StablecoinConversionRateView<'static>>,
+            ) -> Self {
+                StablecoinConversionRateOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<StablecoinConversionRateOwnedView>
+        for ::buffa::OwnedView<StablecoinConversionRateView<'static>> {
+            fn from(wrapper: StablecoinConversionRateOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<StablecoinConversionRateView<'static>>,
+        > for StablecoinConversionRateOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<StablecoinConversionRateView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::StablecoinConversionRate {
+            type View<'a> = StablecoinConversionRateView<'a>;
+            type ViewHandle = StablecoinConversionRateOwnedView;
+        }
+        impl ::serde::Serialize for StablecoinConversionRateOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetCurrencyConversionRatesRequest has no parameters.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetCurrencyConversionRatesRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetCurrencyConversionRatesRequestView<'a> {
+            type Owned = super::super::GetCurrencyConversionRatesRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionRatesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionRatesRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetCurrencyConversionRatesRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetCurrencyConversionRatesRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetCurrencyConversionRatesRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetCurrencyConversionRatesRequestView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "GetCurrencyConversionRatesRequest";
+            const FULL_NAME: &'static str = "marketoverview.v1.GetCurrencyConversionRatesRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionRatesRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetCurrencyConversionRatesRequestView);
+        ::buffa::impl_view_reborrow!(GetCurrencyConversionRatesRequestView);
+        /** Self-contained, `'static` owned view of a `GetCurrencyConversionRatesRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetCurrencyConversionRatesRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetCurrencyConversionRatesRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetCurrencyConversionRatesRequestOwnedView(
+            ::buffa::OwnedView<GetCurrencyConversionRatesRequestView<'static>>,
+        );
+        impl GetCurrencyConversionRatesRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionRatesRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionRatesRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetCurrencyConversionRatesRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionRatesRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetCurrencyConversionRatesRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetCurrencyConversionRatesRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionRatesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetCurrencyConversionRatesRequestView<'static>>,
+        > for GetCurrencyConversionRatesRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetCurrencyConversionRatesRequestView<'static>>,
+            ) -> Self {
+                GetCurrencyConversionRatesRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetCurrencyConversionRatesRequestOwnedView>
+        for ::buffa::OwnedView<GetCurrencyConversionRatesRequestView<'static>> {
+            fn from(wrapper: GetCurrencyConversionRatesRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetCurrencyConversionRatesRequestView<'static>>,
+        > for GetCurrencyConversionRatesRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetCurrencyConversionRatesRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetCurrencyConversionRatesRequest {
+            type View<'a> = GetCurrencyConversionRatesRequestView<'a>;
+            type ViewHandle = GetCurrencyConversionRatesRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetCurrencyConversionRatesRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetCurrencyConversionRatesResponse groups rates by their USD conversion direction.
+        /// Last-known observations remain available with staleness indicated. Before any
+        /// observation is available, the request fails with unavailable (HTTP 503).
+        #[derive(Clone, Debug, Default)]
+        pub struct GetCurrencyConversionRatesResponseView<'a> {
+            /// Complete fiat snapshot; absent until a complete snapshot has been observed.
+            ///
+            /// Field 1: `fiat`
+            pub fiat: ::buffa::MessageFieldView<
+                super::super::__buffa::view::FiatConversionSnapshotView<'a>,
+            >,
+            /// Observed stablecoin rates ordered by code. Unobserved stablecoins are omitted.
+            ///
+            /// Field 2: `stablecoins`
+            pub stablecoins: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::StablecoinConversionRateView<'a>,
+            >,
+            /// Response construction time in seconds since the Unix epoch (UTC).
+            ///
+            /// Field 3: `snapshot_ts_sec`
+            pub snapshot_ts_sec: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for GetCurrencyConversionRatesResponseView<'a> {
+            type Owned = super::super::GetCurrencyConversionRatesResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.fiat.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.fiat = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::FiatConversionSnapshotView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.snapshot_ts_sec = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.stablecoins
+                            .push(
+                                <super::super::__buffa::view::StablecoinConversionRateView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionRatesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionRatesResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetCurrencyConversionRatesResponse {
+                    fiat: match self.fiat.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::FiatConversionSnapshot,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    stablecoins: self
+                        .stablecoins
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    snapshot_ts_sec: self.snapshot_ts_sec,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetCurrencyConversionRatesResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.fiat.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.fiat.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.stablecoins {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.snapshot_ts_sec != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.snapshot_ts_sec)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.fiat.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.fiat.write_to(__cache, buf);
+                }
+                for v in &self.stablecoins {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.snapshot_ts_sec != 0u64 {
+                    ::buffa::types::put_uint64_field(3u32, self.snapshot_ts_sec, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetCurrencyConversionRatesResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.fiat.as_option() {
+                        __map.serialize_entry("fiat", __v)?;
+                    }
+                }
+                if !self.stablecoins.is_empty() {
+                    __map.serialize_entry("stablecoins", &*self.stablecoins)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.snapshot_ts_sec) {
+                    __map
+                        .serialize_entry(
+                            "snapshotTsSec",
+                            &::buffa::json_helpers::ProtoJson(&self.snapshot_ts_sec),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetCurrencyConversionRatesResponseView<'a> {
+            const PACKAGE: &'static str = "marketoverview.v1";
+            const NAME: &'static str = "GetCurrencyConversionRatesResponse";
+            const FULL_NAME: &'static str = "marketoverview.v1.GetCurrencyConversionRatesResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketoverview.v1.GetCurrencyConversionRatesResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetCurrencyConversionRatesResponseView);
+        ::buffa::impl_view_reborrow!(GetCurrencyConversionRatesResponseView);
+        /** Self-contained, `'static` owned view of a `GetCurrencyConversionRatesResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetCurrencyConversionRatesResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetCurrencyConversionRatesResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetCurrencyConversionRatesResponseOwnedView(
+            ::buffa::OwnedView<GetCurrencyConversionRatesResponseView<'static>>,
+        );
+        impl GetCurrencyConversionRatesResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionRatesResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionRatesResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetCurrencyConversionRatesResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetCurrencyConversionRatesResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetCurrencyConversionRatesResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetCurrencyConversionRatesResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetCurrencyConversionRatesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Complete fiat snapshot; absent until a complete snapshot has been observed.
+            ///
+            /// Field 1: `fiat`
+            #[must_use]
+            pub fn fiat(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::FiatConversionSnapshotView<'_>,
+            > {
+                &self.0.reborrow().fiat
+            }
+            /// Observed stablecoin rates ordered by code. Unobserved stablecoins are omitted.
+            ///
+            /// Field 2: `stablecoins`
+            #[must_use]
+            pub fn stablecoins(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::StablecoinConversionRateView<'_>,
+            > {
+                &self.0.reborrow().stablecoins
+            }
+            /// Response construction time in seconds since the Unix epoch (UTC).
+            ///
+            /// Field 3: `snapshot_ts_sec`
+            #[must_use]
+            pub fn snapshot_ts_sec(&self) -> u64 {
+                self.0.reborrow().snapshot_ts_sec
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetCurrencyConversionRatesResponseView<'static>>,
+        > for GetCurrencyConversionRatesResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    GetCurrencyConversionRatesResponseView<'static>,
+                >,
+            ) -> Self {
+                GetCurrencyConversionRatesResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetCurrencyConversionRatesResponseOwnedView>
+        for ::buffa::OwnedView<GetCurrencyConversionRatesResponseView<'static>> {
+            fn from(wrapper: GetCurrencyConversionRatesResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetCurrencyConversionRatesResponseView<'static>>,
+        > for GetCurrencyConversionRatesResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetCurrencyConversionRatesResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetCurrencyConversionRatesResponse {
+            type View<'a> = GetCurrencyConversionRatesResponseView<'a>;
+            type ViewHandle = GetCurrencyConversionRatesResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetCurrencyConversionRatesResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -6827,6 +10857,14 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_SPOT_VOLUME_HISTORY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SPOT_PAIR_VOLUME_SERIES_JSON_ANY);
         reg.register_json_any(super::__GET_SPOT_VOLUME_HISTORY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CURRENCY_METADATA_JSON_ANY);
+        reg.register_json_any(super::__GET_CURRENCY_CONVERSION_CONFIG_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_CURRENCY_CONVERSION_CONFIG_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__FIAT_CONVERSION_RATE_JSON_ANY);
+        reg.register_json_any(super::__FIAT_CONVERSION_SNAPSHOT_JSON_ANY);
+        reg.register_json_any(super::__STABLECOIN_CONVERSION_RATE_JSON_ANY);
+        reg.register_json_any(super::__GET_CURRENCY_CONVERSION_RATES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_CURRENCY_CONVERSION_RATES_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -6865,5 +10903,37 @@ pub use self::__buffa::view::SpotPairVolumeSeriesOwnedView;
 pub use self::__buffa::view::GetSpotVolumeHistoryResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetSpotVolumeHistoryResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CurrencyMetadataView;
+#[doc(inline)]
+pub use self::__buffa::view::CurrencyMetadataOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCurrencyConversionConfigRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCurrencyConversionConfigRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCurrencyConversionConfigResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCurrencyConversionConfigResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::FiatConversionRateView;
+#[doc(inline)]
+pub use self::__buffa::view::FiatConversionRateOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::FiatConversionSnapshotView;
+#[doc(inline)]
+pub use self::__buffa::view::FiatConversionSnapshotOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::StablecoinConversionRateView;
+#[doc(inline)]
+pub use self::__buffa::view::StablecoinConversionRateOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCurrencyConversionRatesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCurrencyConversionRatesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCurrencyConversionRatesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCurrencyConversionRatesResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

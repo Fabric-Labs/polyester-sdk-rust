@@ -3528,7 +3528,10 @@ pub struct OrderIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub side: ::buffa::EnumValue<Side>,
-    /// Optional client order identifier for idempotency.
+    /// Optional account-scoped identifier for correlation, lookup, and cancellation.
+    /// While this identifier is retained, reuse returns
+    /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID, even for identical input, a rejected
+    /// request, or a terminal order. CreateOrder does not replay the earlier result.
     ///
     /// Field 20: `client_order_id`
     #[serde(
@@ -10198,8 +10201,8 @@ pub struct BatchCreateOrdersRequest {
     )]
     pub subaccount_id: ::core::option::Option<u64>,
     /// Required idempotency key for the entire ordered batch. Reusing it with the
-    /// same payload returns the original outcome; reusing it with another payload
-    /// is rejected.
+    /// same payload replays the original per-item results; reusing it with a
+    /// different payload returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
     ///
     /// Field 2: `request_id`
     #[serde(
@@ -10209,9 +10212,9 @@ pub struct BatchCreateOrdersRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
-    /// Orders to create (max 20). Every item uses the same OrderIntent contract as
-    /// single create, but client_order_id remains optional because request_id is
-    /// the idempotency boundary for the ordered batch.
+    /// Orders to create (max 20). client_order_id is optional per item. For a new
+    /// request_id, a reused client_order_id rejects only that item with
+    /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID; other valid items continue.
     ///
     /// Field 3: `items`
     #[serde(
@@ -16184,7 +16187,8 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub symbol_id: u32,
-    /// Client-provided id for idempotency/correlation (may be empty).
+    /// Client-provided, account-scoped identifier for correlation, lookup, and
+    /// cancellation. Empty when none was supplied.
     ///
     /// Field 4: `client_order_id`
     #[serde(
@@ -22108,7 +22112,10 @@ pub mod __buffa {
             ///
             /// Field 2: `side`
             pub side: ::buffa::EnumValue<super::super::Side>,
-            /// Optional client order identifier for idempotency.
+            /// Optional account-scoped identifier for correlation, lookup, and cancellation.
+            /// While this identifier is retained, reuse returns
+            /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID, even for identical input, a rejected
+            /// request, or a terminal order. CreateOrder does not replay the earlier result.
             ///
             /// Field 20: `client_order_id`
             pub client_order_id: &'a str,
@@ -22906,7 +22913,10 @@ pub mod __buffa {
             pub fn side(&self) -> ::buffa::EnumValue<super::super::Side> {
                 self.0.reborrow().side
             }
-            /// Optional client order identifier for idempotency.
+            /// Optional account-scoped identifier for correlation, lookup, and cancellation.
+            /// While this identifier is retained, reuse returns
+            /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID, even for identical input, a rejected
+            /// request, or a terminal order. CreateOrder does not replay the earlier result.
             ///
             /// Field 20: `client_order_id`
             #[must_use]
@@ -32011,14 +32021,14 @@ pub mod __buffa {
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
             /// Required idempotency key for the entire ordered batch. Reusing it with the
-            /// same payload returns the original outcome; reusing it with another payload
-            /// is rejected.
+            /// same payload replays the original per-item results; reusing it with a
+            /// different payload returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
             ///
             /// Field 2: `request_id`
             pub request_id: &'a str,
-            /// Orders to create (max 20). Every item uses the same OrderIntent contract as
-            /// single create, but client_order_id remains optional because request_id is
-            /// the idempotency boundary for the ordered batch.
+            /// Orders to create (max 20). client_order_id is optional per item. For a new
+            /// request_id, a reused client_order_id rejects only that item with
+            /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID; other valid items continue.
             ///
             /// Field 3: `items`
             pub items: ::buffa::RepeatedView<
@@ -32321,17 +32331,17 @@ pub mod __buffa {
                 self.0.reborrow().subaccount_id
             }
             /// Required idempotency key for the entire ordered batch. Reusing it with the
-            /// same payload returns the original outcome; reusing it with another payload
-            /// is rejected.
+            /// same payload replays the original per-item results; reusing it with a
+            /// different payload returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
             ///
             /// Field 2: `request_id`
             #[must_use]
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
             }
-            /// Orders to create (max 20). Every item uses the same OrderIntent contract as
-            /// single create, but client_order_id remains optional because request_id is
-            /// the idempotency boundary for the ordered batch.
+            /// Orders to create (max 20). client_order_id is optional per item. For a new
+            /// request_id, a reused client_order_id rejects only that item with
+            /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID; other valid items continue.
             ///
             /// Field 3: `items`
             #[must_use]
@@ -40235,7 +40245,8 @@ pub mod __buffa {
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
-            /// Client-provided id for idempotency/correlation (may be empty).
+            /// Client-provided, account-scoped identifier for correlation, lookup, and
+            /// cancellation. Empty when none was supplied.
             ///
             /// Field 4: `client_order_id`
             pub client_order_id: &'a str,
@@ -41308,7 +41319,8 @@ pub mod __buffa {
             pub fn symbol_id(&self) -> u32 {
                 self.0.reborrow().symbol_id
             }
-            /// Client-provided id for idempotency/correlation (may be empty).
+            /// Client-provided, account-scoped identifier for correlation, lookup, and
+            /// cancellation. Empty when none was supplied.
             ///
             /// Field 4: `client_order_id`
             #[must_use]
