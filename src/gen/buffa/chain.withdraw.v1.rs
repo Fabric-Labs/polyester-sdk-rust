@@ -1954,7 +1954,7 @@ pub const __CREATE_TRADING_WITHDRAW_REQUEST_JSON_ANY: ::buffa::type_registry::Js
     is_wkt: false,
 };
 /// CreateWalletTradingWithdrawRequest creates or returns one durable Trading
-/// withdraw intent from typed frontend fields plus a wallet EIP-712 signature.
+/// withdraw intent from typed frontend fields plus a wallet personal_sign signature.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -1987,7 +1987,7 @@ pub struct CreateWalletTradingWithdrawRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub signer_wallet: ::buffa::alloc::string::String,
-    /// Wallet EIP-712 signature over the typed withdraw payload.
+    /// Wallet EIP-191 personal_sign signature over the canonical withdraw authorization message.
     ///
     /// Field 4: `payload_signature`
     #[serde(
@@ -4412,7 +4412,7 @@ pub mod __buffa {
             }
         }
         /// CreateWalletTradingWithdrawRequest creates or returns one durable Trading
-        /// withdraw intent from typed frontend fields plus a wallet EIP-712 signature.
+        /// withdraw intent from typed frontend fields plus a wallet personal_sign signature.
         #[derive(Clone, Debug, Default)]
         pub struct CreateWalletTradingWithdrawRequestView<'a> {
             /// Client-signed withdraw details.
@@ -4429,7 +4429,7 @@ pub mod __buffa {
             ///
             /// Field 3: `signer_wallet`
             pub signer_wallet: &'a str,
-            /// Wallet EIP-712 signature over the typed withdraw payload.
+            /// Wallet EIP-191 personal_sign signature over the canonical withdraw authorization message.
             ///
             /// Field 4: `payload_signature`
             pub payload_signature: &'a [u8],
@@ -4791,7 +4791,7 @@ pub mod __buffa {
             pub fn signer_wallet(&self) -> &'_ str {
                 self.0.reborrow().signer_wallet
             }
-            /// Wallet EIP-712 signature over the typed withdraw payload.
+            /// Wallet EIP-191 personal_sign signature over the canonical withdraw authorization message.
             ///
             /// Field 4: `payload_signature`
             #[must_use]
