@@ -2952,7 +2952,8 @@ pub struct CurrencyMetadata {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub default_english_name: ::buffa::alloc::string::String,
-    /// Default English display symbol; the code is used where no distinct symbol exists.
+    /// Representative local display symbol; multiple currencies may share a symbol.
+    /// Uses the code when the selected local display data has no distinct visible symbol.
     ///
     /// Field 3: `symbol`
     #[serde(
@@ -8150,7 +8151,8 @@ pub mod __buffa {
             ///
             /// Field 2: `default_english_name`
             pub default_english_name: &'a str,
-            /// Default English display symbol; the code is used where no distinct symbol exists.
+            /// Representative local display symbol; multiple currencies may share a symbol.
+            /// Uses the code when the selected local display data has no distinct visible symbol.
             ///
             /// Field 3: `symbol`
             pub symbol: &'a str,
@@ -8471,7 +8473,8 @@ pub mod __buffa {
             pub fn default_english_name(&self) -> &'_ str {
                 self.0.reborrow().default_english_name
             }
-            /// Default English display symbol; the code is used where no distinct symbol exists.
+            /// Representative local display symbol; multiple currencies may share a symbol.
+            /// Uses the code when the selected local display data has no distinct visible symbol.
             ///
             /// Field 3: `symbol`
             #[must_use]

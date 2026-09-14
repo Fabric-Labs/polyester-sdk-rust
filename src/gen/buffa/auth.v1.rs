@@ -12793,17 +12793,17 @@ pub struct CreateSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
-    /// Auth challenge nonce returned by GetNonce for this smart account. This is
-    /// not the smart-account derivation salt nonce.
+    /// Exact EIP-4361 message returned by CreateWalletChallenge for the
+    /// CREATE_SUBACCOUNT purpose.
     ///
-    /// Field 3: `nonce`
+    /// Field 3: `message`
     #[serde(
-        rename = "nonce",
+        rename = "message",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub nonce: ::buffa::alloc::string::String,
-    /// Signature over the canonical login message containing the nonce.
+    pub message: ::buffa::alloc::string::String,
+    /// Signature over message using EIP-191 personal_sign semantics.
     ///
     /// Field 4: `signature`
     #[serde(
@@ -12812,25 +12812,6 @@ pub struct CreateSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub signature: ::buffa::alloc::string::String,
-    /// Optional primary wallet address supplied by the client. Sub-account ownership is proven by the Smart Account signature.
-    ///
-    /// Field 5: `primary_wallet_address`
-    #[serde(
-        rename = "primaryWalletAddress",
-        alias = "primary_wallet_address",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub primary_wallet_address: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Optional provider hint supplied by the client. Sub-account creation does not depend on this value.
-    ///
-    /// Field 6: `wallet_provider`
-    #[serde(
-        rename = "walletProvider",
-        alias = "wallet_provider",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub wallet_provider: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -12842,10 +12823,8 @@ impl ::core::fmt::Debug for CreateSubaccountRequest {
             .field("icon", &self.icon)
             .field("color", &self.color)
             .field("smart_account_address", &self.smart_account_address)
-            .field("nonce", &self.nonce)
+            .field("message", &self.message)
             .field("signature", &self.signature)
-            .field("primary_wallet_address", &self.primary_wallet_address)
-            .field("wallet_provider", &self.wallet_provider)
             .finish()
     }
 }
@@ -12855,18 +12834,6 @@ impl CreateSubaccountRequest {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountRequest";
-}
-impl CreateSubaccountRequest {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::primary_wallet_address`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_primary_wallet_address(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.primary_wallet_address = Some(value.into());
-        self
-    }
 }
 ::buffa::impl_default_instance!(CreateSubaccountRequest);
 impl ::buffa::MessageName for CreateSubaccountRequest {
@@ -12895,19 +12862,11 @@ impl ::buffa::Message for CreateSubaccountRequest {
                     + ::buffa::types::string_encoded_len(&self.smart_account_address)
                         as u32;
         }
-        if !self.nonce.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.nonce) as u32;
+        if !self.message.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.message) as u32;
         }
         if !self.signature.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.signature) as u32;
-        }
-        if let Some(ref v) = self.primary_wallet_address {
-            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
-        }
-        if !self.wallet_provider.is_empty() {
-            size
-                += 1u32
-                    + ::buffa::types::string_encoded_len(&self.wallet_provider) as u32;
         }
         if !self.icon.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.icon) as u32;
@@ -12931,17 +12890,11 @@ impl ::buffa::Message for CreateSubaccountRequest {
         if !self.smart_account_address.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.smart_account_address, buf);
         }
-        if !self.nonce.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.nonce, buf);
+        if !self.message.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.message, buf);
         }
         if !self.signature.is_empty() {
             ::buffa::types::put_string_field(4u32, &self.signature, buf);
-        }
-        if let Some(ref v) = self.primary_wallet_address {
-            ::buffa::types::put_string_field(5u32, v, buf);
-        }
-        if !self.wallet_provider.is_empty() {
-            ::buffa::types::put_string_field(6u32, &self.wallet_provider, buf);
         }
         if !self.icon.is_empty() {
             ::buffa::types::put_string_field(7u32, &self.icon, buf);
@@ -12981,7 +12934,7 @@ impl ::buffa::Message for CreateSubaccountRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.nonce, buf)?;
+                ::buffa::types::merge_string(&mut self.message, buf)?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -12989,25 +12942,6 @@ impl ::buffa::Message for CreateSubaccountRequest {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.signature, buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self
-                        .primary_wallet_address
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.wallet_provider, buf)?;
             }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -13033,10 +12967,8 @@ impl ::buffa::Message for CreateSubaccountRequest {
     fn clear(&mut self) {
         self.label.clear();
         self.smart_account_address.clear();
-        self.nonce.clear();
+        self.message.clear();
         self.signature.clear();
-        self.primary_wallet_address = ::core::option::Option::None;
-        self.wallet_provider.clear();
         self.icon.clear();
         self.color.clear();
         self.__buffa_unknown_fields.clear();
@@ -36241,6 +36173,155 @@ pub const __REGENERATE_RECOVERY_CODES_RESPONSE_JSON_ANY: ::buffa::type_registry:
     from_json: ::buffa::type_registry::any_from_json::<RegenerateRecoveryCodesResponse>,
     is_wkt: false,
 };
+/// Purpose for a server-issued wallet challenge.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum WalletChallengePurpose {
+    /// No wallet challenge purpose was specified.
+    WALLET_PROOF_UNSPECIFIED = 0i32,
+    /// Authenticate the wallet and create a Polyester session.
+    LOGIN = 1i32,
+    /// Prove control of a new smart account before creating a sub-account.
+    CREATE_SUBACCOUNT = 2i32,
+}
+impl WalletChallengePurpose {
+    ///Idiomatic alias for [`Self::WALLET_PROOF_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const WalletProofUnspecified: Self = Self::WALLET_PROOF_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::LOGIN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Login: Self = Self::LOGIN;
+    ///Idiomatic alias for [`Self::CREATE_SUBACCOUNT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CreateSubaccount: Self = Self::CREATE_SUBACCOUNT;
+}
+impl ::core::default::Default for WalletChallengePurpose {
+    fn default() -> Self {
+        Self::WALLET_PROOF_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for WalletChallengePurpose {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for WalletChallengePurpose {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = WalletChallengePurpose;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(WalletChallengePurpose)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<WalletChallengePurpose, E> {
+                <WalletChallengePurpose as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<WalletChallengePurpose, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <WalletChallengePurpose as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<WalletChallengePurpose, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <WalletChallengePurpose as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<WalletChallengePurpose, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for WalletChallengePurpose {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for WalletChallengePurpose {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::WALLET_PROOF_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::LOGIN),
+            2i32 => ::core::option::Option::Some(Self::CREATE_SUBACCOUNT),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::WALLET_PROOF_UNSPECIFIED => "WALLET_PROOF_UNSPECIFIED",
+            Self::LOGIN => "LOGIN",
+            Self::CREATE_SUBACCOUNT => "CREATE_SUBACCOUNT",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "WALLET_PROOF_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::WALLET_PROOF_UNSPECIFIED)
+            }
+            "LOGIN" => ::core::option::Option::Some(Self::LOGIN),
+            "CREATE_SUBACCOUNT" => ::core::option::Option::Some(Self::CREATE_SUBACCOUNT),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::WALLET_PROOF_UNSPECIFIED, Self::LOGIN, Self::CREATE_SUBACCOUNT]
+    }
+}
 /// High-level error codes for authentication and account-domain failures.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -36829,13 +36910,13 @@ impl ::buffa::Enumeration for AuthErrorCode {
         ]
     }
 }
-/// GetNonceRequest requests a short-lived login nonce for a smart-account
-/// address. The wallet must sign a message containing this nonce before login.
+/// CreateWalletChallengeRequest requests a short-lived EIP-4361 message whose
+/// exact UTF-8 bytes must be signed by the wallet.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct GetNonceRequest {
-    /// Smart-account EVM address, formatted as 0x plus 40 hex characters.
+pub struct CreateWalletChallengeRequest {
+    /// Smart-account EVM address being authenticated, formatted as 0x plus 40 hex characters.
     ///
     /// Field 1: `smart_account_address`
     #[serde(
@@ -36845,32 +36926,65 @@ pub struct GetNonceRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
+    /// EVM address selected in the wallet and written into the EIP-4361 message.
+    /// For CREATE_SUBACCOUNT, this must equal smart_account_address.
+    ///
+    /// Field 2: `signer_address`
+    #[serde(
+        rename = "signerAddress",
+        alias = "signer_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub signer_address: ::buffa::alloc::string::String,
+    /// Browser origin URI requesting the signature, including scheme and optional
+    /// port but no path, query, fragment, or user information.
+    ///
+    /// Field 3: `uri`
+    #[serde(
+        rename = "uri",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub uri: ::buffa::alloc::string::String,
+    /// Operation for which the challenge may be consumed.
+    ///
+    /// Field 4: `purpose`
+    #[serde(
+        rename = "purpose",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub purpose: ::buffa::EnumValue<WalletChallengePurpose>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for GetNonceRequest {
+impl ::core::fmt::Debug for CreateWalletChallengeRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("GetNonceRequest")
+        f.debug_struct("CreateWalletChallengeRequest")
             .field("smart_account_address", &self.smart_account_address)
+            .field("signer_address", &self.signer_address)
+            .field("uri", &self.uri)
+            .field("purpose", &self.purpose)
             .finish()
     }
 }
-impl GetNonceRequest {
+impl CreateWalletChallengeRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetNonceRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateWalletChallengeRequest";
 }
-::buffa::impl_default_instance!(GetNonceRequest);
-impl ::buffa::MessageName for GetNonceRequest {
+::buffa::impl_default_instance!(CreateWalletChallengeRequest);
+impl ::buffa::MessageName for CreateWalletChallengeRequest {
     const PACKAGE: &'static str = "auth.v1";
-    const NAME: &'static str = "GetNonceRequest";
-    const FULL_NAME: &'static str = "auth.v1.GetNonceRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetNonceRequest";
+    const NAME: &'static str = "CreateWalletChallengeRequest";
+    const FULL_NAME: &'static str = "auth.v1.CreateWalletChallengeRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateWalletChallengeRequest";
 }
-impl ::buffa::Message for GetNonceRequest {
+impl ::buffa::Message for CreateWalletChallengeRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -36887,6 +37001,20 @@ impl ::buffa::Message for GetNonceRequest {
                     + ::buffa::types::string_encoded_len(&self.smart_account_address)
                         as u32;
         }
+        if !self.signer_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.signer_address) as u32;
+        }
+        if !self.uri.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.uri) as u32;
+        }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -36899,6 +37027,18 @@ impl ::buffa::Message for GetNonceRequest {
         use ::buffa::Enumeration as _;
         if !self.smart_account_address.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.smart_account_address, buf);
+        }
+        if !self.signer_address.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.signer_address, buf);
+        }
+        if !self.uri.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.uri, buf);
+        }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -36920,6 +37060,29 @@ impl ::buffa::Message for GetNonceRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.smart_account_address, buf)?;
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.signer_address, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.uri, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.purpose = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -36929,11 +37092,14 @@ impl ::buffa::Message for GetNonceRequest {
     }
     fn clear(&mut self) {
         self.smart_account_address.clear();
+        self.signer_address.clear();
+        self.uri.clear();
+        self.purpose = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for GetNonceRequest {
-    const PROTO_FQN: &'static str = "auth.v1.GetNonceRequest";
+impl ::buffa::ExtensionSet for CreateWalletChallengeRequest {
+    const PROTO_FQN: &'static str = "auth.v1.CreateWalletChallengeRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -36941,7 +37107,7 @@ impl ::buffa::ExtensionSet for GetNonceRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for GetNonceRequest {
+impl ::buffa::json_helpers::ProtoElemJson for CreateWalletChallengeRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -36955,28 +37121,28 @@ impl ::buffa::json_helpers::ProtoElemJson for GetNonceRequest {
     }
 }
 #[doc(hidden)]
-pub const __GET_NONCE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/auth.v1.GetNonceRequest",
-    to_json: ::buffa::type_registry::any_to_json::<GetNonceRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<GetNonceRequest>,
+pub const __CREATE_WALLET_CHALLENGE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.CreateWalletChallengeRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateWalletChallengeRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateWalletChallengeRequest>,
     is_wkt: false,
 };
-/// GetNonceResponse contains the nonce that must be signed for wallet login.
+/// CreateWalletChallengeResponse contains the canonical EIP-4361 message.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct GetNonceResponse {
-    /// Random login nonce. The nonce is single-purpose and is replaced by each new
-    /// nonce request for the same smart-account address.
+pub struct CreateWalletChallengeResponse {
+    /// Canonical EIP-4361 message. Sign these UTF-8 bytes exactly once with
+    /// personal_sign; do not hash, alter, or reconstruct the message.
     ///
-    /// Field 1: `nonce`
+    /// Field 1: `message`
     #[serde(
-        rename = "nonce",
+        rename = "message",
         with = "::buffa::json_helpers::proto_string",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub nonce: ::buffa::alloc::string::String,
-    /// Time in UTC when the nonce expires. Login nonces expire after 5 minutes.
+    pub message: ::buffa::alloc::string::String,
+    /// Time in UTC when the challenge expires. Wallet challenges expire after 5 minutes.
     ///
     /// Field 2: `expires_at`
     #[serde(
@@ -36989,29 +37155,29 @@ pub struct GetNonceResponse {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for GetNonceResponse {
+impl ::core::fmt::Debug for CreateWalletChallengeResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("GetNonceResponse")
-            .field("nonce", &self.nonce)
+        f.debug_struct("CreateWalletChallengeResponse")
+            .field("message", &self.message)
             .field("expires_at", &self.expires_at)
             .finish()
     }
 }
-impl GetNonceResponse {
+impl CreateWalletChallengeResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetNonceResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateWalletChallengeResponse";
 }
-::buffa::impl_default_instance!(GetNonceResponse);
-impl ::buffa::MessageName for GetNonceResponse {
+::buffa::impl_default_instance!(CreateWalletChallengeResponse);
+impl ::buffa::MessageName for CreateWalletChallengeResponse {
     const PACKAGE: &'static str = "auth.v1";
-    const NAME: &'static str = "GetNonceResponse";
-    const FULL_NAME: &'static str = "auth.v1.GetNonceResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetNonceResponse";
+    const NAME: &'static str = "CreateWalletChallengeResponse";
+    const FULL_NAME: &'static str = "auth.v1.CreateWalletChallengeResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateWalletChallengeResponse";
 }
-impl ::buffa::Message for GetNonceResponse {
+impl ::buffa::Message for CreateWalletChallengeResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -37022,8 +37188,8 @@ impl ::buffa::Message for GetNonceResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if !self.nonce.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.nonce) as u32;
+        if !self.message.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.message) as u32;
         }
         if self.expires_at.is_set() {
             let __slot = __cache.reserve();
@@ -37043,8 +37209,8 @@ impl ::buffa::Message for GetNonceResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.nonce.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.nonce, buf);
+        if !self.message.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.message, buf);
         }
         if self.expires_at.is_set() {
             ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
@@ -37068,7 +37234,7 @@ impl ::buffa::Message for GetNonceResponse {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(&mut self.nonce, buf)?;
+                ::buffa::types::merge_string(&mut self.message, buf)?;
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -37089,13 +37255,13 @@ impl ::buffa::Message for GetNonceResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.nonce.clear();
+        self.message.clear();
         self.expires_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for GetNonceResponse {
-    const PROTO_FQN: &'static str = "auth.v1.GetNonceResponse";
+impl ::buffa::ExtensionSet for CreateWalletChallengeResponse {
+    const PROTO_FQN: &'static str = "auth.v1.CreateWalletChallengeResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -37103,7 +37269,7 @@ impl ::buffa::ExtensionSet for GetNonceResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for GetNonceResponse {
+impl ::buffa::json_helpers::ProtoElemJson for CreateWalletChallengeResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -37117,20 +37283,20 @@ impl ::buffa::json_helpers::ProtoElemJson for GetNonceResponse {
     }
 }
 #[doc(hidden)]
-pub const __GET_NONCE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/auth.v1.GetNonceResponse",
-    to_json: ::buffa::type_registry::any_to_json::<GetNonceResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<GetNonceResponse>,
+pub const __CREATE_WALLET_CHALLENGE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.CreateWalletChallengeResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateWalletChallengeResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateWalletChallengeResponse>,
     is_wkt: false,
 };
-/// LoginWithWalletRequest completes smart-account wallet login using a signed
-/// nonce.
+/// LoginWithWalletRequest completes smart-account wallet login using the exact
+/// server-issued EIP-4361 message and its signature.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LoginWithWalletRequest {
-    /// Smart-account EVM address that produced the signature, formatted as 0x plus
-    /// 40 hex characters.
+    /// Smart-account EVM address bound into the challenge resource, formatted as
+    /// 0x plus 40 hex characters.
     ///
     /// Field 1: `smart_account_address`
     #[serde(
@@ -37140,16 +37306,7 @@ pub struct LoginWithWalletRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
-    /// Nonce returned by GetNonce. The nonce must be unused and not expired.
-    ///
-    /// Field 2: `nonce`
-    #[serde(
-        rename = "nonce",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub nonce: ::buffa::alloc::string::String,
-    /// Signature over the canonical login message containing the nonce. Maximum
+    /// Signature over message using EIP-191 personal_sign semantics. Maximum
     /// length is 8192 characters to support universal wallet signatures.
     ///
     /// Field 3: `signature`
@@ -37180,19 +37337,7 @@ pub struct LoginWithWalletRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub ip: ::buffa::alloc::string::String,
-    /// Optional primary wallet address that controls this smart account, formatted
-    /// as 0x plus 40 hex characters. This value is metadata and is not used for
-    /// signature verification.
-    ///
-    /// Field 6: `primary_wallet_address`
-    #[serde(
-        rename = "primaryWalletAddress",
-        alias = "primary_wallet_address",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub primary_wallet_address: ::buffa::alloc::string::String,
-    /// Optional provider hint for the primary wallet. Maximum length is 32 characters.
+    /// Optional provider hint for the signing wallet. Maximum length is 32 characters.
     ///
     /// Field 7: `wallet_provider`
     #[serde(
@@ -37202,6 +37347,16 @@ pub struct LoginWithWalletRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub wallet_provider: ::buffa::alloc::string::String,
+    /// Exact EIP-4361 message returned by CreateWalletChallenge. Maximum length is
+    /// 4096 UTF-8 bytes.
+    ///
+    /// Field 8: `message`
+    #[serde(
+        rename = "message",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub message: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -37210,12 +37365,11 @@ impl ::core::fmt::Debug for LoginWithWalletRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("LoginWithWalletRequest")
             .field("smart_account_address", &self.smart_account_address)
-            .field("nonce", &self.nonce)
             .field("signature", &self.signature)
             .field("user_agent", &self.user_agent)
             .field("ip", &self.ip)
-            .field("primary_wallet_address", &self.primary_wallet_address)
             .field("wallet_provider", &self.wallet_provider)
+            .field("message", &self.message)
             .finish()
     }
 }
@@ -37250,9 +37404,6 @@ impl ::buffa::Message for LoginWithWalletRequest {
                     + ::buffa::types::string_encoded_len(&self.smart_account_address)
                         as u32;
         }
-        if !self.nonce.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.nonce) as u32;
-        }
         if !self.signature.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.signature) as u32;
         }
@@ -37262,16 +37413,13 @@ impl ::buffa::Message for LoginWithWalletRequest {
         if !self.ip.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.ip) as u32;
         }
-        if !self.primary_wallet_address.is_empty() {
-            size
-                += 1u32
-                    + ::buffa::types::string_encoded_len(&self.primary_wallet_address)
-                        as u32;
-        }
         if !self.wallet_provider.is_empty() {
             size
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.wallet_provider) as u32;
+        }
+        if !self.message.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.message) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -37286,9 +37434,6 @@ impl ::buffa::Message for LoginWithWalletRequest {
         if !self.smart_account_address.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.smart_account_address, buf);
         }
-        if !self.nonce.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.nonce, buf);
-        }
         if !self.signature.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.signature, buf);
         }
@@ -37298,11 +37443,11 @@ impl ::buffa::Message for LoginWithWalletRequest {
         if !self.ip.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.ip, buf);
         }
-        if !self.primary_wallet_address.is_empty() {
-            ::buffa::types::put_string_field(6u32, &self.primary_wallet_address, buf);
-        }
         if !self.wallet_provider.is_empty() {
             ::buffa::types::put_string_field(7u32, &self.wallet_provider, buf);
+        }
+        if !self.message.is_empty() {
+            ::buffa::types::put_string_field(8u32, &self.message, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -37323,13 +37468,6 @@ impl ::buffa::Message for LoginWithWalletRequest {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.smart_account_address, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.nonce, buf)?;
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -37352,19 +37490,19 @@ impl ::buffa::Message for LoginWithWalletRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.ip, buf)?;
             }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.primary_wallet_address, buf)?;
-            }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.wallet_provider, buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.message, buf)?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -37375,12 +37513,11 @@ impl ::buffa::Message for LoginWithWalletRequest {
     }
     fn clear(&mut self) {
         self.smart_account_address.clear();
-        self.nonce.clear();
         self.signature.clear();
         self.user_agent.clear();
         self.ip.clear();
-        self.primary_wallet_address.clear();
         self.wallet_provider.clear();
+        self.message.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -63329,23 +63466,15 @@ pub mod __buffa {
             ///
             /// Field 2: `smart_account_address`
             pub smart_account_address: &'a str,
-            /// Auth challenge nonce returned by GetNonce for this smart account. This is
-            /// not the smart-account derivation salt nonce.
+            /// Exact EIP-4361 message returned by CreateWalletChallenge for the
+            /// CREATE_SUBACCOUNT purpose.
             ///
-            /// Field 3: `nonce`
-            pub nonce: &'a str,
-            /// Signature over the canonical login message containing the nonce.
+            /// Field 3: `message`
+            pub message: &'a str,
+            /// Signature over message using EIP-191 personal_sign semantics.
             ///
             /// Field 4: `signature`
             pub signature: &'a str,
-            /// Optional primary wallet address supplied by the client. Sub-account ownership is proven by the Smart Account signature.
-            ///
-            /// Field 5: `primary_wallet_address`
-            pub primary_wallet_address: ::core::option::Option<&'a str>,
-            /// Optional provider hint supplied by the client. Sub-account creation does not depend on this value.
-            ///
-            /// Field 6: `wallet_provider`
-            pub wallet_provider: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CreateSubaccountRequestView<'a> {
@@ -63414,7 +63543,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.nonce = ::buffa::types::borrow_str(&mut cur)?;
+                        view.message = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -63422,22 +63551,6 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.signature = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.primary_wallet_address = Some(
-                            ::buffa::types::borrow_str(&mut cur)?,
-                        );
-                    }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.wallet_provider = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -63472,12 +63585,8 @@ pub mod __buffa {
                     icon: self.icon.to_string(),
                     color: self.color.to_string(),
                     smart_account_address: self.smart_account_address.to_string(),
-                    nonce: self.nonce.to_string(),
+                    message: self.message.to_string(),
                     signature: self.signature.to_string(),
-                    primary_wallet_address: self
-                        .primary_wallet_address
-                        .map(|s| s.to_string()),
-                    wallet_provider: self.wallet_provider.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -63503,23 +63612,15 @@ pub mod __buffa {
                                 &self.smart_account_address,
                             ) as u32;
                 }
-                if !self.nonce.is_empty() {
+                if !self.message.is_empty() {
                     size
-                        += 1u32 + ::buffa::types::string_encoded_len(&self.nonce) as u32;
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.message) as u32;
                 }
                 if !self.signature.is_empty() {
                     size
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.signature) as u32;
-                }
-                if let Some(ref v) = self.primary_wallet_address {
-                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
-                }
-                if !self.wallet_provider.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.wallet_provider)
-                                as u32;
                 }
                 if !self.icon.is_empty() {
                     size += 1u32 + ::buffa::types::string_encoded_len(&self.icon) as u32;
@@ -63549,17 +63650,11 @@ pub mod __buffa {
                         buf,
                     );
                 }
-                if !self.nonce.is_empty() {
-                    ::buffa::types::put_string_field(3u32, &self.nonce, buf);
+                if !self.message.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.message, buf);
                 }
                 if !self.signature.is_empty() {
                     ::buffa::types::put_string_field(4u32, &self.signature, buf);
-                }
-                if let Some(ref v) = self.primary_wallet_address {
-                    ::buffa::types::put_string_field(5u32, v, buf);
-                }
-                if !self.wallet_provider.is_empty() {
-                    ::buffa::types::put_string_field(6u32, &self.wallet_provider, buf);
                 }
                 if !self.icon.is_empty() {
                     ::buffa::types::put_string_field(7u32, &self.icon, buf);
@@ -63606,17 +63701,11 @@ pub mod __buffa {
                             self.smart_account_address,
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.nonce) {
-                    __map.serialize_entry("nonce", self.nonce)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.message) {
+                    __map.serialize_entry("message", self.message)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.signature) {
                     __map.serialize_entry("signature", self.signature)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.primary_wallet_address {
-                    __map.serialize_entry("primaryWalletAddress", __v)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.wallet_provider) {
-                    __map.serialize_entry("walletProvider", self.wallet_provider)?;
                 }
                 __map.end()
             }
@@ -63744,34 +63833,20 @@ pub mod __buffa {
             pub fn smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().smart_account_address
             }
-            /// Auth challenge nonce returned by GetNonce for this smart account. This is
-            /// not the smart-account derivation salt nonce.
+            /// Exact EIP-4361 message returned by CreateWalletChallenge for the
+            /// CREATE_SUBACCOUNT purpose.
             ///
-            /// Field 3: `nonce`
+            /// Field 3: `message`
             #[must_use]
-            pub fn nonce(&self) -> &'_ str {
-                self.0.reborrow().nonce
+            pub fn message(&self) -> &'_ str {
+                self.0.reborrow().message
             }
-            /// Signature over the canonical login message containing the nonce.
+            /// Signature over message using EIP-191 personal_sign semantics.
             ///
             /// Field 4: `signature`
             #[must_use]
             pub fn signature(&self) -> &'_ str {
                 self.0.reborrow().signature
-            }
-            /// Optional primary wallet address supplied by the client. Sub-account ownership is proven by the Smart Account signature.
-            ///
-            /// Field 5: `primary_wallet_address`
-            #[must_use]
-            pub fn primary_wallet_address(&self) -> ::core::option::Option<&'_ str> {
-                self.0.reborrow().primary_wallet_address
-            }
-            /// Optional provider hint supplied by the client. Sub-account creation does not depend on this value.
-            ///
-            /// Field 6: `wallet_provider`
-            #[must_use]
-            pub fn wallet_provider(&self) -> &'_ str {
-                self.0.reborrow().wallet_provider
             }
         }
         impl ::core::convert::From<
@@ -105312,18 +105387,32 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetNonceRequest requests a short-lived login nonce for a smart-account
-        /// address. The wallet must sign a message containing this nonce before login.
+        /// CreateWalletChallengeRequest requests a short-lived EIP-4361 message whose
+        /// exact UTF-8 bytes must be signed by the wallet.
         #[derive(Clone, Debug, Default)]
-        pub struct GetNonceRequestView<'a> {
-            /// Smart-account EVM address, formatted as 0x plus 40 hex characters.
+        pub struct CreateWalletChallengeRequestView<'a> {
+            /// Smart-account EVM address being authenticated, formatted as 0x plus 40 hex characters.
             ///
             /// Field 1: `smart_account_address`
             pub smart_account_address: &'a str,
+            /// EVM address selected in the wallet and written into the EIP-4361 message.
+            /// For CREATE_SUBACCOUNT, this must equal smart_account_address.
+            ///
+            /// Field 2: `signer_address`
+            pub signer_address: &'a str,
+            /// Browser origin URI requesting the signature, including scheme and optional
+            /// port but no path, query, fragment, or user information.
+            ///
+            /// Field 3: `uri`
+            pub uri: &'a str,
+            /// Operation for which the challenge may be consumed.
+            ///
+            /// Field 4: `purpose`
+            pub purpose: ::buffa::EnumValue<super::super::WalletChallengePurpose>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for GetNonceRequestView<'a> {
-            type Owned = super::super::GetNonceRequest;
+        impl<'a> ::buffa::MessageView<'a> for CreateWalletChallengeRequestView<'a> {
+            type Owned = super::super::CreateWalletChallengeRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -105362,6 +105451,29 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.signer_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.uri = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.purpose = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -105374,7 +105486,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::GetNonceRequest,
+                super::super::CreateWalletChallengeRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -105384,14 +105496,17 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::GetNonceRequest,
+                super::super::CreateWalletChallengeRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::GetNonceRequest {
+                ::core::result::Result::Ok(super::super::CreateWalletChallengeRequest {
                     smart_account_address: self.smart_account_address.to_string(),
+                    signer_address: self.signer_address.to_string(),
+                    uri: self.uri.to_string(),
+                    purpose: self.purpose,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -105400,7 +105515,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for GetNonceRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for CreateWalletChallengeRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -105412,6 +105527,21 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(
                                 &self.smart_account_address,
                             ) as u32;
+                }
+                if !self.signer_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.signer_address)
+                                as u32;
+                }
+                if !self.uri.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.uri) as u32;
+                }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -105431,6 +105561,18 @@ pub mod __buffa {
                         buf,
                     );
                 }
+                if !self.signer_address.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.signer_address, buf);
+                }
+                if !self.uri.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.uri, buf);
+                }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -105445,7 +105587,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for GetNonceRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for CreateWalletChallengeRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -105461,27 +105603,38 @@ pub mod __buffa {
                             self.smart_account_address,
                         )?;
                 }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.signer_address) {
+                    __map.serialize_entry("signerAddress", self.signer_address)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.uri) {
+                    __map.serialize_entry("uri", self.uri)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.purpose,
+                ) {
+                    __map.serialize_entry("purpose", &self.purpose)?;
+                }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for GetNonceRequestView<'a> {
+        impl<'a> ::buffa::MessageName for CreateWalletChallengeRequestView<'a> {
             const PACKAGE: &'static str = "auth.v1";
-            const NAME: &'static str = "GetNonceRequest";
-            const FULL_NAME: &'static str = "auth.v1.GetNonceRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetNonceRequest";
+            const NAME: &'static str = "CreateWalletChallengeRequest";
+            const FULL_NAME: &'static str = "auth.v1.CreateWalletChallengeRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateWalletChallengeRequest";
         }
-        ::buffa::impl_default_view_instance!(GetNonceRequestView);
-        ::buffa::impl_view_reborrow!(GetNonceRequestView);
-        /** Self-contained, `'static` owned view of a `GetNonceRequest` message.
+        ::buffa::impl_default_view_instance!(CreateWalletChallengeRequestView);
+        ::buffa::impl_view_reborrow!(CreateWalletChallengeRequestView);
+        /** Self-contained, `'static` owned view of a `CreateWalletChallengeRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`GetNonceRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`CreateWalletChallengeRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetNonceRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateWalletChallengeRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct GetNonceRequestOwnedView(
-            ::buffa::OwnedView<GetNonceRequestView<'static>>,
+        pub struct CreateWalletChallengeRequestOwnedView(
+            ::buffa::OwnedView<CreateWalletChallengeRequestView<'static>>,
         );
-        impl GetNonceRequestOwnedView {
+        impl CreateWalletChallengeRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -105495,7 +105648,9 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetNonceRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    CreateWalletChallengeRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -105510,7 +105665,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetNonceRequestOwnedView(
+                    CreateWalletChallengeRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -105522,15 +105677,17 @@ pub mod __buffa {
             /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::GetNonceRequest,
+                msg: &super::super::CreateWalletChallengeRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetNonceRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    CreateWalletChallengeRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
                 )
             }
-            /// Borrow the full [`GetNonceRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`CreateWalletChallengeRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &GetNonceRequestView<'_> {
+            pub fn view(&self) -> &CreateWalletChallengeRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -105542,7 +105699,7 @@ pub mod __buffa {
             pub fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::GetNonceRequest,
+                super::super::CreateWalletChallengeRequest,
                 ::buffa::DecodeError,
             > {
                 self.0.to_owned_message()
@@ -105557,37 +105714,68 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Smart-account EVM address, formatted as 0x plus 40 hex characters.
+            /// Smart-account EVM address being authenticated, formatted as 0x plus 40 hex characters.
             ///
             /// Field 1: `smart_account_address`
             #[must_use]
             pub fn smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().smart_account_address
             }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<GetNonceRequestView<'static>>>
-        for GetNonceRequestOwnedView {
-            fn from(inner: ::buffa::OwnedView<GetNonceRequestView<'static>>) -> Self {
-                GetNonceRequestOwnedView(inner)
+            /// EVM address selected in the wallet and written into the EIP-4361 message.
+            /// For CREATE_SUBACCOUNT, this must equal smart_account_address.
+            ///
+            /// Field 2: `signer_address`
+            #[must_use]
+            pub fn signer_address(&self) -> &'_ str {
+                self.0.reborrow().signer_address
+            }
+            /// Browser origin URI requesting the signature, including scheme and optional
+            /// port but no path, query, fragment, or user information.
+            ///
+            /// Field 3: `uri`
+            #[must_use]
+            pub fn uri(&self) -> &'_ str {
+                self.0.reborrow().uri
+            }
+            /// Operation for which the challenge may be consumed.
+            ///
+            /// Field 4: `purpose`
+            #[must_use]
+            pub fn purpose(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::WalletChallengePurpose> {
+                self.0.reborrow().purpose
             }
         }
-        impl ::core::convert::From<GetNonceRequestOwnedView>
-        for ::buffa::OwnedView<GetNonceRequestView<'static>> {
-            fn from(wrapper: GetNonceRequestOwnedView) -> Self {
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateWalletChallengeRequestView<'static>>,
+        > for CreateWalletChallengeRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CreateWalletChallengeRequestView<'static>>,
+            ) -> Self {
+                CreateWalletChallengeRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateWalletChallengeRequestOwnedView>
+        for ::buffa::OwnedView<CreateWalletChallengeRequestView<'static>> {
+            fn from(wrapper: CreateWalletChallengeRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<::buffa::OwnedView<GetNonceRequestView<'static>>>
-        for GetNonceRequestOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<GetNonceRequestView<'static>> {
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateWalletChallengeRequestView<'static>>,
+        > for CreateWalletChallengeRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateWalletChallengeRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::GetNonceRequest {
-            type View<'a> = GetNonceRequestView<'a>;
-            type ViewHandle = GetNonceRequestOwnedView;
+        impl ::buffa::HasMessageView for super::super::CreateWalletChallengeRequest {
+            type View<'a> = CreateWalletChallengeRequestView<'a>;
+            type ViewHandle = CreateWalletChallengeRequestOwnedView;
         }
-        impl ::serde::Serialize for GetNonceRequestOwnedView {
+        impl ::serde::Serialize for CreateWalletChallengeRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -105595,15 +105783,15 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetNonceResponse contains the nonce that must be signed for wallet login.
+        /// CreateWalletChallengeResponse contains the canonical EIP-4361 message.
         #[derive(Clone, Debug, Default)]
-        pub struct GetNonceResponseView<'a> {
-            /// Random login nonce. The nonce is single-purpose and is replaced by each new
-            /// nonce request for the same smart-account address.
+        pub struct CreateWalletChallengeResponseView<'a> {
+            /// Canonical EIP-4361 message. Sign these UTF-8 bytes exactly once with
+            /// personal_sign; do not hash, alter, or reconstruct the message.
             ///
-            /// Field 1: `nonce`
-            pub nonce: &'a str,
-            /// Time in UTC when the nonce expires. Login nonces expire after 5 minutes.
+            /// Field 1: `message`
+            pub message: &'a str,
+            /// Time in UTC when the challenge expires. Wallet challenges expire after 5 minutes.
             ///
             /// Field 2: `expires_at`
             pub expires_at: ::buffa::MessageFieldView<
@@ -105611,8 +105799,8 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for GetNonceResponseView<'a> {
-            type Owned = super::super::GetNonceResponse;
+        impl<'a> ::buffa::MessageView<'a> for CreateWalletChallengeResponseView<'a> {
+            type Owned = super::super::CreateWalletChallengeResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -105647,7 +105835,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
-                        view.nonce = ::buffa::types::borrow_str(&mut cur)?;
+                        view.message = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -105686,7 +105874,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::GetNonceResponse,
+                super::super::CreateWalletChallengeResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -105696,14 +105884,14 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::GetNonceResponse,
+                super::super::CreateWalletChallengeResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::GetNonceResponse {
-                    nonce: self.nonce.to_string(),
+                ::core::result::Result::Ok(super::super::CreateWalletChallengeResponse {
+                    message: self.message.to_string(),
                     expires_at: match self.expires_at.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -105720,15 +105908,16 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for GetNonceResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for CreateWalletChallengeResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if !self.nonce.is_empty() {
+                if !self.message.is_empty() {
                     size
-                        += 1u32 + ::buffa::types::string_encoded_len(&self.nonce) as u32;
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.message) as u32;
                 }
                 if self.expires_at.is_set() {
                     let __slot = __cache.reserve();
@@ -105749,8 +105938,8 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if !self.nonce.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.nonce, buf);
+                if !self.message.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.message, buf);
                 }
                 if self.expires_at.is_set() {
                     ::buffa::types::put_len_delimited_header(
@@ -105774,15 +105963,15 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for GetNonceResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for CreateWalletChallengeResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.nonce) {
-                    __map.serialize_entry("nonce", self.nonce)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.message) {
+                    __map.serialize_entry("message", self.message)?;
                 }
                 {
                     if let ::core::option::Option::Some(__v) = self
@@ -105795,24 +105984,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for GetNonceResponseView<'a> {
+        impl<'a> ::buffa::MessageName for CreateWalletChallengeResponseView<'a> {
             const PACKAGE: &'static str = "auth.v1";
-            const NAME: &'static str = "GetNonceResponse";
-            const FULL_NAME: &'static str = "auth.v1.GetNonceResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetNonceResponse";
+            const NAME: &'static str = "CreateWalletChallengeResponse";
+            const FULL_NAME: &'static str = "auth.v1.CreateWalletChallengeResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateWalletChallengeResponse";
         }
-        ::buffa::impl_default_view_instance!(GetNonceResponseView);
-        ::buffa::impl_view_reborrow!(GetNonceResponseView);
-        /** Self-contained, `'static` owned view of a `GetNonceResponse` message.
+        ::buffa::impl_default_view_instance!(CreateWalletChallengeResponseView);
+        ::buffa::impl_view_reborrow!(CreateWalletChallengeResponseView);
+        /** Self-contained, `'static` owned view of a `CreateWalletChallengeResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`GetNonceResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`CreateWalletChallengeResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetNonceResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateWalletChallengeResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct GetNonceResponseOwnedView(
-            ::buffa::OwnedView<GetNonceResponseView<'static>>,
+        pub struct CreateWalletChallengeResponseOwnedView(
+            ::buffa::OwnedView<CreateWalletChallengeResponseView<'static>>,
         );
-        impl GetNonceResponseOwnedView {
+        impl CreateWalletChallengeResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -105826,7 +106015,9 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetNonceResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                    CreateWalletChallengeResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
                 )
             }
             /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -105841,7 +106032,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetNonceResponseOwnedView(
+                    CreateWalletChallengeResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -105853,15 +106044,17 @@ pub mod __buffa {
             /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::GetNonceResponse,
+                msg: &super::super::CreateWalletChallengeResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    GetNonceResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                    CreateWalletChallengeResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
                 )
             }
-            /// Borrow the full [`GetNonceResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`CreateWalletChallengeResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &GetNonceResponseView<'_> {
+            pub fn view(&self) -> &CreateWalletChallengeResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -105873,7 +106066,7 @@ pub mod __buffa {
             pub fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::GetNonceResponse,
+                super::super::CreateWalletChallengeResponse,
                 ::buffa::DecodeError,
             > {
                 self.0.to_owned_message()
@@ -105888,15 +106081,15 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Random login nonce. The nonce is single-purpose and is replaced by each new
-            /// nonce request for the same smart-account address.
+            /// Canonical EIP-4361 message. Sign these UTF-8 bytes exactly once with
+            /// personal_sign; do not hash, alter, or reconstruct the message.
             ///
-            /// Field 1: `nonce`
+            /// Field 1: `message`
             #[must_use]
-            pub fn nonce(&self) -> &'_ str {
-                self.0.reborrow().nonce
+            pub fn message(&self) -> &'_ str {
+                self.0.reborrow().message
             }
-            /// Time in UTC when the nonce expires. Login nonces expire after 5 minutes.
+            /// Time in UTC when the challenge expires. Wallet challenges expire after 5 minutes.
             ///
             /// Field 2: `expires_at`
             #[must_use]
@@ -105908,29 +106101,35 @@ pub mod __buffa {
                 &self.0.reborrow().expires_at
             }
         }
-        impl ::core::convert::From<::buffa::OwnedView<GetNonceResponseView<'static>>>
-        for GetNonceResponseOwnedView {
-            fn from(inner: ::buffa::OwnedView<GetNonceResponseView<'static>>) -> Self {
-                GetNonceResponseOwnedView(inner)
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateWalletChallengeResponseView<'static>>,
+        > for CreateWalletChallengeResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CreateWalletChallengeResponseView<'static>>,
+            ) -> Self {
+                CreateWalletChallengeResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<GetNonceResponseOwnedView>
-        for ::buffa::OwnedView<GetNonceResponseView<'static>> {
-            fn from(wrapper: GetNonceResponseOwnedView) -> Self {
+        impl ::core::convert::From<CreateWalletChallengeResponseOwnedView>
+        for ::buffa::OwnedView<CreateWalletChallengeResponseView<'static>> {
+            fn from(wrapper: CreateWalletChallengeResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
-        impl ::core::convert::AsRef<::buffa::OwnedView<GetNonceResponseView<'static>>>
-        for GetNonceResponseOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<GetNonceResponseView<'static>> {
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateWalletChallengeResponseView<'static>>,
+        > for CreateWalletChallengeResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateWalletChallengeResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::GetNonceResponse {
-            type View<'a> = GetNonceResponseView<'a>;
-            type ViewHandle = GetNonceResponseOwnedView;
+        impl ::buffa::HasMessageView for super::super::CreateWalletChallengeResponse {
+            type View<'a> = CreateWalletChallengeResponseView<'a>;
+            type ViewHandle = CreateWalletChallengeResponseOwnedView;
         }
-        impl ::serde::Serialize for GetNonceResponseOwnedView {
+        impl ::serde::Serialize for CreateWalletChallengeResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -105938,20 +106137,16 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// LoginWithWalletRequest completes smart-account wallet login using a signed
-        /// nonce.
+        /// LoginWithWalletRequest completes smart-account wallet login using the exact
+        /// server-issued EIP-4361 message and its signature.
         #[derive(Clone, Debug, Default)]
         pub struct LoginWithWalletRequestView<'a> {
-            /// Smart-account EVM address that produced the signature, formatted as 0x plus
-            /// 40 hex characters.
+            /// Smart-account EVM address bound into the challenge resource, formatted as
+            /// 0x plus 40 hex characters.
             ///
             /// Field 1: `smart_account_address`
             pub smart_account_address: &'a str,
-            /// Nonce returned by GetNonce. The nonce must be unused and not expired.
-            ///
-            /// Field 2: `nonce`
-            pub nonce: &'a str,
-            /// Signature over the canonical login message containing the nonce. Maximum
+            /// Signature over message using EIP-191 personal_sign semantics. Maximum
             /// length is 8192 characters to support universal wallet signatures.
             ///
             /// Field 3: `signature`
@@ -105966,16 +106161,15 @@ pub mod __buffa {
             ///
             /// Field 5: `ip`
             pub ip: &'a str,
-            /// Optional primary wallet address that controls this smart account, formatted
-            /// as 0x plus 40 hex characters. This value is metadata and is not used for
-            /// signature verification.
-            ///
-            /// Field 6: `primary_wallet_address`
-            pub primary_wallet_address: &'a str,
-            /// Optional provider hint for the primary wallet. Maximum length is 32 characters.
+            /// Optional provider hint for the signing wallet. Maximum length is 32 characters.
             ///
             /// Field 7: `wallet_provider`
             pub wallet_provider: &'a str,
+            /// Exact EIP-4361 message returned by CreateWalletChallenge. Maximum length is
+            /// 4096 UTF-8 bytes.
+            ///
+            /// Field 8: `message`
+            pub message: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LoginWithWalletRequestView<'a> {
@@ -106018,13 +106212,6 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.nonce = ::buffa::types::borrow_str(&mut cur)?;
-                    }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -106046,21 +106233,19 @@ pub mod __buffa {
                         )?;
                         view.ip = ::buffa::types::borrow_str(&mut cur)?;
                     }
-                    6u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.primary_wallet_address = ::buffa::types::borrow_str(
-                            &mut cur,
-                        )?;
-                    }
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.wallet_provider = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.message = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -106092,12 +106277,11 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::LoginWithWalletRequest {
                     smart_account_address: self.smart_account_address.to_string(),
-                    nonce: self.nonce.to_string(),
                     signature: self.signature.to_string(),
                     user_agent: self.user_agent.to_string(),
                     ip: self.ip.to_string(),
-                    primary_wallet_address: self.primary_wallet_address.to_string(),
                     wallet_provider: self.wallet_provider.to_string(),
+                    message: self.message.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -106119,10 +106303,6 @@ pub mod __buffa {
                                 &self.smart_account_address,
                             ) as u32;
                 }
-                if !self.nonce.is_empty() {
-                    size
-                        += 1u32 + ::buffa::types::string_encoded_len(&self.nonce) as u32;
-                }
                 if !self.signature.is_empty() {
                     size
                         += 1u32
@@ -106137,18 +106317,16 @@ pub mod __buffa {
                 if !self.ip.is_empty() {
                     size += 1u32 + ::buffa::types::string_encoded_len(&self.ip) as u32;
                 }
-                if !self.primary_wallet_address.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(
-                                &self.primary_wallet_address,
-                            ) as u32;
-                }
                 if !self.wallet_provider.is_empty() {
                     size
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.wallet_provider)
                                 as u32;
+                }
+                if !self.message.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.message) as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -106168,9 +106346,6 @@ pub mod __buffa {
                         buf,
                     );
                 }
-                if !self.nonce.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.nonce, buf);
-                }
                 if !self.signature.is_empty() {
                     ::buffa::types::put_string_field(3u32, &self.signature, buf);
                 }
@@ -106180,15 +106355,11 @@ pub mod __buffa {
                 if !self.ip.is_empty() {
                     ::buffa::types::put_string_field(5u32, &self.ip, buf);
                 }
-                if !self.primary_wallet_address.is_empty() {
-                    ::buffa::types::put_string_field(
-                        6u32,
-                        &self.primary_wallet_address,
-                        buf,
-                    );
-                }
                 if !self.wallet_provider.is_empty() {
                     ::buffa::types::put_string_field(7u32, &self.wallet_provider, buf);
+                }
+                if !self.message.is_empty() {
+                    ::buffa::types::put_string_field(8u32, &self.message, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -106220,9 +106391,6 @@ pub mod __buffa {
                             self.smart_account_address,
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.nonce) {
-                    __map.serialize_entry("nonce", self.nonce)?;
-                }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.signature) {
                     __map.serialize_entry("signature", self.signature)?;
                 }
@@ -106232,17 +106400,11 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.ip) {
                     __map.serialize_entry("ip", self.ip)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(
-                    self.primary_wallet_address,
-                ) {
-                    __map
-                        .serialize_entry(
-                            "primaryWalletAddress",
-                            self.primary_wallet_address,
-                        )?;
-                }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.wallet_provider) {
                     __map.serialize_entry("walletProvider", self.wallet_provider)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.message) {
+                    __map.serialize_entry("message", self.message)?;
                 }
                 __map.end()
             }
@@ -106340,22 +106502,15 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Smart-account EVM address that produced the signature, formatted as 0x plus
-            /// 40 hex characters.
+            /// Smart-account EVM address bound into the challenge resource, formatted as
+            /// 0x plus 40 hex characters.
             ///
             /// Field 1: `smart_account_address`
             #[must_use]
             pub fn smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().smart_account_address
             }
-            /// Nonce returned by GetNonce. The nonce must be unused and not expired.
-            ///
-            /// Field 2: `nonce`
-            #[must_use]
-            pub fn nonce(&self) -> &'_ str {
-                self.0.reborrow().nonce
-            }
-            /// Signature over the canonical login message containing the nonce. Maximum
+            /// Signature over message using EIP-191 personal_sign semantics. Maximum
             /// length is 8192 characters to support universal wallet signatures.
             ///
             /// Field 3: `signature`
@@ -106379,21 +106534,20 @@ pub mod __buffa {
             pub fn ip(&self) -> &'_ str {
                 self.0.reborrow().ip
             }
-            /// Optional primary wallet address that controls this smart account, formatted
-            /// as 0x plus 40 hex characters. This value is metadata and is not used for
-            /// signature verification.
-            ///
-            /// Field 6: `primary_wallet_address`
-            #[must_use]
-            pub fn primary_wallet_address(&self) -> &'_ str {
-                self.0.reborrow().primary_wallet_address
-            }
-            /// Optional provider hint for the primary wallet. Maximum length is 32 characters.
+            /// Optional provider hint for the signing wallet. Maximum length is 32 characters.
             ///
             /// Field 7: `wallet_provider`
             #[must_use]
             pub fn wallet_provider(&self) -> &'_ str {
                 self.0.reborrow().wallet_provider
+            }
+            /// Exact EIP-4361 message returned by CreateWalletChallenge. Maximum length is
+            /// 4096 UTF-8 bytes.
+            ///
+            /// Field 8: `message`
+            #[must_use]
+            pub fn message(&self) -> &'_ str {
+                self.0.reborrow().message
             }
         }
         impl ::core::convert::From<
@@ -116742,8 +116896,8 @@ pub mod __buffa {
         reg.register_json_any(super::__DELETE_MFA_FACTOR_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__REGENERATE_RECOVERY_CODES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__REGENERATE_RECOVERY_CODES_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__GET_NONCE_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__GET_NONCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_WALLET_CHALLENGE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_WALLET_CHALLENGE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LOGIN_WITH_WALLET_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LOGIN_WITH_WALLET_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ME_REQUEST_JSON_ANY);
@@ -117411,13 +117565,13 @@ pub use self::__buffa::view::RegenerateRecoveryCodesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::RegenerateRecoveryCodesResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::GetNonceRequestView;
+pub use self::__buffa::view::CreateWalletChallengeRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::GetNonceRequestOwnedView;
+pub use self::__buffa::view::CreateWalletChallengeRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::GetNonceResponseView;
+pub use self::__buffa::view::CreateWalletChallengeResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::GetNonceResponseOwnedView;
+pub use self::__buffa::view::CreateWalletChallengeResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::LoginWithWalletRequestView;
 #[doc(inline)]

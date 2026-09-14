@@ -7,12 +7,12 @@ service = "auth.v1.MFAService"
 reason = "MFA enrollment and step-up are outside the API-key SDK surface."
 
 [[allowlist]]
-procedure = "/auth.v1.AuthService/GetNonce"
-reason = "Wallet login; this SDK authenticates with API-key HMAC credentials."
+procedure = "/auth.v1.AuthService/CreateWalletChallenge"
+reason = "Wallet login is intentionally outside the API-key SDK surface."
 
 [[allowlist]]
 procedure = "/auth.v1.AuthService/LoginWithWallet"
-reason = "Wallet login; this SDK authenticates with API-key HMAC credentials."
+reason = "Wallet login is intentionally outside the API-key SDK surface."
 
 [[allowlist]]
 service = "auth.v1.PolicyService"

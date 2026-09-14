@@ -11441,13 +11441,13 @@ where
     }
 }
 
-///Shorthand for `OwnedView<GetNonceRequestView<'static>>`.
-pub type OwnedGetNonceRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::GetNonceRequestView<'static>,
+///Shorthand for `OwnedView<CreateWalletChallengeRequestView<'static>>`.
+pub type OwnedCreateWalletChallengeRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::CreateWalletChallengeRequestView<'static>,
 >;
-///Shorthand for `OwnedView<GetNonceResponseView<'static>>`.
-pub type OwnedGetNonceResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::GetNonceResponseView<'static>,
+///Shorthand for `OwnedView<CreateWalletChallengeResponseView<'static>>`.
+pub type OwnedCreateWalletChallengeResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::CreateWalletChallengeResponseView<'static>,
 >;
 ///Shorthand for `OwnedView<LoginWithWalletRequestView<'static>>`.
 pub type OwnedLoginWithWalletRequestView = ::buffa::view::OwnedView<
@@ -11473,8 +11473,8 @@ pub type OwnedMeRequestView = ::buffa::view::OwnedView<
 pub type OwnedMeResponseView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::MeResponseView<'static>,
 >;
-impl ::connectrpc::Encodable<crate::proto::auth::v1::GetNonceResponse>
-for crate::proto::auth::v1::__buffa::view::GetNonceResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::auth::v1::CreateWalletChallengeResponse>
+for crate::proto::auth::v1::__buffa::view::CreateWalletChallengeResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -11482,9 +11482,9 @@ for crate::proto::auth::v1::__buffa::view::GetNonceResponseView<'_> {
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::auth::v1::GetNonceResponse>
+impl ::connectrpc::Encodable<crate::proto::auth::v1::CreateWalletChallengeResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::GetNonceResponseView<'static>,
+    crate::proto::auth::v1::__buffa::view::CreateWalletChallengeResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -11555,12 +11555,12 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const AUTH_SERVICE_SERVICE_NAME: &str = "auth.v1.AuthService";
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetNonce` RPC.
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CreateWalletChallenge` RPC.
 ///
 /// The dispatcher surfaces this on
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const AUTH_SERVICE_GET_NONCE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.AuthService/GetNonce",
+pub const AUTH_SERVICE_CREATE_WALLET_CHALLENGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.AuthService/CreateWalletChallenge",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -11642,7 +11642,7 @@ pub const AUTH_SERVICE_ME_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait AuthService: Send + Sync + 'static {
-    /// Get a short-lived login nonce.
+    /// Create a short-lived EIP-4361 wallet challenge.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -11651,21 +11651,21 @@ pub trait AuthService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn get_nonce<'a>(
+    fn create_wallet_challenge<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::auth::v1::GetNonceRequest,
+            crate::proto::auth::v1::CreateWalletChallengeRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::GetNonceResponse,
+                crate::proto::auth::v1::CreateWalletChallengeResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Verify a signed nonce and issue an access token. Login and account creation
+    /// Verify a signed EIP-4361 message and issue an access token. Login and account creation
     /// do not accept terms; explicit consent is recorded only by AcceptTerms.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -11770,13 +11770,13 @@ impl<S: AuthService> AuthServiceExt for S {
         router
             .route_view(
                 AUTH_SERVICE_SERVICE_NAME,
-                "GetNonce",
+                "CreateWalletChallenge",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::GetNonceRequestView<
+                            crate::proto::auth::v1::__buffa::view::CreateWalletChallengeRequestView<
                                 'static,
                             >,
                         >,
@@ -11785,16 +11785,18 @@ impl<S: AuthService> AuthServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::GetNonceRequest,
+                                crate::proto::auth::v1::CreateWalletChallengeRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.get_nonce(ctx, sreq)
+                            svc.create_wallet_challenge(ctx, sreq)
                                 .await?
-                                .encode::<crate::proto::auth::v1::GetNonceResponse>(format)
+                                .encode::<
+                                    crate::proto::auth::v1::CreateWalletChallengeResponse,
+                                >(format)
                         }
                     })
                 },
             )
-            .with_spec(AUTH_SERVICE_GET_NONCE_SPEC)
+            .with_spec(AUTH_SERVICE_CREATE_WALLET_CHALLENGE_SPEC)
             .route_view(
                 AUTH_SERVICE_SERVICE_NAME,
                 "LoginWithWallet",
@@ -11932,10 +11934,10 @@ impl<T: AuthService> ::connectrpc::Dispatcher for AuthServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("auth.v1.AuthService/")?;
         match method {
-            "GetNonce" => {
+            "CreateWalletChallenge" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(AUTH_SERVICE_GET_NONCE_SPEC),
+                        .with_spec(AUTH_SERVICE_CREATE_WALLET_CHALLENGE_SPEC),
                 )
             }
             "LoginWithWallet" => {
@@ -11971,23 +11973,25 @@ impl<T: AuthService> ::connectrpc::Dispatcher for AuthServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "GetNonce" => {
+            "CreateWalletChallenge" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::GetNonceRequest,
+                        crate::proto::auth::v1::CreateWalletChallengeRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::GetNonceRequestView<
+                    let req: crate::proto::auth::v1::__buffa::view::CreateWalletChallengeRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::GetNonceRequest,
+                        crate::proto::auth::v1::CreateWalletChallengeRequest,
                     >::from_parts(&req, &body);
-                    svc.get_nonce(ctx, req)
+                    svc.create_wallet_challenge(ctx, req)
                         .await?
-                        .encode::<crate::proto::auth::v1::GetNonceResponse>(format)
+                        .encode::<
+                            crate::proto::auth::v1::CreateWalletChallengeResponse,
+                        >(format)
                 })
             }
             "LoginWithWallet" => {
@@ -12110,7 +12114,7 @@ impl<T: AuthService> ::connectrpc::Dispatcher for AuthServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.get_nonce(request).await?;
+/// let resp = client.create_wallet_challenge(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -12118,7 +12122,7 @@ impl<T: AuthService> ::connectrpc::Dispatcher for AuthServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.get_nonce(request).await?.into_owned();
+/// let owned = client.create_wallet_challenge(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -12149,33 +12153,37 @@ where
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
     }
-    /// Call the GetNonce RPC. Sends a request to /auth.v1.AuthService/GetNonce.
-    pub async fn get_nonce(
+    /// Call the CreateWalletChallenge RPC. Sends a request to /auth.v1.AuthService/CreateWalletChallenge.
+    pub async fn create_wallet_challenge(
         &self,
-        request: crate::proto::auth::v1::GetNonceRequest,
+        request: crate::proto::auth::v1::CreateWalletChallengeRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::GetNonceResponseView<'static>,
+                crate::proto::auth::v1::__buffa::view::CreateWalletChallengeResponseView<
+                    'static,
+                >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.get_nonce_with_options(
+        self.create_wallet_challenge_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the GetNonce RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn get_nonce_with_options(
+    /// Call the CreateWalletChallenge RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_wallet_challenge_with_options(
         &self,
-        request: crate::proto::auth::v1::GetNonceRequest,
+        request: crate::proto::auth::v1::CreateWalletChallengeRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::GetNonceResponseView<'static>,
+                crate::proto::auth::v1::__buffa::view::CreateWalletChallengeResponseView<
+                    'static,
+                >,
             >,
         >,
         ::connectrpc::ConnectError,
@@ -12184,7 +12192,7 @@ where
                 &self.transport,
                 &self.config,
                 AUTH_SERVICE_SERVICE_NAME,
-                "GetNonce",
+                "CreateWalletChallenge",
                 request,
                 options,
             )
