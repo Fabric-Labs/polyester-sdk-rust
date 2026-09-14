@@ -5,7 +5,7 @@ use alloy_sol_types::{SolCall, sol};
 use std::sync::LazyLock;
 
 use crate::chain::environment::{
-    POLYESTER_TESTNET_ENVIRONMENT, PolyesterChainEnvironment, SafeDeploymentConfig,
+    POLYESTER_DEVNET_ENVIRONMENT, PolyesterChainEnvironment, SafeDeploymentConfig,
 };
 use crate::errors::{Error, Result};
 
@@ -78,9 +78,9 @@ fn get_initializer(
     threshold: u64,
     safe: &SafeDeploymentConfig,
 ) -> Result<Vec<u8>> {
-    let module = parse_address(safe.safe_4337_module_address)?;
-    let setup_addr = parse_address(safe.safe_module_setup_address)?;
-    let multi_send = parse_address(safe.multi_send_address)?;
+    let module = parse_address(&safe.safe_4337_module_address)?;
+    let setup_addr = parse_address(&safe.safe_module_setup_address)?;
+    let multi_send = parse_address(&safe.multi_send_address)?;
 
     let enable_modules = enableModulesCall {
         modules: vec![module],
@@ -123,14 +123,14 @@ pub fn predict_safe_address_with_data(
     if owners.is_empty() {
         return Err(Error::validation("owners must be non-empty"));
     }
-    let env = environment.unwrap_or(&POLYESTER_TESTNET_ENVIRONMENT);
+    let env = environment.unwrap_or(&POLYESTER_DEVNET_ENVIRONMENT);
     let cfg = safe.unwrap_or(&env.account_abstraction.safe);
     let owner_addrs: Result<Vec<Address>> = owners.iter().map(|o| parse_address(o)).collect();
     let owner_addrs = owner_addrs?;
     let thresh = threshold.unwrap_or(owner_addrs.len() as u64);
     let initializer = get_initializer(&owner_addrs, thresh, cfg)?;
-    let singleton = parse_address(cfg.safe_singleton_address)?;
-    let factory = parse_address(cfg.safe_proxy_factory_address)?;
+    let singleton = parse_address(&cfg.safe_singleton_address)?;
+    let factory = parse_address(&cfg.safe_proxy_factory_address)?;
 
     let factory_calldata = createProxyWithNonceCall {
         singleton,

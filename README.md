@@ -136,6 +136,7 @@ use polyester::services::ListMarketOverviewOptions;
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = Client::new(Config {
+        environment: Some(polyester::POLYESTER_DEVNET_ENVIRONMENT.clone()),
         api_key_id: Some("ak_...".into()),
         api_private_key: Some("...".into()), // 64-char hex from key creation
         default_account_id: Some("YOUR_ACCOUNT_ID".into()), // Profile → Account ID
@@ -169,8 +170,16 @@ async fn main() -> Result<()> {
 | API private key | Shown once when the key is created | `api_private_key` |
 | Account ID | **Profile** → **Account ID** | `default_account_id` |
 
+Pass `Config.environment` so API, websocket, RPC, and contract pins stay
+together. `POLYESTER_DEVNET_ENVIRONMENT` is the `Client::new` default.
+`POLYESTER_TESTNET_ENVIRONMENT` targets public testnet
+(`api-testnet.polyester.com`, chain `888169`). Custom / VPC endpoints use
+`create_polyester_environment` or `environment.with_urls(...)`. `api_url` /
+`ws_url` remain as transport overrides.
+
 Pass credentials on `Config` / `Client::new`. The SDK does not implicitly read
-environment variables unless you call `Client::from_env`.
+environment variables unless you call `Client::from_env`. `from_env` also reads
+`POLYESTER_ENV=devnet|testnet`.
 
 `api_private_key` accepts the 64-character hex Ed25519 secret from key creation.
 
@@ -518,7 +527,7 @@ SDK notes:
 ```rust,no_run
 use alloy_primitives::U256;
 use polyester::chain::{
-    POLYESTER_TESTNET_ENVIRONMENT, PolyesterSmartAccount, encode_trading_gateway_deposit,
+    POLYESTER_DEVNET_ENVIRONMENT, PolyesterSmartAccount, encode_trading_gateway_deposit,
 };
 use std::time::Duration;
 
@@ -526,7 +535,7 @@ let owner_private_key = "0x...";
 let u_asset_id = "0x...";
 let account = PolyesterSmartAccount::new(owner_private_key, None, 0, Duration::from_secs(60))?;
 let call = encode_trading_gateway_deposit(
-    POLYESTER_TESTNET_ENVIRONMENT.contracts.trading_gateway_address,
+    &POLYESTER_DEVNET_ENVIRONMENT.contracts.trading_gateway_address,
     u_asset_id,
     U256::from(10u64).pow(U256::from(18u64)),
 )?;
@@ -736,6 +745,8 @@ Never trust, guess, or invent a stream quantity scale.
 source "$HOME/.cargo/env"   # if cargo is not on PATH yet
 cargo check
 cargo test --lib
+# Named-environment pins vs live Zipper catalog (no API key)
+cargo test --test integration environment_pins:: -- --test-threads=1
 cargo test --test integration -- --test-threads=1
 cargo clippy --all-targets -- -D warnings
 ```

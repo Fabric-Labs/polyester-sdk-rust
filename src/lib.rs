@@ -44,6 +44,7 @@ pub mod auth;
 pub mod catalogs;
 pub mod client;
 pub mod codecs;
+pub mod environment;
 pub mod errors;
 pub mod marketoverview;
 pub mod models;
@@ -61,6 +62,12 @@ pub mod realtime;
 pub mod chain;
 
 pub use client::{Client, Config};
+pub use environment::{
+    AccountAbstractionEnvironment, ContractsEnvironment, CreatePolyesterEnvironmentParams,
+    EntryPointConfig, POLYESTER_DEVNET_ENVIRONMENT, POLYESTER_TESTNET_ENVIRONMENT,
+    PolyesterEnvironment, SafeDeploymentConfig, create_polyester_environment,
+    environment_from_name,
+};
 pub use errors::{Error, Result, auth_codes};
 pub use services::{
     PreparedTradingWithdraw, new_trading_withdraw_idempotency_key, new_trading_withdraw_nonce,

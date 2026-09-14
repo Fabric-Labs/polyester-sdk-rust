@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::chain::calldata::ChainCall;
-use crate::chain::environment::{POLYESTER_TESTNET_ENVIRONMENT, PolyesterChainEnvironment};
+use crate::chain::environment::{POLYESTER_DEVNET_ENVIRONMENT, PolyesterChainEnvironment};
 use crate::chain::rpc::JsonRpcClient;
 use crate::chain::safe::predict_safe_address_with_data;
 use crate::errors::{Error, Result};
@@ -197,12 +197,12 @@ pub fn sign_safe_user_operation(
     valid_until: u64,
 ) -> Result<Vec<u8>> {
     let module = parse_address(
-        environment
+        &environment
             .account_abstraction
             .safe
             .safe_4337_module_address,
     )?;
-    let entry_point = parse_address(environment.account_abstraction.entry_point.address)?;
+    let entry_point = parse_address(&environment.account_abstraction.entry_point.address)?;
     let safe = parse_address(sender)?;
 
     if valid_after > (1u64 << 48) - 1 || valid_until > (1u64 << 48) - 1 {
@@ -272,7 +272,7 @@ impl PolyesterSmartAccount {
         let signing_key = parse_private_key(owner_private_key)?;
         let owner = address_from_signing_key(&signing_key);
         let owner_address = owner.to_checksum(None);
-        let environment = environment.unwrap_or_else(|| POLYESTER_TESTNET_ENVIRONMENT.clone());
+        let environment = environment.unwrap_or_else(|| POLYESTER_DEVNET_ENVIRONMENT.clone());
         let predicted = predict_safe_address_with_data(
             &[&owner_address],
             salt_nonce,
@@ -283,9 +283,9 @@ impl PolyesterSmartAccount {
         let aa = &environment.account_abstraction;
         Ok(Self {
             signing_key,
-            rpc: JsonRpcClient::new(environment.rpc_url, timeout)?,
-            bundler: JsonRpcClient::new(aa.bundler_url, timeout)?,
-            paymaster: JsonRpcClient::new(aa.paymaster_url, timeout)?,
+            rpc: JsonRpcClient::new(environment.rpc_url.as_str(), timeout)?,
+            bundler: JsonRpcClient::new(aa.bundler_url.as_str(), timeout)?,
+            paymaster: JsonRpcClient::new(aa.paymaster_url.as_str(), timeout)?,
             environment,
             salt_nonce,
             address: predicted.address,
@@ -318,7 +318,7 @@ impl PolyesterSmartAccount {
                 .map_err(|e| Error::transport(format!("system clock error: {e}")))?
                 .as_millis(),
         };
-        let ep = self.environment.account_abstraction.entry_point.address;
+        let ep = &self.environment.account_abstraction.entry_point.address;
         let data = getNonceCall {
             sender: parse_address(&self.address)?,
             key: alloy_primitives::Uint::<192, 3>::from(nonce_key),
@@ -368,7 +368,8 @@ impl PolyesterSmartAccount {
                 .environment
                 .account_abstraction
                 .safe
-                .safe_proxy_factory_address;
+                .safe_proxy_factory_address
+                .as_str();
             factory = Some(parse_address(factory_addr)?.to_checksum(None));
             factory_data = Some(self.factory_calldata.clone());
             let mut code = parse_address(factory_addr)?.as_slice().to_vec();
@@ -409,7 +410,7 @@ impl PolyesterSmartAccount {
             user_op["factoryData"] = json!(encode_hex(fd));
         }
 
-        let entry_point = self.environment.account_abstraction.entry_point.address;
+        let entry_point = &self.environment.account_abstraction.entry_point.address;
 
         // Sponsor once for estimates, buffer gas (incl. paymaster), then re-sponsor so
         // paymasterData matches the final limits. Polyester's paymaster often returns
