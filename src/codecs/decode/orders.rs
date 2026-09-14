@@ -15,9 +15,9 @@ use crate::models::{
     BatchCreateOrdersResult, BatchCreateResultItem, BatchReplaceAdmissionItem,
     BatchReplaceOrdersResult, BatchReplaceStatusItem, BatchReplaceStatusResult,
     CancelAllAfterResult, CancelAllOrdersResult, CreateOrderType, GetOrderResult, MaxSlippage,
-    ModifyOrderResult, Order, OrderErrorDetail, OrderFieldViolation, OrderMutationResult,
-    OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, UserTrade,
-    UserTradesList,
+    ModifyOrderResult, Order, OrderErrorDetail, OrderFieldViolation, OrderLineage,
+    OrderMutationResult, OrderTransfer, OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance,
+    TrailingStop, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
     AttachedRisk as ProtoAttachedRisk, AttachedRiskLegState as ProtoAttachedRiskLegState,
@@ -26,9 +26,10 @@ use crate::proto::orders::v1::{
     CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse, CreateOrderResponse,
     ErrorDetail, GetBatchReplaceStatusResponse, GetOpenOrdersResponse, GetOrderHistoryResponse,
     GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse, Order as ProtoOrder,
-    PreviewOrderResponse, RiskExecution, TrailingStopPolicy, UserTrade as ProtoUserTrade,
-    batch_cancel_result_item, batch_create_result_item, cancel_all_after_response,
-    cancel_all_orders_response, cancel_order_response, risk_execution, trailing_stop_policy,
+    OrderLineage as ProtoOrderLineage, OrderTransfer as ProtoOrderTransfer, PreviewOrderResponse,
+    RiskExecution, TrailingStopPolicy, UserTrade as ProtoUserTrade, batch_cancel_result_item,
+    batch_create_result_item, cancel_all_after_response, cancel_all_orders_response,
+    cancel_order_response, risk_execution, trailing_stop_policy,
 };
 use crate::proto::polyester::r#type::v1::U128;
 use buffa::Enumeration;
@@ -64,6 +65,36 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
             .map(attached_risk_from_proto)
             .transpose()?
             .flatten(),
+        lineage: order_lineage_from_proto(msg.lineage.as_option()),
+    })
+}
+
+fn order_lineage_from_proto(msg: Option<&ProtoOrderLineage>) -> Option<OrderLineage> {
+    let msg = msg?;
+    if msg.id == 0 && msg.generation == 0 {
+        return None;
+    }
+    Some(OrderLineage {
+        id: format_uint64_id(msg.id),
+        generation: msg.generation,
+    })
+}
+
+fn order_transfer_from_proto(msg: &ProtoOrderTransfer) -> Result<OrderTransfer> {
+    Ok(OrderTransfer {
+        match_id: if msg.match_id == 0 {
+            String::new()
+        } else {
+            msg.match_id.to_string()
+        },
+        symbol_id: msg.symbol_id,
+        asset_id: msg.asset_id,
+        amount_e18: u128_field(msg.amount_e18.as_option()),
+        is_debit: msg.is_debit,
+        transfer_code: msg.transfer_code.to_i32(),
+        account_code: msg.account_code.to_i32(),
+        ts_ns: TsNs::from_wire(msg.ts_ns, "OrderTransfer.ts_ns")?.optional_string(),
+        tx_id: msg.tx_id.clone(),
     })
 }
 
@@ -262,6 +293,7 @@ pub fn user_trade_from_proto(msg: &ProtoUserTrade) -> Result<UserTrade> {
         referral_share_amount_e18: u128_field(msg.referral_share_amount_e18.as_option()),
         ts_ns: TsNs::from_wire(msg.ts_ns, "UserTrade.ts_ns")?.optional_string(),
         fee_is_rebate: msg.fee_is_rebate,
+        lineage: order_lineage_from_proto(msg.lineage.as_option()),
     })
 }
 
@@ -279,6 +311,11 @@ pub fn user_trades_list_from_proto(msg: &GetUserTradesResponse) -> Result<UserTr
             .iter()
             .map(user_trade_from_proto)
             .collect::<Result<Vec<_>>>()?,
+        transfers: msg
+            .transfers
+            .iter()
+            .map(order_transfer_from_proto)
+            .collect::<Result<Vec<_>>>()?,
         next_page_token: msg.next_page_token.clone(),
     })
 }
@@ -290,7 +327,17 @@ pub fn get_order_from_proto(msg: &GetOrderResponse) -> Result<GetOrderResult> {
         .iter()
         .map(user_trade_from_proto)
         .collect::<Result<Vec<_>>>()?;
-    Ok(GetOrderResult { order, trades })
+    let transfers = msg
+        .transfers
+        .iter()
+        .map(order_transfer_from_proto)
+        .collect::<Result<Vec<_>>>()?;
+    Ok(GetOrderResult {
+        order,
+        trades,
+        transfers,
+        next_page_token: msg.next_page_token.clone(),
+    })
 }
 
 /// `CreateOrderResponse` acknowledges admission only and no longer carries a
@@ -1443,6 +1490,61 @@ mod tests {
         assert_eq!(result.trades[0].fee_asset, "base");
         assert_eq!(result.trades[0].referral_share_amount_e18, "2");
         assert!(result.trades[0].fee_is_rebate);
+    }
+
+    #[test]
+    fn get_order_includes_lineage_transfers_and_page_token() {
+        let msg = GetOrderResponse {
+            order: ProtoOrder {
+                order_id: 11,
+                symbol_id: 2,
+                lineage: crate::proto::orders::v1::OrderLineage {
+                    id: 7,
+                    generation: 2,
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            trades: vec![ProtoUserTrade {
+                symbol_id: 2,
+                match_id: 99,
+                order_id: 7,
+                lineage: crate::proto::orders::v1::OrderLineage {
+                    id: 7,
+                    generation: 1,
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }],
+            transfers: vec![crate::proto::orders::v1::OrderTransfer {
+                match_id: 99,
+                symbol_id: 2,
+                asset_id: 1,
+                amount_e18: crate::proto::polyester::r#type::v1::U128 {
+                    hi: 0,
+                    lo: 8,
+                    ..Default::default()
+                }
+                .into(),
+                is_debit: true,
+                tx_id: "tx-1".into(),
+                ..Default::default()
+            }],
+            next_page_token: "page-2".into(),
+            ..Default::default()
+        };
+        let result = get_order_from_proto(&msg).unwrap();
+        let order = result.order.as_ref().unwrap();
+        let lineage = order.lineage.as_ref().unwrap();
+        assert_eq!(lineage.id, format_uint64_id(7));
+        assert_eq!(lineage.generation, 2);
+        assert_eq!(result.trades[0].lineage.as_ref().unwrap().generation, 1);
+        assert_eq!(result.transfers[0].tx_id, "tx-1");
+        assert_eq!(result.transfers[0].amount_e18, "8");
+        assert_eq!(result.next_page_token, "page-2");
     }
 
     #[test]

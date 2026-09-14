@@ -32,8 +32,8 @@ use crate::proto::orders::v1::{
     MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, PreviewOrderRequest, RiskExecution,
     RiskLimitGtc, RiskPolicy, SelfTradePreventionMode, Side, StopLossPolicy, TakeProfitPolicy,
     TrailingStopPolicy, batch_replace_order_item, cancel_order_request, get_order_request,
-    market_ioc, modify_order_request, order_intent, risk_execution, risk_policy,
-    trailing_stop_policy,
+    get_user_trades_request, market_ioc, modify_order_request, order_intent, risk_execution,
+    risk_policy, trailing_stop_policy,
 };
 use crate::types::{
     Price, Quantity, resolve_price_ticks, resolve_qty_scaled, resolve_quote_qty_scaled,
@@ -191,17 +191,34 @@ impl OrdersService {
             subaccount_id,
             include_attached_risk: false,
             include_attached_risk_state: false,
+            include_execution_history: None,
+            limit: None,
+            page_token: None,
         })
         .await
     }
 
     pub async fn get_with(&self, opts: GetOrderOpts) -> Result<GetOrderResult> {
+        if opts.include_execution_history == Some(false)
+            && (opts.limit.is_some()
+                || opts
+                    .page_token
+                    .as_deref()
+                    .is_some_and(|token| !token.is_empty()))
+        {
+            return Err(Error::validation(
+                "orders.get limit and page_token require include_execution_history",
+            ));
+        }
         let key = Some(Self::encode_get_order_key(&opts.key)?);
         let req = GetOrderRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
             key,
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
+            include_execution_history: opts.include_execution_history,
+            limit: opts.limit,
+            page_token: opts.page_token.unwrap_or_default(),
             ..Default::default()
         };
         let client = self.read_client();
@@ -234,13 +251,14 @@ impl OrdersService {
         };
         let deadline = tokio::time::Instant::now() + timeout;
         loop {
-            let last = tokio::time::timeout_at(deadline, self.get(key.clone(), None))
-                .await
-                .map_err(|_| {
-                    Error::transport(format!(
-                        "timed out waiting for order trades to match cum_qty (key={key:?})"
-                    ))
-                })??;
+            let last =
+                tokio::time::timeout_at(deadline, self.get_order_execution_pages(key.clone()))
+                    .await
+                    .map_err(|_| {
+                        Error::transport(format!(
+                            "timed out waiting for order trades to match cum_qty (key={key:?})"
+                        ))
+                    })??;
             if order_trades_projection_complete(&last) {
                 return Ok(last);
             }
@@ -253,6 +271,40 @@ impl OrdersService {
                 deadline.min(tokio::time::Instant::now() + Duration::from_millis(100)),
             )
             .await;
+        }
+    }
+
+    async fn get_order_execution_pages(&self, key: OrderKey) -> Result<GetOrderResult> {
+        let mut page_token = None;
+        let mut trades = Vec::new();
+        let mut transfers = Vec::new();
+        let mut order = None;
+        loop {
+            let page = self
+                .get_with(GetOrderOpts {
+                    key: key.clone(),
+                    subaccount_id: None,
+                    include_attached_risk: false,
+                    include_attached_risk_state: false,
+                    include_execution_history: Some(true),
+                    limit: None,
+                    page_token,
+                })
+                .await?;
+            if page.order.is_some() {
+                order = page.order;
+            }
+            trades.extend(page.trades);
+            transfers.extend(page.transfers);
+            if page.next_page_token.is_empty() {
+                return Ok(GetOrderResult {
+                    order,
+                    trades,
+                    transfers,
+                    next_page_token: String::new(),
+                });
+            }
+            page_token = Some(page.next_page_token);
         }
     }
 
@@ -1261,6 +1313,21 @@ impl TradesService {
     }
 
     pub async fn list_with(&self, opts: ListUserTradesOpts) -> Result<UserTradesList> {
+        if opts.order_id.is_some() && opts.lineage_id.is_some() {
+            return Err(Error::validation(
+                "trades.list order_id and lineage_id are mutually exclusive",
+            ));
+        }
+        if opts.through_generation.is_some() && opts.lineage_id.is_none() {
+            return Err(Error::validation(
+                "trades.list through_generation requires lineage_id",
+            ));
+        }
+        if opts.through_generation == Some(0) {
+            return Err(Error::validation(
+                "trades.list through_generation must be a positive integer",
+            ));
+        }
         if opts.symbol_id.is_none()
             && opts
                 .symbol
@@ -1280,6 +1347,15 @@ impl TradesService {
                 .catalogs
                 .optional_symbol_id(opts.symbol.as_deref(), opts.symbol_id)?
         };
+        let execution_scope = match (opts.order_id, opts.lineage_id) {
+            (Some(order_id), None) => Some(get_user_trades_request::ExecutionScope::OrderId(
+                id_to_u64(&order_id, "order_id")?,
+            )),
+            (None, Some(lineage_id)) => Some(get_user_trades_request::ExecutionScope::LineageId(
+                id_to_u64(&lineage_id, "lineage_id")?,
+            )),
+            _ => None,
+        };
         let req = GetUserTradesRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_id,
@@ -1287,6 +1363,9 @@ impl TradesService {
             // Option wire field: None omits; Some(0) means server default.
             limit: opts.limit,
             page_token: opts.page_token.unwrap_or_default(),
+            through_generation: opts.through_generation,
+            include_transfers: opts.include_transfers,
+            execution_scope,
             ..Default::default()
         };
         let client = OrdersReadServiceClient::new(
@@ -2284,8 +2363,11 @@ mod tests {
                 fee_asset: "quote".into(),
                 submitted_max_quote_debit_scaled: None,
                 attached_risk: None,
+                lineage: None,
             }),
             trades: vec![],
+            transfers: vec![],
+            next_page_token: String::new(),
         };
         assert!(!order_trades_projection_complete(&incomplete));
 
@@ -2299,6 +2381,8 @@ mod tests {
                 ..incomplete.order.clone().unwrap()
             }),
             trades: vec![],
+            transfers: vec![],
+            next_page_token: String::new(),
         };
         assert!(
             !order_trades_projection_complete(&open_unfilled),
@@ -2332,7 +2416,10 @@ mod tests {
                 referral_share_amount_e18: "0".into(),
                 ts_ns: String::new(),
                 fee_is_rebate: false,
+                lineage: None,
             }],
+            transfers: vec![],
+            next_page_token: String::new(),
         };
         assert!(order_trades_projection_complete(&complete));
     }

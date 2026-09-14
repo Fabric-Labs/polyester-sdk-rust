@@ -14,8 +14,9 @@ pub struct Order {
     pub tif: String,
     /// Current accepted total quantity. A successful modify updates this to
     /// the amended total; retain the first submitted quantity separately if
-    /// needed. `cum_qty` is cumulative fills; `leaves_qty` is remaining
-    /// working quantity.
+    /// needed. `cum_qty` and `avg_px` are cumulative execution values across
+    /// the lineage through the returned generation, not values limited to one
+    /// physical order. `leaves_qty` is remaining working quantity.
     pub orig_qty: Option<Quantity>,
     pub cum_qty: Option<Quantity>,
     pub leaves_qty: Option<Quantity>,
@@ -31,6 +32,30 @@ pub struct Order {
     pub submitted_max_quote_debit_scaled: Option<i64>,
     /// Attached risk policy when requested via `include_attached_risk`.
     pub attached_risk: Option<AttachedRisk>,
+    pub lineage: Option<OrderLineage>,
+}
+
+/// Stable replacement-chain identity. `id` is the first generation's public
+/// order ID. `generation` is one-based.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderLineage {
+    pub id: String,
+    pub generation: u32,
+}
+
+/// Settlement leg linked to a match. Identify a match by `(symbol_id, match_id)`
+/// and deduplicate repeated legs across pages by `tx_id`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderTransfer {
+    pub match_id: String,
+    pub symbol_id: u32,
+    pub asset_id: u32,
+    pub amount_e18: String,
+    pub is_debit: bool,
+    pub transfer_code: i32,
+    pub account_code: i32,
+    pub ts_ns: String,
+    pub tx_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,6 +79,8 @@ pub struct OrderMutationResult {
 pub struct GetOrderResult {
     pub order: Option<Order>,
     pub trades: Vec<UserTrade>,
+    pub transfers: Vec<OrderTransfer>,
+    pub next_page_token: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,11 +103,13 @@ pub struct UserTrade {
     /// True when `fee_amount_e18` is a rebate credit instead of a fee debit.
     /// Proto3 omits false, so sparse wire encoding only sets this for rebates.
     pub fee_is_rebate: bool,
+    pub lineage: Option<OrderLineage>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserTradesList {
     pub trades: Vec<UserTrade>,
+    pub transfers: Vec<OrderTransfer>,
     pub next_page_token: String,
 }
 
@@ -461,6 +490,10 @@ pub struct ListUserTradesOpts {
     pub symbol: Option<String>,
     pub symbol_id: Option<u32>,
     pub after_match_id: Option<u64>,
+    pub order_id: Option<String>,
+    pub lineage_id: Option<String>,
+    pub through_generation: Option<u32>,
+    pub include_transfers: bool,
     pub limit: Option<u32>,
     pub page_token: Option<String>,
 }
@@ -472,6 +505,10 @@ pub struct GetOrderOpts {
     pub subaccount_id: Option<u64>,
     pub include_attached_risk: bool,
     pub include_attached_risk_state: bool,
+    /// `None` omits the field so the server default (enabled) applies.
+    pub include_execution_history: Option<bool>,
+    pub limit: Option<u32>,
+    pub page_token: Option<String>,
 }
 
 /// Params for [`crate::services::OrdersService::cancel_with`].

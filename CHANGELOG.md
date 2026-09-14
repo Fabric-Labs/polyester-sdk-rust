@@ -9,6 +9,15 @@
   client / chain-helper default. Environment fields are owned `String`s.
 
 ### Added
+- Paginated order lineage history: `Order.lineage` / `UserTrade.lineage`
+  (`id` + one-based `generation`), `GetOrderResult.transfers` /
+  `next_page_token`, and `UserTradesList.transfers`. `GetOrderOpts` accepts
+  `include_execution_history`, `limit`, and `page_token`.
+  `ListUserTradesOpts` accepts mutually exclusive `order_id` / `lineage_id`,
+  optional `through_generation` (requires `lineage_id`), and
+  `include_transfers`. `wait_for_order_trades_complete` pages execution
+  history; an empty page is not a settlement watermark. `cum_qty` /
+  `avg_px` are lineage-cumulative.
 - First-class `Config.environment` / `POLYESTER_DEVNET_ENVIRONMENT` /
   `POLYESTER_TESTNET_ENVIRONMENT`. `create_polyester_environment` and
   `PolyesterEnvironment::with_urls` support custom / VPC endpoints.
