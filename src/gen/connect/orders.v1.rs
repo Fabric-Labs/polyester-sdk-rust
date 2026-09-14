@@ -1984,7 +1984,8 @@ pub trait OrdersReadService: Send + Sync + 'static {
         >,
     > + Send;
     /// Retrieve per-user trade fills for an account.
-    /// Supports optional subaccount, symbol, side, and time-range filters with cursor pagination.
+    /// Supports exact physical-order or logical-lineage scope, an inclusive generation
+    /// cutoff, and subaccount, symbol, side and time filters with cursor pagination.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2007,7 +2008,8 @@ pub trait OrdersReadService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Retrieve a single order by order ID or client order ID, including related user trades and ledger transfers.
+    /// Retrieve order state and a bounded page of its lineage executions by order or client order ID.
+    /// Use GetUserTrades for paginated execution history and optional settlement legs.
     /// Recent accepted orders may wait briefly for read availability; retry UNAVAILABLE with the same lookup key.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
