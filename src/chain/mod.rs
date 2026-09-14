@@ -23,8 +23,10 @@ pub use calldata::{
 };
 pub use destination::encode_withdraw_destination;
 pub use environment::{
-    AccountAbstractionEnvironment, ContractsEnvironment, EntryPointConfig,
-    POLYESTER_TESTNET_ENVIRONMENT, PolyesterChainEnvironment, SafeDeploymentConfig,
+    AccountAbstractionEnvironment, ContractsEnvironment, CreatePolyesterEnvironmentParams,
+    EntryPointConfig, POLYESTER_DEVNET_ENVIRONMENT, POLYESTER_TESTNET_ENVIRONMENT,
+    PolyesterChainEnvironment, PolyesterEnvironment, SafeDeploymentConfig,
+    create_polyester_environment, environment_from_name, parse_polyester_environment,
 };
 pub use fees::{ZipperFeeQuote, quote_zipper_fee};
 pub use rpc::JsonRpcClient;

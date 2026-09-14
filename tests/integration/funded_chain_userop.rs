@@ -8,7 +8,7 @@ use crate::support::{
 };
 use alloy_primitives::U256;
 use polyester::chain::{
-    POLYESTER_TESTNET_ENVIRONMENT, PolyesterSmartAccount, SendCallsResult,
+    POLYESTER_DEVNET_ENVIRONMENT, PolyesterSmartAccount, SendCallsResult,
     encode_funding_withdraw_to_chain, encode_trading_gateway_deposit, encode_withdraw_destination,
     quote_zipper_fee,
 };
@@ -111,7 +111,7 @@ async fn funding_to_trading_userop() {
     let account = PolyesterSmartAccount::new(&owner, None, 0, Duration::from_secs(60))
         .expect("smart account");
     let call = encode_trading_gateway_deposit(
-        POLYESTER_TESTNET_ENVIRONMENT
+        &POLYESTER_DEVNET_ENVIRONMENT
             .contracts
             .trading_gateway_address,
         &asset.u_asset_id,
@@ -221,7 +221,7 @@ async fn funding_withdraw_to_chain_userop() {
     let fee = quote_zipper_fee(
         chain_id,
         &variant.z_token.address,
-        POLYESTER_TESTNET_ENVIRONMENT
+        &POLYESTER_DEVNET_ENVIRONMENT
             .contracts
             .zipper_endpoint_address,
         None,
@@ -241,7 +241,7 @@ async fn funding_withdraw_to_chain_userop() {
         .expect("smart account");
     let dest_bytes = encode_withdraw_destination(&dest, case_sensitive);
     let call = encode_funding_withdraw_to_chain(
-        POLYESTER_TESTNET_ENVIRONMENT
+        &POLYESTER_DEVNET_ENVIRONMENT
             .contracts
             .funding_account_address,
         chain_id,

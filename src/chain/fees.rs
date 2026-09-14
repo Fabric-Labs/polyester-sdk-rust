@@ -4,7 +4,7 @@ use alloy_primitives::{Address, U256};
 use alloy_sol_types::{SolCall, sol};
 use serde_json::json;
 
-use crate::chain::environment::{POLYESTER_TESTNET_ENVIRONMENT, PolyesterChainEnvironment};
+use crate::chain::environment::{POLYESTER_DEVNET_ENVIRONMENT, PolyesterChainEnvironment};
 use crate::chain::rpc::JsonRpcClient;
 use crate::errors::{Error, Result};
 
@@ -40,12 +40,13 @@ pub async fn quote_zipper_fee(
     let token = normalize_address(z_token, "z_token")?;
     let endpoint = normalize_address(zipper_endpoint, "zipper_endpoint")?;
 
-    let env = environment.unwrap_or(&POLYESTER_TESTNET_ENVIRONMENT);
+    let env = environment.unwrap_or(&POLYESTER_DEVNET_ENVIRONMENT);
     let owned_client;
     let client = match rpc {
         Some(c) => c,
         None => {
-            owned_client = JsonRpcClient::new(env.rpc_url, std::time::Duration::from_secs(60))?;
+            owned_client =
+                JsonRpcClient::new(env.rpc_url.as_str(), std::time::Duration::from_secs(60))?;
             &owned_client
         }
     };

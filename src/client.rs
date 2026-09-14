@@ -2,6 +2,10 @@
 
 use crate::auth::{self, Credentials};
 use crate::catalogs::Manager as CatalogManager;
+use crate::environment::{
+    ENV_NAME_ENV, POLYESTER_DEVNET_ENVIRONMENT, PolyesterEnvironment, environment_from_name,
+    parse_polyester_environment,
+};
 use crate::errors::{Error, Result};
 use crate::services::{
     AddressBookService, ApiKeysService, AuthService, BalancesService, ChainAnalyticsService,
@@ -23,6 +27,7 @@ use crate::realtime::Client as RealtimeClient;
 /// Client configuration.
 #[derive(Clone)]
 pub struct Config {
+    pub environment: Option<PolyesterEnvironment>,
     pub api_key_id: Option<String>,
     pub api_private_key: Option<String>,
     pub api_url: String,
@@ -39,6 +44,10 @@ pub struct Config {
 impl std::fmt::Debug for Config {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Config")
+            .field(
+                "environment",
+                &self.environment.as_ref().map(|env| &env.name),
+            )
             .field("api_key_id", &self.api_key_id)
             .field(
                 "api_private_key",
@@ -59,6 +68,7 @@ impl std::fmt::Debug for Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            environment: None,
             api_key_id: None,
             api_private_key: None,
             api_url: DEFAULT_API_URL.to_owned(),
@@ -75,6 +85,7 @@ impl Default for Config {
 
 /// Async Polyester SDK entrypoint.
 pub struct Client {
+    pub environment: PolyesterEnvironment,
     pub api_url: String,
     pub ws_url: String,
     pub default_sub_account_id: Option<String>,
@@ -116,9 +127,32 @@ pub struct Client {
     hydrate_catalogs_enabled: bool,
 }
 
+fn resolve_environment(config: &Config) -> Result<(PolyesterEnvironment, String, String)> {
+    let resolved = match &config.environment {
+        Some(env) => parse_polyester_environment(env)?,
+        None => POLYESTER_DEVNET_ENVIRONMENT.clone(),
+    };
+    let api_url = if config.api_url.is_empty()
+        || (config.environment.is_some() && config.api_url == DEFAULT_API_URL)
+    {
+        resolved.api_url.clone()
+    } else {
+        config.api_url.clone()
+    };
+    let ws_url = if config.ws_url.is_empty()
+        || (config.environment.is_some() && config.ws_url == DEFAULT_WS_URL)
+    {
+        resolved.websocket_url.clone()
+    } else {
+        config.ws_url.clone()
+    };
+    Ok((resolved, api_url, ws_url))
+}
+
 impl Client {
     pub fn new(config: Config) -> Result<Self> {
         let hydrate_catalogs_enabled = config.hydrate_catalogs;
+        let (environment, api_url, ws_url) = resolve_environment(&config)?;
         let credentials = Credentials::load(
             config.api_key_id.as_deref(),
             config.api_private_key.as_deref(),
@@ -126,8 +160,8 @@ impl Client {
         )?;
 
         let transport_cfg = TransportConfig {
-            api_url: config.api_url.clone(),
-            ws_url: config.ws_url.clone(),
+            api_url: api_url.clone(),
+            ws_url: ws_url.clone(),
             timeout: config.timeout,
             wire_format: config.wire_format,
             allow_insecure_http: config.allow_insecure_http,
@@ -136,8 +170,8 @@ impl Client {
         let catalogs = Arc::new(CatalogManager::new());
 
         let realtime = RealtimeClient::with_timeout(
-            config.ws_url.clone(),
-            config.api_url.clone(),
+            ws_url.clone(),
+            api_url.clone(),
             credentials,
             None,
             config.timeout,
@@ -158,8 +192,9 @@ impl Client {
         };
 
         let client = Self {
-            api_url: config.api_url,
-            ws_url: config.ws_url,
+            environment,
+            api_url,
+            ws_url,
             default_sub_account_id: config.default_sub_account_id,
             default_account_id: config.default_account_id,
             catalogs,
@@ -210,6 +245,11 @@ impl Client {
             default_account_id: auth::account_id_from_env(),
             ..Default::default()
         };
+        if let Ok(name) = std::env::var(ENV_NAME_ENV)
+            && !name.trim().is_empty()
+        {
+            config.environment = Some(environment_from_name(&name)?);
+        }
         if let Ok(url) = std::env::var("POLYESTER_API_URL")
             && !url.trim().is_empty()
         {
@@ -221,11 +261,12 @@ impl Client {
             config.ws_url = url;
         }
         config.allow_insecure_http = crate::transport::env_allow_insecure_http();
+        let (environment, api_url, ws_url) = resolve_environment(&config)?;
         // Force from_env credential loading
         let credentials = Credentials::load(None, None, true)?;
         let transport_cfg = TransportConfig {
-            api_url: config.api_url.clone(),
-            ws_url: config.ws_url.clone(),
+            api_url: api_url.clone(),
+            ws_url: ws_url.clone(),
             timeout: config.timeout,
             wire_format: config.wire_format,
             allow_insecure_http: config.allow_insecure_http,
@@ -233,8 +274,8 @@ impl Client {
         let factory = Factory::new(transport_cfg, credentials.clone())?;
         let catalogs = Arc::new(CatalogManager::new());
         let realtime = RealtimeClient::with_timeout(
-            config.ws_url.clone(),
-            config.api_url.clone(),
+            ws_url.clone(),
+            api_url.clone(),
             credentials,
             None,
             config.timeout,
@@ -254,8 +295,9 @@ impl Client {
             hydrate_catalogs_enabled,
         };
         let client = Self {
-            api_url: config.api_url,
-            ws_url: config.ws_url,
+            environment,
+            api_url,
+            ws_url,
             default_sub_account_id: config.default_sub_account_id,
             default_account_id: config.default_account_id,
             catalogs,
@@ -424,6 +466,19 @@ mod tests {
         assert_eq!(cfg.api_url, DEFAULT_API_URL);
         assert!(cfg.hydrate_catalogs);
         assert!(cfg.api_key_id.is_none());
+        assert!(cfg.environment.is_none());
+    }
+
+    #[test]
+    fn client_uses_named_environment_urls() {
+        let client = Client::new(Config {
+            environment: Some(crate::POLYESTER_TESTNET_ENVIRONMENT.clone()),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .expect("client");
+        assert_eq!(client.api_url, crate::POLYESTER_TESTNET_ENVIRONMENT.api_url);
+        assert_eq!(client.environment.chain_id, 888169);
     }
 
     #[test]

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Breaking
+- `POLYESTER_TESTNET_ENVIRONMENT` is now public testnet
+  (`api-testnet.polyester.com`, chain `888169`). The previous preset (devnet
+  URLs, chain `888168`) is `POLYESTER_DEVNET_ENVIRONMENT` and remains the
+  client / chain-helper default. Environment fields are owned `String`s.
+
+### Added
+- First-class `Config.environment` / `POLYESTER_DEVNET_ENVIRONMENT` /
+  `POLYESTER_TESTNET_ENVIRONMENT`. `create_polyester_environment` and
+  `PolyesterEnvironment::with_urls` support custom / VPC endpoints.
+  `Client::from_env` reads `POLYESTER_ENV=devnet|testnet`.
+
+
 ## 0.1.0a46
 
 Package version: `0.1.0-alpha.46`. Git tag: `v0.1.0a46`.

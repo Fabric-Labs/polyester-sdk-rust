@@ -31,6 +31,7 @@ mod auth;
 mod balances;
 mod batch_replace_regression;
 mod currency_conversion;
+mod environment_pins;
 mod funded_chain_userop;
 mod funded_internal_transfer;
 mod funded_market_fill;
