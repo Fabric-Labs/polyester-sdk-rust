@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a47
+
+Package version: `0.1.0-alpha.47`. Git tag: `v0.1.0a47`.
+
 ### Breaking
 - `POLYESTER_TESTNET_ENVIRONMENT` is now public testnet
   (`api-testnet.polyester.com`, chain `888169`). The previous preset (devnet
