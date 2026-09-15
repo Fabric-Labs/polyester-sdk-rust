@@ -168,14 +168,13 @@ async fn wait_listed_open(
 ) -> std::result::Result<polyester::models::Order, Box<dyn std::error::Error + Send + Sync>> {
     let deadline = std::time::Instant::now() + Duration::from_secs(15);
     while std::time::Instant::now() < deadline {
-        if let Ok(listed) = client.orders.list_open(None).await {
-            if let Some(order) = listed
+        if let Ok(listed) = client.orders.list_open(None).await
+            && let Some(order) = listed
                 .orders
                 .into_iter()
                 .find(|order| order.client_order_id == client_order_id)
-            {
-                return Ok(order);
-            }
+        {
+            return Ok(order);
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }

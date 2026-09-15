@@ -548,14 +548,13 @@ async fn wait_listed_open(
 ) -> std::result::Result<polyester::models::Order, ()> {
     let deadline = std::time::Instant::now() + Duration::from_secs(15);
     while std::time::Instant::now() < deadline {
-        if let Ok(listed) = client.orders.list_open(None).await {
-            if let Some(order) = listed
+        if let Ok(listed) = client.orders.list_open(None).await
+            && let Some(order) = listed
                 .orders
                 .into_iter()
                 .find(|order| order.client_order_id == client_order_id)
-            {
-                return Ok(order);
-            }
+        {
+            return Ok(order);
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
@@ -602,7 +601,7 @@ async fn wait_partial_fill(
 ) -> std::result::Result<Option<GetOrderResult>, String> {
     let deadline = std::time::Instant::now() + Duration::from_secs(20);
     while std::time::Instant::now() < deadline {
-        match client
+        if let Ok(detail) = client
             .orders
             .get_with(GetOrderOpts {
                 key: OrderKey::ClientOrderId(client_order_id.to_string()),
@@ -614,23 +613,19 @@ async fn wait_partial_fill(
                 page_token: None,
             })
             .await
+            && let Some(order) = &detail.order
         {
-            Ok(detail) => {
-                if let Some(order) = &detail.order {
-                    let cum = order.cum_qty.as_ref().map(Quantity::as_scaled).unwrap_or(0);
-                    let leaves = order.leaves_qty.as_ref().map(Quantity::as_scaled);
-                    if cum > 0 && leaves.unwrap_or(0) > 0 {
-                        return Ok(Some(detail));
-                    }
-                    if order.status == "filled" || matches!(leaves, Some(0)) {
-                        return Ok(None);
-                    }
-                    if cum > 0 && matches!(order.status.as_str(), "working" | "pending") {
-                        return Ok(Some(detail));
-                    }
-                }
+            let cum = order.cum_qty.as_ref().map(Quantity::as_scaled).unwrap_or(0);
+            let leaves = order.leaves_qty.as_ref().map(Quantity::as_scaled);
+            if cum > 0 && leaves.unwrap_or(0) > 0 {
+                return Ok(Some(detail));
             }
-            Err(_) => {}
+            if order.status == "filled" || matches!(leaves, Some(0)) {
+                return Ok(None);
+            }
+            if cum > 0 && matches!(order.status.as_str(), "working" | "pending") {
+                return Ok(Some(detail));
+            }
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
