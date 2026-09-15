@@ -2,9 +2,10 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::support::{
-    hydrate_spot_and_zipper, is_internal_order_error, is_notional_validation, maker_client_from_env,
-    min_base_qty_for_pair, pair_for_symbol, require_funded, require_live_client, require_mutation,
-    require_trading_quote_balance, trade_e2e_enabled, trade_symbol, unique_client_order_id,
+    hydrate_spot_and_zipper, is_internal_order_error, is_notional_validation,
+    maker_client_from_env, min_base_qty_for_pair, pair_for_symbol, require_funded,
+    require_live_client, require_mutation, require_trading_quote_balance, trade_e2e_enabled,
+    trade_symbol, unique_client_order_id,
 };
 use polyester::codecs::scalars::{format_price_ticks, parse_price_ticks_str};
 use polyester::models::{
@@ -59,7 +60,9 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
         .base_quantity_scale_for_symbol(&symbol)
         .expect("catalog scale");
     let Some(maker) = second_client() else {
-        eprintln!("skip: no second key for a cheap partial fill; sweeping the ask is too expensive");
+        eprintln!(
+            "skip: no second key for a cheap partial fill; sweeping the ask is too expensive"
+        );
         return;
     };
     let Some(bid) = book.bids.first().and_then(|level| level.price.as_ref()) else {
@@ -77,16 +80,14 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
         eprintln!("skip: spread is too tight for an inside-spread maker");
         return;
     }
-    let create_price = match Price::from_decimal_str(
-        &format_price_ticks(maker_ticks),
-        Some(symbol.clone()),
-    ) {
-        Ok(p) => p,
-        Err(err) => {
-            eprintln!("skip: maker price: {err}");
-            return;
-        }
-    };
+    let create_price =
+        match Price::from_decimal_str(&format_price_ticks(maker_ticks), Some(symbol.clone())) {
+            Ok(p) => p,
+            Err(err) => {
+                eprintln!("skip: maker price: {err}");
+                return;
+            }
+        };
     let min = min_base_qty_for_pair(Some(&pair), &create_price.format());
     let maker_qty = match Quantity::from_decimal_str(&min, scale, Some(symbol.clone()), None) {
         Ok(q) => q,
@@ -304,10 +305,7 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
     }
     let Some(modified) = modified else {
         cleanup().await;
-        eprintln!(
-            "skip: remainder was not modifyable: {:?}",
-            last_modify_err
-        );
+        eprintln!("skip: remainder was not modifyable: {:?}", last_modify_err);
         return;
     };
     assert_eq!(modified.old_order_id, created.order_id);
