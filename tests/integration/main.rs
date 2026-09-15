@@ -34,6 +34,7 @@ mod currency_conversion;
 mod environment_pins;
 mod funded_chain_userop;
 mod funded_internal_transfer;
+mod funded_lineage_partial_modify;
 mod funded_market_fill;
 mod funded_order_holds;
 mod funded_spot_fill;

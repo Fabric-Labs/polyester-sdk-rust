@@ -16162,6 +16162,158 @@ pub const __ATTACHED_RISK_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
 /// Connect/Proto-facing Messages (scaled ints, fixed64 IDs)
 /// =============================================================================
 ///
+/// OrderLineage identifies a logical order and one of its accepted generations.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct OrderLineage {
+    /// Stable logical-order ID: the first generation's public order ID.
+    /// Replace preserves this ID; an independent new order starts a new lineage.
+    ///
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub id: u64,
+    /// One-based replacement generation, distinct from per-order state version.
+    ///
+    /// Field 2: `generation`
+    #[serde(
+        rename = "generation",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub generation: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for OrderLineage {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("OrderLineage")
+            .field("id", &self.id)
+            .field("generation", &self.generation)
+            .finish()
+    }
+}
+impl OrderLineage {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.OrderLineage";
+}
+::buffa::impl_default_instance!(OrderLineage);
+impl ::buffa::MessageName for OrderLineage {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "OrderLineage";
+    const FULL_NAME: &'static str = "orders.v1.OrderLineage";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.OrderLineage";
+}
+impl ::buffa::Message for OrderLineage {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.generation != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.generation) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.id, buf);
+        }
+        if self.generation != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.generation, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.generation = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id = 0u64;
+        self.generation = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for OrderLineage {
+    const PROTO_FQN: &'static str = "orders.v1.OrderLineage";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OrderLineage {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ORDER_LINEAGE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.OrderLineage",
+    to_json: ::buffa::type_registry::any_to_json::<OrderLineage>,
+    from_json: ::buffa::type_registry::any_from_json::<OrderLineage>,
+    is_wkt: false,
+};
 /// Order is the Connect-facing order view with compact binary fields.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -16277,8 +16429,8 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub orig_qty_scaled: i64,
-    /// Cumulative filled quantity scaled by the pair's base_quantity_scale from
-    /// GetSpotConfig for symbol_id.
+    /// Cumulative filled quantity across the lineage through this generation,
+    /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
     ///
     /// Field 13: `cum_qty_scaled`
     #[serde(
@@ -16299,7 +16451,8 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub leaves_qty_scaled: i64,
-    /// Average fill price in quote units scaled by 1e6. Zero if no fills.
+    /// Average execution price across the lineage through this generation,
+    /// in quote units scaled by 1e6. Zero if no fills.
     ///
     /// Field 14: `avg_price_ticks`
     #[serde(
@@ -16441,6 +16594,14 @@ pub struct Order {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
+    /// Logical-order identity and requested generation. Always populated by order reads.
+    ///
+    /// Field 31: `lineage`
+    #[serde(
+        rename = "lineage",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub lineage: ::buffa::MessageField<OrderLineage>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -16478,6 +16639,7 @@ impl ::core::fmt::Debug for Order {
                 "submitted_max_quote_debit_scaled",
                 &self.submitted_max_quote_debit_scaled,
             )
+            .field("lineage", &self.lineage)
             .finish()
     }
 }
@@ -16646,6 +16808,14 @@ impl ::buffa::Message for Order {
         if let Some(v) = self.submitted_max_quote_debit_scaled {
             size += 2u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
+        if self.lineage.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.lineage.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -16760,6 +16930,10 @@ impl ::buffa::Message for Order {
         }
         if let Some(v) = self.submitted_max_quote_debit_scaled {
             ::buffa::types::put_int64_field(28u32, v, buf);
+        }
+        if self.lineage.is_set() {
+            ::buffa::types::put_len_delimited_header(31u32, __cache.consume_next(), buf);
+            self.lineage.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -16983,6 +17157,17 @@ impl ::buffa::Message for Order {
                     ::buffa::types::decode_int64(buf)?,
                 );
             }
+            31u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.lineage.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -17018,6 +17203,7 @@ impl ::buffa::Message for Order {
         self.version = 0u32;
         self.batch_request_id = 0u64;
         self.submitted_max_quote_debit_scaled = ::core::option::Option::None;
+        self.lineage = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -17175,6 +17361,15 @@ pub struct UserTrade {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub fee_is_rebate: bool,
+    /// Logical-order identity and the generation that executed this fill.
+    /// Always populated by execution reads; order_id retains its original identity.
+    ///
+    /// Field 17: `lineage`
+    #[serde(
+        rename = "lineage",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub lineage: ::buffa::MessageField<OrderLineage>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -17194,6 +17389,7 @@ impl ::core::fmt::Debug for UserTrade {
             .field("referral_share_amount_e18", &self.referral_share_amount_e18)
             .field("ts_ns", &self.ts_ns)
             .field("fee_is_rebate", &self.fee_is_rebate)
+            .field("lineage", &self.lineage)
             .finish()
     }
 }
@@ -17274,6 +17470,14 @@ impl ::buffa::Message for UserTrade {
         if self.fee_is_rebate {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
+        if self.lineage.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.lineage.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -17327,6 +17531,10 @@ impl ::buffa::Message for UserTrade {
         }
         if self.fee_is_rebate {
             ::buffa::types::put_bool_field(14u32, self.fee_is_rebate, buf);
+        }
+        if self.lineage.is_set() {
+            ::buffa::types::put_len_delimited_header(17u32, __cache.consume_next(), buf);
+            self.lineage.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -17435,6 +17643,17 @@ impl ::buffa::Message for UserTrade {
                 )?;
                 self.fee_is_rebate = ::buffa::types::decode_bool(buf)?;
             }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.lineage.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -17455,6 +17674,7 @@ impl ::buffa::Message for UserTrade {
         self.referral_share_amount_e18 = ::buffa::MessageField::none();
         self.ts_ns = 0u64;
         self.fee_is_rebate = false;
+        self.lineage = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -17492,7 +17712,7 @@ pub const __USER_TRADE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa:
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct OrderTransfer {
-    /// Match identifier that linked this transfer to an execution.
+    /// Match identifier that linked this transfer to an execution, scoped by symbol_id.
     ///
     /// Field 1: `match_id`
     #[serde(
@@ -17502,6 +17722,16 @@ pub struct OrderTransfer {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub match_id: u64,
+    /// Market of the execution; together with match_id identifies its match.
+    ///
+    /// Field 10: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
     /// Asset identifier for the transferred asset.
     ///
     /// Field 2: `asset_id`
@@ -17579,6 +17809,7 @@ impl ::core::fmt::Debug for OrderTransfer {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("OrderTransfer")
             .field("match_id", &self.match_id)
+            .field("symbol_id", &self.symbol_id)
             .field("asset_id", &self.asset_id)
             .field("amount_e18", &self.amount_e18)
             .field("is_debit", &self.is_debit)
@@ -17649,6 +17880,9 @@ impl ::buffa::Message for OrderTransfer {
         if !self.tx_id.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.tx_id) as u32;
         }
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -17689,6 +17923,9 @@ impl ::buffa::Message for OrderTransfer {
         }
         if !self.tx_id.is_empty() {
             ::buffa::types::put_string_field(9u32, &self.tx_id, buf);
+        }
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(10u32, self.symbol_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -17767,6 +18004,13 @@ impl ::buffa::Message for OrderTransfer {
                 )?;
                 ::buffa::types::merge_string(&mut self.tx_id, buf)?;
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -17783,6 +18027,7 @@ impl ::buffa::Message for OrderTransfer {
         self.account_code = ::buffa::EnumValue::from(0);
         self.ts_ns = 0u64;
         self.tx_id.clear();
+        self.symbol_id = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -19027,7 +19272,7 @@ pub const __GET_ORDER_HISTORY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
 };
 /// GetUserTradesRequest lists trade fills for an account.
 #[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct GetUserTradesRequest {
     /// Target sub-account numeric ID. When omitted, uses caller's root account.
@@ -19112,6 +19357,31 @@ pub struct GetUserTradesRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub after_match_id: ::core::option::Option<u64>,
+    /// Inclusive generation ceiling. Does not freeze an actively filling generation.
+    ///
+    /// Field 17: `through_generation`
+    #[serde(
+        rename = "throughGeneration",
+        alias = "through_generation",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub through_generation: ::core::option::Option<u32>,
+    /// Include account settlement legs linked to matches on this page.
+    /// Legs may repeat across pages when two fills share a match; deduplicate by tx_id.
+    ///
+    /// Field 18: `include_transfers`
+    #[serde(
+        rename = "includeTransfers",
+        alias = "include_transfers",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub include_transfers: bool,
+    #[serde(flatten)]
+    pub execution_scope: ::core::option::Option<
+        __buffa::oneof::get_user_trades_request::ExecutionScope,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -19127,6 +19397,9 @@ impl ::core::fmt::Debug for GetUserTradesRequest {
             .field("limit", &self.limit)
             .field("page_token", &self.page_token)
             .field("after_match_id", &self.after_match_id)
+            .field("through_generation", &self.through_generation)
+            .field("include_transfers", &self.include_transfers)
+            .field("execution_scope", &self.execution_scope)
             .finish()
     }
 }
@@ -19171,6 +19444,13 @@ impl GetUserTradesRequest {
     ///Sets [`Self::after_match_id`] to `Some(value)`, consuming and returning `self`.
     pub fn with_after_match_id(mut self, value: u64) -> Self {
         self.after_match_id = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::through_generation`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_through_generation(mut self, value: u32) -> Self {
+        self.through_generation = Some(value);
         self
     }
 }
@@ -19219,6 +19499,24 @@ impl ::buffa::Message for GetUserTradesRequest {
         if let Some(v) = self.after_match_id {
             size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
         }
+        if let ::core::option::Option::Some(ref v) = self.execution_scope {
+            match v {
+                __buffa::oneof::get_user_trades_request::ExecutionScope::OrderId(_x) => {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                __buffa::oneof::get_user_trades_request::ExecutionScope::LineageId(
+                    _x,
+                ) => {
+                    size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+            }
+        }
+        if let Some(v) = self.through_generation {
+            size += 2u32 + ::buffa::types::uint32_encoded_len(v) as u32;
+        }
+        if self.include_transfers {
+            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -19255,6 +19553,24 @@ impl ::buffa::Message for GetUserTradesRequest {
         }
         if let Some(v) = self.after_match_id {
             ::buffa::types::put_uint64_field(14u32, v, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.execution_scope {
+            match v {
+                __buffa::oneof::get_user_trades_request::ExecutionScope::OrderId(x) => {
+                    ::buffa::types::put_fixed64_field(15u32, *x, buf);
+                }
+                __buffa::oneof::get_user_trades_request::ExecutionScope::LineageId(
+                    x,
+                ) => {
+                    ::buffa::types::put_fixed64_field(16u32, *x, buf);
+                }
+            }
+        }
+        if let Some(v) = self.through_generation {
+            ::buffa::types::put_uint32_field(17u32, v, buf);
+        }
+        if self.include_transfers {
+            ::buffa::types::put_bool_field(18u32, self.include_transfers, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -19335,6 +19651,44 @@ impl ::buffa::Message for GetUserTradesRequest {
                     ::buffa::types::decode_uint64(buf)?,
                 );
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.execution_scope = ::core::option::Option::Some(
+                    __buffa::oneof::get_user_trades_request::ExecutionScope::OrderId(
+                        ::buffa::types::decode_fixed64(buf)?,
+                    ),
+                );
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.execution_scope = ::core::option::Option::Some(
+                    __buffa::oneof::get_user_trades_request::ExecutionScope::LineageId(
+                        ::buffa::types::decode_fixed64(buf)?,
+                    ),
+                );
+            }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.through_generation = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.include_transfers = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -19351,6 +19705,9 @@ impl ::buffa::Message for GetUserTradesRequest {
         self.limit = ::core::option::Option::None;
         self.page_token.clear();
         self.after_match_id = ::core::option::Option::None;
+        self.execution_scope = ::core::option::Option::None;
+        self.through_generation = ::core::option::Option::None;
+        self.include_transfers = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -19361,6 +19718,325 @@ impl ::buffa::ExtensionSet for GetUserTradesRequest {
     }
     fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
         &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for GetUserTradesRequest {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = GetUserTradesRequest;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct GetUserTradesRequest")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<GetUserTradesRequest, A::Error> {
+                let mut __f_subaccount_id: ::core::option::Option<
+                    ::core::option::Option<u64>,
+                > = None;
+                let mut __f_symbol_id: ::core::option::Option<u32> = None;
+                let mut __f_side: ::core::option::Option<::buffa::EnumValue<Side>> = None;
+                let mut __f_start_ts_ns: ::core::option::Option<
+                    ::core::option::Option<u64>,
+                > = None;
+                let mut __f_end_ts_ns: ::core::option::Option<
+                    ::core::option::Option<u64>,
+                > = None;
+                let mut __f_limit: ::core::option::Option<::core::option::Option<u32>> = None;
+                let mut __f_page_token: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_after_match_id: ::core::option::Option<
+                    ::core::option::Option<u64>,
+                > = None;
+                let mut __f_through_generation: ::core::option::Option<
+                    ::core::option::Option<u32>,
+                > = None;
+                let mut __f_include_transfers: ::core::option::Option<bool> = None;
+                let mut __oneof_execution_scope: ::core::option::Option<
+                    __buffa::oneof::get_user_trades_request::ExecutionScope,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "subaccountId" | "subaccount_id" => {
+                            __f_subaccount_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<u64>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<u64>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "symbolId" | "symbol_id" => {
+                            __f_symbol_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u32;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u32, D::Error> {
+                                        ::buffa::json_helpers::uint32::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "side" => {
+                            __f_side = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<Side>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<Side>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "startTsNs" | "start_ts_ns" => {
+                            __f_start_ts_ns = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<u64>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<u64>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "endTsNs" | "end_ts_ns" => {
+                            __f_end_ts_ns = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<u64>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<u64>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "limit" => {
+                            __f_limit = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<u32>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<u32>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_uint32::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "pageToken" | "page_token" => {
+                            __f_page_token = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "afterMatchId" | "after_match_id" => {
+                            __f_after_match_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<u64>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<u64>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "throughGeneration" | "through_generation" => {
+                            __f_through_generation = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<u32>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<u32>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_uint32::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "includeTransfers" | "include_transfers" => {
+                            __f_include_transfers = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = bool;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<bool, D::Error> {
+                                        ::buffa::json_helpers::proto_bool::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "orderId" | "order_id" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = u64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<u64, D::Error> {
+                                    ::buffa::json_helpers::uint64::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<u64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution_scope.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution_scope'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution_scope = Some(
+                                    __buffa::oneof::get_user_trades_request::ExecutionScope::OrderId(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "lineageId" | "lineage_id" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = u64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<u64, D::Error> {
+                                    ::buffa::json_helpers::uint64::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<u64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution_scope.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution_scope'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution_scope = Some(
+                                    __buffa::oneof::get_user_trades_request::ExecutionScope::LineageId(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <GetUserTradesRequest as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_subaccount_id {
+                    __r.subaccount_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_symbol_id {
+                    __r.symbol_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_side {
+                    __r.side = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_start_ts_ns {
+                    __r.start_ts_ns = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_end_ts_ns {
+                    __r.end_ts_ns = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_limit {
+                    __r.limit = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_page_token {
+                    __r.page_token = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_after_match_id {
+                    __r.after_match_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_through_generation {
+                    __r.through_generation = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_include_transfers {
+                    __r.include_transfers = v;
+                }
+                __r.execution_scope = __oneof_execution_scope;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for GetUserTradesRequest {
@@ -19383,12 +20059,21 @@ pub const __GET_USER_TRADES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     from_json: ::buffa::type_registry::any_from_json::<GetUserTradesRequest>,
     is_wkt: false,
 };
+pub mod get_user_trades_request {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::get_user_trades_request::ExecutionScope;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::get_user_trades_request::ExecutionScope as ExecutionScopeView;
+}
 /// GetUserTradesResponse returns user trade fills and an optional next-page cursor.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetUserTradesResponse {
-    /// Trades ordered newest-first.
+    /// Trades ordered by timestamp, symbol, match and physical order, descending.
+    /// Projection is eventual: an empty page is not proof of order-state reconciliation.
     ///
     /// Field 1: `trades`
     #[serde(
@@ -19407,6 +20092,15 @@ pub struct GetUserTradesResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub next_page_token: ::buffa::alloc::string::String,
+    /// Settlement legs for matches represented on this page, when requested.
+    ///
+    /// Field 3: `transfers`
+    #[serde(
+        rename = "transfers",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub transfers: ::buffa::alloc::vec::Vec<OrderTransfer>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -19416,6 +20110,7 @@ impl ::core::fmt::Debug for GetUserTradesResponse {
         f.debug_struct("GetUserTradesResponse")
             .field("trades", &self.trades)
             .field("next_page_token", &self.next_page_token)
+            .field("transfers", &self.transfers)
             .finish()
     }
 }
@@ -19457,6 +20152,14 @@ impl ::buffa::Message for GetUserTradesResponse {
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
         }
+        for v in &self.transfers {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -19473,6 +20176,10 @@ impl ::buffa::Message for GetUserTradesResponse {
         }
         if !self.next_page_token.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+        }
+        for v in &self.transfers {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -19503,6 +20210,15 @@ impl ::buffa::Message for GetUserTradesResponse {
                 )?;
                 ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.transfers.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -19513,6 +20229,7 @@ impl ::buffa::Message for GetUserTradesResponse {
     fn clear(&mut self) {
         self.trades.clear();
         self.next_page_token.clear();
+        self.transfers.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -19545,7 +20262,7 @@ pub const __GET_USER_TRADES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEn
     from_json: ::buffa::type_registry::any_from_json::<GetUserTradesResponse>,
     is_wkt: false,
 };
-/// GetOrderRequest retrieves a single order and related execution context.
+/// GetOrderRequest retrieves one physical order and a bounded page of its lineage executions.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -19578,6 +20295,36 @@ pub struct GetOrderRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub include_attached_risk_state: ::core::option::Option<bool>,
+    /// Include a page of lineage trades and their settlement transfers (default true).
+    /// Set false for state-only polling; limit and page_token must then be omitted.
+    ///
+    /// Field 12: `include_execution_history`
+    #[serde(
+        rename = "includeExecutionHistory",
+        alias = "include_execution_history",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub include_execution_history: ::core::option::Option<bool>,
+    /// Maximum executions to return (1-1000, default 100).
+    ///
+    /// Field 13: `limit`
+    #[serde(
+        rename = "limit",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub limit: ::core::option::Option<u32>,
+    /// Execution cursor from this order's previous response. Use order_id rather
+    /// than a reused client_order_id to keep the requested generation stable.
+    ///
+    /// Field 14: `page_token`
+    #[serde(
+        rename = "pageToken",
+        alias = "page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub page_token: ::buffa::alloc::string::String,
     #[serde(flatten)]
     pub key: ::core::option::Option<__buffa::oneof::get_order_request::Key>,
     #[serde(skip)]
@@ -19590,6 +20337,9 @@ impl ::core::fmt::Debug for GetOrderRequest {
             .field("subaccount_id", &self.subaccount_id)
             .field("include_attached_risk", &self.include_attached_risk)
             .field("include_attached_risk_state", &self.include_attached_risk_state)
+            .field("include_execution_history", &self.include_execution_history)
+            .field("limit", &self.limit)
+            .field("page_token", &self.page_token)
             .field("key", &self.key)
             .finish()
     }
@@ -19621,6 +20371,20 @@ impl GetOrderRequest {
     ///Sets [`Self::include_attached_risk_state`] to `Some(value)`, consuming and returning `self`.
     pub fn with_include_attached_risk_state(mut self, value: bool) -> Self {
         self.include_attached_risk_state = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::include_execution_history`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_include_execution_history(mut self, value: bool) -> Self {
+        self.include_execution_history = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::limit`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_limit(mut self, value: u32) -> Self {
+        self.limit = Some(value);
         self
     }
 }
@@ -19661,6 +20425,15 @@ impl ::buffa::Message for GetOrderRequest {
         if self.include_attached_risk_state.is_some() {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
+        if self.include_execution_history.is_some() {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        if let Some(v) = self.limit {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
+        }
+        if !self.page_token.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.page_token) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -19689,6 +20462,15 @@ impl ::buffa::Message for GetOrderRequest {
         }
         if let Some(v) = self.include_attached_risk_state {
             ::buffa::types::put_bool_field(11u32, v, buf);
+        }
+        if let Some(v) = self.include_execution_history {
+            ::buffa::types::put_bool_field(12u32, v, buf);
+        }
+        if let Some(v) = self.limit {
+            ::buffa::types::put_uint32_field(13u32, v, buf);
+        }
+        if !self.page_token.is_empty() {
+            ::buffa::types::put_string_field(14u32, &self.page_token, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -19752,6 +20534,31 @@ impl ::buffa::Message for GetOrderRequest {
                     ::buffa::types::decode_bool(buf)?,
                 );
             }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.include_execution_history = ::core::option::Option::Some(
+                    ::buffa::types::decode_bool(buf)?,
+                );
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.page_token, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -19764,6 +20571,9 @@ impl ::buffa::Message for GetOrderRequest {
         self.key = ::core::option::Option::None;
         self.include_attached_risk = ::core::option::Option::None;
         self.include_attached_risk_state = ::core::option::Option::None;
+        self.include_execution_history = ::core::option::Option::None;
+        self.limit = ::core::option::Option::None;
+        self.page_token.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -19800,6 +20610,13 @@ impl<'de> serde::Deserialize<'de> for GetOrderRequest {
                 let mut __f_include_attached_risk_state: ::core::option::Option<
                     ::core::option::Option<bool>,
                 > = None;
+                let mut __f_include_execution_history: ::core::option::Option<
+                    ::core::option::Option<bool>,
+                > = None;
+                let mut __f_limit: ::core::option::Option<::core::option::Option<u32>> = None;
+                let mut __f_page_token: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
                 let mut __oneof_key: ::core::option::Option<
                     __buffa::oneof::get_order_request::Key,
                 > = None;
@@ -19832,6 +20649,47 @@ impl<'de> serde::Deserialize<'de> for GetOrderRequest {
                             __f_include_attached_risk_state = Some(
                                 map.next_value::<::core::option::Option<bool>>()?,
                             );
+                        }
+                        "includeExecutionHistory" | "include_execution_history" => {
+                            __f_include_execution_history = Some(
+                                map.next_value::<::core::option::Option<bool>>()?,
+                            );
+                        }
+                        "limit" => {
+                            __f_limit = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<u32>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<u32>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_uint32::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "pageToken" | "page_token" => {
+                            __f_page_token = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
                         }
                         "orderId" | "order_id" => {
                             struct _DeserSeed;
@@ -19900,6 +20758,15 @@ impl<'de> serde::Deserialize<'de> for GetOrderRequest {
                 if let ::core::option::Option::Some(v) = __f_include_attached_risk_state {
                     __r.include_attached_risk_state = v;
                 }
+                if let ::core::option::Option::Some(v) = __f_include_execution_history {
+                    __r.include_execution_history = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_limit {
+                    __r.limit = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_page_token {
+                    __r.page_token = v;
+                }
                 __r.key = __oneof_key;
                 Ok(__r)
             }
@@ -19935,7 +20802,9 @@ pub mod get_order_request {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::get_order_request::Key as KeyView;
 }
-/// GetOrderResponse returns the order plus related trades and transfer legs.
+/// GetOrderResponse returns order details and a bounded execution page.
+/// Order state, trades and transfers are eventually consistent;
+/// one page's execution quantities need not equal the order's cumulative quantity.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -19948,7 +20817,8 @@ pub struct GetOrderResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub order: ::buffa::MessageField<Order>,
-    /// User trade fills for the order, ordered newest-first.
+    /// Lineage executions through the requested generation, newest first, retaining
+    /// original executing order IDs. Omitted when execution history is disabled.
     ///
     /// Field 2: `trades`
     #[serde(
@@ -19957,7 +20827,8 @@ pub struct GetOrderResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub trades: ::buffa::alloc::vec::Vec<UserTrade>,
-    /// Transfer legs linked to the order's matches, ordered newest-first.
+    /// Account settlement legs for matches on this page. Deduplicate by tx_id when
+    /// multiple execution pages contain legs of the same match.
     ///
     /// Field 3: `transfers`
     #[serde(
@@ -19966,6 +20837,17 @@ pub struct GetOrderResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub transfers: ::buffa::alloc::vec::Vec<OrderTransfer>,
+    /// Cursor for the next execution page. Empty when no further rows are visible;
+    /// this is not a settlement or order-state reconciliation watermark.
+    ///
+    /// Field 6: `next_page_token`
+    #[serde(
+        rename = "nextPageToken",
+        alias = "next_page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub next_page_token: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -19976,6 +20858,7 @@ impl ::core::fmt::Debug for GetOrderResponse {
             .field("order", &self.order)
             .field("trades", &self.trades)
             .field("transfers", &self.transfers)
+            .field("next_page_token", &self.next_page_token)
             .finish()
     }
 }
@@ -20028,6 +20911,11 @@ impl ::buffa::Message for GetOrderResponse {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if !self.next_page_token.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -20049,6 +20937,9 @@ impl ::buffa::Message for GetOrderResponse {
         for v in &self.transfers {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
+        }
+        if !self.next_page_token.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.next_page_token, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -20092,6 +20983,13 @@ impl ::buffa::Message for GetOrderResponse {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.transfers.push(elem);
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -20103,6 +21001,7 @@ impl ::buffa::Message for GetOrderResponse {
         self.order = ::buffa::MessageField::none();
         self.trades.clear();
         self.transfers.clear();
+        self.next_page_token.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -40234,6 +41133,310 @@ pub mod __buffa {
         /// Connect/Proto-facing Messages (scaled ints, fixed64 IDs)
         /// =============================================================================
         ///
+        /// OrderLineage identifies a logical order and one of its accepted generations.
+        #[derive(Clone, Debug, Default)]
+        pub struct OrderLineageView<'a> {
+            /// Stable logical-order ID: the first generation's public order ID.
+            /// Replace preserves this ID; an independent new order starts a new lineage.
+            ///
+            /// Field 1: `id`
+            pub id: u64,
+            /// One-based replacement generation, distinct from per-order state version.
+            ///
+            /// Field 2: `generation`
+            pub generation: u32,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for OrderLineageView<'a> {
+            type Owned = super::super::OrderLineage;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.generation = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::OrderLineage,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::OrderLineage,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::OrderLineage {
+                    id: self.id,
+                    generation: self.generation,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for OrderLineageView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.generation != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.generation) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.id, buf);
+                }
+                if self.generation != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.generation, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for OrderLineageView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.id) {
+                    __map
+                        .serialize_entry(
+                            "id",
+                            &::buffa::json_helpers::ProtoJson(&self.id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.generation) {
+                    __map
+                        .serialize_entry(
+                            "generation",
+                            &::buffa::json_helpers::ProtoJson(&self.generation),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for OrderLineageView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "OrderLineage";
+            const FULL_NAME: &'static str = "orders.v1.OrderLineage";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.OrderLineage";
+        }
+        ::buffa::impl_default_view_instance!(OrderLineageView);
+        ::buffa::impl_view_reborrow!(OrderLineageView);
+        /** Self-contained, `'static` owned view of a `OrderLineage` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OrderLineageView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OrderLineageView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct OrderLineageOwnedView(::buffa::OwnedView<OrderLineageView<'static>>);
+        impl OrderLineageOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrderLineageOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrderLineageOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::OrderLineage,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrderLineageOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`OrderLineageView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &OrderLineageView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::OrderLineage,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable logical-order ID: the first generation's public order ID.
+            /// Replace preserves this ID; an independent new order starts a new lineage.
+            ///
+            /// Field 1: `id`
+            #[must_use]
+            pub fn id(&self) -> u64 {
+                self.0.reborrow().id
+            }
+            /// One-based replacement generation, distinct from per-order state version.
+            ///
+            /// Field 2: `generation`
+            #[must_use]
+            pub fn generation(&self) -> u32 {
+                self.0.reborrow().generation
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<OrderLineageView<'static>>>
+        for OrderLineageOwnedView {
+            fn from(inner: ::buffa::OwnedView<OrderLineageView<'static>>) -> Self {
+                OrderLineageOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<OrderLineageOwnedView>
+        for ::buffa::OwnedView<OrderLineageView<'static>> {
+            fn from(wrapper: OrderLineageOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<OrderLineageView<'static>>>
+        for OrderLineageOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<OrderLineageView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::OrderLineage {
+            type View<'a> = OrderLineageView<'a>;
+            type ViewHandle = OrderLineageOwnedView;
+        }
+        impl ::serde::Serialize for OrderLineageOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// Order is the Connect-facing order view with compact binary fields.
         #[derive(Clone, Debug, Default)]
         pub struct OrderView<'a> {
@@ -40285,8 +41488,8 @@ pub mod __buffa {
             ///
             /// Field 12: `orig_qty_scaled`
             pub orig_qty_scaled: i64,
-            /// Cumulative filled quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig for symbol_id.
+            /// Cumulative filled quantity across the lineage through this generation,
+            /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
             ///
             /// Field 13: `cum_qty_scaled`
             pub cum_qty_scaled: i64,
@@ -40295,7 +41498,8 @@ pub mod __buffa {
             ///
             /// Field 20: `leaves_qty_scaled`
             pub leaves_qty_scaled: i64,
-            /// Average fill price in quote units scaled by 1e6. Zero if no fills.
+            /// Average execution price across the lineage through this generation,
+            /// in quote units scaled by 1e6. Zero if no fills.
             ///
             /// Field 14: `avg_price_ticks`
             pub avg_price_ticks: i64,
@@ -40361,6 +41565,12 @@ pub mod __buffa {
             ///
             /// Field 28: `submitted_max_quote_debit_scaled`
             pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
+            /// Logical-order identity and requested generation. Always populated by order reads.
+            ///
+            /// Field 31: `lineage`
+            pub lineage: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OrderLineageView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for OrderView<'a> {
@@ -40643,6 +41853,31 @@ pub mod __buffa {
                             ::buffa::types::decode_int64(&mut cur)?,
                         );
                     }
+                    31u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.lineage.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.lineage = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OrderLineageView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -40708,6 +41943,14 @@ pub mod __buffa {
                     batch_request_id: self.batch_request_id,
                     submitted_max_quote_debit_scaled: self
                         .submitted_max_quote_debit_scaled,
+                    lineage: match self.lineage.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OrderLineage,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -40877,6 +42120,14 @@ pub mod __buffa {
                 if let Some(v) = self.submitted_max_quote_debit_scaled {
                     size += 2u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
+                if self.lineage.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.lineage.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -41012,6 +42263,14 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.submitted_max_quote_debit_scaled {
                     ::buffa::types::put_int64_field(28u32, v, buf);
+                }
+                if self.lineage.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        31u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.lineage.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -41216,6 +42475,11 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
+                {
+                    if let ::core::option::Option::Some(__v) = self.lineage.as_option() {
+                        __map.serialize_entry("lineage", __v)?;
+                    }
+                }
                 __map.end()
             }
         }
@@ -41388,8 +42652,8 @@ pub mod __buffa {
             pub fn orig_qty_scaled(&self) -> i64 {
                 self.0.reborrow().orig_qty_scaled
             }
-            /// Cumulative filled quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig for symbol_id.
+            /// Cumulative filled quantity across the lineage through this generation,
+            /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
             ///
             /// Field 13: `cum_qty_scaled`
             #[must_use]
@@ -41404,7 +42668,8 @@ pub mod __buffa {
             pub fn leaves_qty_scaled(&self) -> i64 {
                 self.0.reborrow().leaves_qty_scaled
             }
-            /// Average fill price in quote units scaled by 1e6. Zero if no fills.
+            /// Average execution price across the lineage through this generation,
+            /// in quote units scaled by 1e6. Zero if no fills.
             ///
             /// Field 14: `avg_price_ticks`
             #[must_use]
@@ -41518,6 +42783,17 @@ pub mod __buffa {
             ) -> ::core::option::Option<i64> {
                 self.0.reborrow().submitted_max_quote_debit_scaled
             }
+            /// Logical-order identity and requested generation. Always populated by order reads.
+            ///
+            /// Field 31: `lineage`
+            #[must_use]
+            pub fn lineage(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OrderLineageView<'_>,
+            > {
+                &self.0.reborrow().lineage
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<OrderView<'static>>>
         for OrderOwnedView {
@@ -41609,6 +42885,13 @@ pub mod __buffa {
             ///
             /// Field 14: `fee_is_rebate`
             pub fee_is_rebate: bool,
+            /// Logical-order identity and the generation that executed this fill.
+            /// Always populated by execution reads; order_id retains its original identity.
+            ///
+            /// Field 17: `lineage`
+            pub lineage: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OrderLineageView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UserTradeView<'a> {
@@ -41766,6 +43049,31 @@ pub mod __buffa {
                         )?;
                         view.fee_is_rebate = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    17u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.lineage.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.lineage = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OrderLineageView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -41818,6 +43126,14 @@ pub mod __buffa {
                     },
                     ts_ns: self.ts_ns,
                     fee_is_rebate: self.fee_is_rebate,
+                    lineage: match self.lineage.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OrderLineage,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -41894,6 +43210,14 @@ pub mod __buffa {
                 if self.fee_is_rebate {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
+                if self.lineage.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.lineage.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -41956,6 +43280,14 @@ pub mod __buffa {
                 }
                 if self.fee_is_rebate {
                     ::buffa::types::put_bool_field(14u32, self.fee_is_rebate, buf);
+                }
+                if self.lineage.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        17u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.lineage.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -42049,6 +43381,11 @@ pub mod __buffa {
                 }
                 if self.fee_is_rebate {
                     __map.serialize_entry("feeIsRebate", &self.fee_is_rebate)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.lineage.as_option() {
+                        __map.serialize_entry("lineage", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -42238,6 +43575,18 @@ pub mod __buffa {
             pub fn fee_is_rebate(&self) -> bool {
                 self.0.reborrow().fee_is_rebate
             }
+            /// Logical-order identity and the generation that executed this fill.
+            /// Always populated by execution reads; order_id retains its original identity.
+            ///
+            /// Field 17: `lineage`
+            #[must_use]
+            pub fn lineage(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OrderLineageView<'_>,
+            > {
+                &self.0.reborrow().lineage
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<UserTradeView<'static>>>
         for UserTradeOwnedView {
@@ -42272,10 +43621,14 @@ pub mod __buffa {
         /// OrderTransfer is the Connect-facing minimal per-leg transfer view.
         #[derive(Clone, Debug, Default)]
         pub struct OrderTransferView<'a> {
-            /// Match identifier that linked this transfer to an execution.
+            /// Match identifier that linked this transfer to an execution, scoped by symbol_id.
             ///
             /// Field 1: `match_id`
             pub match_id: u64,
+            /// Market of the execution; together with match_id identifies its match.
+            ///
+            /// Field 10: `symbol_id`
+            pub symbol_id: u32,
             /// Asset identifier for the transferred asset.
             ///
             /// Field 2: `asset_id`
@@ -42351,6 +43704,13 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.match_id = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -42453,6 +43813,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::OrderTransfer {
                     match_id: self.match_id,
+                    symbol_id: self.symbol_id,
                     asset_id: self.asset_id,
                     amount_e18: match self.amount_e18.as_option() {
                         Some(v) => {
@@ -42521,6 +43882,11 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::types::string_encoded_len(&self.tx_id) as u32;
                 }
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -42567,6 +43933,9 @@ pub mod __buffa {
                 if !self.tx_id.is_empty() {
                     ::buffa::types::put_string_field(9u32, &self.tx_id, buf);
                 }
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(10u32, self.symbol_id, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -42593,6 +43962,13 @@ pub mod __buffa {
                         .serialize_entry(
                             "matchId",
                             &::buffa::json_helpers::ProtoJson(&self.match_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
@@ -42729,12 +44105,19 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Match identifier that linked this transfer to an execution.
+            /// Match identifier that linked this transfer to an execution, scoped by symbol_id.
             ///
             /// Field 1: `match_id`
             #[must_use]
             pub fn match_id(&self) -> u64 {
                 self.0.reborrow().match_id
+            }
+            /// Market of the execution; together with match_id identifies its match.
+            ///
+            /// Field 10: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
             }
             /// Asset identifier for the transferred asset.
             ///
@@ -44716,6 +46099,18 @@ pub mod __buffa {
             ///
             /// Field 14: `after_match_id`
             pub after_match_id: ::core::option::Option<u64>,
+            /// Inclusive generation ceiling. Does not freeze an actively filling generation.
+            ///
+            /// Field 17: `through_generation`
+            pub through_generation: ::core::option::Option<u32>,
+            /// Include account settlement legs linked to matches on this page.
+            /// Legs may repeat across pages when two fills share a match; deduplicate by tx_id.
+            ///
+            /// Field 18: `include_transfers`
+            pub include_transfers: bool,
+            pub execution_scope: ::core::option::Option<
+                super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetUserTradesRequestView<'a> {
@@ -44813,6 +46208,44 @@ pub mod __buffa {
                             ::buffa::types::decode_uint64(&mut cur)?,
                         );
                     }
+                    17u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.through_generation = Some(
+                            ::buffa::types::decode_uint32(&mut cur)?,
+                        );
+                    }
+                    18u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.include_transfers = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.execution_scope = Some(
+                            super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope::OrderId(
+                                ::buffa::types::decode_fixed64(&mut cur)?,
+                            ),
+                        );
+                    }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.execution_scope = Some(
+                            super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope::LineageId(
+                                ::buffa::types::decode_fixed64(&mut cur)?,
+                            ),
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -44850,6 +46283,27 @@ pub mod __buffa {
                     limit: self.limit,
                     page_token: self.page_token.to_string(),
                     after_match_id: self.after_match_id,
+                    through_generation: self.through_generation,
+                    include_transfers: self.include_transfers,
+                    execution_scope: self
+                        .execution_scope
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope::OrderId(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::get_user_trades_request::ExecutionScope::OrderId(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope::LineageId(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::get_user_trades_request::ExecutionScope::LineageId(
+                                    *v,
+                                )
+                            }
+                        }),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -44896,6 +46350,26 @@ pub mod __buffa {
                 if let Some(v) = self.after_match_id {
                     size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
                 }
+                if let ::core::option::Option::Some(ref v) = self.execution_scope {
+                    match v {
+                        super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope::OrderId(
+                            _x,
+                        ) => {
+                            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                        }
+                        super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope::LineageId(
+                            _x,
+                        ) => {
+                            size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                        }
+                    }
+                }
+                if let Some(v) = self.through_generation {
+                    size += 2u32 + ::buffa::types::uint32_encoded_len(v) as u32;
+                }
+                if self.include_transfers {
+                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -44933,6 +46407,26 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.after_match_id {
                     ::buffa::types::put_uint64_field(14u32, v, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.execution_scope {
+                    match v {
+                        super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope::OrderId(
+                            x,
+                        ) => {
+                            ::buffa::types::put_fixed64_field(15u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope::LineageId(
+                            x,
+                        ) => {
+                            ::buffa::types::put_fixed64_field(16u32, *x, buf);
+                        }
+                    }
+                }
+                if let Some(v) = self.through_generation {
+                    ::buffa::types::put_uint32_field(17u32, v, buf);
+                }
+                if self.include_transfers {
+                    ::buffa::types::put_bool_field(18u32, self.include_transfers, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -45002,6 +46496,38 @@ pub mod __buffa {
                             "afterMatchId",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.through_generation {
+                    __map
+                        .serialize_entry(
+                            "throughGeneration",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if self.include_transfers {
+                    __map.serialize_entry("includeTransfers", &self.include_transfers)?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.execution_scope {
+                    match __ov {
+                        super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope::OrderId(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "orderId",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope::LineageId(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "lineageId",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                    }
                 }
                 __map.end()
             }
@@ -45159,6 +46685,30 @@ pub mod __buffa {
             pub fn after_match_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().after_match_id
             }
+            /// Inclusive generation ceiling. Does not freeze an actively filling generation.
+            ///
+            /// Field 17: `through_generation`
+            #[must_use]
+            pub fn through_generation(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().through_generation
+            }
+            /// Include account settlement legs linked to matches on this page.
+            /// Legs may repeat across pages when two fills share a match; deduplicate by tx_id.
+            ///
+            /// Field 18: `include_transfers`
+            #[must_use]
+            pub fn include_transfers(&self) -> bool {
+                self.0.reborrow().include_transfers
+            }
+            /// Oneof `execution_scope`.
+            #[must_use]
+            pub fn execution_scope(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::get_user_trades_request::ExecutionScope,
+            > {
+                self.0.reborrow().execution_scope.as_ref()
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetUserTradesRequestView<'static>>>
         for GetUserTradesRequestOwnedView {
@@ -45196,7 +46746,8 @@ pub mod __buffa {
         /// GetUserTradesResponse returns user trade fills and an optional next-page cursor.
         #[derive(Clone, Debug, Default)]
         pub struct GetUserTradesResponseView<'a> {
-            /// Trades ordered newest-first.
+            /// Trades ordered by timestamp, symbol, match and physical order, descending.
+            /// Projection is eventual: an empty page is not proof of order-state reconciliation.
             ///
             /// Field 1: `trades`
             pub trades: ::buffa::RepeatedView<
@@ -45207,6 +46758,13 @@ pub mod __buffa {
             ///
             /// Field 2: `next_page_token`
             pub next_page_token: &'a str,
+            /// Settlement legs for matches represented on this page, when requested.
+            ///
+            /// Field 3: `transfers`
+            pub transfers: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::OrderTransferView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetUserTradesResponseView<'a> {
@@ -45262,6 +46820,21 @@ pub mod __buffa {
                                 )?,
                             );
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.transfers
+                            .push(
+                                <super::super::__buffa::view::OrderTransferView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -45297,6 +46870,11 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     next_page_token: self.next_page_token.to_string(),
+                    transfers: self
+                        .transfers
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -45325,6 +46903,14 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.next_page_token)
                                 as u32;
                 }
+                for v in &self.transfers {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -45346,6 +46932,14 @@ pub mod __buffa {
                 }
                 if !self.next_page_token.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+                }
+                for v in &self.transfers {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -45373,6 +46967,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
                     __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                if !self.transfers.is_empty() {
+                    __map.serialize_entry("transfers", &*self.transfers)?;
                 }
                 __map.end()
             }
@@ -45470,7 +47067,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trades ordered newest-first.
+            /// Trades ordered by timestamp, symbol, match and physical order, descending.
+            /// Projection is eventual: an empty page is not proof of order-state reconciliation.
             ///
             /// Field 1: `trades`
             #[must_use]
@@ -45488,6 +47086,18 @@ pub mod __buffa {
             #[must_use]
             pub fn next_page_token(&self) -> &'_ str {
                 self.0.reborrow().next_page_token
+            }
+            /// Settlement legs for matches represented on this page, when requested.
+            ///
+            /// Field 3: `transfers`
+            #[must_use]
+            pub fn transfers(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::OrderTransferView<'_>,
+            > {
+                &self.0.reborrow().transfers
             }
         }
         impl ::core::convert::From<
@@ -45524,7 +47134,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetOrderRequest retrieves a single order and related execution context.
+        /// GetOrderRequest retrieves one physical order and a bounded page of its lineage executions.
         #[derive(Clone, Debug, Default)]
         pub struct GetOrderRequestView<'a> {
             /// Target sub-account numeric ID. When omitted, uses caller's root account.
@@ -45539,6 +47149,20 @@ pub mod __buffa {
             ///
             /// Field 11: `include_attached_risk_state`
             pub include_attached_risk_state: ::core::option::Option<bool>,
+            /// Include a page of lineage trades and their settlement transfers (default true).
+            /// Set false for state-only polling; limit and page_token must then be omitted.
+            ///
+            /// Field 12: `include_execution_history`
+            pub include_execution_history: ::core::option::Option<bool>,
+            /// Maximum executions to return (1-1000, default 100).
+            ///
+            /// Field 13: `limit`
+            pub limit: ::core::option::Option<u32>,
+            /// Execution cursor from this order's previous response. Use order_id rather
+            /// than a reused client_order_id to keep the requested generation stable.
+            ///
+            /// Field 14: `page_token`
+            pub page_token: &'a str,
             pub key: ::core::option::Option<
                 super::super::__buffa::view::oneof::get_order_request::Key<'a>,
             >,
@@ -45602,6 +47226,29 @@ pub mod __buffa {
                             ::buffa::types::decode_bool(&mut cur)?,
                         );
                     }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.include_execution_history = Some(
+                            ::buffa::types::decode_bool(&mut cur)?,
+                        );
+                    }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit = Some(::buffa::types::decode_uint32(&mut cur)?);
+                    }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -45656,6 +47303,9 @@ pub mod __buffa {
                     subaccount_id: self.subaccount_id,
                     include_attached_risk: self.include_attached_risk,
                     include_attached_risk_state: self.include_attached_risk_state,
+                    include_execution_history: self.include_execution_history,
+                    limit: self.limit,
+                    page_token: self.page_token.to_string(),
                     key: self
                         .key
                         .as_ref()
@@ -45712,6 +47362,18 @@ pub mod __buffa {
                 if self.include_attached_risk_state.is_some() {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
+                if self.include_execution_history.is_some() {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                if let Some(v) = self.limit {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
+                }
+                if !self.page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.page_token)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -45745,6 +47407,15 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.include_attached_risk_state {
                     ::buffa::types::put_bool_field(11u32, v, buf);
+                }
+                if let Some(v) = self.include_execution_history {
+                    ::buffa::types::put_bool_field(12u32, v, buf);
+                }
+                if let Some(v) = self.limit {
+                    ::buffa::types::put_uint32_field(13u32, v, buf);
+                }
+                if !self.page_token.is_empty() {
+                    ::buffa::types::put_string_field(14u32, &self.page_token, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -45781,6 +47452,20 @@ pub mod __buffa {
                     .include_attached_risk_state
                 {
                     __map.serialize_entry("includeAttachedRiskState", &__v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.include_execution_history
+                {
+                    __map.serialize_entry("includeExecutionHistory", &__v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.limit {
+                    __map
+                        .serialize_entry(
+                            "limit",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.page_token) {
+                    __map.serialize_entry("pageToken", self.page_token)?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.key {
                     match __ov {
@@ -45917,6 +47602,29 @@ pub mod __buffa {
             pub fn include_attached_risk_state(&self) -> ::core::option::Option<bool> {
                 self.0.reborrow().include_attached_risk_state
             }
+            /// Include a page of lineage trades and their settlement transfers (default true).
+            /// Set false for state-only polling; limit and page_token must then be omitted.
+            ///
+            /// Field 12: `include_execution_history`
+            #[must_use]
+            pub fn include_execution_history(&self) -> ::core::option::Option<bool> {
+                self.0.reborrow().include_execution_history
+            }
+            /// Maximum executions to return (1-1000, default 100).
+            ///
+            /// Field 13: `limit`
+            #[must_use]
+            pub fn limit(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().limit
+            }
+            /// Execution cursor from this order's previous response. Use order_id rather
+            /// than a reused client_order_id to keep the requested generation stable.
+            ///
+            /// Field 14: `page_token`
+            #[must_use]
+            pub fn page_token(&self) -> &'_ str {
+                self.0.reborrow().page_token
+            }
             /// Oneof `key`.
             #[must_use]
             pub fn key(
@@ -45957,7 +47665,9 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetOrderResponse returns the order plus related trades and transfer legs.
+        /// GetOrderResponse returns order details and a bounded execution page.
+        /// Order state, trades and transfers are eventually consistent;
+        /// one page's execution quantities need not equal the order's cumulative quantity.
         #[derive(Clone, Debug, Default)]
         pub struct GetOrderResponseView<'a> {
             /// Requested order, if found.
@@ -45966,20 +47676,27 @@ pub mod __buffa {
             pub order: ::buffa::MessageFieldView<
                 super::super::__buffa::view::OrderView<'a>,
             >,
-            /// User trade fills for the order, ordered newest-first.
+            /// Lineage executions through the requested generation, newest first, retaining
+            /// original executing order IDs. Omitted when execution history is disabled.
             ///
             /// Field 2: `trades`
             pub trades: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::UserTradeView<'a>,
             >,
-            /// Transfer legs linked to the order's matches, ordered newest-first.
+            /// Account settlement legs for matches on this page. Deduplicate by tx_id when
+            /// multiple execution pages contain legs of the same match.
             ///
             /// Field 3: `transfers`
             pub transfers: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::OrderTransferView<'a>,
             >,
+            /// Cursor for the next execution page. Empty when no further rows are visible;
+            /// this is not a settlement or order-state reconciliation watermark.
+            ///
+            /// Field 6: `next_page_token`
+            pub next_page_token: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetOrderResponseView<'a> {
@@ -46037,6 +47754,13 @@ pub mod __buffa {
                                 );
                             }
                         }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -46115,6 +47839,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    next_page_token: self.next_page_token.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -46153,6 +47878,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if !self.next_page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.next_page_token)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -46188,6 +47919,9 @@ pub mod __buffa {
                     );
                     v.write_to(__cache, buf);
                 }
+                if !self.next_page_token.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.next_page_token, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -46219,6 +47953,9 @@ pub mod __buffa {
                 }
                 if !self.transfers.is_empty() {
                     __map.serialize_entry("transfers", &*self.transfers)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
+                    __map.serialize_entry("nextPageToken", self.next_page_token)?;
                 }
                 __map.end()
             }
@@ -46325,7 +48062,8 @@ pub mod __buffa {
             ) -> &::buffa::MessageFieldView<super::super::__buffa::view::OrderView<'_>> {
                 &self.0.reborrow().order
             }
-            /// User trade fills for the order, ordered newest-first.
+            /// Lineage executions through the requested generation, newest first, retaining
+            /// original executing order IDs. Omitted when execution history is disabled.
             ///
             /// Field 2: `trades`
             #[must_use]
@@ -46337,7 +48075,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().trades
             }
-            /// Transfer legs linked to the order's matches, ordered newest-first.
+            /// Account settlement legs for matches on this page. Deduplicate by tx_id when
+            /// multiple execution pages contain legs of the same match.
             ///
             /// Field 3: `transfers`
             #[must_use]
@@ -46348,6 +48087,14 @@ pub mod __buffa {
                 super::super::__buffa::view::OrderTransferView<'_>,
             > {
                 &self.0.reborrow().transfers
+            }
+            /// Cursor for the next execution page. Empty when no further rows are visible;
+            /// this is not a settlement or order-state reconciliation watermark.
+            ///
+            /// Field 6: `next_page_token`
+            #[must_use]
+            pub fn next_page_token(&self) -> &'_ str {
+                self.0.reborrow().next_page_token
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetOrderResponseView<'static>>>
@@ -47853,6 +49600,15 @@ pub mod __buffa {
                     ClientOrderId(&'a str),
                 }
             }
+            pub mod get_user_trades_request {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum ExecutionScope {
+                    OrderId(u64),
+                    LineageId(u64),
+                }
+            }
             pub mod get_order_request {
                 #[allow(unused_imports)]
                 use super::*;
@@ -48341,6 +50097,41 @@ pub mod __buffa {
                 }
             }
         }
+        pub mod get_user_trades_request {
+            #[allow(unused_imports)]
+            use super::*;
+            /// Optional execution scope. Omitting it returns all matching account fills.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum ExecutionScope {
+                OrderId(u64),
+                LineageId(u64),
+            }
+            impl ::buffa::Oneof for ExecutionScope {}
+            impl serde::Serialize for ExecutionScope {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::OrderId(v) => {
+                            map.serialize_entry(
+                                "orderId",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                        Self::LineageId(v) => {
+                            map.serialize_entry(
+                                "lineageId",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
         pub mod get_order_request {
             #[allow(unused_imports)]
             use super::*;
@@ -48421,6 +50212,7 @@ pub mod __buffa {
         reg.register_json_any(super::__ATTACHED_RISK_STOP_LOSS_JSON_ANY);
         reg.register_json_any(super::__ATTACHED_RISK_TRAILING_STOP_JSON_ANY);
         reg.register_json_any(super::__ATTACHED_RISK_JSON_ANY);
+        reg.register_json_any(super::__ORDER_LINEAGE_JSON_ANY);
         reg.register_json_any(super::__ORDER_JSON_ANY);
         reg.register_json_any(super::__USER_TRADE_JSON_ANY);
         reg.register_json_any(super::__ORDER_TRANSFER_JSON_ANY);
@@ -48617,6 +50409,10 @@ pub use self::__buffa::view::AttachedRiskTrailingStopOwnedView;
 pub use self::__buffa::view::AttachedRiskView;
 #[doc(inline)]
 pub use self::__buffa::view::AttachedRiskOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::OrderLineageView;
+#[doc(inline)]
+pub use self::__buffa::view::OrderLineageOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::OrderView;
 #[doc(inline)]
