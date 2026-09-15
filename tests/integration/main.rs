@@ -36,6 +36,7 @@ mod funded_chain_userop;
 mod funded_internal_transfer;
 mod funded_market_fill;
 mod funded_order_holds;
+mod funded_lineage_partial_modify;
 mod funded_spot_fill;
 mod lifecycle_app;
 mod market;
