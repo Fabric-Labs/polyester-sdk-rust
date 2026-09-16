@@ -28,19 +28,48 @@ use crate::proto::orders::v1::{
     BatchReplaceOrderItem as ProtoBatchReplaceOrderItem, BatchReplaceOrdersRequest,
     CancelAllAfterRequest, CancelAllOrdersRequest, CancelOrderRequest, CreateOrderRequest,
     FeeAsset as ProtoFeeAsset, GetBatchReplaceStatusRequest, GetOpenOrdersRequest,
-    GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, LimitFok, LimitGtc, LimitIoc,
-    MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, PreviewOrderRequest, RiskExecution,
-    RiskLimitGtc, RiskPolicy, SelfTradePreventionMode, Side, StopLossPolicy, TakeProfitPolicy,
-    TrailingStopPolicy, batch_replace_order_item, cancel_order_request, get_order_request,
-    get_user_trades_request, market_ioc, modify_order_request, order_intent, risk_execution,
-    risk_policy, trailing_stop_policy,
+    GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, LimitFok, LimitGtc, LimitGtd,
+    LimitIoc, MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, PreviewOrderRequest,
+    RiskExecution, RiskLimitGtc, RiskPolicy, SelfTradePreventionMode, Side, StopLossPolicy,
+    TakeProfitPolicy, TrailingStopPolicy, batch_replace_order_item, cancel_order_request,
+    get_order_request, get_user_trades_request, market_ioc, modify_order_request, order_intent,
+    risk_execution, risk_policy, trailing_stop_policy,
 };
 use crate::types::{
     Price, Quantity, resolve_price_ticks, resolve_qty_scaled, resolve_quote_qty_scaled,
 };
+use buffa_types::google::protobuf::Timestamp;
 use rand_core::{OsRng, RngCore};
 use std::collections::HashSet;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+const GTD_MIN_OFFSET: Duration = Duration::from_secs(1);
+const GTD_MAX_OFFSET: Duration = Duration::from_secs(30 * 24 * 60 * 60);
+
+fn timestamp_from_system_time(when: SystemTime) -> Result<Timestamp> {
+    let dur = when
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| Error::validation("expire_at must be after the Unix epoch"))?;
+    Ok(Timestamp {
+        seconds: i64::try_from(dur.as_secs())
+            .map_err(|_| Error::validation("expire_at is out of range"))?,
+        nanos: i32::try_from(dur.subsec_nanos())
+            .map_err(|_| Error::validation("expire_at is out of range"))?,
+        ..Default::default()
+    })
+}
+
+fn validate_gtd_expire_at(when: SystemTime, now: SystemTime) -> Result<Timestamp> {
+    let delta = when.duration_since(now).map_err(|_| {
+        Error::validation("expire_at must be between 1 second and 30 days after validation")
+    })?;
+    if delta < GTD_MIN_OFFSET || delta > GTD_MAX_OFFSET {
+        return Err(Error::validation(
+            "expire_at must be between 1 second and 30 days after validation",
+        ));
+    }
+    timestamp_from_system_time(when)
+}
 
 const MAX_BPS: i32 = 10_000;
 
@@ -467,6 +496,13 @@ impl OrdersService {
         let post_only = params.post_only.unwrap_or(false);
         intent.execution = Some(match params.order_type {
             CreateOrderType::Market => {
+                if matches!(params.time_in_force, Some(CreateTimeInForce::Gtd))
+                    || params.expire_at.is_some()
+                {
+                    return Err(Error::validation(
+                        "tif=gtd / expire_at is only valid for limit orders",
+                    ));
+                }
                 if post_only {
                     return Err(Error::validation(
                         "post_only is not supported for market orders",
@@ -511,6 +547,11 @@ impl OrdersService {
                                 "post_only is not supported for ioc limit orders",
                             ));
                         }
+                        if params.expire_at.is_some() {
+                            return Err(Error::validation(
+                                "expire_at is only valid for limit GTD orders",
+                            ));
+                        }
                         order_intent::Execution::LimitIoc(Box::new(LimitIoc {
                             price_ticks,
                             ..Default::default()
@@ -522,17 +563,42 @@ impl OrdersService {
                                 "post_only is not supported for fok limit orders",
                             ));
                         }
+                        if params.expire_at.is_some() {
+                            return Err(Error::validation(
+                                "expire_at is only valid for limit GTD orders",
+                            ));
+                        }
                         order_intent::Execution::LimitFok(Box::new(LimitFok {
                             price_ticks,
                             ..Default::default()
                         }))
                     }
+                    Some(CreateTimeInForce::Gtd) => {
+                        let expire_at = params
+                            .expire_at
+                            .ok_or_else(|| Error::validation("tif=gtd requires expire_at"))?;
+                        let mut limit = LimitGtd {
+                            price_ticks,
+                            post_only,
+                            ..Default::default()
+                        };
+                        *limit.expire_at.get_or_insert_default() =
+                            validate_gtd_expire_at(expire_at, SystemTime::now())?;
+                        order_intent::Execution::LimitGtd(Box::new(limit))
+                    }
                     // gtc or unspecified
-                    _ => order_intent::Execution::LimitGtc(Box::new(LimitGtc {
-                        price_ticks,
-                        post_only,
-                        ..Default::default()
-                    })),
+                    _ => {
+                        if params.expire_at.is_some() {
+                            return Err(Error::validation(
+                                "expire_at is only valid for limit GTD orders",
+                            ));
+                        }
+                        order_intent::Execution::LimitGtc(Box::new(LimitGtc {
+                            price_ticks,
+                            post_only,
+                            ..Default::default()
+                        }))
+                    }
                 }
             }
         });
@@ -861,6 +927,7 @@ impl OrdersService {
             self_trade_prevention: params.self_trade_prevention,
             market_max_slippage: params.market_max_slippage,
             attached_risk: params.attached_risk.clone(),
+            expire_at: params.expire_at,
         };
         let order = self.order_intent_from_params(&create)?;
         let mut req = PreviewOrderRequest {
@@ -1260,6 +1327,7 @@ impl OrdersService {
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         }
     }
 
@@ -1451,6 +1519,64 @@ mod tests {
         client
     }
 
+    fn gtd_quantity_price() -> (Quantity, Price) {
+        (
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        )
+    }
+
+    #[test]
+    fn encode_limit_gtd() {
+        let client = client();
+        let (quantity, price) = gtd_quantity_price();
+        let mut params = create_params(quantity, price);
+        params.time_in_force = Some(CreateTimeInForce::Gtd);
+        params.expire_at = Some(SystemTime::now() + Duration::from_secs(3600));
+        let intent = client.orders.order_intent_from_params(&params).unwrap();
+        match intent.execution {
+            Some(order_intent::Execution::LimitGtd(gtd)) => {
+                assert_eq!(gtd.price_ticks, 50_000_000_000);
+                assert!(gtd.post_only);
+                assert!(gtd.expire_at.is_set());
+            }
+            other => panic!("expected limit_gtd, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn encode_gtd_requires_expire_at() {
+        let client = client();
+        let (quantity, price) = gtd_quantity_price();
+        let mut params = create_params(quantity, price);
+        params.time_in_force = Some(CreateTimeInForce::Gtd);
+        let err = client
+            .orders
+            .order_intent_from_params(&params)
+            .expect_err("missing expire_at");
+        assert!(err.to_string().contains("requires expire_at"));
+    }
+
+    #[test]
+    fn encode_rejects_expire_at_outside_gtd() {
+        let client = client();
+        let (quantity, price) = gtd_quantity_price();
+        let mut params = create_params(quantity, price);
+        params.expire_at = Some(SystemTime::now() + Duration::from_secs(3600));
+        let err = client
+            .orders
+            .order_intent_from_params(&params)
+            .expect_err("expire_at on GTC");
+        assert!(err.to_string().contains("only valid for limit GTD"));
+    }
+
     fn create_params(quantity: Quantity, price: Price) -> CreateOrderParams {
         CreateOrderParams {
             symbol: "BTC-USDT".into(),
@@ -1468,6 +1594,7 @@ mod tests {
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         }
     }
 
@@ -2048,6 +2175,7 @@ mod tests {
             self_trade_prevention: Some(OrderSelfTradePrevention::ExpireTaker),
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         };
         let wire = client.orders.encode_preview_params(&preview).unwrap();
         assert_eq!(wire.subaccount_id, Some(9));
@@ -2363,6 +2491,7 @@ mod tests {
                 fee_asset: "quote".into(),
                 submitted_max_quote_debit_scaled: None,
                 attached_risk: None,
+                expire_at: None,
                 lineage: None,
             }),
             trades: vec![],

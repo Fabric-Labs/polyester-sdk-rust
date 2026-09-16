@@ -31,6 +31,7 @@ pub fn time_in_force_name(tif: TimeInForce) -> &'static str {
         TimeInForce::Gtc => "gtc",
         TimeInForce::Ioc => "ioc",
         TimeInForce::Fok => "fok",
+        TimeInForce::Gtd => "gtd",
         TimeInForce::TimeInForceUnspecified => "",
     }
 }

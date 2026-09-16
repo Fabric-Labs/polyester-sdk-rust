@@ -134,6 +134,7 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         })
         .await
     {
@@ -174,6 +175,7 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         })
         .await
     {

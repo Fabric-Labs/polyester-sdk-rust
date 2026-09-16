@@ -144,6 +144,7 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         };
         match client.orders.create(params).await {
             Ok(_) => match wait_for_open_order(&client, &cid, Duration::from_secs(15)).await {

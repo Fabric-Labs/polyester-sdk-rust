@@ -142,6 +142,7 @@ async fn spot_fill() {
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,
+        expire_at: None,
     };
     match maker.orders.create(maker_params).await {
         Ok(c) => {
@@ -173,6 +174,7 @@ async fn spot_fill() {
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,
+        expire_at: None,
     };
     match client.orders.create(taker_params).await {
         Ok(c) => {

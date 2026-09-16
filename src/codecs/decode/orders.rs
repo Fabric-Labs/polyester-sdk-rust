@@ -66,7 +66,46 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
             .transpose()?
             .flatten(),
         lineage: order_lineage_from_proto(msg.lineage.as_option()),
+        expire_at: expire_at_rfc3339(msg.expire_at.as_option()),
     })
+}
+
+fn expire_at_rfc3339(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> Option<String> {
+    let ts = ts?;
+    if ts.seconds == 0 && ts.nanos == 0 {
+        return None;
+    }
+    Some(format_rfc3339_utc(ts.seconds, ts.nanos))
+}
+
+fn format_rfc3339_utc(seconds: i64, nanos: i32) -> String {
+    let secs = seconds.max(0) as u64;
+    let days = secs / 86_400;
+    let tod = secs % 86_400;
+    let hour = tod / 3600;
+    let min = (tod % 3600) / 60;
+    let sec = tod % 60;
+    let (y, m, d) = civil_from_days(days as i64);
+    let nanos = nanos.max(0) as u32;
+    if nanos == 0 {
+        format!("{y:04}-{m:02}-{d:02}T{hour:02}:{min:02}:{sec:02}Z")
+    } else {
+        format!("{y:04}-{m:02}-{d:02}T{hour:02}:{min:02}:{sec:02}.{nanos:09}Z")
+    }
+}
+
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
 }
 
 fn order_lineage_from_proto(msg: Option<&ProtoOrderLineage>) -> Option<OrderLineage> {
@@ -897,6 +936,7 @@ mod tests {
         assert_eq!(order.status, "working");
         assert_eq!(order.order_type, "limit");
         assert_eq!(order.tif, "gtc");
+        assert!(order.expire_at.is_none());
         assert!(order.post_only);
         assert!(order.attached_risk.is_none());
         assert_eq!(order.orig_qty.as_ref().unwrap().as_scaled(), 100);
@@ -904,6 +944,24 @@ mod tests {
         msg2.version = 7;
         let order2 = order_from_proto(&msg2).unwrap();
         assert_eq!(order2.version, 7);
+    }
+
+    #[test]
+    fn order_from_proto_maps_gtd_expire_at() {
+        let msg = ProtoOrder {
+            order_id: 42,
+            symbol_id: 3,
+            time_in_force: TimeInForce::Gtd.into(),
+            expire_at: buffa_types::google::protobuf::Timestamp {
+                seconds: 1_700_000_000,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let order = order_from_proto(&msg).unwrap();
+        assert_eq!(order.tif, "gtd");
+        assert_eq!(order.expire_at.as_deref(), Some("2023-11-14T22:13:20Z"));
     }
 
     #[test]

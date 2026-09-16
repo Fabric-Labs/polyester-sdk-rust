@@ -407,6 +407,11 @@ impl TriggersService {
                             },
                         ))
                     }
+                    Some(CreateTimeInForce::Gtd) => {
+                        return Err(Error::validation(
+                            "tif=gtd is not valid for trigger child orders",
+                        ));
+                    }
                     // gtc or unspecified
                     _ => conditional_child_execution::Execution::LimitGtc(Box::new(
                         TriggerLimitGtc {

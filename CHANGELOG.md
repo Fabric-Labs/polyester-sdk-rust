@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+- Limit GTD orders: `CreateTimeInForce::Gtd` plus required `expire_at`
+  encode `OrderIntent.limit_gtd` (price, optional `post_only`, 1s–30d
+  expiry). Order reads expose `expire_at` for GTD and omit it otherwise.
+
+### Changed
+- Generated Connect/protobuf bindings now include
+  `ClaimsService.GetDailyClaimStatus` and `ClaimDailyReward`. Those RPCs
+  stay JWT/session-only and are not wrapped in this API-key SDK.
+
 ## 0.1.0a47
 
 Package version: `0.1.0-alpha.47`. Git tag: `v0.1.0a47`.
