@@ -36926,8 +36926,10 @@ pub struct CreateWalletChallengeRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
-    /// EVM address selected in the wallet and written into the EIP-4361 message.
-    /// For CREATE_SUBACCOUNT, this must equal smart_account_address.
+    /// Address whose signature authorizes the challenge and that is written into
+    /// the EIP-4361 message. For LOGIN, this must be an EOA that controls the
+    /// target smart account. For CREATE_SUBACCOUNT, this must equal
+    /// smart_account_address.
     ///
     /// Field 2: `signer_address`
     #[serde(
@@ -37306,8 +37308,9 @@ pub struct LoginWithWalletRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
-    /// Signature over message using EIP-191 personal_sign semantics. Maximum
-    /// length is 8192 characters to support universal wallet signatures.
+    /// EOA signature over message using EIP-191 personal_sign semantics. A valid
+    /// value is 65 bytes of hexadecimal with an optional 0x prefix. Requests are
+    /// limited to 8192 characters.
     ///
     /// Field 3: `signature`
     #[serde(
@@ -105395,8 +105398,10 @@ pub mod __buffa {
             ///
             /// Field 1: `smart_account_address`
             pub smart_account_address: &'a str,
-            /// EVM address selected in the wallet and written into the EIP-4361 message.
-            /// For CREATE_SUBACCOUNT, this must equal smart_account_address.
+            /// Address whose signature authorizes the challenge and that is written into
+            /// the EIP-4361 message. For LOGIN, this must be an EOA that controls the
+            /// target smart account. For CREATE_SUBACCOUNT, this must equal
+            /// smart_account_address.
             ///
             /// Field 2: `signer_address`
             pub signer_address: &'a str,
@@ -105721,8 +105726,10 @@ pub mod __buffa {
             pub fn smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().smart_account_address
             }
-            /// EVM address selected in the wallet and written into the EIP-4361 message.
-            /// For CREATE_SUBACCOUNT, this must equal smart_account_address.
+            /// Address whose signature authorizes the challenge and that is written into
+            /// the EIP-4361 message. For LOGIN, this must be an EOA that controls the
+            /// target smart account. For CREATE_SUBACCOUNT, this must equal
+            /// smart_account_address.
             ///
             /// Field 2: `signer_address`
             #[must_use]
@@ -106146,8 +106153,9 @@ pub mod __buffa {
             ///
             /// Field 1: `smart_account_address`
             pub smart_account_address: &'a str,
-            /// Signature over message using EIP-191 personal_sign semantics. Maximum
-            /// length is 8192 characters to support universal wallet signatures.
+            /// EOA signature over message using EIP-191 personal_sign semantics. A valid
+            /// value is 65 bytes of hexadecimal with an optional 0x prefix. Requests are
+            /// limited to 8192 characters.
             ///
             /// Field 3: `signature`
             pub signature: &'a str,
@@ -106510,8 +106518,9 @@ pub mod __buffa {
             pub fn smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().smart_account_address
             }
-            /// Signature over message using EIP-191 personal_sign semantics. Maximum
-            /// length is 8192 characters to support universal wallet signatures.
+            /// EOA signature over message using EIP-191 personal_sign semantics. A valid
+            /// value is 65 bytes of hexadecimal with an optional 0x prefix. Requests are
+            /// limited to 8192 characters.
             ///
             /// Field 3: `signature`
             #[must_use]
