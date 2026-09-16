@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a48
+
+Package version: `0.1.0-alpha.48`. Git tag: `v0.1.0a48`.
+
 ### Added
 - Limit GTD orders: `CreateTimeInForce::Gtd` plus required `expire_at`
   encode `OrderIntent.limit_gtd` (price, optional `post_only`, 1s–30d
