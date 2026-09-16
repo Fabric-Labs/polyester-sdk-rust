@@ -421,6 +421,7 @@ async fn digit_only_public_subaccount_id_uses_canonical_base58_on_order_wire() {
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         })
         .await
         .unwrap();
@@ -504,6 +505,7 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         })
         .await
         .unwrap_err();
@@ -649,6 +651,7 @@ async fn l2_invalid_client_order_and_trigger_ids_fail_closed_without_hitting_con
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         })
         .await
         .expect_err("invalid client_order_id must fail locally");

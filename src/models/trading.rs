@@ -33,6 +33,8 @@ pub struct Order {
     /// Attached risk policy when requested via `include_attached_risk`.
     pub attached_risk: Option<AttachedRisk>,
     pub lineage: Option<OrderLineage>,
+    /// RFC3339 UTC expiry for GTD orders. `None` for every other TIF.
+    pub expire_at: Option<String>,
 }
 
 /// Stable replacement-chain identity. `id` is the first generation's public
@@ -571,6 +573,8 @@ pub struct CreateOrderParams {
     pub market_max_slippage: Option<MaxSlippage>,
     /// Optional TP/SL/trailing controls that arm after the parent fills.
     pub attached_risk: Option<AttachedRisk>,
+    /// Required when `time_in_force` is [`CreateTimeInForce::Gtd`].
+    pub expire_at: Option<std::time::SystemTime>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -616,6 +620,8 @@ pub struct PreviewOrderParams {
     /// Optional TP/SL/trailing controls. Preview validates the full intent;
     /// nothing is armed until a subsequent create.
     pub attached_risk: Option<AttachedRisk>,
+    /// Required when `time_in_force` is [`CreateTimeInForce::Gtd`].
+    pub expire_at: Option<std::time::SystemTime>,
 }
 
 /// One actionable field-level validation failure from preview/create rejection.
@@ -677,6 +683,7 @@ pub enum CreateTimeInForce {
     Gtc,
     Ioc,
     Fok,
+    Gtd,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

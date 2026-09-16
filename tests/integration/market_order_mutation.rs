@@ -80,6 +80,7 @@ async fn market_buy_mutation() {
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,
+        expire_at: None,
     };
 
     let created = match client.orders.create(params).await {
@@ -187,6 +188,7 @@ async fn market_sell_mutation() {
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,
+        expire_at: None,
     };
 
     let created = match client.orders.create(params).await {

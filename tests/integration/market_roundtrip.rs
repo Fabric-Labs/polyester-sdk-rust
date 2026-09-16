@@ -152,6 +152,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         };
         if let Err(err) = maker.orders.create(maker_params).await {
             if is_internal_order_error(&err) || crate::support::devnet_unavailable(&err) {
@@ -182,6 +183,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,
+        expire_at: None,
     };
     match client.orders.create(buy_params).await {
         Ok(_) => {}
@@ -288,6 +290,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,
+            expire_at: None,
         };
         if let Err(err) = maker.orders.create(maker_buy).await {
             cancel_test_order(&client, &symbol, &buy_cid, "taker buy").await;
@@ -331,6 +334,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,
+        expire_at: None,
     };
     match client.orders.create(sell_params).await {
         Ok(_) => {}

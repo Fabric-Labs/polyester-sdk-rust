@@ -17,5 +17,6 @@ fn main() {
         self_trade_prevention: None,
         market_max_slippage: None,
         attached_risk: None,
+        expire_at: None,
     };
 }

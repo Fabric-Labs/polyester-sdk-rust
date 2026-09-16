@@ -305,6 +305,8 @@ pub enum TimeInForce {
     IOC = 2i32,
     /// Fill-or-kill.
     FOK = 3i32,
+    /// Good-til-date; the order may remain active only before its exact expiry time.
+    GTD = 4i32,
 }
 impl TimeInForce {
     ///Idiomatic alias for [`Self::TIME_IN_FORCE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -319,6 +321,9 @@ impl TimeInForce {
     ///Idiomatic alias for [`Self::FOK`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Fok: Self = Self::FOK;
+    ///Idiomatic alias for [`Self::GTD`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Gtd: Self = Self::GTD;
 }
 impl ::core::default::Default for TimeInForce {
     fn default() -> Self {
@@ -418,6 +423,7 @@ impl ::buffa::Enumeration for TimeInForce {
             1i32 => ::core::option::Option::Some(Self::GTC),
             2i32 => ::core::option::Option::Some(Self::IOC),
             3i32 => ::core::option::Option::Some(Self::FOK),
+            4i32 => ::core::option::Option::Some(Self::GTD),
             _ => ::core::option::Option::None,
         }
     }
@@ -430,6 +436,7 @@ impl ::buffa::Enumeration for TimeInForce {
             Self::GTC => "GTC",
             Self::IOC => "IOC",
             Self::FOK => "FOK",
+            Self::GTD => "GTD",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -440,11 +447,12 @@ impl ::buffa::Enumeration for TimeInForce {
             "GTC" => ::core::option::Option::Some(Self::GTC),
             "IOC" => ::core::option::Option::Some(Self::IOC),
             "FOK" => ::core::option::Option::Some(Self::FOK),
+            "GTD" => ::core::option::Option::Some(Self::GTD),
             _ => ::core::option::Option::None,
         }
     }
     fn values() -> &'static [Self] {
-        &[Self::TIME_IN_FORCE_UNSPECIFIED, Self::GTC, Self::IOC, Self::FOK]
+        &[Self::TIME_IN_FORCE_UNSPECIFIED, Self::GTC, Self::IOC, Self::FOK, Self::GTD]
     }
 }
 /// FeeAsset identifies the asset in which an order fee is charged.
@@ -3251,6 +3259,196 @@ pub const __LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
     from_json: ::buffa::type_registry::any_from_json::<LimitGtc>,
     is_wkt: false,
 };
+/// LimitGtd configures a limit order that may remain active only before an
+/// exact expiry time.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct LimitGtd {
+    /// Limit price in quote units scaled by 1e6.
+    ///
+    /// Field 1: `price_ticks`
+    #[serde(
+        rename = "priceTicks",
+        alias = "price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_ticks: i64,
+    /// Reject the order instead of taking liquidity.
+    ///
+    /// Field 2: `post_only`
+    #[serde(
+        rename = "postOnly",
+        alias = "post_only",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub post_only: bool,
+    /// Exact expiry time in UTC. It must be at least 1 second and at most 30 days
+    /// after validation time. The order cannot execute when the current time equals
+    /// this value.
+    ///
+    /// Field 3: `expire_at`
+    #[serde(
+        rename = "expireAt",
+        alias = "expire_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expire_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for LimitGtd {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("LimitGtd")
+            .field("price_ticks", &self.price_ticks)
+            .field("post_only", &self.post_only)
+            .field("expire_at", &self.expire_at)
+            .finish()
+    }
+}
+impl LimitGtd {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitGtd";
+}
+::buffa::impl_default_instance!(LimitGtd);
+impl ::buffa::MessageName for LimitGtd {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "LimitGtd";
+    const FULL_NAME: &'static str = "orders.v1.LimitGtd";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitGtd";
+}
+impl ::buffa::Message for LimitGtd {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.price_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+        }
+        if self.post_only {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        if self.expire_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expire_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+        }
+        if self.post_only {
+            ::buffa::types::put_bool_field(2u32, self.post_only, buf);
+        }
+        if self.expire_at.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.expire_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.post_only = ::buffa::types::decode_bool(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expire_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.price_ticks = 0i64;
+        self.post_only = false;
+        self.expire_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for LimitGtd {
+    const PROTO_FQN: &'static str = "orders.v1.LimitGtd";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for LimitGtd {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIMIT_GTD_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.LimitGtd",
+    to_json: ::buffa::type_registry::any_to_json::<LimitGtd>,
+    from_json: ::buffa::type_registry::any_from_json::<LimitGtd>,
+    is_wkt: false,
+};
 /// LimitIoc configures an immediate-or-cancel limit order.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -3671,6 +3869,14 @@ impl ::buffa::Message for OrderIntent {
                         += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::order_intent::Execution::LimitGtd(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         if !self.client_order_id.is_empty() {
@@ -3756,6 +3962,14 @@ impl ::buffa::Message for OrderIntent {
                 __buffa::oneof::order_intent::Execution::LimitFok(x) => {
                     ::buffa::types::put_len_delimited_header(
                         13u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::order_intent::Execution::LimitGtd(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        14u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -3906,6 +4120,26 @@ impl ::buffa::Message for OrderIntent {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.execution = ::core::option::Option::Some(
                         __buffa::oneof::order_intent::Execution::LimitFok(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::order_intent::Execution::LimitGtd(ref mut existing),
+                ) = self.execution
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.execution = ::core::option::Option::Some(
+                        __buffa::oneof::order_intent::Execution::LimitGtd(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -4251,6 +4485,30 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                                 }
                                 __oneof_execution = Some(
                                     __buffa::oneof::order_intent::Execution::LimitFok(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "limitGtd" | "limit_gtd" => {
+                            let v: ::core::option::Option<LimitGtd> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            LimitGtd,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_execution.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'execution'",
+                                        ),
+                                    );
+                                }
+                                __oneof_execution = Some(
+                                    __buffa::oneof::order_intent::Execution::LimitGtd(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -16602,6 +16860,18 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub lineage: ::buffa::MessageField<OrderLineage>,
+    /// Exact UTC expiry time for GTD orders, within the supported signed
+    /// Unix-nanosecond range from 1677-09-21T00:12:43.145224193Z through
+    /// 2262-04-11T23:47:16.854775807Z. Omitted for all other time-in-force policies.
+    /// The order cannot execute when the current time equals this value.
+    ///
+    /// Field 32: `expire_at`
+    #[serde(
+        rename = "expireAt",
+        alias = "expire_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expire_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -16640,6 +16910,7 @@ impl ::core::fmt::Debug for Order {
                 &self.submitted_max_quote_debit_scaled,
             )
             .field("lineage", &self.lineage)
+            .field("expire_at", &self.expire_at)
             .finish()
     }
 }
@@ -16816,6 +17087,14 @@ impl ::buffa::Message for Order {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.expire_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expire_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -16934,6 +17213,10 @@ impl ::buffa::Message for Order {
         if self.lineage.is_set() {
             ::buffa::types::put_len_delimited_header(31u32, __cache.consume_next(), buf);
             self.lineage.write_to(__cache, buf);
+        }
+        if self.expire_at.is_set() {
+            ::buffa::types::put_len_delimited_header(32u32, __cache.consume_next(), buf);
+            self.expire_at.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -17168,6 +17451,17 @@ impl ::buffa::Message for Order {
                     ctx,
                 )?;
             }
+            32u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expire_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -17204,6 +17498,7 @@ impl ::buffa::Message for Order {
         self.batch_request_id = 0u64;
         self.submitted_max_quote_debit_scaled = ::core::option::Option::None;
         self.lineage = ::buffa::MessageField::none();
+        self.expire_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -22477,6 +22772,372 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// LimitGtd configures a limit order that may remain active only before an
+        /// exact expiry time.
+        #[derive(Clone, Debug, Default)]
+        pub struct LimitGtdView<'a> {
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            pub price_ticks: i64,
+            /// Reject the order instead of taking liquidity.
+            ///
+            /// Field 2: `post_only`
+            pub post_only: bool,
+            /// Exact expiry time in UTC. It must be at least 1 second and at most 30 days
+            /// after validation time. The order cannot execute when the current time equals
+            /// this value.
+            ///
+            /// Field 3: `expire_at`
+            pub expire_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for LimitGtdView<'a> {
+            type Owned = super::super::LimitGtd;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.post_only = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expire_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expire_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::LimitGtd, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::LimitGtd, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::LimitGtd {
+                    price_ticks: self.price_ticks,
+                    post_only: self.post_only,
+                    expire_at: match self.expire_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for LimitGtdView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+                }
+                if self.post_only {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                if self.expire_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expire_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.price_ticks, buf);
+                }
+                if self.post_only {
+                    ::buffa::types::put_bool_field(2u32, self.post_only, buf);
+                }
+                if self.expire_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expire_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for LimitGtdView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
+                        )?;
+                }
+                if self.post_only {
+                    __map.serialize_entry("postOnly", &self.post_only)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.expire_at.as_option()
+                    {
+                        __map.serialize_entry("expireAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for LimitGtdView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "LimitGtd";
+            const FULL_NAME: &'static str = "orders.v1.LimitGtd";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.LimitGtd";
+        }
+        ::buffa::impl_default_view_instance!(LimitGtdView);
+        ::buffa::impl_view_reborrow!(LimitGtdView);
+        /** Self-contained, `'static` owned view of a `LimitGtd` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`LimitGtdView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LimitGtdView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct LimitGtdOwnedView(::buffa::OwnedView<LimitGtdView<'static>>);
+        impl LimitGtdOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitGtdOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitGtdOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::LimitGtd,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LimitGtdOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`LimitGtdView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &LimitGtdView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::LimitGtd, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Limit price in quote units scaled by 1e6.
+            ///
+            /// Field 1: `price_ticks`
+            #[must_use]
+            pub fn price_ticks(&self) -> i64 {
+                self.0.reborrow().price_ticks
+            }
+            /// Reject the order instead of taking liquidity.
+            ///
+            /// Field 2: `post_only`
+            #[must_use]
+            pub fn post_only(&self) -> bool {
+                self.0.reborrow().post_only
+            }
+            /// Exact expiry time in UTC. It must be at least 1 second and at most 30 days
+            /// after validation time. The order cannot execute when the current time equals
+            /// this value.
+            ///
+            /// Field 3: `expire_at`
+            #[must_use]
+            pub fn expire_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expire_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<LimitGtdView<'static>>>
+        for LimitGtdOwnedView {
+            fn from(inner: ::buffa::OwnedView<LimitGtdView<'static>>) -> Self {
+                LimitGtdOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<LimitGtdOwnedView>
+        for ::buffa::OwnedView<LimitGtdView<'static>> {
+            fn from(wrapper: LimitGtdOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<LimitGtdView<'static>>>
+        for LimitGtdOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<LimitGtdView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::LimitGtd {
+            type View<'a> = LimitGtdView<'a>;
+            type ViewHandle = LimitGtdOwnedView;
+        }
+        impl ::serde::Serialize for LimitGtdOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// LimitIoc configures an immediate-or-cancel limit order.
         #[derive(Clone, Debug, Default)]
         pub struct LimitIocView<'a> {
@@ -23286,6 +23947,37 @@ pub mod __buffa {
                             );
                         }
                     }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::order_intent::Execution::LimitGtd(
+                                ref mut existing,
+                            ),
+                        ) = view.execution
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.execution = Some(
+                                super::super::__buffa::view::oneof::order_intent::Execution::LimitGtd(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::LimitGtdView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -23387,6 +24079,15 @@ pub mod __buffa {
                                             ),
                                         )
                                     }
+                                    super::super::__buffa::view::oneof::order_intent::Execution::LimitGtd(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::order_intent::Execution::LimitGtd(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
                                 },
                             )
                         }
@@ -23464,6 +24165,16 @@ pub mod __buffa {
                                     + inner;
                         }
                         super::super::__buffa::view::oneof::order_intent::Execution::LimitFok(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitGtd(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -23572,6 +24283,16 @@ pub mod __buffa {
                         ) => {
                             ::buffa::types::put_len_delimited_header(
                                 13u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitGtd(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                14u32,
                                 __cache.consume_next(),
                                 buf,
                             );
@@ -23701,6 +24422,11 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("limitFok", v)?;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Execution::LimitGtd(
+                            v,
+                        ) => {
+                            __map.serialize_entry("limitGtd", v)?;
                         }
                     }
                 }
@@ -41571,6 +42297,15 @@ pub mod __buffa {
             pub lineage: ::buffa::MessageFieldView<
                 super::super::__buffa::view::OrderLineageView<'a>,
             >,
+            /// Exact UTC expiry time for GTD orders, within the supported signed
+            /// Unix-nanosecond range from 1677-09-21T00:12:43.145224193Z through
+            /// 2262-04-11T23:47:16.854775807Z. Omitted for all other time-in-force policies.
+            /// The order cannot execute when the current time equals this value.
+            ///
+            /// Field 32: `expire_at`
+            pub expire_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for OrderView<'a> {
@@ -41878,6 +42613,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    32u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expire_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expire_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -41947,6 +42707,14 @@ pub mod __buffa {
                         Some(v) => {
                             ::buffa::MessageField::<
                                 super::super::OrderLineage,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    expire_at: match self.expire_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
                             >::some(v.to_owned_from_source(__buffa_src)?)
                         }
                         None => ::buffa::MessageField::none(),
@@ -42128,6 +42896,14 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.expire_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expire_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -42271,6 +43047,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.lineage.write_to(__cache, buf);
+                }
+                if self.expire_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        32u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expire_at.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -42478,6 +43262,12 @@ pub mod __buffa {
                 {
                     if let ::core::option::Option::Some(__v) = self.lineage.as_option() {
                         __map.serialize_entry("lineage", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.expire_at.as_option()
+                    {
+                        __map.serialize_entry("expireAt", __v)?;
                     }
                 }
                 __map.end()
@@ -42793,6 +43583,20 @@ pub mod __buffa {
                 super::super::__buffa::view::OrderLineageView<'_>,
             > {
                 &self.0.reborrow().lineage
+            }
+            /// Exact UTC expiry time for GTD orders, within the supported signed
+            /// Unix-nanosecond range from 1677-09-21T00:12:43.145224193Z through
+            /// 2262-04-11T23:47:16.854775807Z. Omitted for all other time-in-force policies.
+            /// The order cannot execute when the current time equals this value.
+            ///
+            /// Field 32: `expire_at`
+            #[must_use]
+            pub fn expire_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expire_at
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<OrderView<'static>>>
@@ -49494,6 +50298,11 @@ pub mod __buffa {
                             super::super::super::super::__buffa::view::LimitFokView<'a>,
                         >,
                     ),
+                    LimitGtd(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::LimitGtdView<'a>,
+                        >,
+                    ),
                 }
             }
             pub mod cancel_order_request {
@@ -49700,6 +50509,7 @@ pub mod __buffa {
                 LimitGtc(::buffa::alloc::boxed::Box<super::super::super::LimitGtc>),
                 LimitIoc(::buffa::alloc::boxed::Box<super::super::super::LimitIoc>),
                 LimitFok(::buffa::alloc::boxed::Box<super::super::super::LimitFok>),
+                LimitGtd(::buffa::alloc::boxed::Box<super::super::super::LimitGtd>),
             }
             impl ::buffa::Oneof for Execution {}
             impl From<super::super::super::MarketIoc> for Execution {
@@ -49746,6 +50556,17 @@ pub mod __buffa {
                     Self::Some(Execution::from(v))
                 }
             }
+            impl From<super::super::super::LimitGtd> for Execution {
+                fn from(v: super::super::super::LimitGtd) -> Self {
+                    Self::LimitGtd(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::LimitGtd>
+            for ::core::option::Option<Execution> {
+                fn from(v: super::super::super::LimitGtd) -> Self {
+                    Self::Some(Execution::from(v))
+                }
+            }
             impl serde::Serialize for Execution {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -49765,6 +50586,9 @@ pub mod __buffa {
                         }
                         Self::LimitFok(v) => {
                             map.serialize_entry("limitFok", v)?;
+                        }
+                        Self::LimitGtd(v) => {
+                            map.serialize_entry("limitGtd", v)?;
                         }
                     }
                     map.end()
@@ -50169,6 +50993,7 @@ pub mod __buffa {
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
         reg.register_json_any(super::__MARKET_IOC_JSON_ANY);
         reg.register_json_any(super::__LIMIT_GTC_JSON_ANY);
+        reg.register_json_any(super::__LIMIT_GTD_JSON_ANY);
         reg.register_json_any(super::__LIMIT_IOC_JSON_ANY);
         reg.register_json_any(super::__LIMIT_FOK_JSON_ANY);
         reg.register_json_any(super::__ORDER_INTENT_JSON_ANY);
@@ -50237,6 +51062,10 @@ pub use self::__buffa::view::MarketIocOwnedView;
 pub use self::__buffa::view::LimitGtcView;
 #[doc(inline)]
 pub use self::__buffa::view::LimitGtcOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LimitGtdView;
+#[doc(inline)]
+pub use self::__buffa::view::LimitGtdOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::LimitIocView;
 #[doc(inline)]

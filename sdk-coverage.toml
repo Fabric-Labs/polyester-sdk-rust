@@ -81,3 +81,7 @@ reason = "Root portfolio equity snapshot requires an interactive root-account se
 [[allowlist]]
 procedure = "/auth.v1.AuthService/AcceptTerms"
 reason = "Terms acceptance requires an interactive JWT session; API keys are not supported."
+
+[[allowlist]]
+service = "claims.v1.ClaimsService"
+reason = "Daily claims require an interactive root-account session; API keys are not accepted."
