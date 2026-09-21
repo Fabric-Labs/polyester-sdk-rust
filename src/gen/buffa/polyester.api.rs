@@ -162,6 +162,153 @@ impl ::buffa::Enumeration for MFARequirement {
         ]
     }
 }
+/// AuthenticationMethod identifies a credential type accepted by an RPC.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum AuthenticationMethod {
+    /// No authentication method was specified.
+    AUTH_UNSPECIFIED = 0i32,
+    /// A bearer token for an interactive user session.
+    SESSION_TOKEN = 1i32,
+    /// A signed API key request.
+    API_KEY = 2i32,
+}
+impl AuthenticationMethod {
+    ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthUnspecified: Self = Self::AUTH_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::SESSION_TOKEN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SessionToken: Self = Self::SESSION_TOKEN;
+    ///Idiomatic alias for [`Self::API_KEY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ApiKey: Self = Self::API_KEY;
+}
+impl ::core::default::Default for AuthenticationMethod {
+    fn default() -> Self {
+        Self::AUTH_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for AuthenticationMethod {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for AuthenticationMethod {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = AuthenticationMethod;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(AuthenticationMethod)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<AuthenticationMethod, E> {
+                <AuthenticationMethod as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<AuthenticationMethod, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AuthenticationMethod as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<AuthenticationMethod, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AuthenticationMethod as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<AuthenticationMethod, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AuthenticationMethod {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for AuthenticationMethod {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::AUTH_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::SESSION_TOKEN),
+            2i32 => ::core::option::Option::Some(Self::API_KEY),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::AUTH_UNSPECIFIED => "AUTH_UNSPECIFIED",
+            Self::SESSION_TOKEN => "SESSION_TOKEN",
+            Self::API_KEY => "API_KEY",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "AUTH_UNSPECIFIED" => ::core::option::Option::Some(Self::AUTH_UNSPECIFIED),
+            "SESSION_TOKEN" => ::core::option::Option::Some(Self::SESSION_TOKEN),
+            "API_KEY" => ::core::option::Option::Some(Self::API_KEY),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::AUTH_UNSPECIFIED, Self::SESSION_TOKEN, Self::API_KEY]
+    }
+}
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -223,12 +370,33 @@ Proto enum type: `.polyester.api.MFARequirement`. Cast via `EnumValue::from_i32`
                 super::super::MFARequirement,
             >,
         };
+        /**Extension `authentication_methods` on `.google.protobuf.MethodOptions` (field 50004).
+
+Proto enum type: `.polyester.api.AuthenticationMethod`. Cast via `EnumValue::from_i32`.*/
+        pub const AUTHENTICATION_METHODS: ::buffa::Extension<
+            ::buffa::extension::codecs::PackedRepeated<
+                ::buffa::extension::codecs::EnumI32,
+            >,
+        > = ::buffa::Extension::new(50004u32, "google.protobuf.MethodOptions");
+        #[doc(hidden)]
+        pub const __AUTHENTICATION_METHODS_JSON_EXT: ::buffa::type_registry::JsonExtEntry = ::buffa::type_registry::JsonExtEntry {
+            number: 50004u32,
+            full_name: "polyester.api.authentication_methods",
+            extendee: "google.protobuf.MethodOptions",
+            to_json: ::buffa::extension_registry::helpers::repeated_enum_to_json::<
+                super::super::AuthenticationMethod,
+            >,
+            from_json: ::buffa::extension_registry::helpers::repeated_enum_from_json::<
+                super::super::AuthenticationMethod,
+            >,
+        };
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
         reg.register_json_ext(super::__buffa::ext::__PUBLIC_JSON_EXT);
         reg.register_json_ext(super::__buffa::ext::__HIDDEN_JSON_EXT);
         reg.register_json_ext(super::__buffa::ext::__MFA_REQUIREMENT_JSON_EXT);
+        reg.register_json_ext(super::__buffa::ext::__AUTHENTICATION_METHODS_JSON_EXT);
     }
 }
 #[doc(inline)]
@@ -237,5 +405,7 @@ pub use self::__buffa::ext::PUBLIC;
 pub use self::__buffa::ext::HIDDEN;
 #[doc(inline)]
 pub use self::__buffa::ext::MFA_REQUIREMENT;
+#[doc(inline)]
+pub use self::__buffa::ext::AUTHENTICATION_METHODS;
 #[doc(inline)]
 pub use self::__buffa::register_types;

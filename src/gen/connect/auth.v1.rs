@@ -3243,6 +3243,14 @@ pub type OwnedListSubaccountsRequestView = ::buffa::view::OwnedView<
 pub type OwnedListSubaccountsResponseView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::ListSubaccountsResponseView<'static>,
 >;
+///Shorthand for `OwnedView<CreateSubaccountChallengeRequestView<'static>>`.
+pub type OwnedCreateSubaccountChallengeRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::CreateSubaccountChallengeRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CreateSubaccountChallengeResponseView<'static>>`.
+pub type OwnedCreateSubaccountChallengeResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::CreateSubaccountChallengeResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<CreateSubaccountRequestView<'static>>`.
 pub type OwnedCreateSubaccountRequestView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::CreateSubaccountRequestView<'static>,
@@ -3393,6 +3401,26 @@ for crate::proto::auth::v1::__buffa::view::ListSubaccountsResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::auth::v1::ListSubaccountsResponse>
 for ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::ListSubaccountsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::CreateSubaccountChallengeResponse>
+for crate::proto::auth::v1::__buffa::view::CreateSubaccountChallengeResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::CreateSubaccountChallengeResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::CreateSubaccountChallengeResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -4170,6 +4198,15 @@ pub const SUBACCOUNT_SERVICE_LIST_SUBACCOUNTS_SPEC: ::connectrpc::Spec = ::conne
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CreateSubaccountChallenge` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const SUBACCOUNT_SERVICE_CREATE_SUBACCOUNT_CHALLENGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.SubaccountService/CreateSubaccountChallenge",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `CreateSubaccount` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -4322,6 +4359,30 @@ pub trait SubaccountService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::auth::v1::ListSubaccountsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Request the canonical next smart account and a short-lived account-control
+    /// authorization bound to the authenticated root and selected owner wallet.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_subaccount_challenge<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::CreateSubaccountChallengeRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::CreateSubaccountChallengeResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -4596,6 +4657,35 @@ impl<S: SubaccountService> SubaccountServiceExt for S {
                 },
             )
             .with_spec(SUBACCOUNT_SERVICE_LIST_SUBACCOUNTS_SPEC)
+            .route_view(
+                SUBACCOUNT_SERVICE_SERVICE_NAME,
+                "CreateSubaccountChallenge",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::CreateSubaccountChallengeRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::CreateSubaccountChallengeRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_subaccount_challenge(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::CreateSubaccountChallengeResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(SUBACCOUNT_SERVICE_CREATE_SUBACCOUNT_CHALLENGE_SPEC)
             .route_view(
                 SUBACCOUNT_SERVICE_SERVICE_NAME,
                 "CreateSubaccount",
@@ -4917,6 +5007,12 @@ impl<T: SubaccountService> ::connectrpc::Dispatcher for SubaccountServiceServer<
                         .with_spec(SUBACCOUNT_SERVICE_LIST_SUBACCOUNTS_SPEC),
                 )
             }
+            "CreateSubaccountChallenge" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(SUBACCOUNT_SERVICE_CREATE_SUBACCOUNT_CHALLENGE_SPEC),
+                )
+            }
             "CreateSubaccount" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -5006,6 +5102,27 @@ impl<T: SubaccountService> ::connectrpc::Dispatcher for SubaccountServiceServer<
                         .await?
                         .encode::<
                             crate::proto::auth::v1::ListSubaccountsResponse,
+                        >(format)
+                })
+            }
+            "CreateSubaccountChallenge" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::CreateSubaccountChallengeRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::CreateSubaccountChallengeRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::CreateSubaccountChallengeRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_subaccount_challenge(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::CreateSubaccountChallengeResponse,
                         >(format)
                 })
             }
@@ -5340,6 +5457,51 @@ where
                 &self.config,
                 SUBACCOUNT_SERVICE_SERVICE_NAME,
                 "ListSubaccounts",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateSubaccountChallenge RPC. Sends a request to /auth.v1.SubaccountService/CreateSubaccountChallenge.
+    pub async fn create_subaccount_challenge(
+        &self,
+        request: crate::proto::auth::v1::CreateSubaccountChallengeRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::CreateSubaccountChallengeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_subaccount_challenge_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateSubaccountChallenge RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_subaccount_challenge_with_options(
+        &self,
+        request: crate::proto::auth::v1::CreateSubaccountChallengeRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::CreateSubaccountChallengeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                SUBACCOUNT_SERVICE_SERVICE_NAME,
+                "CreateSubaccountChallenge",
                 request,
                 options,
             )
@@ -11689,11 +11851,10 @@ pub trait AuthService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Explicitly accept the currently required terms for the caller's root account.
-    /// Requires an interactive JWT session; API keys are not allowed. No MFA is
-    /// required. Login, trading, reads, and use of existing resources remain available
-    /// without acceptance. Only CreateSubaccount, CreateApiKey, and
-    /// CreateDepositAddress require acceptance of the current version.
+    /// Explicitly accept the terms that apply to the caller's root account.
+    /// Requires an interactive JWT session; API keys are not allowed. Login, trading,
+    /// reads, and use of existing resources remain available without acceptance.
+    /// Acceptance is required before creating a subaccount, API key, or deposit address.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -13925,6 +14086,9 @@ pub trait SocialVerificationService: Send + Sync + 'static {
         >,
     > + Send;
     /// Mark a verification as ready after the challenge code has been placed.
+    /// AUTH_RESOURCE_NOT_FOUND means no verification exists; start one first.
+    /// AUTH_SOCIAL_VERIFICATION_EXPIRED means the challenge window passed; start a new verification, then mark it ready again.
+    /// AUTH_SOCIAL_VERIFICATION_INVALID_STATE means Ready is not valid in the current state; call GetSocialVerification for the current status.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

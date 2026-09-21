@@ -12603,9 +12603,8 @@ pub struct ListSubaccountsResponse {
     )]
     pub subaccounts: ::buffa::alloc::vec::Vec<Subaccount>,
     /// Total number of sub-accounts that have ever been created for this root,
-    /// including soft-deleted ones. Clients use total_created + 1 only for the
-    /// next new Smart Account; existing sub-accounts expose their assigned salt
-    /// nonce on Subaccount when direct signing is available.
+    /// including soft-deleted ones. Request CreateSubaccountChallenge to obtain
+    /// the canonical next smart-account address and salt.
     ///
     /// Field 2: `total_created`
     #[serde(
@@ -12751,6 +12750,410 @@ pub const __LIST_SUBACCOUNTS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyE
     from_json: ::buffa::type_registry::any_from_json::<ListSubaccountsResponse>,
     is_wkt: false,
 };
+/// Request an authorization for the canonical next sub-account. Requires a
+/// session token for the root account and current terms acceptance.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateSubaccountChallengeRequest {
+    /// Selected EOA bound to the authenticated root account.
+    ///
+    /// Field 1: `owner_address`
+    #[serde(
+        rename = "ownerAddress",
+        alias = "owner_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub owner_address: ::buffa::alloc::string::String,
+    /// Requesting browser origin including scheme and optional port, without path,
+    /// query, fragment, or user information. Must match the HTTP Origin when present.
+    ///
+    /// Field 2: `uri`
+    #[serde(
+        rename = "uri",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub uri: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateSubaccountChallengeRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateSubaccountChallengeRequest")
+            .field("owner_address", &self.owner_address)
+            .field("uri", &self.uri)
+            .finish()
+    }
+}
+impl CreateSubaccountChallengeRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountChallengeRequest";
+}
+::buffa::impl_default_instance!(CreateSubaccountChallengeRequest);
+impl ::buffa::MessageName for CreateSubaccountChallengeRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "CreateSubaccountChallengeRequest";
+    const FULL_NAME: &'static str = "auth.v1.CreateSubaccountChallengeRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountChallengeRequest";
+}
+impl ::buffa::Message for CreateSubaccountChallengeRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.owner_address.is_empty() {
+            size
+                += 1u32 + ::buffa::types::string_encoded_len(&self.owner_address) as u32;
+        }
+        if !self.uri.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.uri) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.owner_address.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.owner_address, buf);
+        }
+        if !self.uri.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.uri, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.owner_address, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.uri, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.owner_address.clear();
+        self.uri.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateSubaccountChallengeRequest {
+    const PROTO_FQN: &'static str = "auth.v1.CreateSubaccountChallengeRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateSubaccountChallengeRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_SUBACCOUNT_CHALLENGE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.CreateSubaccountChallengeRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateSubaccountChallengeRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateSubaccountChallengeRequest>,
+    is_wkt: false,
+};
+/// Canonical sub-account authorization. Issuing a new challenge replaces the
+/// previous challenge for this root. A stale challenge requires reissue.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateSubaccountChallengeResponse {
+    /// Exact UTF-8 EIP-191 personal_sign message. This is an account-control
+    /// authorization, not an EIP-4361 sign-in message. Sign through the returned
+    /// smart account; do not hash, alter, or reconstruct the message.
+    ///
+    /// Field 1: `message`
+    #[serde(
+        rename = "message",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub message: ::buffa::alloc::string::String,
+    /// Canonical address of the next smart account, derived by the server.
+    ///
+    /// Field 2: `smart_account_address`
+    #[serde(
+        rename = "smartAccountAddress",
+        alias = "smart_account_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub smart_account_address: ::buffa::alloc::string::String,
+    /// Canonical derivation salt nonce for the returned smart account.
+    ///
+    /// Field 3: `smart_account_salt_nonce`
+    #[serde(
+        rename = "smartAccountSaltNonce",
+        alias = "smart_account_salt_nonce",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub smart_account_salt_nonce: u32,
+    /// Expiration in UTC, five minutes after issuance.
+    ///
+    /// Field 4: `expires_at`
+    #[serde(
+        rename = "expiresAt",
+        alias = "expires_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Polyester EIP-155 chain ID used for smart-account derivation and verification.
+    ///
+    /// Field 5: `polyester_chain_id`
+    #[serde(
+        rename = "polyesterChainId",
+        alias = "polyester_chain_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub polyester_chain_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateSubaccountChallengeResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateSubaccountChallengeResponse")
+            .field("message", &self.message)
+            .field("smart_account_address", &self.smart_account_address)
+            .field("smart_account_salt_nonce", &self.smart_account_salt_nonce)
+            .field("expires_at", &self.expires_at)
+            .field("polyester_chain_id", &self.polyester_chain_id)
+            .finish()
+    }
+}
+impl CreateSubaccountChallengeResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountChallengeResponse";
+}
+::buffa::impl_default_instance!(CreateSubaccountChallengeResponse);
+impl ::buffa::MessageName for CreateSubaccountChallengeResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "CreateSubaccountChallengeResponse";
+    const FULL_NAME: &'static str = "auth.v1.CreateSubaccountChallengeResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountChallengeResponse";
+}
+impl ::buffa::Message for CreateSubaccountChallengeResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.message.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.message) as u32;
+        }
+        if !self.smart_account_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.smart_account_address)
+                        as u32;
+        }
+        if self.smart_account_salt_nonce != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.smart_account_salt_nonce)
+                        as u32;
+        }
+        if self.expires_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expires_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.polyester_chain_id != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.polyester_chain_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.message.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.message, buf);
+        }
+        if !self.smart_account_address.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.smart_account_address, buf);
+        }
+        if self.smart_account_salt_nonce != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.smart_account_salt_nonce, buf);
+        }
+        if self.expires_at.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.expires_at.write_to(__cache, buf);
+        }
+        if self.polyester_chain_id != 0u64 {
+            ::buffa::types::put_uint64_field(5u32, self.polyester_chain_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.message, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.smart_account_address, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.smart_account_salt_nonce = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expires_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.polyester_chain_id = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.message.clear();
+        self.smart_account_address.clear();
+        self.smart_account_salt_nonce = 0u32;
+        self.expires_at = ::buffa::MessageField::none();
+        self.polyester_chain_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateSubaccountChallengeResponse {
+    const PROTO_FQN: &'static str = "auth.v1.CreateSubaccountChallengeResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateSubaccountChallengeResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_SUBACCOUNT_CHALLENGE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.CreateSubaccountChallengeResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateSubaccountChallengeResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CreateSubaccountChallengeResponse,
+    >,
+    is_wkt: false,
+};
 /// Request to create a new sub-account under the caller's root account.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -12793,8 +13196,7 @@ pub struct CreateSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
-    /// Exact EIP-4361 message returned by CreateWalletChallenge for the
-    /// CREATE_SUBACCOUNT purpose.
+    /// Exact EIP-191 authorization returned by CreateSubaccountChallenge.
     ///
     /// Field 3: `message`
     #[serde(
@@ -12803,7 +13205,8 @@ pub struct CreateSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub message: ::buffa::alloc::string::String,
-    /// Signature over message using EIP-191 personal_sign semantics.
+    /// Smart-account signature over message using EIP-191 personal_sign semantics.
+    /// Deployed ERC-1271 and counterfactual ERC-6492 signatures are supported.
     ///
     /// Field 4: `signature`
     #[serde(
@@ -13019,8 +13422,7 @@ pub struct CreateSubaccountResponse {
     )]
     pub subaccount_id: u64,
     /// Total number of sub-accounts that have ever been created for this root,
-    /// including soft-deleted ones. Returned here so clients can immediately
-    /// derive the next salt/index without requiring a fresh ListSubaccounts call.
+    /// including soft-deleted ones. Request a new challenge for the next account.
     ///
     /// Field 2: `total_created`
     #[serde(
@@ -36181,8 +36583,6 @@ pub enum WalletChallengePurpose {
     WALLET_PROOF_UNSPECIFIED = 0i32,
     /// Authenticate the wallet and create a Polyester session.
     LOGIN = 1i32,
-    /// Prove control of a new smart account before creating a sub-account.
-    CREATE_SUBACCOUNT = 2i32,
 }
 impl WalletChallengePurpose {
     ///Idiomatic alias for [`Self::WALLET_PROOF_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -36191,9 +36591,6 @@ impl WalletChallengePurpose {
     ///Idiomatic alias for [`Self::LOGIN`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Login: Self = Self::LOGIN;
-    ///Idiomatic alias for [`Self::CREATE_SUBACCOUNT`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const CreateSubaccount: Self = Self::CREATE_SUBACCOUNT;
 }
 impl ::core::default::Default for WalletChallengePurpose {
     fn default() -> Self {
@@ -36294,7 +36691,6 @@ impl ::buffa::Enumeration for WalletChallengePurpose {
         match value {
             0i32 => ::core::option::Option::Some(Self::WALLET_PROOF_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::LOGIN),
-            2i32 => ::core::option::Option::Some(Self::CREATE_SUBACCOUNT),
             _ => ::core::option::Option::None,
         }
     }
@@ -36305,7 +36701,6 @@ impl ::buffa::Enumeration for WalletChallengePurpose {
         match self {
             Self::WALLET_PROOF_UNSPECIFIED => "WALLET_PROOF_UNSPECIFIED",
             Self::LOGIN => "LOGIN",
-            Self::CREATE_SUBACCOUNT => "CREATE_SUBACCOUNT",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -36314,12 +36709,11 @@ impl ::buffa::Enumeration for WalletChallengePurpose {
                 ::core::option::Option::Some(Self::WALLET_PROOF_UNSPECIFIED)
             }
             "LOGIN" => ::core::option::Option::Some(Self::LOGIN),
-            "CREATE_SUBACCOUNT" => ::core::option::Option::Some(Self::CREATE_SUBACCOUNT),
             _ => ::core::option::Option::None,
         }
     }
     fn values() -> &'static [Self] {
-        &[Self::WALLET_PROOF_UNSPECIFIED, Self::LOGIN, Self::CREATE_SUBACCOUNT]
+        &[Self::WALLET_PROOF_UNSPECIFIED, Self::LOGIN]
     }
 }
 /// High-level error codes for authentication and account-domain failures.
@@ -36406,8 +36800,14 @@ pub enum AuthErrorCode {
     AUTH_MFA_LAST_FACTOR_REQUIRED = 39i32,
     /// An unexpected internal failure prevented the auth mutation from completing.
     AUTH_INTERNAL_ERROR = 40i32,
-    /// The caller has not explicitly accepted the currently required terms.
+    /// The caller has not accepted the terms required for this action.
     AUTH_TERMS_NOT_ACCEPTED = 41i32,
+    /// Social verification challenge expired. Start a new verification, then mark it ready again.
+    AUTH_SOCIAL_VERIFICATION_EXPIRED = 42i32,
+    /// Social verification cannot accept a ready mark in its current state.
+    AUTH_SOCIAL_VERIFICATION_INVALID_STATE = 43i32,
+    /// Sub-account authorization is expired, replaced, replayed, or invalid.
+    AUTH_SUBACCOUNT_CHALLENGE_INVALID = 44i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -36533,6 +36933,15 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_TERMS_NOT_ACCEPTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthTermsNotAccepted: Self = Self::AUTH_TERMS_NOT_ACCEPTED;
+    ///Idiomatic alias for [`Self::AUTH_SOCIAL_VERIFICATION_EXPIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthSocialVerificationExpired: Self = Self::AUTH_SOCIAL_VERIFICATION_EXPIRED;
+    ///Idiomatic alias for [`Self::AUTH_SOCIAL_VERIFICATION_INVALID_STATE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthSocialVerificationInvalidState: Self = Self::AUTH_SOCIAL_VERIFICATION_INVALID_STATE;
+    ///Idiomatic alias for [`Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthSubaccountChallengeInvalid: Self = Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -36679,6 +37088,15 @@ impl ::buffa::Enumeration for AuthErrorCode {
             39i32 => ::core::option::Option::Some(Self::AUTH_MFA_LAST_FACTOR_REQUIRED),
             40i32 => ::core::option::Option::Some(Self::AUTH_INTERNAL_ERROR),
             41i32 => ::core::option::Option::Some(Self::AUTH_TERMS_NOT_ACCEPTED),
+            42i32 => ::core::option::Option::Some(Self::AUTH_SOCIAL_VERIFICATION_EXPIRED),
+            43i32 => {
+                ::core::option::Option::Some(
+                    Self::AUTH_SOCIAL_VERIFICATION_INVALID_STATE,
+                )
+            }
+            44i32 => {
+                ::core::option::Option::Some(Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -36736,6 +37154,13 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_MFA_LAST_FACTOR_REQUIRED => "AUTH_MFA_LAST_FACTOR_REQUIRED",
             Self::AUTH_INTERNAL_ERROR => "AUTH_INTERNAL_ERROR",
             Self::AUTH_TERMS_NOT_ACCEPTED => "AUTH_TERMS_NOT_ACCEPTED",
+            Self::AUTH_SOCIAL_VERIFICATION_EXPIRED => "AUTH_SOCIAL_VERIFICATION_EXPIRED",
+            Self::AUTH_SOCIAL_VERIFICATION_INVALID_STATE => {
+                "AUTH_SOCIAL_VERIFICATION_INVALID_STATE"
+            }
+            Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID => {
+                "AUTH_SUBACCOUNT_CHALLENGE_INVALID"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -36861,6 +37286,17 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_TERMS_NOT_ACCEPTED" => {
                 ::core::option::Option::Some(Self::AUTH_TERMS_NOT_ACCEPTED)
             }
+            "AUTH_SOCIAL_VERIFICATION_EXPIRED" => {
+                ::core::option::Option::Some(Self::AUTH_SOCIAL_VERIFICATION_EXPIRED)
+            }
+            "AUTH_SOCIAL_VERIFICATION_INVALID_STATE" => {
+                ::core::option::Option::Some(
+                    Self::AUTH_SOCIAL_VERIFICATION_INVALID_STATE,
+                )
+            }
+            "AUTH_SUBACCOUNT_CHALLENGE_INVALID" => {
+                ::core::option::Option::Some(Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -36907,6 +37343,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_MFA_LAST_FACTOR_REQUIRED,
             Self::AUTH_INTERNAL_ERROR,
             Self::AUTH_TERMS_NOT_ACCEPTED,
+            Self::AUTH_SOCIAL_VERIFICATION_EXPIRED,
+            Self::AUTH_SOCIAL_VERIFICATION_INVALID_STATE,
+            Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID,
         ]
     }
 }
@@ -36927,9 +37366,7 @@ pub struct CreateWalletChallengeRequest {
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
     /// Address whose signature authorizes the challenge and that is written into
-    /// the EIP-4361 message. For LOGIN, this must be an EOA that controls the
-    /// target smart account. For CREATE_SUBACCOUNT, this must equal
-    /// smart_account_address.
+    /// the EIP-4361 message. This must be an EOA that controls the target smart account.
     ///
     /// Field 2: `signer_address`
     #[serde(
@@ -36949,7 +37386,7 @@ pub struct CreateWalletChallengeRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub uri: ::buffa::alloc::string::String,
-    /// Operation for which the challenge may be consumed.
+    /// Operation for which the challenge may be consumed. Must be LOGIN.
     ///
     /// Field 4: `purpose`
     #[serde(
@@ -38320,7 +38757,7 @@ pub const __AUTH_ERROR_DETAIL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     from_json: ::buffa::type_registry::any_from_json::<AuthErrorDetail>,
     is_wkt: false,
 };
-/// AcceptTermsRequest records explicit consent to the currently required terms.
+/// AcceptTermsRequest records explicit consent to the terms that apply to the caller's root account.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -38422,8 +38859,8 @@ pub const __ACCEPT_TERMS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
     from_json: ::buffa::type_registry::any_from_json::<AcceptTermsRequest>,
     is_wkt: false,
 };
-/// AcceptTermsResponse confirms acceptance. Repeated acceptance of the current
-/// version succeeds and preserves the first acceptance time.
+/// AcceptTermsResponse confirms acceptance. Repeated requests succeed and
+/// preserve the first acceptance time.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -39041,8 +39478,8 @@ pub struct UserProfile {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub username_unlocked: bool,
-    /// Whether the caller's root account explicitly accepted the currently required terms.
-    /// False for new or existing accounts without current acceptance.
+    /// Whether the caller's root account accepted the terms required for restricted actions.
+    /// False when the required terms have not been accepted.
     ///
     /// Field 13: `current_terms_accepted`
     #[serde(
@@ -63116,9 +63553,8 @@ pub mod __buffa {
                 super::super::__buffa::view::SubaccountView<'a>,
             >,
             /// Total number of sub-accounts that have ever been created for this root,
-            /// including soft-deleted ones. Clients use total_created + 1 only for the
-            /// next new Smart Account; existing sub-accounts expose their assigned salt
-            /// nonce on Subaccount when direct signing is available.
+            /// including soft-deleted ones. Request CreateSubaccountChallenge to obtain
+            /// the canonical next smart-account address and salt.
             ///
             /// Field 2: `total_created`
             pub total_created: u32,
@@ -63404,9 +63840,8 @@ pub mod __buffa {
                 &self.0.reborrow().subaccounts
             }
             /// Total number of sub-accounts that have ever been created for this root,
-            /// including soft-deleted ones. Clients use total_created + 1 only for the
-            /// next new Smart Account; existing sub-accounts expose their assigned salt
-            /// nonce on Subaccount when direct signing is available.
+            /// including soft-deleted ones. Request CreateSubaccountChallenge to obtain
+            /// the canonical next smart-account address and salt.
             ///
             /// Field 2: `total_created`
             #[must_use]
@@ -63450,6 +63885,803 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// Request an authorization for the canonical next sub-account. Requires a
+        /// session token for the root account and current terms acceptance.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateSubaccountChallengeRequestView<'a> {
+            /// Selected EOA bound to the authenticated root account.
+            ///
+            /// Field 1: `owner_address`
+            pub owner_address: &'a str,
+            /// Requesting browser origin including scheme and optional port, without path,
+            /// query, fragment, or user information. Must match the HTTP Origin when present.
+            ///
+            /// Field 2: `uri`
+            pub uri: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateSubaccountChallengeRequestView<'a> {
+            type Owned = super::super::CreateSubaccountChallengeRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.owner_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.uri = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateSubaccountChallengeRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateSubaccountChallengeRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateSubaccountChallengeRequest {
+                    owner_address: self.owner_address.to_string(),
+                    uri: self.uri.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateSubaccountChallengeRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.owner_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.owner_address)
+                                as u32;
+                }
+                if !self.uri.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.uri) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.owner_address.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.owner_address, buf);
+                }
+                if !self.uri.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.uri, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateSubaccountChallengeRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.owner_address) {
+                    __map.serialize_entry("ownerAddress", self.owner_address)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.uri) {
+                    __map.serialize_entry("uri", self.uri)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateSubaccountChallengeRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "CreateSubaccountChallengeRequest";
+            const FULL_NAME: &'static str = "auth.v1.CreateSubaccountChallengeRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountChallengeRequest";
+        }
+        ::buffa::impl_default_view_instance!(CreateSubaccountChallengeRequestView);
+        ::buffa::impl_view_reborrow!(CreateSubaccountChallengeRequestView);
+        /** Self-contained, `'static` owned view of a `CreateSubaccountChallengeRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateSubaccountChallengeRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateSubaccountChallengeRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateSubaccountChallengeRequestOwnedView(
+            ::buffa::OwnedView<CreateSubaccountChallengeRequestView<'static>>,
+        );
+        impl CreateSubaccountChallengeRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateSubaccountChallengeRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateSubaccountChallengeRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateSubaccountChallengeRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateSubaccountChallengeRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateSubaccountChallengeRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateSubaccountChallengeRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateSubaccountChallengeRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Selected EOA bound to the authenticated root account.
+            ///
+            /// Field 1: `owner_address`
+            #[must_use]
+            pub fn owner_address(&self) -> &'_ str {
+                self.0.reborrow().owner_address
+            }
+            /// Requesting browser origin including scheme and optional port, without path,
+            /// query, fragment, or user information. Must match the HTTP Origin when present.
+            ///
+            /// Field 2: `uri`
+            #[must_use]
+            pub fn uri(&self) -> &'_ str {
+                self.0.reborrow().uri
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateSubaccountChallengeRequestView<'static>>,
+        > for CreateSubaccountChallengeRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CreateSubaccountChallengeRequestView<'static>>,
+            ) -> Self {
+                CreateSubaccountChallengeRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateSubaccountChallengeRequestOwnedView>
+        for ::buffa::OwnedView<CreateSubaccountChallengeRequestView<'static>> {
+            fn from(wrapper: CreateSubaccountChallengeRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateSubaccountChallengeRequestView<'static>>,
+        > for CreateSubaccountChallengeRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateSubaccountChallengeRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CreateSubaccountChallengeRequest {
+            type View<'a> = CreateSubaccountChallengeRequestView<'a>;
+            type ViewHandle = CreateSubaccountChallengeRequestOwnedView;
+        }
+        impl ::serde::Serialize for CreateSubaccountChallengeRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Canonical sub-account authorization. Issuing a new challenge replaces the
+        /// previous challenge for this root. A stale challenge requires reissue.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateSubaccountChallengeResponseView<'a> {
+            /// Exact UTF-8 EIP-191 personal_sign message. This is an account-control
+            /// authorization, not an EIP-4361 sign-in message. Sign through the returned
+            /// smart account; do not hash, alter, or reconstruct the message.
+            ///
+            /// Field 1: `message`
+            pub message: &'a str,
+            /// Canonical address of the next smart account, derived by the server.
+            ///
+            /// Field 2: `smart_account_address`
+            pub smart_account_address: &'a str,
+            /// Canonical derivation salt nonce for the returned smart account.
+            ///
+            /// Field 3: `smart_account_salt_nonce`
+            pub smart_account_salt_nonce: u32,
+            /// Expiration in UTC, five minutes after issuance.
+            ///
+            /// Field 4: `expires_at`
+            pub expires_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Polyester EIP-155 chain ID used for smart-account derivation and verification.
+            ///
+            /// Field 5: `polyester_chain_id`
+            pub polyester_chain_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateSubaccountChallengeResponseView<'a> {
+            type Owned = super::super::CreateSubaccountChallengeResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.message = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.smart_account_address = ::buffa::types::borrow_str(
+                            &mut cur,
+                        )?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.smart_account_salt_nonce = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expires_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expires_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.polyester_chain_id = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateSubaccountChallengeResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateSubaccountChallengeResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateSubaccountChallengeResponse {
+                    message: self.message.to_string(),
+                    smart_account_address: self.smart_account_address.to_string(),
+                    smart_account_salt_nonce: self.smart_account_salt_nonce,
+                    expires_at: match self.expires_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    polyester_chain_id: self.polyester_chain_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateSubaccountChallengeResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.message.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.message) as u32;
+                }
+                if !self.smart_account_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.smart_account_address,
+                            ) as u32;
+                }
+                if self.smart_account_salt_nonce != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(
+                                self.smart_account_salt_nonce,
+                            ) as u32;
+                }
+                if self.expires_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expires_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.polyester_chain_id != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.polyester_chain_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.message.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.message, buf);
+                }
+                if !self.smart_account_address.is_empty() {
+                    ::buffa::types::put_string_field(
+                        2u32,
+                        &self.smart_account_address,
+                        buf,
+                    );
+                }
+                if self.smart_account_salt_nonce != 0u32 {
+                    ::buffa::types::put_uint32_field(
+                        3u32,
+                        self.smart_account_salt_nonce,
+                        buf,
+                    );
+                }
+                if self.expires_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expires_at.write_to(__cache, buf);
+                }
+                if self.polyester_chain_id != 0u64 {
+                    ::buffa::types::put_uint64_field(5u32, self.polyester_chain_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateSubaccountChallengeResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.message) {
+                    __map.serialize_entry("message", self.message)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.smart_account_address,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "smartAccountAddress",
+                            self.smart_account_address,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.smart_account_salt_nonce,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "smartAccountSaltNonce",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.smart_account_salt_nonce,
+                            ),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expires_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("expiresAt", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.polyester_chain_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "polyesterChainId",
+                            &::buffa::json_helpers::ProtoJson(&self.polyester_chain_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateSubaccountChallengeResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "CreateSubaccountChallengeResponse";
+            const FULL_NAME: &'static str = "auth.v1.CreateSubaccountChallengeResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.CreateSubaccountChallengeResponse";
+        }
+        ::buffa::impl_default_view_instance!(CreateSubaccountChallengeResponseView);
+        ::buffa::impl_view_reborrow!(CreateSubaccountChallengeResponseView);
+        /** Self-contained, `'static` owned view of a `CreateSubaccountChallengeResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateSubaccountChallengeResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateSubaccountChallengeResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateSubaccountChallengeResponseOwnedView(
+            ::buffa::OwnedView<CreateSubaccountChallengeResponseView<'static>>,
+        );
+        impl CreateSubaccountChallengeResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateSubaccountChallengeResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateSubaccountChallengeResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateSubaccountChallengeResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateSubaccountChallengeResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateSubaccountChallengeResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateSubaccountChallengeResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateSubaccountChallengeResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Exact UTF-8 EIP-191 personal_sign message. This is an account-control
+            /// authorization, not an EIP-4361 sign-in message. Sign through the returned
+            /// smart account; do not hash, alter, or reconstruct the message.
+            ///
+            /// Field 1: `message`
+            #[must_use]
+            pub fn message(&self) -> &'_ str {
+                self.0.reborrow().message
+            }
+            /// Canonical address of the next smart account, derived by the server.
+            ///
+            /// Field 2: `smart_account_address`
+            #[must_use]
+            pub fn smart_account_address(&self) -> &'_ str {
+                self.0.reborrow().smart_account_address
+            }
+            /// Canonical derivation salt nonce for the returned smart account.
+            ///
+            /// Field 3: `smart_account_salt_nonce`
+            #[must_use]
+            pub fn smart_account_salt_nonce(&self) -> u32 {
+                self.0.reborrow().smart_account_salt_nonce
+            }
+            /// Expiration in UTC, five minutes after issuance.
+            ///
+            /// Field 4: `expires_at`
+            #[must_use]
+            pub fn expires_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expires_at
+            }
+            /// Polyester EIP-155 chain ID used for smart-account derivation and verification.
+            ///
+            /// Field 5: `polyester_chain_id`
+            #[must_use]
+            pub fn polyester_chain_id(&self) -> u64 {
+                self.0.reborrow().polyester_chain_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateSubaccountChallengeResponseView<'static>>,
+        > for CreateSubaccountChallengeResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CreateSubaccountChallengeResponseView<'static>>,
+            ) -> Self {
+                CreateSubaccountChallengeResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateSubaccountChallengeResponseOwnedView>
+        for ::buffa::OwnedView<CreateSubaccountChallengeResponseView<'static>> {
+            fn from(wrapper: CreateSubaccountChallengeResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateSubaccountChallengeResponseView<'static>>,
+        > for CreateSubaccountChallengeResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateSubaccountChallengeResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CreateSubaccountChallengeResponse {
+            type View<'a> = CreateSubaccountChallengeResponseView<'a>;
+            type ViewHandle = CreateSubaccountChallengeResponseOwnedView;
+        }
+        impl ::serde::Serialize for CreateSubaccountChallengeResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// Request to create a new sub-account under the caller's root account.
         #[derive(Clone, Debug, Default)]
         pub struct CreateSubaccountRequestView<'a> {
@@ -63469,12 +64701,12 @@ pub mod __buffa {
             ///
             /// Field 2: `smart_account_address`
             pub smart_account_address: &'a str,
-            /// Exact EIP-4361 message returned by CreateWalletChallenge for the
-            /// CREATE_SUBACCOUNT purpose.
+            /// Exact EIP-191 authorization returned by CreateSubaccountChallenge.
             ///
             /// Field 3: `message`
             pub message: &'a str,
-            /// Signature over message using EIP-191 personal_sign semantics.
+            /// Smart-account signature over message using EIP-191 personal_sign semantics.
+            /// Deployed ERC-1271 and counterfactual ERC-6492 signatures are supported.
             ///
             /// Field 4: `signature`
             pub signature: &'a str,
@@ -63836,15 +65068,15 @@ pub mod __buffa {
             pub fn smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().smart_account_address
             }
-            /// Exact EIP-4361 message returned by CreateWalletChallenge for the
-            /// CREATE_SUBACCOUNT purpose.
+            /// Exact EIP-191 authorization returned by CreateSubaccountChallenge.
             ///
             /// Field 3: `message`
             #[must_use]
             pub fn message(&self) -> &'_ str {
                 self.0.reborrow().message
             }
-            /// Signature over message using EIP-191 personal_sign semantics.
+            /// Smart-account signature over message using EIP-191 personal_sign semantics.
+            /// Deployed ERC-1271 and counterfactual ERC-6492 signatures are supported.
             ///
             /// Field 4: `signature`
             #[must_use]
@@ -63896,8 +65128,7 @@ pub mod __buffa {
             /// Field 1: `subaccount_id`
             pub subaccount_id: u64,
             /// Total number of sub-accounts that have ever been created for this root,
-            /// including soft-deleted ones. Returned here so clients can immediately
-            /// derive the next salt/index without requiring a fresh ListSubaccounts call.
+            /// including soft-deleted ones. Request a new challenge for the next account.
             ///
             /// Field 2: `total_created`
             pub total_created: u32,
@@ -64228,8 +65459,7 @@ pub mod __buffa {
                 self.0.reborrow().subaccount_id
             }
             /// Total number of sub-accounts that have ever been created for this root,
-            /// including soft-deleted ones. Returned here so clients can immediately
-            /// derive the next salt/index without requiring a fresh ListSubaccounts call.
+            /// including soft-deleted ones. Request a new challenge for the next account.
             ///
             /// Field 2: `total_created`
             #[must_use]
@@ -105399,9 +106629,7 @@ pub mod __buffa {
             /// Field 1: `smart_account_address`
             pub smart_account_address: &'a str,
             /// Address whose signature authorizes the challenge and that is written into
-            /// the EIP-4361 message. For LOGIN, this must be an EOA that controls the
-            /// target smart account. For CREATE_SUBACCOUNT, this must equal
-            /// smart_account_address.
+            /// the EIP-4361 message. This must be an EOA that controls the target smart account.
             ///
             /// Field 2: `signer_address`
             pub signer_address: &'a str,
@@ -105410,7 +106638,7 @@ pub mod __buffa {
             ///
             /// Field 3: `uri`
             pub uri: &'a str,
-            /// Operation for which the challenge may be consumed.
+            /// Operation for which the challenge may be consumed. Must be LOGIN.
             ///
             /// Field 4: `purpose`
             pub purpose: ::buffa::EnumValue<super::super::WalletChallengePurpose>,
@@ -105727,9 +106955,7 @@ pub mod __buffa {
                 self.0.reborrow().smart_account_address
             }
             /// Address whose signature authorizes the challenge and that is written into
-            /// the EIP-4361 message. For LOGIN, this must be an EOA that controls the
-            /// target smart account. For CREATE_SUBACCOUNT, this must equal
-            /// smart_account_address.
+            /// the EIP-4361 message. This must be an EOA that controls the target smart account.
             ///
             /// Field 2: `signer_address`
             #[must_use]
@@ -105744,7 +106970,7 @@ pub mod __buffa {
             pub fn uri(&self) -> &'_ str {
                 self.0.reborrow().uri
             }
-            /// Operation for which the challenge may be consumed.
+            /// Operation for which the challenge may be consumed. Must be LOGIN.
             ///
             /// Field 4: `purpose`
             #[must_use]
@@ -108052,7 +109278,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// AcceptTermsRequest records explicit consent to the currently required terms.
+        /// AcceptTermsRequest records explicit consent to the terms that apply to the caller's root account.
         #[derive(Clone, Debug, Default)]
         pub struct AcceptTermsRequestView<'a> {
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -108290,8 +109516,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// AcceptTermsResponse confirms acceptance. Repeated acceptance of the current
-        /// version succeeds and preserves the first acceptance time.
+        /// AcceptTermsResponse confirms acceptance. Repeated requests succeed and
+        /// preserve the first acceptance time.
         #[derive(Clone, Debug, Default)]
         pub struct AcceptTermsResponseView<'a> {
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -108970,8 +110196,8 @@ pub mod __buffa {
             ///
             /// Field 11: `username_unlocked`
             pub username_unlocked: bool,
-            /// Whether the caller's root account explicitly accepted the currently required terms.
-            /// False for new or existing accounts without current acceptance.
+            /// Whether the caller's root account accepted the terms required for restricted actions.
+            /// False when the required terms have not been accepted.
             ///
             /// Field 13: `current_terms_accepted`
             pub current_terms_accepted: bool,
@@ -109605,8 +110831,8 @@ pub mod __buffa {
             pub fn username_unlocked(&self) -> bool {
                 self.0.reborrow().username_unlocked
             }
-            /// Whether the caller's root account explicitly accepted the currently required terms.
-            /// False for new or existing accounts without current acceptance.
+            /// Whether the caller's root account accepted the terms required for restricted actions.
+            /// False when the required terms have not been accepted.
             ///
             /// Field 13: `current_terms_accepted`
             #[must_use]
@@ -116791,6 +118017,8 @@ pub mod __buffa {
         reg.register_json_any(super::__SUBACCOUNT_JSON_ANY);
         reg.register_json_any(super::__LIST_SUBACCOUNTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_SUBACCOUNTS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_SUBACCOUNT_CHALLENGE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_SUBACCOUNT_CHALLENGE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_SUBACCOUNT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_SUBACCOUNT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SUBACCOUNT_UPDATE_SPEC_JSON_ANY);
@@ -117149,6 +118377,14 @@ pub use self::__buffa::view::ListSubaccountsRequestOwnedView;
 pub use self::__buffa::view::ListSubaccountsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListSubaccountsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSubaccountChallengeRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSubaccountChallengeRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSubaccountChallengeResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSubaccountChallengeResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateSubaccountRequestView;
 #[doc(inline)]
