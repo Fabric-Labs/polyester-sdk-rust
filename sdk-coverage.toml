@@ -43,6 +43,10 @@ procedure = "/auth.v1.SubaccountService/CreateSubaccount"
 reason = "Subaccount mutations and invite/member writes are JWT/session-only."
 
 [[allowlist]]
+procedure = "/auth.v1.SubaccountService/CreateSubaccountChallenge"
+reason = "Subaccount mutations and invite/member writes are JWT/session-only."
+
+[[allowlist]]
 procedure = "/auth.v1.SubaccountService/UpdateSubaccount"
 reason = "Subaccount mutations and invite/member writes are JWT/session-only."
 
