@@ -16698,6 +16698,20 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub cum_qty_scaled: i64,
+    /// Cumulative filled base quantity inherited from predecessors when this
+    /// replacement was accepted, scaled by the pair's base_quantity_scale from
+    /// GetSpotConfig for symbol_id. Zero for the original order and immutable
+    /// within a generation. cum_qty_scaled minus this value is the quantity
+    /// executed by this generation, not the quantity new to a client session.
+    ///
+    /// Field 33: `inherited_cum_qty_scaled`
+    #[serde(
+        rename = "inheritedCumQtyScaled",
+        alias = "inherited_cum_qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub inherited_cum_qty_scaled: i64,
     /// Remaining working quantity scaled by the pair's base_quantity_scale from
     /// GetSpotConfig for symbol_id. Zero for terminal orders.
     ///
@@ -16891,6 +16905,7 @@ impl ::core::fmt::Debug for Order {
             .field("post_only", &self.post_only)
             .field("orig_qty_scaled", &self.orig_qty_scaled)
             .field("cum_qty_scaled", &self.cum_qty_scaled)
+            .field("inherited_cum_qty_scaled", &self.inherited_cum_qty_scaled)
             .field("leaves_qty_scaled", &self.leaves_qty_scaled)
             .field("avg_price_ticks", &self.avg_price_ticks)
             .field("price_ticks", &self.price_ticks)
@@ -17095,6 +17110,12 @@ impl ::buffa::Message for Order {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.inherited_cum_qty_scaled != 0i64 {
+            size
+                += 2u32
+                    + ::buffa::types::int64_encoded_len(self.inherited_cum_qty_scaled)
+                        as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -17217,6 +17238,9 @@ impl ::buffa::Message for Order {
         if self.expire_at.is_set() {
             ::buffa::types::put_len_delimited_header(32u32, __cache.consume_next(), buf);
             self.expire_at.write_to(__cache, buf);
+        }
+        if self.inherited_cum_qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(33u32, self.inherited_cum_qty_scaled, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -17462,6 +17486,13 @@ impl ::buffa::Message for Order {
                     ctx,
                 )?;
             }
+            33u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.inherited_cum_qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -17499,6 +17530,7 @@ impl ::buffa::Message for Order {
         self.submitted_max_quote_debit_scaled = ::core::option::Option::None;
         self.lineage = ::buffa::MessageField::none();
         self.expire_at = ::buffa::MessageField::none();
+        self.inherited_cum_qty_scaled = 0i64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -42219,6 +42251,14 @@ pub mod __buffa {
             ///
             /// Field 13: `cum_qty_scaled`
             pub cum_qty_scaled: i64,
+            /// Cumulative filled base quantity inherited from predecessors when this
+            /// replacement was accepted, scaled by the pair's base_quantity_scale from
+            /// GetSpotConfig for symbol_id. Zero for the original order and immutable
+            /// within a generation. cum_qty_scaled minus this value is the quantity
+            /// executed by this generation, not the quantity new to a client session.
+            ///
+            /// Field 33: `inherited_cum_qty_scaled`
+            pub inherited_cum_qty_scaled: i64,
             /// Remaining working quantity scaled by the pair's base_quantity_scale from
             /// GetSpotConfig for symbol_id. Zero for terminal orders.
             ///
@@ -42434,6 +42474,15 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.cum_qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    33u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.inherited_cum_qty_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
                     }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -42673,6 +42722,7 @@ pub mod __buffa {
                     post_only: self.post_only,
                     orig_qty_scaled: self.orig_qty_scaled,
                     cum_qty_scaled: self.cum_qty_scaled,
+                    inherited_cum_qty_scaled: self.inherited_cum_qty_scaled,
                     leaves_qty_scaled: self.leaves_qty_scaled,
                     avg_price_ticks: self.avg_price_ticks,
                     price_ticks: self.price_ticks,
@@ -42904,6 +42954,13 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.inherited_cum_qty_scaled != 0i64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::int64_encoded_len(
+                                self.inherited_cum_qty_scaled,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -43056,6 +43113,13 @@ pub mod __buffa {
                     );
                     self.expire_at.write_to(__cache, buf);
                 }
+                if self.inherited_cum_qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(
+                        33u32,
+                        self.inherited_cum_qty_scaled,
+                        buf,
+                    );
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -43139,6 +43203,17 @@ pub mod __buffa {
                         .serialize_entry(
                             "cumQtyScaled",
                             &::buffa::json_helpers::ProtoJson(&self.cum_qty_scaled),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.inherited_cum_qty_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "inheritedCumQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.inherited_cum_qty_scaled,
+                            ),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_i64(
@@ -43449,6 +43524,17 @@ pub mod __buffa {
             #[must_use]
             pub fn cum_qty_scaled(&self) -> i64 {
                 self.0.reborrow().cum_qty_scaled
+            }
+            /// Cumulative filled base quantity inherited from predecessors when this
+            /// replacement was accepted, scaled by the pair's base_quantity_scale from
+            /// GetSpotConfig for symbol_id. Zero for the original order and immutable
+            /// within a generation. cum_qty_scaled minus this value is the quantity
+            /// executed by this generation, not the quantity new to a client session.
+            ///
+            /// Field 33: `inherited_cum_qty_scaled`
+            #[must_use]
+            pub fn inherited_cum_qty_scaled(&self) -> i64 {
+                self.0.reborrow().inherited_cum_qty_scaled
             }
             /// Remaining working quantity scaled by the pair's base_quantity_scale from
             /// GetSpotConfig for symbol_id. Zero for terminal orders.

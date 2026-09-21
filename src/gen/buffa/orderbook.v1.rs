@@ -211,7 +211,7 @@ impl ::buffa::Enumeration for Depth {
         ]
     }
 }
-/// GetOrderBookRequest describes a snapshot view request.
+/// GetOrderBookRequest describes a ConnectRPC snapshot request.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -1109,7 +1109,7 @@ pub mod __buffa {
     pub mod view {
         #[allow(unused_imports)]
         use super::*;
-        /// GetOrderBookRequest describes a snapshot view request.
+        /// GetOrderBookRequest describes a ConnectRPC snapshot request.
         #[derive(Clone, Debug, Default)]
         pub struct GetOrderBookRequestView<'a> {
             /// Stable numeric pair ID from GetSpotConfig.
