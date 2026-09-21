@@ -1065,8 +1065,9 @@ pub struct MarketOverview {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub low_24h_ticks: i64,
-    /// Rolling 24h base volume scaled by the pair's base_quantity_scale from
-    /// GetSpotConfig. Omitted if the amount exceeds the signed 64-bit range.
+    /// Rolling 24h base volume scaled by the base asset's
+    /// market_data_volume_scale from GetSpotConfig. Omitted if the amount exceeds
+    /// the signed 64-bit range.
     ///
     /// Field 8: `volume_24h_base_scaled`
     #[serde(
@@ -4902,8 +4903,9 @@ pub mod __buffa {
             ///
             /// Field 7: `low_24h_ticks`
             pub low_24h_ticks: i64,
-            /// Rolling 24h base volume scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig. Omitted if the amount exceeds the signed 64-bit range.
+            /// Rolling 24h base volume scaled by the base asset's
+            /// market_data_volume_scale from GetSpotConfig. Omitted if the amount exceeds
+            /// the signed 64-bit range.
             ///
             /// Field 8: `volume_24h_base_scaled`
             pub volume_24h_base_scaled: ::core::option::Option<i64>,
@@ -5613,8 +5615,9 @@ pub mod __buffa {
             pub fn low_24h_ticks(&self) -> i64 {
                 self.0.reborrow().low_24h_ticks
             }
-            /// Rolling 24h base volume scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig. Omitted if the amount exceeds the signed 64-bit range.
+            /// Rolling 24h base volume scaled by the base asset's
+            /// market_data_volume_scale from GetSpotConfig. Omitted if the amount exceeds
+            /// the signed 64-bit range.
             ///
             /// Field 8: `volume_24h_base_scaled`
             #[must_use]
