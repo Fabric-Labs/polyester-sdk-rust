@@ -534,6 +534,11 @@ impl OrdersService {
                 order_intent::Execution::MarketIoc(Box::new(market))
             }
             CreateOrderType::Limit => {
+                if params.market_max_slippage.is_some() {
+                    return Err(Error::validation(
+                        "market_max_slippage is only valid for market orders",
+                    ));
+                }
                 let price = params.price.as_ref().ok_or_else(|| {
                     Error::validation(
                         "price is required for limit orders (use Price::from_decimal or Price::from_ticks)",
@@ -2265,6 +2270,16 @@ mod tests {
         params.price = None;
         params.market_max_slippage = Some(MaxSlippage::Ticks(0));
         assert!(client.orders.encode_create_params(&params).is_err());
+
+        params.market_max_slippage = Some(MaxSlippage::Bps(25));
+        params.order_type = CreateOrderType::Limit;
+        params.price = Some(Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap());
+        let err = client.orders.encode_create_params(&params).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("market_max_slippage is only valid for market orders"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

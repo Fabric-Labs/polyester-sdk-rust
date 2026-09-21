@@ -40,6 +40,7 @@ mod funded_order_holds;
 mod funded_spot_fill;
 mod lifecycle_app;
 mod market;
+mod market_ioc_slippage;
 mod market_order_mutation;
 mod market_roundtrip;
 mod money;
