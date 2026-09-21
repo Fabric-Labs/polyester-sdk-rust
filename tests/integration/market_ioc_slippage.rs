@@ -3,8 +3,9 @@ use std::time::Duration;
 use crate::support::{
     call_optional, devnet_unavailable, hydrate_spot_and_zipper, is_internal_order_error,
     is_notional_validation, is_terminal_status, market_ref_price, min_base_qty_for_pair,
-    mutation_test_guard, order_status_label, pair_for_symbol, require_live_client, require_mutation,
-    require_trading_quote_balance, smoke_symbol, unique_client_order_id, wait_for_terminal_order,
+    mutation_test_guard, order_status_label, pair_for_symbol, require_live_client,
+    require_mutation, require_trading_quote_balance, smoke_symbol, unique_client_order_id,
+    wait_for_terminal_order,
 };
 use polyester::models::{
     CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce, MaxSlippage,
