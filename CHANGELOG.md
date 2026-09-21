@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a49
+
+Package version: `0.1.0-alpha.49`. Git tag: `v0.1.0a49`.
+
 ### Fixed
 - Limit-order create now rejects `market_max_slippage` instead of dropping
   the supplied protection.
