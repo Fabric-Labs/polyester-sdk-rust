@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+- Candle and market-overview base volume now use the base asset
+  `market_data_volume_scale` from `get_spot_config`. Primary candle prices
+  stay on scale 6.
+- Composite reference-candle OHLC uses the pair `reference_price_scale`.
+  `GetCandlesOpts.include_reference` requests that series.
+  `MarketOverviewEntry.volume_24h_base` is the decoded decimal when the
+  catalog scale is known; `volume_24h_base_scaled` stays the integer.
+
 ## 0.1.0a49
 
 Package version: `0.1.0-alpha.49`. Git tag: `v0.1.0a49`.
