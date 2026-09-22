@@ -33,6 +33,22 @@ pub fn spot_config_from_proto(msg: &GetSpotConfigResponse) -> SpotConfig {
                     "quoteQuantityScale".to_owned(),
                     Value::from(typed.quote_quantity_scale),
                 );
+                object.remove("reference_price_scale");
+                object.insert(
+                    "referencePriceScale".to_owned(),
+                    Value::from(typed.reference_price_scale),
+                );
+            }
+        }
+    }
+    if let Some(assets) = raw.get_mut("assets").and_then(Value::as_array_mut) {
+        for (asset, typed) in assets.iter_mut().zip(&msg.assets) {
+            if let Some(object) = asset.as_object_mut() {
+                object.remove("market_data_volume_scale");
+                object.insert(
+                    "marketDataVolumeScale".to_owned(),
+                    Value::from(typed.market_data_volume_scale),
+                );
             }
         }
     }
@@ -122,7 +138,11 @@ pub fn candle_point_from_proto(
     })
 }
 
-pub fn candles_from_proto(msg: &GetCandlesResponse, volume_scale: u32) -> Result<CandlesResult> {
+pub fn candles_from_proto(
+    msg: &GetCandlesResponse,
+    volume_scale: u32,
+    reference_price_scale: Option<u32>,
+) -> Result<CandlesResult> {
     let timeframe = enum_value_timeframe(msg.timeframe);
     let symbol_id = msg.symbol_id;
     let mut candles = Vec::with_capacity(msg.candles.len());
@@ -134,18 +154,68 @@ pub fn candles_from_proto(msg: &GetCandlesResponse, volume_scale: u32) -> Result
             &timeframe,
         )?);
     }
+    let reference_candles = reference_candles_from_points(
+        &msg.reference_candles,
+        volume_scale,
+        reference_price_scale,
+        symbol_id,
+        &timeframe,
+    )?;
     Ok(CandlesResult {
         symbol_id,
         timeframe,
         candles,
+        reference_candles,
         next_page_token: msg.next_page_token.clone(),
     })
+}
+
+fn reference_candles_from_points(
+    points: &[CandlePoint],
+    volume_scale: u32,
+    reference_price_scale: Option<u32>,
+    symbol_id: u32,
+    timeframe: &str,
+) -> Result<Vec<Candle>> {
+    if points.is_empty() {
+        return Ok(Vec::new());
+    }
+    let price_scale = reference_price_scale.ok_or_else(|| {
+        Error::validation(
+            "candle reference prices require reference_price_scale from GetSpotConfig",
+        )
+    })?;
+    let mut out = Vec::with_capacity(points.len());
+    for point in points {
+        out.push(Candle {
+            ts_sec: point.ts_sec as i64,
+            open: format_qty_scaled(point.open, price_scale).map_err(|e| {
+                Error::validation(format!("reference candle price scale invalid: {e}"))
+            })?,
+            high: format_qty_scaled(point.high, price_scale).map_err(|e| {
+                Error::validation(format!("reference candle price scale invalid: {e}"))
+            })?,
+            low: format_qty_scaled(point.low, price_scale).map_err(|e| {
+                Error::validation(format!("reference candle price scale invalid: {e}"))
+            })?,
+            close: format_qty_scaled(point.close, price_scale).map_err(|e| {
+                Error::validation(format!("reference candle price scale invalid: {e}"))
+            })?,
+            volume: format_qty_scaled(point.volume, volume_scale)
+                .map_err(|e| Error::validation(format!("candle volume scale invalid: {e}")))?,
+            quote_volume: point.quote_volume.clone(),
+            symbol_id,
+            timeframe: timeframe.to_owned(),
+        });
+    }
+    Ok(out)
 }
 
 /// Decode columnar OHLCV into row-oriented [`CandlesResult`] (Go `CandlesColumnsFromProto`).
 pub fn candles_columns_from_proto(
     msg: &GetCandlesColumnsResponse,
     volume_scale: u32,
+    reference_price_scale: Option<u32>,
 ) -> Result<CandlesResult> {
     let rows = msg.ts_sec.len();
     let lengths = [
@@ -187,12 +257,83 @@ pub fn candles_columns_from_proto(
             timeframe: timeframe.clone(),
         });
     }
+    let reference_candles = reference_candles_from_columns(
+        msg,
+        volume_scale,
+        reference_price_scale,
+        symbol_id,
+        &timeframe,
+    )?;
     Ok(CandlesResult {
         symbol_id,
         timeframe,
         candles,
+        reference_candles,
         next_page_token: msg.next_page_token.clone(),
     })
+}
+
+fn reference_candles_from_columns(
+    msg: &GetCandlesColumnsResponse,
+    volume_scale: u32,
+    reference_price_scale: Option<u32>,
+    symbol_id: u32,
+    timeframe: &str,
+) -> Result<Vec<Candle>> {
+    let rows = msg.reference_ts_sec.len();
+    let empty = rows == 0
+        && msg.reference_open.is_empty()
+        && msg.reference_high.is_empty()
+        && msg.reference_low.is_empty()
+        && msg.reference_close.is_empty()
+        && msg.reference_volume.is_empty();
+    if empty {
+        return Ok(Vec::new());
+    }
+    if msg.reference_open.len() != rows
+        || msg.reference_high.len() != rows
+        || msg.reference_low.len() != rows
+        || msg.reference_close.len() != rows
+        || msg.reference_volume.len() != rows
+    {
+        return Err(Error::transport(format!(
+            "invalid GetCandlesColumns reference lengths: reference_ts_sec={rows}, reference_open={}, reference_high={}, reference_low={}, reference_close={}, reference_volume={}",
+            msg.reference_open.len(),
+            msg.reference_high.len(),
+            msg.reference_low.len(),
+            msg.reference_close.len(),
+            msg.reference_volume.len()
+        )));
+    }
+    let price_scale = reference_price_scale.ok_or_else(|| {
+        Error::validation(
+            "candle reference prices require reference_price_scale from GetSpotConfig",
+        )
+    })?;
+    let mut out = Vec::with_capacity(rows);
+    for (i, &ts) in msg.reference_ts_sec.iter().enumerate() {
+        out.push(Candle {
+            ts_sec: ts as i64,
+            open: format_qty_scaled(msg.reference_open[i], price_scale).map_err(|e| {
+                Error::validation(format!("reference candle price scale invalid: {e}"))
+            })?,
+            high: format_qty_scaled(msg.reference_high[i], price_scale).map_err(|e| {
+                Error::validation(format!("reference candle price scale invalid: {e}"))
+            })?,
+            low: format_qty_scaled(msg.reference_low[i], price_scale).map_err(|e| {
+                Error::validation(format!("reference candle price scale invalid: {e}"))
+            })?,
+            close: format_qty_scaled(msg.reference_close[i], price_scale).map_err(|e| {
+                Error::validation(format!("reference candle price scale invalid: {e}"))
+            })?,
+            volume: format_qty_scaled(msg.reference_volume[i], volume_scale)
+                .map_err(|e| Error::validation(format!("candle volume scale invalid: {e}")))?,
+            quote_volume: String::new(),
+            symbol_id,
+            timeframe: timeframe.to_owned(),
+        });
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -259,6 +400,8 @@ mod tests {
             serde_json::from_value(spot.raw.clone()).expect("spot config round-trip");
         assert_eq!(round_trip.pairs[0].base_quantity_scale, 0);
         assert_eq!(round_trip.pairs[0].quote_quantity_scale, 0);
+        assert_eq!(spot.raw["pairs"][0]["referencePriceScale"], 0);
+        assert_eq!(round_trip.pairs[0].reference_price_scale, 0);
     }
 
     #[test]
@@ -268,7 +411,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            candles_from_proto(&msg, 8).unwrap().timeframe,
+            candles_from_proto(&msg, 8, None).unwrap().timeframe,
             "UNKNOWN(77)"
         );
     }
@@ -290,7 +433,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let result = candles_from_proto(&msg, 8).expect("candles");
+        let result = candles_from_proto(&msg, 8, None).expect("candles");
         assert_eq!(result.symbol_id, 1);
         assert_eq!(result.timeframe, "1m");
         assert_eq!(result.candles.len(), 1);
@@ -305,6 +448,38 @@ mod tests {
     }
 
     #[test]
+    fn reference_candles_use_reference_price_scale() {
+        let msg = GetCandlesResponse {
+            symbol_id: 1,
+            timeframe: Timeframe::Min1.into(),
+            candles: vec![CandlePoint {
+                ts_sec: 1,
+                open: 1_000_000,
+                high: 1_000_000,
+                low: 1_000_000,
+                close: 1_000_000,
+                volume: 100_000_000,
+                ..Default::default()
+            }],
+            reference_candles: vec![CandlePoint {
+                ts_sec: 1,
+                open: 100_000_000,
+                high: 100_000_000,
+                low: 100_000_000,
+                close: 100_000_000,
+                volume: 100_000_000,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let result = candles_from_proto(&msg, 8, Some(8)).expect("candles");
+        assert_eq!(result.candles[0].open, "1");
+        assert_eq!(result.candles[0].volume, "1");
+        assert_eq!(result.reference_candles[0].open, "1");
+        assert_eq!(result.reference_candles[0].volume, "1");
+    }
+
+    #[test]
     fn candle_decode_rejects_invalid_volume_scale() {
         let msg = GetCandlesResponse {
             symbol_id: 1,
@@ -316,7 +491,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let err = candles_from_proto(&msg, 65535).expect_err("invalid scale");
+        let err = candles_from_proto(&msg, 65535, None).expect_err("invalid scale");
         assert!(err.to_string().to_ascii_lowercase().contains("scale"));
     }
 
@@ -333,7 +508,7 @@ mod tests {
             volume: vec![1],
             ..Default::default()
         };
-        let err = candles_columns_from_proto(&msg, 65535).expect_err("invalid scale");
+        let err = candles_columns_from_proto(&msg, 65535, None).expect_err("invalid scale");
         assert!(err.to_string().to_ascii_lowercase().contains("scale"));
     }
 
@@ -350,7 +525,7 @@ mod tests {
             volume: vec![1, 2],
             ..Default::default()
         };
-        let err = candles_columns_from_proto(&msg, 8)
+        let err = candles_columns_from_proto(&msg, 8, None)
             .expect_err("misaligned columnar response must fail closed");
         assert!(err.to_string().contains("response lengths"));
         assert!(err.to_string().contains("high=1"));

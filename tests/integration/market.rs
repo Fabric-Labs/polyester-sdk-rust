@@ -114,6 +114,91 @@ async fn market_data_get_trades() {
 }
 
 #[tokio::test]
+async fn canonical_market_data_scales() {
+    let Some(client) = require_live_client() else {
+        return;
+    };
+    let cfg = call_required("market_data.get_spot_config", || {
+        client.market_data.get_spot_config()
+    })
+    .await;
+    let assets = cfg
+        .raw
+        .get("assets")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(!assets.is_empty(), "expected spot assets");
+    for asset in &assets {
+        let scale = asset
+            .get("marketDataVolumeScale")
+            .or_else(|| asset.get("market_data_volume_scale"))
+            .and_then(|v| v.as_u64());
+        assert!(
+            matches!(scale, Some(scale) if scale <= 18),
+            "asset market_data_volume_scale missing: {asset:?}"
+        );
+    }
+    let pairs = cfg
+        .raw
+        .get("pairs")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    for pair in &pairs {
+        let scale = pair
+            .get("referencePriceScale")
+            .or_else(|| pair.get("reference_price_scale"))
+            .and_then(|v| v.as_u64());
+        assert!(
+            matches!(scale, Some(scale) if scale <= 18),
+            "pair reference_price_scale missing: {pair:?}"
+        );
+    }
+    let spot = match hydrate_spot_and_zipper(&client).await {
+        Ok(s) => s,
+        Err(err) => {
+            eprintln!("skip: hydrate failed: {err}");
+            return;
+        }
+    };
+    let symbol = smoke_symbol(&spot);
+    let Some(candles) = call_optional("market_data.get_candles", || {
+        client
+            .market_data
+            .get_candles_with(polyester::models::GetCandlesOpts {
+                symbol: Some(symbol.clone()),
+                timeframe: "1m".into(),
+                limit: Some(5),
+                include_reference: true,
+                ..Default::default()
+            })
+    })
+    .await
+    else {
+        return;
+    };
+    for candle in candles
+        .candles
+        .iter()
+        .chain(candles.reference_candles.iter())
+    {
+        for value in [
+            &candle.open,
+            &candle.high,
+            &candle.low,
+            &candle.close,
+            &candle.volume,
+        ] {
+            if value.is_empty() {
+                continue;
+            }
+            assert!(value.parse::<f64>().is_ok(), "value {value}");
+        }
+    }
+}
+
+#[tokio::test]
 async fn market_data_get_candles() {
     let Some(client) = require_live_client() else {
         return;

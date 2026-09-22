@@ -69,6 +69,8 @@ struct Inner {
     symbol_to_base_scale: HashMap<String, u32>,
     id_to_quote_scale: HashMap<u32, u32>,
     symbol_to_quote_scale: HashMap<String, u32>,
+    id_to_market_data_volume_scale: HashMap<u32, u32>,
+    id_to_reference_price_scale: HashMap<u32, u32>,
     asset_to_ledger_id: HashMap<String, u32>,
     asset_to_qty_scale: HashMap<String, u32>,
     zipped_id_to_scale: HashMap<u32, u32>,
@@ -87,6 +89,8 @@ struct SpotSnapshot {
     symbol_to_base_scale: HashMap<String, u32>,
     id_to_quote_scale: HashMap<u32, u32>,
     symbol_to_quote_scale: HashMap<String, u32>,
+    id_to_market_data_volume_scale: HashMap<u32, u32>,
+    id_to_reference_price_scale: HashMap<u32, u32>,
     orderbook_buckets: HashMap<String, Vec<String>>,
     spot_config: Value,
 }
@@ -113,6 +117,22 @@ fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
             "catalog spot config must contain a pairs or markets array",
         ));
     };
+    let mut asset_volume_scales = HashMap::<String, u32>::new();
+    if let Some(assets) = value.get("assets").and_then(Value::as_array) {
+        for asset in assets {
+            let Some(code) = asset.get("asset").and_then(Value::as_str) else {
+                continue;
+            };
+            if let Some(scale) = parse_optional_scale(
+                asset
+                    .get("market_data_volume_scale")
+                    .or_else(|| asset.get("marketDataVolumeScale")),
+                "market_data_volume_scale",
+            )? {
+                asset_volume_scales.insert(code.to_owned(), scale);
+            }
+        }
+    }
     let mut id_to_symbol = HashMap::<u32, String>::new();
     for m in markets {
         let symbol = m
@@ -152,6 +172,23 @@ fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
             snap.symbol_to_quote_scale
                 .insert(symbol.to_owned(), quote_scale);
             snap.id_to_quote_scale.insert(symbol_id, quote_scale);
+        }
+        if let Some(base_asset) = m
+            .get("base_asset")
+            .or_else(|| m.get("baseAsset"))
+            .and_then(Value::as_str)
+            && let Some(scale) = asset_volume_scales.get(base_asset)
+        {
+            snap.id_to_market_data_volume_scale
+                .insert(symbol_id, *scale);
+        }
+        if let Some(reference_scale) = parse_optional_scale(
+            m.get("reference_price_scale")
+                .or_else(|| m.get("referencePriceScale")),
+            "reference_price_scale",
+        )? {
+            snap.id_to_reference_price_scale
+                .insert(symbol_id, reference_scale);
         }
         // Optional catalog minima/tick/step fields are ignored here. Venue
         // admission owns those checks; zero-valued optional minima must not
@@ -501,6 +538,25 @@ impl Manager {
             .copied()
     }
 
+    /// Base-asset scale for public candle and market-overview base volume.
+    ///
+    /// `Some(0)` is a valid whole-unit scale. `None` means the catalog did not
+    /// include `market_data_volume_scale` for the pair's base asset.
+    pub fn market_data_volume_scale_for_symbol_id(&self, id: u32) -> Option<u32> {
+        read_unpoisoned(&self.inner)
+            .id_to_market_data_volume_scale
+            .get(&id)
+            .copied()
+    }
+
+    /// Pair scale for composite reference-candle prices. Primary prices stay on scale 6.
+    pub fn reference_price_scale_for_symbol_id(&self, id: u32) -> Option<u32> {
+        read_unpoisoned(&self.inner)
+            .id_to_reference_price_scale
+            .get(&id)
+            .copied()
+    }
+
     pub fn quantity_scale_for_zipped_asset_id(&self, id: u32) -> Option<u32> {
         read_unpoisoned(&self.inner)
             .zipped_id_to_scale
@@ -576,6 +632,8 @@ fn apply_spot(inner: &mut Inner, snap: SpotSnapshot) {
     inner.symbol_to_base_scale = snap.symbol_to_base_scale;
     inner.id_to_quote_scale = snap.id_to_quote_scale;
     inner.symbol_to_quote_scale = snap.symbol_to_quote_scale;
+    inner.id_to_market_data_volume_scale = snap.id_to_market_data_volume_scale;
+    inner.id_to_reference_price_scale = snap.id_to_reference_price_scale;
     inner.orderbook_buckets = snap.orderbook_buckets;
     inner.spot_config = Some(snap.spot_config);
 }

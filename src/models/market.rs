@@ -16,6 +16,9 @@ pub struct GetCandlesOpts {
     /// Inclusive upper bound (unix seconds UTC).
     pub end: Option<i64>,
     pub include_incomplete: bool,
+    /// When true, request composite reference candles. Their OHLC uses
+    /// `reference_price_scale`; primary OHLC stays on scale 6.
+    pub include_reference: bool,
     pub page_token: Option<String>,
 }
 
@@ -56,6 +59,7 @@ pub struct CandlesResult {
     pub symbol_id: u32,
     pub timeframe: String,
     pub candles: Vec<Candle>,
+    pub reference_candles: Vec<Candle>,
     pub next_page_token: String,
 }
 
@@ -82,6 +86,8 @@ pub struct MarketOverviewEntry {
     pub last_price: Option<Price>,
     pub index_price: Option<Price>,
     pub volume_24h_base_scaled: Option<String>,
+    /// Base volume decoded with the asset `market_data_volume_scale`.
+    pub volume_24h_base: Option<String>,
     pub volume_24h_quote_scaled: Option<String>,
     pub volume_24h_usd_scaled: Option<String>,
 }

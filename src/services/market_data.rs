@@ -67,6 +67,17 @@ impl MarketDataService {
             })
     }
 
+    fn require_market_data_volume_scale(&self, symbol_id: u32, label: &str) -> Result<u32> {
+        self.ctx
+            .catalogs
+            .market_data_volume_scale_for_symbol_id(symbol_id)
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "{label} requires a hydrated market_data_volume_scale for symbol_id {symbol_id}"
+                ))
+            })
+    }
+
     fn require_quantity_scale(&self, symbol_id: u32, label: &str) -> Result<u32> {
         self.ctx
             .catalogs
@@ -151,10 +162,17 @@ impl MarketDataService {
 
     pub async fn get_candles_with(&self, opts: GetCandlesOpts) -> Result<CandlesResult> {
         let (req, volume_scale) = self.build_candles_request(&opts)?;
+        let symbol_id = req.symbol_id;
         let resp = unary::await_public(self.client().get_candles(req))
             .await?
             .into_owned();
-        candles_from_proto(&resp, volume_scale)
+        candles_from_proto(
+            &resp,
+            volume_scale,
+            self.ctx
+                .catalogs
+                .reference_price_scale_for_symbol_id(symbol_id),
+        )
     }
 
     /// Latest candle for a symbol/timeframe, or `None` when the market has no rows.
@@ -192,7 +210,13 @@ impl MarketDataService {
         let resp = unary::await_public(self.client().get_candles_columns(req))
             .await?
             .into_owned();
-        candles_columns_from_proto(&resp, volume_scale)
+        candles_columns_from_proto(
+            &resp,
+            volume_scale,
+            self.ctx
+                .catalogs
+                .reference_price_scale_for_symbol_id(base.symbol_id),
+        )
     }
 
     fn build_candles_request(&self, opts: &GetCandlesOpts) -> Result<(GetCandlesRequest, u32)> {
@@ -204,7 +228,18 @@ impl MarketDataService {
             opts.timeframe.as_str()
         };
         let timeframe = parse_timeframe(timeframe_label)?;
-        let volume_scale = self.require_quantity_scale(symbol_id, "get_candles")?;
+        let volume_scale = self.require_market_data_volume_scale(symbol_id, "get_candles")?;
+        if opts.include_reference
+            && self
+                .ctx
+                .catalogs
+                .reference_price_scale_for_symbol_id(symbol_id)
+                .is_none()
+        {
+            return Err(Error::validation(format!(
+                "candle reference prices require reference_price_scale for symbol_id {symbol_id}"
+            )));
+        }
         let req = GetCandlesRequest {
             symbol_id,
             timeframe: timeframe.into(),
@@ -212,6 +247,7 @@ impl MarketDataService {
             start_time: Self::timestamp_field(opts.start),
             end_time: Self::timestamp_field(opts.end),
             include_incomplete: opts.include_incomplete,
+            include_reference: opts.include_reference,
             page_token: opts.page_token.clone().unwrap_or_default(),
             ..Default::default()
         };
@@ -266,7 +302,7 @@ impl MarketDataService {
                 "unsupported candle interval {timeframe:?}"
             )));
         }
-        let volume_scale = self.require_quantity_scale(symbol_id, "subscribe_candles")?;
+        let volume_scale = self.require_market_data_volume_scale(symbol_id, "subscribe_candles")?;
         let channel = format!("public:spot:market:candles:{channel_tf}:{symbol_id}:proto");
         let decode = crate::codecs::decode::candle_point_from_bytes(
             symbol_id,
@@ -379,6 +415,19 @@ impl MarketOverviewService {
         for market in &mut list.markets {
             if market.symbol.is_empty() {
                 market.symbol = self.ctx.catalogs.display_symbol(market.symbol_id);
+            }
+            if let (Some(raw), Some(scale)) = (
+                market.volume_24h_base_scaled.as_deref(),
+                self.ctx
+                    .catalogs
+                    .market_data_volume_scale_for_symbol_id(market.symbol_id),
+            ) && let Ok(value) = raw.parse::<i64>()
+            {
+                market.volume_24h_base = Some(
+                    crate::codecs::scalars::format_qty_scaled(value, scale).map_err(|e| {
+                        Error::validation(format!("market overview base volume scale invalid: {e}"))
+                    })?,
+                );
             }
         }
         Ok(list)
@@ -1000,6 +1049,7 @@ mod tests {
             symbol_id: 1,
             timeframe: "1m".into(),
             candles: vec![candle(20), candle(10)],
+            reference_candles: Vec::new(),
             next_page_token: String::new(),
         })
         .expect("current candle");

@@ -5030,7 +5030,8 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// Opening price in quote units scaled by 1e6.
+    /// Opening price in quote units. Primary candles use scale 6; composite
+    /// reference candles use the pair's reference_price_scale from GetSpotConfig.
     ///
     /// Field 2: `open`
     #[serde(
@@ -5039,7 +5040,7 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub open: i64,
-    /// Highest traded price in quote units scaled by 1e6.
+    /// Highest traded price, using the same scale as open.
     ///
     /// Field 3: `high`
     #[serde(
@@ -5048,7 +5049,7 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub high: i64,
-    /// Lowest traded price in quote units scaled by 1e6.
+    /// Lowest traded price, using the same scale as open.
     ///
     /// Field 4: `low`
     #[serde(
@@ -5057,7 +5058,7 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub low: i64,
-    /// Closing price in quote units scaled by 1e6.
+    /// Closing price, using the same scale as open.
     ///
     /// Field 5: `close`
     #[serde(
@@ -5066,8 +5067,8 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub close: i64,
-    /// Traded base-asset quantity scaled by the market's base asset quantity_scale
-    /// from GetSpotConfig.
+    /// Traded base-asset quantity scaled by the base asset's
+    /// market_data_volume_scale from GetSpotConfig.
     ///
     /// Field 6: `volume`
     #[serde(
@@ -5610,7 +5611,8 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub ts_sec: ::buffa::alloc::vec::Vec<u64>,
-    /// Opening prices in quote units scaled by 1e6.
+    /// Opening primary-market prices use scale 6. Reference prices use the pair's
+    /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 4: `open`
     #[serde(
@@ -5619,7 +5621,8 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub open: ::buffa::alloc::vec::Vec<i64>,
-    /// Highest traded prices in quote units scaled by 1e6.
+    /// Highest primary-market prices use scale 6. Reference prices use the pair's
+    /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 5: `high`
     #[serde(
@@ -5628,7 +5631,8 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub high: ::buffa::alloc::vec::Vec<i64>,
-    /// Lowest traded prices in quote units scaled by 1e6.
+    /// Lowest primary-market prices use scale 6. Reference prices use the pair's
+    /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 6: `low`
     #[serde(
@@ -5637,7 +5641,8 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub low: ::buffa::alloc::vec::Vec<i64>,
-    /// Closing prices in quote units scaled by 1e6.
+    /// Closing primary-market prices use scale 6. Reference prices use the pair's
+    /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 7: `close`
     #[serde(
@@ -5646,8 +5651,8 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub close: ::buffa::alloc::vec::Vec<i64>,
-    /// Traded base-asset quantities scaled by the pair's base_quantity_scale from
-    /// GetSpotConfig.
+    /// Traded base-asset quantities scaled by the base asset's
+    /// market_data_volume_scale from GetSpotConfig.
     ///
     /// Field 8: `volume`
     #[serde(
@@ -5667,7 +5672,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub reference_ts_sec: ::buffa::alloc::vec::Vec<u64>,
-    /// Reference opening prices in quote units scaled by 1e6.
+    /// Reference opening prices use the pair's reference_price_scale.
     ///
     /// Field 10: `reference_open`
     #[serde(
@@ -5677,7 +5682,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub reference_open: ::buffa::alloc::vec::Vec<i64>,
-    /// Reference high prices in quote units scaled by 1e6.
+    /// Reference high prices use the pair's reference_price_scale.
     ///
     /// Field 11: `reference_high`
     #[serde(
@@ -5687,7 +5692,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub reference_high: ::buffa::alloc::vec::Vec<i64>,
-    /// Reference low prices in quote units scaled by 1e6.
+    /// Reference low prices use the pair's reference_price_scale.
     ///
     /// Field 12: `reference_low`
     #[serde(
@@ -5697,7 +5702,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub reference_low: ::buffa::alloc::vec::Vec<i64>,
-    /// Reference closing prices in quote units scaled by 1e6.
+    /// Reference closing prices use the pair's reference_price_scale.
     ///
     /// Field 13: `reference_close`
     #[serde(
@@ -5707,8 +5712,8 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub reference_close: ::buffa::alloc::vec::Vec<i64>,
-    /// Reference traded base-asset quantities scaled by the pair's
-    /// base_quantity_scale from GetSpotConfig.
+    /// Reference traded base-asset quantities use the base asset's
+    /// market_data_volume_scale from GetSpotConfig.
     ///
     /// Field 14: `reference_volume`
     #[serde(
@@ -6574,7 +6579,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// opening price in quote units scaled by 1e6
+    /// opening primary-market price in scale 6
     ///
     /// Field 4: `open`
     #[serde(
@@ -6583,7 +6588,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub open: i64,
-    /// highest traded price in quote units scaled by 1e6
+    /// highest primary-market price in scale 6
     ///
     /// Field 5: `high`
     #[serde(
@@ -6592,7 +6597,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub high: i64,
-    /// lowest traded price in quote units scaled by 1e6
+    /// lowest primary-market price in scale 6
     ///
     /// Field 6: `low`
     #[serde(
@@ -6601,7 +6606,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub low: i64,
-    /// closing price in quote units scaled by 1e6
+    /// closing primary-market price in scale 6
     ///
     /// Field 7: `close`
     #[serde(
@@ -6610,8 +6615,8 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub close: i64,
-    /// Traded base-asset quantity scaled by the pair's base_quantity_scale from
-    /// GetSpotConfig.
+    /// Traded base-asset quantity scaled by the base asset's
+    /// market_data_volume_scale from GetSpotConfig.
     ///
     /// Field 8: `volume`
     #[serde(
@@ -6930,6 +6935,16 @@ pub struct AssetConfig {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub quantity_scale: u32,
+    /// Integer scale for public candle and market-overview base volume (0..18).
+    ///
+    /// Field 6: `market_data_volume_scale`
+    #[serde(
+        rename = "marketDataVolumeScale",
+        alias = "market_data_volume_scale",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub market_data_volume_scale: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -6942,6 +6957,7 @@ impl ::core::fmt::Debug for AssetConfig {
             .field("name", &self.name)
             .field("quantity_display_decimals", &self.quantity_display_decimals)
             .field("quantity_scale", &self.quantity_scale)
+            .field("market_data_volume_scale", &self.market_data_volume_scale)
             .finish()
     }
 }
@@ -6989,6 +7005,12 @@ impl ::buffa::Message for AssetConfig {
             size
                 += 1u32 + ::buffa::types::uint32_encoded_len(self.quantity_scale) as u32;
         }
+        if self.market_data_volume_scale != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.market_data_volume_scale)
+                        as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7013,6 +7035,9 @@ impl ::buffa::Message for AssetConfig {
         }
         if self.quantity_scale != 0u32 {
             ::buffa::types::put_uint32_field(5u32, self.quantity_scale, buf);
+        }
+        if self.market_data_volume_scale != 0u32 {
+            ::buffa::types::put_uint32_field(6u32, self.market_data_volume_scale, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7062,6 +7087,13 @@ impl ::buffa::Message for AssetConfig {
                 )?;
                 self.quantity_scale = ::buffa::types::decode_uint32(buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.market_data_volume_scale = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7075,6 +7107,7 @@ impl ::buffa::Message for AssetConfig {
         self.name.clear();
         self.quantity_display_decimals = 0u32;
         self.quantity_scale = 0u32;
+        self.market_data_volume_scale = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7457,6 +7490,17 @@ pub struct PairConfig {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub max_client_ref_drift_bps: i32,
+    /// Integer scale for composite reference prices in candle responses (0..18).
+    /// Primary market and execution prices continue to use scale 6.
+    ///
+    /// Field 19: `reference_price_scale`
+    #[serde(
+        rename = "referencePriceScale",
+        alias = "reference_price_scale",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub reference_price_scale: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7488,6 +7532,7 @@ impl ::core::fmt::Debug for PairConfig {
                 &self.default_market_slippage_bps_sell,
             )
             .field("max_client_ref_drift_bps", &self.max_client_ref_drift_bps)
+            .field("reference_price_scale", &self.reference_price_scale)
             .finish()
     }
 }
@@ -7608,6 +7653,12 @@ impl ::buffa::Message for PairConfig {
                     + ::buffa::types::int32_encoded_len(self.max_client_ref_drift_bps)
                         as u32;
         }
+        if self.reference_price_scale != 0u32 {
+            size
+                += 2u32
+                    + ::buffa::types::uint32_encoded_len(self.reference_price_scale)
+                        as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7685,6 +7736,9 @@ impl ::buffa::Message for PairConfig {
         }
         if self.max_client_ref_drift_bps != 0i32 {
             ::buffa::types::put_int32_field(18u32, self.max_client_ref_drift_bps, buf);
+        }
+        if self.reference_price_scale != 0u32 {
+            ::buffa::types::put_uint32_field(19u32, self.reference_price_scale, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7843,6 +7897,13 @@ impl ::buffa::Message for PairConfig {
                 )?;
                 self.max_client_ref_drift_bps = ::buffa::types::decode_int32(buf)?;
             }
+            19u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reference_price_scale = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7869,6 +7930,7 @@ impl ::buffa::Message for PairConfig {
         self.default_market_slippage_bps_buy = 0i32;
         self.default_market_slippage_bps_sell = 0i32;
         self.max_client_ref_drift_bps = 0i32;
+        self.reference_price_scale = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -15305,24 +15367,25 @@ pub mod __buffa {
             ///
             /// Field 1: `ts_sec`
             pub ts_sec: u64,
-            /// Opening price in quote units scaled by 1e6.
+            /// Opening price in quote units. Primary candles use scale 6; composite
+            /// reference candles use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 2: `open`
             pub open: i64,
-            /// Highest traded price in quote units scaled by 1e6.
+            /// Highest traded price, using the same scale as open.
             ///
             /// Field 3: `high`
             pub high: i64,
-            /// Lowest traded price in quote units scaled by 1e6.
+            /// Lowest traded price, using the same scale as open.
             ///
             /// Field 4: `low`
             pub low: i64,
-            /// Closing price in quote units scaled by 1e6.
+            /// Closing price, using the same scale as open.
             ///
             /// Field 5: `close`
             pub close: i64,
-            /// Traded base-asset quantity scaled by the market's base asset quantity_scale
-            /// from GetSpotConfig.
+            /// Traded base-asset quantity scaled by the base asset's
+            /// market_data_volume_scale from GetSpotConfig.
             ///
             /// Field 6: `volume`
             pub volume: i64,
@@ -15709,36 +15772,37 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// Opening price in quote units scaled by 1e6.
+            /// Opening price in quote units. Primary candles use scale 6; composite
+            /// reference candles use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 2: `open`
             #[must_use]
             pub fn open(&self) -> i64 {
                 self.0.reborrow().open
             }
-            /// Highest traded price in quote units scaled by 1e6.
+            /// Highest traded price, using the same scale as open.
             ///
             /// Field 3: `high`
             #[must_use]
             pub fn high(&self) -> i64 {
                 self.0.reborrow().high
             }
-            /// Lowest traded price in quote units scaled by 1e6.
+            /// Lowest traded price, using the same scale as open.
             ///
             /// Field 4: `low`
             #[must_use]
             pub fn low(&self) -> i64 {
                 self.0.reborrow().low
             }
-            /// Closing price in quote units scaled by 1e6.
+            /// Closing price, using the same scale as open.
             ///
             /// Field 5: `close`
             #[must_use]
             pub fn close(&self) -> i64 {
                 self.0.reborrow().close
             }
-            /// Traded base-asset quantity scaled by the market's base asset quantity_scale
-            /// from GetSpotConfig.
+            /// Traded base-asset quantity scaled by the base asset's
+            /// market_data_volume_scale from GetSpotConfig.
             ///
             /// Field 6: `volume`
             #[must_use]
@@ -16274,24 +16338,28 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: ::buffa::RepeatedView<'a, u64>,
-            /// Opening prices in quote units scaled by 1e6.
+            /// Opening primary-market prices use scale 6. Reference prices use the pair's
+            /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 4: `open`
             pub open: ::buffa::RepeatedView<'a, i64>,
-            /// Highest traded prices in quote units scaled by 1e6.
+            /// Highest primary-market prices use scale 6. Reference prices use the pair's
+            /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 5: `high`
             pub high: ::buffa::RepeatedView<'a, i64>,
-            /// Lowest traded prices in quote units scaled by 1e6.
+            /// Lowest primary-market prices use scale 6. Reference prices use the pair's
+            /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 6: `low`
             pub low: ::buffa::RepeatedView<'a, i64>,
-            /// Closing prices in quote units scaled by 1e6.
+            /// Closing primary-market prices use scale 6. Reference prices use the pair's
+            /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 7: `close`
             pub close: ::buffa::RepeatedView<'a, i64>,
-            /// Traded base-asset quantities scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig.
+            /// Traded base-asset quantities scaled by the base asset's
+            /// market_data_volume_scale from GetSpotConfig.
             ///
             /// Field 8: `volume`
             pub volume: ::buffa::RepeatedView<'a, i64>,
@@ -16300,24 +16368,24 @@ pub mod __buffa {
             ///
             /// Field 9: `reference_ts_sec`
             pub reference_ts_sec: ::buffa::RepeatedView<'a, u64>,
-            /// Reference opening prices in quote units scaled by 1e6.
+            /// Reference opening prices use the pair's reference_price_scale.
             ///
             /// Field 10: `reference_open`
             pub reference_open: ::buffa::RepeatedView<'a, i64>,
-            /// Reference high prices in quote units scaled by 1e6.
+            /// Reference high prices use the pair's reference_price_scale.
             ///
             /// Field 11: `reference_high`
             pub reference_high: ::buffa::RepeatedView<'a, i64>,
-            /// Reference low prices in quote units scaled by 1e6.
+            /// Reference low prices use the pair's reference_price_scale.
             ///
             /// Field 12: `reference_low`
             pub reference_low: ::buffa::RepeatedView<'a, i64>,
-            /// Reference closing prices in quote units scaled by 1e6.
+            /// Reference closing prices use the pair's reference_price_scale.
             ///
             /// Field 13: `reference_close`
             pub reference_close: ::buffa::RepeatedView<'a, i64>,
-            /// Reference traded base-asset quantities scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
+            /// Reference traded base-asset quantities use the base asset's
+            /// market_data_volume_scale from GetSpotConfig.
             ///
             /// Field 14: `reference_volume`
             pub reference_volume: ::buffa::RepeatedView<'a, i64>,
@@ -17282,36 +17350,40 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> &::buffa::RepeatedView<'_, u64> {
                 &self.0.reborrow().ts_sec
             }
-            /// Opening prices in quote units scaled by 1e6.
+            /// Opening primary-market prices use scale 6. Reference prices use the pair's
+            /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 4: `open`
             #[must_use]
             pub fn open(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().open
             }
-            /// Highest traded prices in quote units scaled by 1e6.
+            /// Highest primary-market prices use scale 6. Reference prices use the pair's
+            /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 5: `high`
             #[must_use]
             pub fn high(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().high
             }
-            /// Lowest traded prices in quote units scaled by 1e6.
+            /// Lowest primary-market prices use scale 6. Reference prices use the pair's
+            /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 6: `low`
             #[must_use]
             pub fn low(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().low
             }
-            /// Closing prices in quote units scaled by 1e6.
+            /// Closing primary-market prices use scale 6. Reference prices use the pair's
+            /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 7: `close`
             #[must_use]
             pub fn close(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().close
             }
-            /// Traded base-asset quantities scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig.
+            /// Traded base-asset quantities scaled by the base asset's
+            /// market_data_volume_scale from GetSpotConfig.
             ///
             /// Field 8: `volume`
             #[must_use]
@@ -17326,36 +17398,36 @@ pub mod __buffa {
             pub fn reference_ts_sec(&self) -> &::buffa::RepeatedView<'_, u64> {
                 &self.0.reborrow().reference_ts_sec
             }
-            /// Reference opening prices in quote units scaled by 1e6.
+            /// Reference opening prices use the pair's reference_price_scale.
             ///
             /// Field 10: `reference_open`
             #[must_use]
             pub fn reference_open(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().reference_open
             }
-            /// Reference high prices in quote units scaled by 1e6.
+            /// Reference high prices use the pair's reference_price_scale.
             ///
             /// Field 11: `reference_high`
             #[must_use]
             pub fn reference_high(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().reference_high
             }
-            /// Reference low prices in quote units scaled by 1e6.
+            /// Reference low prices use the pair's reference_price_scale.
             ///
             /// Field 12: `reference_low`
             #[must_use]
             pub fn reference_low(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().reference_low
             }
-            /// Reference closing prices in quote units scaled by 1e6.
+            /// Reference closing prices use the pair's reference_price_scale.
             ///
             /// Field 13: `reference_close`
             #[must_use]
             pub fn reference_close(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().reference_close
             }
-            /// Reference traded base-asset quantities scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
+            /// Reference traded base-asset quantities use the base asset's
+            /// market_data_volume_scale from GetSpotConfig.
             ///
             /// Field 14: `reference_volume`
             #[must_use]
@@ -17432,24 +17504,24 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: u64,
-            /// opening price in quote units scaled by 1e6
+            /// opening primary-market price in scale 6
             ///
             /// Field 4: `open`
             pub open: i64,
-            /// highest traded price in quote units scaled by 1e6
+            /// highest primary-market price in scale 6
             ///
             /// Field 5: `high`
             pub high: i64,
-            /// lowest traded price in quote units scaled by 1e6
+            /// lowest primary-market price in scale 6
             ///
             /// Field 6: `low`
             pub low: i64,
-            /// closing price in quote units scaled by 1e6
+            /// closing primary-market price in scale 6
             ///
             /// Field 7: `close`
             pub close: i64,
-            /// Traded base-asset quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig.
+            /// Traded base-asset quantity scaled by the base asset's
+            /// market_data_volume_scale from GetSpotConfig.
             ///
             /// Field 8: `volume`
             pub volume: i64,
@@ -17868,36 +17940,36 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// opening price in quote units scaled by 1e6
+            /// opening primary-market price in scale 6
             ///
             /// Field 4: `open`
             #[must_use]
             pub fn open(&self) -> i64 {
                 self.0.reborrow().open
             }
-            /// highest traded price in quote units scaled by 1e6
+            /// highest primary-market price in scale 6
             ///
             /// Field 5: `high`
             #[must_use]
             pub fn high(&self) -> i64 {
                 self.0.reborrow().high
             }
-            /// lowest traded price in quote units scaled by 1e6
+            /// lowest primary-market price in scale 6
             ///
             /// Field 6: `low`
             #[must_use]
             pub fn low(&self) -> i64 {
                 self.0.reborrow().low
             }
-            /// closing price in quote units scaled by 1e6
+            /// closing primary-market price in scale 6
             ///
             /// Field 7: `close`
             #[must_use]
             pub fn close(&self) -> i64 {
                 self.0.reborrow().close
             }
-            /// Traded base-asset quantity scaled by the pair's base_quantity_scale from
-            /// GetSpotConfig.
+            /// Traded base-asset quantity scaled by the base asset's
+            /// market_data_volume_scale from GetSpotConfig.
             ///
             /// Field 8: `volume`
             #[must_use]
@@ -17971,6 +18043,10 @@ pub mod __buffa {
             ///
             /// Field 5: `quantity_scale`
             pub quantity_scale: u32,
+            /// Integer scale for public candle and market-overview base volume (0..18).
+            ///
+            /// Field 6: `market_data_volume_scale`
+            pub market_data_volume_scale: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AssetConfigView<'a> {
@@ -18041,6 +18117,15 @@ pub mod __buffa {
                         )?;
                         view.quantity_scale = ::buffa::types::decode_uint32(&mut cur)?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.market_data_volume_scale = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -18075,6 +18160,7 @@ pub mod __buffa {
                     name: self.name.to_string(),
                     quantity_display_decimals: self.quantity_display_decimals,
                     quantity_scale: self.quantity_scale,
+                    market_data_volume_scale: self.market_data_volume_scale,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -18114,6 +18200,13 @@ pub mod __buffa {
                             + ::buffa::types::uint32_encoded_len(self.quantity_scale)
                                 as u32;
                 }
+                if self.market_data_volume_scale != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(
+                                self.market_data_volume_scale,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -18143,6 +18236,13 @@ pub mod __buffa {
                 }
                 if self.quantity_scale != 0u32 {
                     ::buffa::types::put_uint32_field(5u32, self.quantity_scale, buf);
+                }
+                if self.market_data_volume_scale != 0u32 {
+                    ::buffa::types::put_uint32_field(
+                        6u32,
+                        self.market_data_volume_scale,
+                        buf,
+                    );
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -18194,6 +18294,17 @@ pub mod __buffa {
                         .serialize_entry(
                             "quantityScale",
                             &::buffa::json_helpers::ProtoJson(&self.quantity_scale),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.market_data_volume_scale,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "marketDataVolumeScale",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.market_data_volume_scale,
+                            ),
                         )?;
                 }
                 __map.end()
@@ -18326,6 +18437,13 @@ pub mod __buffa {
             #[must_use]
             pub fn quantity_scale(&self) -> u32 {
                 self.0.reborrow().quantity_scale
+            }
+            /// Integer scale for public candle and market-overview base volume (0..18).
+            ///
+            /// Field 6: `market_data_volume_scale`
+            #[must_use]
+            pub fn market_data_volume_scale(&self) -> u32 {
+                self.0.reborrow().market_data_volume_scale
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AssetConfigView<'static>>>
@@ -18751,6 +18869,11 @@ pub mod __buffa {
             ///
             /// Field 18: `max_client_ref_drift_bps`
             pub max_client_ref_drift_bps: i32,
+            /// Integer scale for composite reference prices in candle responses (0..18).
+            /// Primary market and execution prices continue to use scale 6.
+            ///
+            /// Field 19: `reference_price_scale`
+            pub reference_price_scale: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for PairConfigView<'a> {
@@ -18978,6 +19101,15 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    19u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reference_price_scale = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -19042,6 +19174,7 @@ pub mod __buffa {
                     default_market_slippage_bps_sell: self
                         .default_market_slippage_bps_sell,
                     max_client_ref_drift_bps: self.max_client_ref_drift_bps,
+                    reference_price_scale: self.reference_price_scale,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -19169,6 +19302,13 @@ pub mod __buffa {
                                 self.max_client_ref_drift_bps,
                             ) as u32;
                 }
+                if self.reference_price_scale != 0u32 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint32_encoded_len(
+                                self.reference_price_scale,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -19277,6 +19417,13 @@ pub mod __buffa {
                     ::buffa::types::put_int32_field(
                         18u32,
                         self.max_client_ref_drift_bps,
+                        buf,
+                    );
+                }
+                if self.reference_price_scale != 0u32 {
+                    ::buffa::types::put_uint32_field(
+                        19u32,
+                        self.reference_price_scale,
                         buf,
                     );
                 }
@@ -19413,6 +19560,17 @@ pub mod __buffa {
                             "maxClientRefDriftBps",
                             &::buffa::json_helpers::ProtoJson(
                                 &self.max_client_ref_drift_bps,
+                            ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.reference_price_scale,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "referencePriceScale",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.reference_price_scale,
                             ),
                         )?;
                 }
@@ -19653,6 +19811,14 @@ pub mod __buffa {
             #[must_use]
             pub fn max_client_ref_drift_bps(&self) -> i32 {
                 self.0.reborrow().max_client_ref_drift_bps
+            }
+            /// Integer scale for composite reference prices in candle responses (0..18).
+            /// Primary market and execution prices continue to use scale 6.
+            ///
+            /// Field 19: `reference_price_scale`
+            #[must_use]
+            pub fn reference_price_scale(&self) -> u32 {
+                self.0.reborrow().reference_price_scale
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<PairConfigView<'static>>>

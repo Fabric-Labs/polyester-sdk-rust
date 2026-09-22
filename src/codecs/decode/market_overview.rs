@@ -20,6 +20,7 @@ pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> MarketOver
         last_price: decode_price_ticks(msg.last_price_ticks, None),
         index_price: decode_price_ticks(msg.index_price_ticks, None),
         volume_24h_base_scaled: msg.volume_24h_base_scaled.map(|value| value.to_string()),
+        volume_24h_base: None,
         volume_24h_quote_scaled: msg.volume_24h_quote_scaled.map(|value| value.to_string()),
         volume_24h_usd_scaled: msg.volume_24h_usd_scaled.map(|value| value.to_string()),
     }

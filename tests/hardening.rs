@@ -470,9 +470,15 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
     client
         .catalogs
         .hydrate_spot_config_json(json!({
+            "assets": [{
+                "asset": "BTC",
+                "quantity_scale": 8,
+                "market_data_volume_scale": 8
+            }],
             "pairs": [{
                 "symbol": "BTC-USDT",
                 "symbol_id": 1,
+                "base_asset": "BTC",
                 "base_quantity_scale": 8
             }]
         }))
@@ -2503,12 +2509,18 @@ async fn l2_wait_for_order_trades_complete_enforces_overall_deadline() {
 fn spot_config_fixture() -> polyester::proto::marketdata::v1::GetSpotConfigResponse {
     use polyester::proto::marketdata::v1::{GetSpotConfigResponse, PairConfig};
     GetSpotConfigResponse {
+        assets: vec![polyester::proto::marketdata::v1::AssetConfig {
+            asset: "BTC".into(),
+            market_data_volume_scale: 8,
+            ..Default::default()
+        }],
         pairs: vec![PairConfig {
             symbol_id: 1,
             symbol: "BTC-USDT".into(),
             base_asset: "BTC".into(),
             quote_asset: "USDT".into(),
             base_quantity_scale: 8,
+            reference_price_scale: 6,
             ..Default::default()
         }],
         ts_sec: 1,
