@@ -2869,7 +2869,7 @@ impl ::buffa::Message for MarketIoc {
         if let ::core::option::Option::Some(ref v) = self.max_slippage {
             match v {
                 __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(v) => {
-                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                 }
                 __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageBps(v) => {
                     size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
@@ -2895,7 +2895,7 @@ impl ::buffa::Message for MarketIoc {
         if let ::core::option::Option::Some(ref v) = self.max_slippage {
             match v {
                 __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(x) => {
-                    ::buffa::types::put_int32_field(1u32, *x, buf);
+                    ::buffa::types::put_int64_field(1u32, *x, buf);
                 }
                 __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageBps(x) => {
                     ::buffa::types::put_int32_field(2u32, *x, buf);
@@ -2925,7 +2925,7 @@ impl ::buffa::Message for MarketIoc {
                 )?;
                 self.max_slippage = ::core::option::Option::Some(
                     __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
-                        ::buffa::types::decode_int32(buf)?,
+                        ::buffa::types::decode_int64(buf)?,
                     ),
                 );
             }
@@ -3008,15 +3008,15 @@ impl<'de> serde::Deserialize<'de> for MarketIoc {
                         "maxSlippageTicks" | "max_slippage_ticks" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
+                                type Value = i64;
                                 fn deserialize<D: serde::Deserializer<'de>>(
                                     self,
                                     d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
                                 }
                             }
-                            let v: ::core::option::Option<i32> = map
+                            let v: ::core::option::Option<i64> = map
                                 .next_value_seed(
                                     ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
                                 )?;
@@ -7608,7 +7608,7 @@ impl ::buffa::Message for TrailingStopPolicy {
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
                     v,
                 ) => {
-                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                 }
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageBps(v) => {
                     size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
@@ -7647,7 +7647,7 @@ impl ::buffa::Message for TrailingStopPolicy {
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
                     x,
                 ) => {
-                    ::buffa::types::put_int32_field(6u32, *x, buf);
+                    ::buffa::types::put_int64_field(6u32, *x, buf);
                 }
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageBps(x) => {
                     ::buffa::types::put_int32_field(7u32, *x, buf);
@@ -7703,7 +7703,7 @@ impl ::buffa::Message for TrailingStopPolicy {
                 )?;
                 self.max_slippage = ::core::option::Option::Some(
                     __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
-                        ::buffa::types::decode_int32(buf)?,
+                        ::buffa::types::decode_int64(buf)?,
                     ),
                 );
             }
@@ -7843,15 +7843,15 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                         "maxSlippageTicks" | "max_slippage_ticks" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
+                                type Value = i64;
                                 fn deserialize<D: serde::Deserializer<'de>>(
                                     self,
                                     d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
                                 }
                             }
-                            let v: ::core::option::Option<i32> = map
+                            let v: ::core::option::Option<i64> = map
                                 .next_value_seed(
                                     ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
                                 )?;
@@ -16855,16 +16855,17 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub market_client_ref_price_ticks: i64,
-    /// Optional MARKET max slippage as a price delta in 1e-9 quote-unit ticks.
+    /// Non-negative MARKET maximum absolute price delta in Q9 execution-price ticks
+    /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
     ///
     /// Field 24: `market_max_slippage_ticks`
     #[serde(
         rename = "marketMaxSlippageTicks",
         alias = "market_max_slippage_ticks",
-        with = "::buffa::json_helpers::int32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
-    pub market_max_slippage_ticks: i32,
+    pub market_max_slippage_ticks: i64,
     /// Optional MARKET max slippage in basis points (1 bp = 0.01%).
     ///
     /// Field 25: `market_max_slippage_bps`
@@ -17114,10 +17115,10 @@ impl ::buffa::Message for Order {
                         self.market_client_ref_price_ticks,
                     ) as u32;
         }
-        if self.market_max_slippage_ticks != 0i32 {
+        if self.market_max_slippage_ticks != 0i64 {
             size
                 += 2u32
-                    + ::buffa::types::int32_encoded_len(self.market_max_slippage_ticks)
+                    + ::buffa::types::int64_encoded_len(self.market_max_slippage_ticks)
                         as u32;
         }
         if self.market_max_slippage_bps != 0i32 {
@@ -17257,8 +17258,8 @@ impl ::buffa::Message for Order {
                 buf,
             );
         }
-        if self.market_max_slippage_ticks != 0i32 {
-            ::buffa::types::put_int32_field(24u32, self.market_max_slippage_ticks, buf);
+        if self.market_max_slippage_ticks != 0i64 {
+            ::buffa::types::put_int64_field(24u32, self.market_max_slippage_ticks, buf);
         }
         if self.market_max_slippage_bps != 0i32 {
             ::buffa::types::put_int32_field(25u32, self.market_max_slippage_bps, buf);
@@ -17473,7 +17474,7 @@ impl ::buffa::Message for Order {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.market_max_slippage_ticks = ::buffa::types::decode_int32(buf)?;
+                self.market_max_slippage_ticks = ::buffa::types::decode_int64(buf)?;
             }
             25u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -17564,7 +17565,7 @@ impl ::buffa::Message for Order {
         self.attached_risk = ::buffa::MessageField::none();
         self.origin = ::buffa::MessageField::none();
         self.market_client_ref_price_ticks = 0i64;
-        self.market_max_slippage_ticks = 0i32;
+        self.market_max_slippage_ticks = 0i64;
         self.market_max_slippage_bps = 0i32;
         self.version = 0u32;
         self.batch_request_id = 0u64;
@@ -22270,7 +22271,7 @@ pub mod __buffa {
                         )?;
                         view.max_slippage = Some(
                             super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
-                                ::buffa::types::decode_int32(&mut cur)?,
+                                ::buffa::types::decode_int64(&mut cur)?,
                             ),
                         );
                     }
@@ -22347,7 +22348,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
                             v,
                         ) => {
-                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                         }
                         super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
                             v,
@@ -22379,7 +22380,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
                             x,
                         ) => {
-                            ::buffa::types::put_int32_field(1u32, *x, buf);
+                            ::buffa::types::put_int64_field(1u32, *x, buf);
                         }
                         super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
                             x,
@@ -29791,7 +29792,7 @@ pub mod __buffa {
                         )?;
                         view.max_slippage = Some(
                             super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
-                                ::buffa::types::decode_int32(&mut cur)?,
+                                ::buffa::types::decode_int64(&mut cur)?,
                             ),
                         );
                     }
@@ -29914,7 +29915,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
                             v,
                         ) => {
-                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                         }
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageBps(
                             v,
@@ -29960,7 +29961,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
                             x,
                         ) => {
-                            ::buffa::types::put_int32_field(6u32, *x, buf);
+                            ::buffa::types::put_int64_field(6u32, *x, buf);
                         }
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageBps(
                             x,
@@ -42435,10 +42436,11 @@ pub mod __buffa {
             ///
             /// Field 23: `market_client_ref_price_ticks`
             pub market_client_ref_price_ticks: i64,
-            /// Optional MARKET max slippage as a price delta in 1e-9 quote-unit ticks.
+            /// Non-negative MARKET maximum absolute price delta in Q9 execution-price ticks
+            /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
             ///
             /// Field 24: `market_max_slippage_ticks`
-            pub market_max_slippage_ticks: i32,
+            pub market_max_slippage_ticks: i64,
             /// Optional MARKET max slippage in basis points (1 bp = 0.01%).
             ///
             /// Field 25: `market_max_slippage_bps`
@@ -42726,7 +42728,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.market_max_slippage_ticks = ::buffa::types::decode_int32(
+                        view.market_max_slippage_ticks = ::buffa::types::decode_int64(
                             &mut cur,
                         )?;
                     }
@@ -43040,10 +43042,10 @@ pub mod __buffa {
                                 self.market_client_ref_price_ticks,
                             ) as u32;
                 }
-                if self.market_max_slippage_ticks != 0i32 {
+                if self.market_max_slippage_ticks != 0i64 {
                     size
                         += 2u32
-                            + ::buffa::types::int32_encoded_len(
+                            + ::buffa::types::int64_encoded_len(
                                 self.market_max_slippage_ticks,
                             ) as u32;
                 }
@@ -43201,8 +43203,8 @@ pub mod __buffa {
                         buf,
                     );
                 }
-                if self.market_max_slippage_ticks != 0i32 {
-                    ::buffa::types::put_int32_field(
+                if self.market_max_slippage_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(
                         24u32,
                         self.market_max_slippage_ticks,
                         buf,
@@ -43416,7 +43418,7 @@ pub mod __buffa {
                             ),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i32(
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
                     &self.market_max_slippage_ticks,
                 ) {
                     __map
@@ -43746,11 +43748,12 @@ pub mod __buffa {
             pub fn market_client_ref_price_ticks(&self) -> i64 {
                 self.0.reborrow().market_client_ref_price_ticks
             }
-            /// Optional MARKET max slippage as a price delta in 1e-9 quote-unit ticks.
+            /// Non-negative MARKET maximum absolute price delta in Q9 execution-price ticks
+            /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
             ///
             /// Field 24: `market_max_slippage_ticks`
             #[must_use]
-            pub fn market_max_slippage_ticks(&self) -> i32 {
+            pub fn market_max_slippage_ticks(&self) -> i64 {
                 self.0.reborrow().market_max_slippage_ticks
             }
             /// Optional MARKET max slippage in basis points (1 bp = 0.01%).
@@ -50519,7 +50522,7 @@ pub mod __buffa {
                 use super::*;
                 #[derive(Clone, Debug)]
                 pub enum MaxSlippage {
-                    MaxSlippageTicks(i32),
+                    MaxSlippageTicks(i64),
                     MaxSlippageBps(i32),
                 }
             }
@@ -50600,7 +50603,7 @@ pub mod __buffa {
                 }
                 #[derive(Clone, Debug)]
                 pub enum MaxSlippage {
-                    MaxSlippageTicks(i32),
+                    MaxSlippageTicks(i64),
                     MaxSlippageBps(i32),
                 }
             }
@@ -50693,7 +50696,7 @@ pub mod __buffa {
             /// Optional max slippage override. If omitted, the pair default is used.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
-                MaxSlippageTicks(i32),
+                MaxSlippageTicks(i64),
                 MaxSlippageBps(i32),
             }
             impl ::buffa::Oneof for MaxSlippage {}
@@ -50974,7 +50977,7 @@ pub mod __buffa {
             /// Exactly one of these should be set (or neither for unprotected behavior).
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
-                MaxSlippageTicks(i32),
+                MaxSlippageTicks(i64),
                 MaxSlippageBps(i32),
             }
             impl ::buffa::Oneof for MaxSlippage {}
