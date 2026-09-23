@@ -390,6 +390,8 @@ pub enum TriggerEventType {
     EVENT_UPDATED = 3i32,
     /// Trigger became terminal after its next child order could not be admitted.
     EVENT_FAILED = 4i32,
+    /// A standalone trailing trigger's activation condition was satisfied and tracking began.
+    EVENT_ACTIVATED = 5i32,
 }
 impl TriggerEventType {
     ///Idiomatic alias for [`Self::EVENT_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -407,6 +409,9 @@ impl TriggerEventType {
     ///Idiomatic alias for [`Self::EVENT_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const EventFailed: Self = Self::EVENT_FAILED;
+    ///Idiomatic alias for [`Self::EVENT_ACTIVATED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const EventActivated: Self = Self::EVENT_ACTIVATED;
 }
 impl ::core::default::Default for TriggerEventType {
     fn default() -> Self {
@@ -509,6 +514,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             2i32 => ::core::option::Option::Some(Self::EVENT_CANCELED),
             3i32 => ::core::option::Option::Some(Self::EVENT_UPDATED),
             4i32 => ::core::option::Option::Some(Self::EVENT_FAILED),
+            5i32 => ::core::option::Option::Some(Self::EVENT_ACTIVATED),
             _ => ::core::option::Option::None,
         }
     }
@@ -522,6 +528,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             Self::EVENT_CANCELED => "EVENT_CANCELED",
             Self::EVENT_UPDATED => "EVENT_UPDATED",
             Self::EVENT_FAILED => "EVENT_FAILED",
+            Self::EVENT_ACTIVATED => "EVENT_ACTIVATED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -531,6 +538,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             "EVENT_CANCELED" => ::core::option::Option::Some(Self::EVENT_CANCELED),
             "EVENT_UPDATED" => ::core::option::Option::Some(Self::EVENT_UPDATED),
             "EVENT_FAILED" => ::core::option::Option::Some(Self::EVENT_FAILED),
+            "EVENT_ACTIVATED" => ::core::option::Option::Some(Self::EVENT_ACTIVATED),
             _ => ::core::option::Option::None,
         }
     }
@@ -541,6 +549,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             Self::EVENT_CANCELED,
             Self::EVENT_UPDATED,
             Self::EVENT_FAILED,
+            Self::EVENT_ACTIVATED,
         ]
     }
 }
@@ -9820,6 +9829,18 @@ pub struct TrailingDetails {
     pub trigger_direction: ::buffa::EnumValue<
         super::super::orders::v1::TriggerDirection,
     >,
+    /// Current trailing trigger threshold in quote units scaled by 1e6. This is
+    /// evaluator-authored runtime state and moves when the peak or trough changes.
+    /// It is absent until the trailing trigger is armed and a positive threshold exists.
+    ///
+    /// Field 10: `trigger_price_ticks`
+    #[serde(
+        rename = "triggerPriceTicks",
+        alias = "trigger_price_ticks",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub trigger_price_ticks: ::core::option::Option<i64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9836,6 +9857,7 @@ impl ::core::fmt::Debug for TrailingDetails {
             .field("max_slippage_bps", &self.max_slippage_bps)
             .field("trigger_price_source", &self.trigger_price_source)
             .field("trigger_direction", &self.trigger_direction)
+            .field("trigger_price_ticks", &self.trigger_price_ticks)
             .finish()
     }
 }
@@ -9845,6 +9867,15 @@ impl TrailingDetails {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TrailingDetails";
+}
+impl TrailingDetails {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::trigger_price_ticks`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_trigger_price_ticks(mut self, value: i64) -> Self {
+        self.trigger_price_ticks = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(TrailingDetails);
 impl ::buffa::MessageName for TrailingDetails {
@@ -9914,6 +9945,9 @@ impl ::buffa::Message for TrailingDetails {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if let Some(v) = self.trigger_price_ticks {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -9956,6 +9990,9 @@ impl ::buffa::Message for TrailingDetails {
             if val != 0 {
                 ::buffa::types::put_int32_field(9u32, val, buf);
             }
+        }
+        if let Some(v) = self.trigger_price_ticks {
+            ::buffa::types::put_int64_field(10u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -10037,6 +10074,15 @@ impl ::buffa::Message for TrailingDetails {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_ticks = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -10054,6 +10100,7 @@ impl ::buffa::Message for TrailingDetails {
         self.max_slippage_bps = 0i32;
         self.trigger_price_source = ::buffa::EnumValue::from(0);
         self.trigger_direction = ::buffa::EnumValue::from(0);
+        self.trigger_price_ticks = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -24323,6 +24370,12 @@ pub mod __buffa {
             pub trigger_direction: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::TriggerDirection,
             >,
+            /// Current trailing trigger threshold in quote units scaled by 1e6. This is
+            /// evaluator-authored runtime state and moves when the peak or trough changes.
+            /// It is absent until the trailing trigger is armed and a positive threshold exists.
+            ///
+            /// Field 10: `trigger_price_ticks`
+            pub trigger_price_ticks: ::core::option::Option<i64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for TrailingDetailsView<'a> {
@@ -24433,6 +24486,15 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_ticks = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -24471,6 +24533,7 @@ pub mod __buffa {
                     max_slippage_bps: self.max_slippage_bps,
                     trigger_price_source: self.trigger_price_source,
                     trigger_direction: self.trigger_direction,
+                    trigger_price_ticks: self.trigger_price_ticks,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -24542,6 +24605,9 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if let Some(v) = self.trigger_price_ticks {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -24597,6 +24663,9 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(9u32, val, buf);
                     }
+                }
+                if let Some(v) = self.trigger_price_ticks {
+                    ::buffa::types::put_int64_field(10u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -24697,6 +24766,13 @@ pub mod __buffa {
                     &self.trigger_direction,
                 ) {
                     __map.serialize_entry("triggerDirection", &self.trigger_direction)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.trigger_price_ticks {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -24867,6 +24943,15 @@ pub mod __buffa {
                 super::super::super::super::orders::v1::TriggerDirection,
             > {
                 self.0.reborrow().trigger_direction
+            }
+            /// Current trailing trigger threshold in quote units scaled by 1e6. This is
+            /// evaluator-authored runtime state and moves when the peak or trough changes.
+            /// It is absent until the trailing trigger is armed and a positive threshold exists.
+            ///
+            /// Field 10: `trigger_price_ticks`
+            #[must_use]
+            pub fn trigger_price_ticks(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().trigger_price_ticks
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<TrailingDetailsView<'static>>>
