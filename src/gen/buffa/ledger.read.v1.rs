@@ -3378,7 +3378,7 @@ pub struct GetEquityHistorySeriesResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub series: ::buffa::alloc::vec::Vec<EquitySeries>,
-    /// BTC-USDT close price at each timestamp, scaled by 1e6 (same as price_ticks).
+    /// BTC-USDT close price at each timestamp, scaled by 1e9 (same as price_ticks).
     /// Enables client-side conversion to BTC denomination without refetch.
     ///
     /// Field 10: `btc_prices_q`
@@ -3872,7 +3872,7 @@ pub struct GetPortfolioEquityHistorySeriesResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub series: ::buffa::alloc::vec::Vec<EquitySeries>,
-    /// BTC-USDT close price at each timestamp, scaled by 1e6 (same as price_ticks).
+    /// BTC-USDT close price at each timestamp, scaled by 1e9 (same as price_ticks).
     /// Enables client-side conversion to BTC denomination without refetch.
     ///
     /// Field 8: `btc_prices_q`
@@ -4705,7 +4705,7 @@ pub struct GetPortfolioEquitySnapshotResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub assets: ::buffa::alloc::vec::Vec<PortfolioAssetEquity>,
-    /// Current BTC-USDT price scaled by 1e6. Zero when unavailable.
+    /// Current BTC-USDT price scaled by 1e9. Zero when unavailable.
     ///
     /// Field 5: `btc_price_q`
     #[serde(
@@ -11248,7 +11248,7 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::EquitySeriesView<'a>,
             >,
-            /// BTC-USDT close price at each timestamp, scaled by 1e6 (same as price_ticks).
+            /// BTC-USDT close price at each timestamp, scaled by 1e9 (same as price_ticks).
             /// Enables client-side conversion to BTC denomination without refetch.
             ///
             /// Field 10: `btc_prices_q`
@@ -11736,7 +11736,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().series
             }
-            /// BTC-USDT close price at each timestamp, scaled by 1e6 (same as price_ticks).
+            /// BTC-USDT close price at each timestamp, scaled by 1e9 (same as price_ticks).
             /// Enables client-side conversion to BTC denomination without refetch.
             ///
             /// Field 10: `btc_prices_q`
@@ -12109,7 +12109,7 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::EquitySeriesView<'a>,
             >,
-            /// BTC-USDT close price at each timestamp, scaled by 1e6 (same as price_ticks).
+            /// BTC-USDT close price at each timestamp, scaled by 1e9 (same as price_ticks).
             /// Enables client-side conversion to BTC denomination without refetch.
             ///
             /// Field 8: `btc_prices_q`
@@ -12604,7 +12604,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().series
             }
-            /// BTC-USDT close price at each timestamp, scaled by 1e6 (same as price_ticks).
+            /// BTC-USDT close price at each timestamp, scaled by 1e9 (same as price_ticks).
             /// Enables client-side conversion to BTC denomination without refetch.
             ///
             /// Field 8: `btc_prices_q`
@@ -13653,7 +13653,7 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::PortfolioAssetEquityView<'a>,
             >,
-            /// Current BTC-USDT price scaled by 1e6. Zero when unavailable.
+            /// Current BTC-USDT price scaled by 1e9. Zero when unavailable.
             ///
             /// Field 5: `btc_price_q`
             pub btc_price_q: i64,
@@ -14052,7 +14052,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().assets
             }
-            /// Current BTC-USDT price scaled by 1e6. Zero when unavailable.
+            /// Current BTC-USDT price scaled by 1e9. Zero when unavailable.
             ///
             /// Field 5: `btc_price_q`
             #[must_use]

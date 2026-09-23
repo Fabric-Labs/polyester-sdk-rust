@@ -2816,7 +2816,7 @@ impl ::buffa::Enumeration for BatchReplaceItemAdmissionStatus {
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct MarketIoc {
-    /// Optional client reference price in quote units scaled by 1e6. When
+    /// Optional client reference price in quote units scaled by 1e9. When
     /// omitted, admission uses server-side reference pricing.
     ///
     /// Field 3: `client_ref_price_ticks`
@@ -3110,7 +3110,7 @@ pub mod market_ioc {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitGtc {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -3265,7 +3265,7 @@ pub const __LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitGtd {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -3454,7 +3454,7 @@ pub const __LIMIT_GTD_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitIoc {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -3580,7 +3580,7 @@ pub const __LIMIT_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitFok {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -5356,7 +5356,7 @@ pub struct PreviewOrderResponse {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub resolved_base_qty_scaled: ::core::option::Option<i64>,
-    /// Protective execution boundary in quote units scaled by 1e6. This is not an
+    /// Protective execution boundary in quote units scaled by 1e9. This is not an
     /// expected fill price. Present when price protection was resolved.
     ///
     /// Field 4: `protected_price_bound_ticks`
@@ -6792,7 +6792,7 @@ pub const __RISK_MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct RiskLimitGtc {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -7196,7 +7196,7 @@ pub mod risk_execution {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TakeProfitPolicy {
-    /// Trigger price in quote units scaled by 1e6.
+    /// Trigger price in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -7360,7 +7360,7 @@ pub const __TAKE_PROFIT_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct StopLossPolicy {
-    /// Trigger price in quote units scaled by 1e6.
+    /// Trigger price in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -7527,7 +7527,7 @@ pub const __STOP_LOSS_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
 pub struct TrailingStopPolicy {
     /// Optional activation price: trailing only starts after this price is
     /// reached. If omitted, trailing starts immediately after the parent order
-    /// fills. Expressed in quote units scaled by 1e6.
+    /// fills. Expressed in quote units scaled by 1e9.
     ///
     /// Field 3: `activation_price_ticks`
     #[serde(
@@ -10924,7 +10924,7 @@ pub struct ModifyOrderRequest {
     )]
     pub request_id: ::buffa::alloc::string::String,
     /// Patch fields (presence-based).
-    /// New limit price in quote units scaled by 1e6. Required for price changes.
+    /// New limit price in quote units scaled by 1e9. Required for price changes.
     ///
     /// Field 5: `new_price_ticks`
     #[serde(
@@ -11943,7 +11943,7 @@ pub const __MODIFY_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct BatchReplaceOrderItem {
-    /// New limit price in quote units scaled by 1e6.
+    /// New limit price in quote units scaled by 1e9.
     ///
     /// Field 3: `new_price_ticks`
     #[serde(
@@ -16765,7 +16765,7 @@ pub struct Order {
     )]
     pub leaves_qty_scaled: i64,
     /// Average execution price across the lineage through this generation,
-    /// in quote units scaled by 1e6. Zero if no fills.
+    /// in quote units scaled by 1e9. Zero if no fills.
     ///
     /// Field 14: `avg_price_ticks`
     #[serde(
@@ -16775,7 +16775,7 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub avg_price_ticks: i64,
-    /// Limit price in quote units scaled by 1e6. Zero for MARKET orders.
+    /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
     ///
     /// Field 15: `price_ticks`
     #[serde(
@@ -16845,7 +16845,7 @@ pub struct Order {
     )]
     pub origin: ::buffa::MessageField<OrderOrigin>,
     /// Optional client-side reference price used for MARKET slippage protection,
-    /// in quote units scaled by 1e6.
+    /// in quote units scaled by 1e9.
     ///
     /// Field 23: `market_client_ref_price_ticks`
     #[serde(
@@ -16855,7 +16855,7 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub market_client_ref_price_ticks: i64,
-    /// Optional MARKET max slippage as a price delta in 1e-6 quote-unit ticks.
+    /// Optional MARKET max slippage as a price delta in 1e-9 quote-unit ticks.
     ///
     /// Field 24: `market_max_slippage_ticks`
     #[serde(
@@ -17658,7 +17658,7 @@ pub struct UserTrade {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_maker: bool,
-    /// Execution price in quote units scaled by 1e6.
+    /// Execution price in quote units scaled by 1e9.
     ///
     /// Field 7: `price_ticks`
     #[serde(
@@ -22213,7 +22213,7 @@ pub mod __buffa {
         /// immediate-or-cancel and therefore cannot rest or be post-only.
         #[derive(Clone, Debug, Default)]
         pub struct MarketIocView<'a> {
-            /// Optional client reference price in quote units scaled by 1e6. When
+            /// Optional client reference price in quote units scaled by 1e9. When
             /// omitted, admission uses server-side reference pricing.
             ///
             /// Field 3: `client_ref_price_ticks`
@@ -22540,7 +22540,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional client reference price in quote units scaled by 1e6. When
+            /// Optional client reference price in quote units scaled by 1e9. When
             /// omitted, admission uses server-side reference pricing.
             ///
             /// Field 3: `client_ref_price_ticks`
@@ -22591,7 +22591,7 @@ pub mod __buffa {
         /// LimitGtc configures a good-til-canceled limit order.
         #[derive(Clone, Debug, Default)]
         pub struct LimitGtcView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -22833,7 +22833,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -22883,7 +22883,7 @@ pub mod __buffa {
         /// exact expiry time.
         #[derive(Clone, Debug, Default)]
         pub struct LimitGtdView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -23187,7 +23187,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -23248,7 +23248,7 @@ pub mod __buffa {
         /// LimitIoc configures an immediate-or-cancel limit order.
         #[derive(Clone, Debug, Default)]
         pub struct LimitIocView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -23468,7 +23468,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -23509,7 +23509,7 @@ pub mod __buffa {
         /// LimitFok configures a fill-or-kill limit order.
         #[derive(Clone, Debug, Default)]
         pub struct LimitFokView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -23729,7 +23729,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -26063,7 +26063,7 @@ pub mod __buffa {
             ///
             /// Field 3: `resolved_base_qty_scaled`
             pub resolved_base_qty_scaled: ::core::option::Option<i64>,
-            /// Protective execution boundary in quote units scaled by 1e6. This is not an
+            /// Protective execution boundary in quote units scaled by 1e9. This is not an
             /// expected fill price. Present when price protection was resolved.
             ///
             /// Field 4: `protected_price_bound_ticks`
@@ -26484,7 +26484,7 @@ pub mod __buffa {
             pub fn resolved_base_qty_scaled(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().resolved_base_qty_scaled
             }
-            /// Protective execution boundary in quote units scaled by 1e6. This is not an
+            /// Protective execution boundary in quote units scaled by 1e9. This is not an
             /// expected fill price. Present when price protection was resolved.
             ///
             /// Field 4: `protected_price_bound_ticks`
@@ -28336,7 +28336,7 @@ pub mod __buffa {
         /// child. Attached risk legs do not support post-only.
         #[derive(Clone, Debug, Default)]
         pub struct RiskLimitGtcView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -28565,7 +28565,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -29009,7 +29009,7 @@ pub mod __buffa {
         /// last trade price, arms after the parent fills, and submits the selected child.
         #[derive(Clone, Debug, Default)]
         pub struct TakeProfitPolicyView<'a> {
-            /// Trigger price in quote units scaled by 1e6.
+            /// Trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
@@ -29305,7 +29305,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger price in quote units scaled by 1e6.
+            /// Trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
@@ -29358,7 +29358,7 @@ pub mod __buffa {
         /// trade price, arms after the parent fills, and submits the selected child.
         #[derive(Clone, Debug, Default)]
         pub struct StopLossPolicyView<'a> {
-            /// Trigger price in quote units scaled by 1e6.
+            /// Trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
@@ -29654,7 +29654,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger price in quote units scaled by 1e6.
+            /// Trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
@@ -29710,7 +29710,7 @@ pub mod __buffa {
         pub struct TrailingStopPolicyView<'a> {
             /// Optional activation price: trailing only starts after this price is
             /// reached. If omitted, trailing starts immediately after the parent order
-            /// fills. Expressed in quote units scaled by 1e6.
+            /// fills. Expressed in quote units scaled by 1e9.
             ///
             /// Field 3: `activation_price_ticks`
             pub activation_price_ticks: i64,
@@ -30143,7 +30143,7 @@ pub mod __buffa {
             }
             /// Optional activation price: trailing only starts after this price is
             /// reached. If omitted, trailing starts immediately after the parent order
-            /// fills. Expressed in quote units scaled by 1e6.
+            /// fills. Expressed in quote units scaled by 1e9.
             ///
             /// Field 3: `activation_price_ticks`
             #[must_use]
@@ -34625,7 +34625,7 @@ pub mod __buffa {
             /// Field 4: `request_id`
             pub request_id: &'a str,
             /// Patch fields (presence-based).
-            /// New limit price in quote units scaled by 1e6. Required for price changes.
+            /// New limit price in quote units scaled by 1e9. Required for price changes.
             ///
             /// Field 5: `new_price_ticks`
             pub new_price_ticks: ::core::option::Option<i64>,
@@ -35186,7 +35186,7 @@ pub mod __buffa {
                 self.0.reborrow().request_id
             }
             /// Patch fields (presence-based).
-            /// New limit price in quote units scaled by 1e6. Required for price changes.
+            /// New limit price in quote units scaled by 1e9. Required for price changes.
             ///
             /// Field 5: `new_price_ticks`
             #[must_use]
@@ -35856,7 +35856,7 @@ pub mod __buffa {
         /// BatchReplaceOrderItem identifies one replacement inside a quote-refresh batch.
         #[derive(Clone, Debug, Default)]
         pub struct BatchReplaceOrderItemView<'a> {
-            /// New limit price in quote units scaled by 1e6.
+            /// New limit price in quote units scaled by 1e9.
             ///
             /// Field 3: `new_price_ticks`
             pub new_price_ticks: ::core::option::Option<i64>,
@@ -36299,7 +36299,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// New limit price in quote units scaled by 1e6.
+            /// New limit price in quote units scaled by 1e9.
             ///
             /// Field 3: `new_price_ticks`
             #[must_use]
@@ -42392,11 +42392,11 @@ pub mod __buffa {
             /// Field 20: `leaves_qty_scaled`
             pub leaves_qty_scaled: i64,
             /// Average execution price across the lineage through this generation,
-            /// in quote units scaled by 1e6. Zero if no fills.
+            /// in quote units scaled by 1e9. Zero if no fills.
             ///
             /// Field 14: `avg_price_ticks`
             pub avg_price_ticks: i64,
-            /// Limit price in quote units scaled by 1e6. Zero for MARKET orders.
+            /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
             ///
             /// Field 15: `price_ticks`
             pub price_ticks: i64,
@@ -42431,11 +42431,11 @@ pub mod __buffa {
                 super::super::__buffa::view::OrderOriginView<'a>,
             >,
             /// Optional client-side reference price used for MARKET slippage protection,
-            /// in quote units scaled by 1e6.
+            /// in quote units scaled by 1e9.
             ///
             /// Field 23: `market_client_ref_price_ticks`
             pub market_client_ref_price_ticks: i64,
-            /// Optional MARKET max slippage as a price delta in 1e-6 quote-unit ticks.
+            /// Optional MARKET max slippage as a price delta in 1e-9 quote-unit ticks.
             ///
             /// Field 24: `market_max_slippage_ticks`
             pub market_max_slippage_ticks: i32,
@@ -43672,14 +43672,14 @@ pub mod __buffa {
                 self.0.reborrow().leaves_qty_scaled
             }
             /// Average execution price across the lineage through this generation,
-            /// in quote units scaled by 1e6. Zero if no fills.
+            /// in quote units scaled by 1e9. Zero if no fills.
             ///
             /// Field 14: `avg_price_ticks`
             #[must_use]
             pub fn avg_price_ticks(&self) -> i64 {
                 self.0.reborrow().avg_price_ticks
             }
-            /// Limit price in quote units scaled by 1e6. Zero for MARKET orders.
+            /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
             ///
             /// Field 15: `price_ticks`
             #[must_use]
@@ -43739,14 +43739,14 @@ pub mod __buffa {
                 &self.0.reborrow().origin
             }
             /// Optional client-side reference price used for MARKET slippage protection,
-            /// in quote units scaled by 1e6.
+            /// in quote units scaled by 1e9.
             ///
             /// Field 23: `market_client_ref_price_ticks`
             #[must_use]
             pub fn market_client_ref_price_ticks(&self) -> i64 {
                 self.0.reborrow().market_client_ref_price_ticks
             }
-            /// Optional MARKET max slippage as a price delta in 1e-6 quote-unit ticks.
+            /// Optional MARKET max slippage as a price delta in 1e-9 quote-unit ticks.
             ///
             /// Field 24: `market_max_slippage_ticks`
             #[must_use]
@@ -43865,7 +43865,7 @@ pub mod __buffa {
             ///
             /// Field 6: `is_maker`
             pub is_maker: bool,
-            /// Execution price in quote units scaled by 1e6.
+            /// Execution price in quote units scaled by 1e9.
             ///
             /// Field 7: `price_ticks`
             pub price_ticks: i64,
@@ -44530,7 +44530,7 @@ pub mod __buffa {
             pub fn is_maker(&self) -> bool {
                 self.0.reborrow().is_maker
             }
-            /// Execution price in quote units scaled by 1e6.
+            /// Execution price in quote units scaled by 1e9.
             ///
             /// Field 7: `price_ticks`
             #[must_use]

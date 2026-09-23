@@ -1853,7 +1853,7 @@ pub const __TRIGGER_MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TriggerLimitGtc {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -2006,7 +2006,7 @@ pub const __TRIGGER_LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TriggerLimitIoc {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -2134,7 +2134,7 @@ pub const __TRIGGER_LIMIT_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TriggerLimitFok {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -2669,7 +2669,7 @@ pub mod conditional_child_execution {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ConditionalTrigger {
-    /// Trigger threshold in quote units scaled by 1e6.
+    /// Trigger threshold in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -2864,7 +2864,7 @@ pub const __CONDITIONAL_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct TrailingStopTrigger {
-    /// Optional activation price in quote units scaled by 1e6.
+    /// Optional activation price in quote units scaled by 1e9.
     ///
     /// Field 3: `activation_price_ticks`
     #[serde(
@@ -3604,7 +3604,7 @@ pub mod twap_market_ioc {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TwapLimitGtc {
-    /// Slice limit price in quote units scaled by 1e6.
+    /// Slice limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -4162,7 +4162,7 @@ pub struct LadderTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
-    /// Minimum generated level price in quote units scaled by 1e6.
+    /// Minimum generated level price in quote units scaled by 1e9.
     ///
     /// Field 2: `price_min_ticks`
     #[serde(
@@ -4172,7 +4172,7 @@ pub struct LadderTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub price_min_ticks: i64,
-    /// Maximum generated level price in quote units scaled by 1e6.
+    /// Maximum generated level price in quote units scaled by 1e9.
     ///
     /// Field 3: `price_max_ticks`
     #[serde(
@@ -6654,7 +6654,7 @@ pub struct TriggerEvent {
     )]
     pub child_order_id: u64,
     /// Price that caused a conditional trigger to fire, in quote units scaled by
-    /// 1e6. Absent for time-scheduled triggers such as TWAP.
+    /// 1e9. Absent for time-scheduled triggers such as TWAP.
     ///
     /// Field 13: `fire_price_ticks`
     #[serde(
@@ -7842,7 +7842,7 @@ pub struct ModifyTriggerRequest {
     pub symbol_id: u32,
     /// Patch fields for safe price, trailing-distance, and slippage edits.
     /// For stop/take-profit:
-    /// Updated trigger price in quote units scaled by 1e6.
+    /// Updated trigger price in quote units scaled by 1e9.
     ///
     /// Field 10: `trigger_price_ticks`
     #[serde(
@@ -7852,7 +7852,7 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub trigger_price_ticks: ::core::option::Option<i64>,
-    /// Updated limit price in quote units scaled by 1e6 for LIMIT child orders.
+    /// Updated limit price in quote units scaled by 1e9 for LIMIT child orders.
     ///
     /// Field 11: `limit_price_ticks`
     #[serde(
@@ -7862,7 +7862,7 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub limit_price_ticks: ::core::option::Option<i64>,
-    /// Updated activation price in quote units scaled by 1e6. Set to zero to
+    /// Updated activation price in quote units scaled by 1e9. Set to zero to
     /// clear an existing activation price; omit to leave it unchanged.
     ///
     /// Field 14: `activation_price_ticks`
@@ -9531,7 +9531,7 @@ pub const __RESUME_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct StopDetails {
-    /// Trigger threshold price in quote units scaled by 1e6.
+    /// Trigger threshold price in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -9732,7 +9732,7 @@ pub const __STOP_DETAILS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TrailingDetails {
-    /// Trailing distance as a price delta in 1e-6 quote-unit ticks.
+    /// Trailing distance as a price delta in 1e-9 quote-unit ticks.
     ///
     /// Field 1: `trailing_distance_ticks`
     #[serde(
@@ -9743,7 +9743,7 @@ pub struct TrailingDetails {
     )]
     pub trailing_distance_ticks: i64,
     /// Optional activation price: trailing only starts after this price is
-    /// reached. Expressed in quote units scaled by 1e6.
+    /// reached. Expressed in quote units scaled by 1e9.
     ///
     /// Field 2: `activation_price_ticks`
     #[serde(
@@ -9753,7 +9753,7 @@ pub struct TrailingDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub activation_price_ticks: i64,
-    /// Current peak price in quote units scaled by 1e6 for sell trailing stops.
+    /// Current peak price in quote units scaled by 1e9 for sell trailing stops.
     ///
     /// Field 3: `peak_price_ticks`
     #[serde(
@@ -9763,7 +9763,7 @@ pub struct TrailingDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub peak_price_ticks: i64,
-    /// Current trough price in quote units scaled by 1e6 for buy trailing stops.
+    /// Current trough price in quote units scaled by 1e9 for buy trailing stops.
     ///
     /// Field 4: `trough_price_ticks`
     #[serde(
@@ -9783,7 +9783,7 @@ pub struct TrailingDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub trailing_distance_bps: i32,
-    /// Optional maximum allowed slippage as a price delta in 1e-6 quote-unit ticks.
+    /// Optional maximum allowed slippage as a price delta in 1e-9 quote-unit ticks.
     ///
     /// Field 6: `max_slippage_ticks`
     #[serde(
@@ -9829,7 +9829,7 @@ pub struct TrailingDetails {
     pub trigger_direction: ::buffa::EnumValue<
         super::super::orders::v1::TriggerDirection,
     >,
-    /// Current trailing trigger threshold in quote units scaled by 1e6. This is
+    /// Current trailing trigger threshold in quote units scaled by 1e9. This is
     /// evaluator-authored runtime state and moves when the peak or trough changes.
     /// It is absent until the trailing trigger is armed and a positive threshold exists.
     ///
@@ -10374,7 +10374,7 @@ pub const __TWAP_DETAILS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LadderDetails {
-    /// Minimum price in quote units scaled by 1e6 for the ladder range.
+    /// Minimum price in quote units scaled by 1e9 for the ladder range.
     ///
     /// Field 1: `ladder_price_min_ticks`
     #[serde(
@@ -10384,7 +10384,7 @@ pub struct LadderDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub ladder_price_min_ticks: i64,
-    /// Maximum price in quote units scaled by 1e6 for the ladder range.
+    /// Maximum price in quote units scaled by 1e9 for the ladder range.
     ///
     /// Field 2: `ladder_price_max_ticks`
     #[serde(
@@ -12394,7 +12394,7 @@ pub mod __buffa {
         /// TriggerLimitGtc configures a resting limit child.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerLimitGtcView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -12646,7 +12646,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -12694,7 +12694,7 @@ pub mod __buffa {
         /// TriggerLimitIoc configures an immediate-or-cancel limit child.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerLimitIocView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -12925,7 +12925,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -12966,7 +12966,7 @@ pub mod __buffa {
         /// TriggerLimitFok configures a fill-or-kill limit child.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerLimitFokView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -13197,7 +13197,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -13784,7 +13784,7 @@ pub mod __buffa {
         /// ConditionalTrigger configures a standalone stop-loss or take-profit.
         #[derive(Clone, Debug, Default)]
         pub struct ConditionalTriggerView<'a> {
-            /// Trigger threshold in quote units scaled by 1e6.
+            /// Trigger threshold in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
@@ -14109,7 +14109,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger threshold in quote units scaled by 1e6.
+            /// Trigger threshold in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
@@ -14172,7 +14172,7 @@ pub mod __buffa {
         /// trailing stops may use either side, opposite their parent order.
         #[derive(Clone, Debug, Default)]
         pub struct TrailingStopTriggerView<'a> {
-            /// Optional activation price in quote units scaled by 1e6.
+            /// Optional activation price in quote units scaled by 1e9.
             ///
             /// Field 3: `activation_price_ticks`
             pub activation_price_ticks: i64,
@@ -14632,7 +14632,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional activation price in quote units scaled by 1e6.
+            /// Optional activation price in quote units scaled by 1e9.
             ///
             /// Field 3: `activation_price_ticks`
             #[must_use]
@@ -15044,7 +15044,7 @@ pub mod __buffa {
         /// slice is canceled before the next interval.
         #[derive(Clone, Debug, Default)]
         pub struct TwapLimitGtcView<'a> {
-            /// Slice limit price in quote units scaled by 1e6.
+            /// Slice limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -15273,7 +15273,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Slice limit price in quote units scaled by 1e6.
+            /// Slice limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -15827,11 +15827,11 @@ pub mod __buffa {
             ///
             /// Field 1: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
-            /// Minimum generated level price in quote units scaled by 1e6.
+            /// Minimum generated level price in quote units scaled by 1e9.
             ///
             /// Field 2: `price_min_ticks`
             pub price_min_ticks: i64,
-            /// Maximum generated level price in quote units scaled by 1e6.
+            /// Maximum generated level price in quote units scaled by 1e9.
             ///
             /// Field 3: `price_max_ticks`
             pub price_max_ticks: i64,
@@ -16167,14 +16167,14 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
                 self.0.reborrow().side
             }
-            /// Minimum generated level price in quote units scaled by 1e6.
+            /// Minimum generated level price in quote units scaled by 1e9.
             ///
             /// Field 2: `price_min_ticks`
             #[must_use]
             pub fn price_min_ticks(&self) -> i64 {
                 self.0.reborrow().price_min_ticks
             }
-            /// Maximum generated level price in quote units scaled by 1e6.
+            /// Maximum generated level price in quote units scaled by 1e9.
             ///
             /// Field 3: `price_max_ticks`
             #[must_use]
@@ -19728,7 +19728,7 @@ pub mod __buffa {
             /// Field 12: `child_order_id`
             pub child_order_id: u64,
             /// Price that caused a conditional trigger to fire, in quote units scaled by
-            /// 1e6. Absent for time-scheduled triggers such as TWAP.
+            /// 1e9. Absent for time-scheduled triggers such as TWAP.
             ///
             /// Field 13: `fire_price_ticks`
             pub fire_price_ticks: ::core::option::Option<i64>,
@@ -20294,7 +20294,7 @@ pub mod __buffa {
                 self.0.reborrow().child_order_id
             }
             /// Price that caused a conditional trigger to fire, in quote units scaled by
-            /// 1e6. Absent for time-scheduled triggers such as TWAP.
+            /// 1e9. Absent for time-scheduled triggers such as TWAP.
             ///
             /// Field 13: `fire_price_ticks`
             #[must_use]
@@ -21426,15 +21426,15 @@ pub mod __buffa {
             pub symbol_id: u32,
             /// Patch fields for safe price, trailing-distance, and slippage edits.
             /// For stop/take-profit:
-            /// Updated trigger price in quote units scaled by 1e6.
+            /// Updated trigger price in quote units scaled by 1e9.
             ///
             /// Field 10: `trigger_price_ticks`
             pub trigger_price_ticks: ::core::option::Option<i64>,
-            /// Updated limit price in quote units scaled by 1e6 for LIMIT child orders.
+            /// Updated limit price in quote units scaled by 1e9 for LIMIT child orders.
             ///
             /// Field 11: `limit_price_ticks`
             pub limit_price_ticks: ::core::option::Option<i64>,
-            /// Updated activation price in quote units scaled by 1e6. Set to zero to
+            /// Updated activation price in quote units scaled by 1e9. Set to zero to
             /// clear an existing activation price; omit to leave it unchanged.
             ///
             /// Field 14: `activation_price_ticks`
@@ -21991,21 +21991,21 @@ pub mod __buffa {
             }
             /// Patch fields for safe price, trailing-distance, and slippage edits.
             /// For stop/take-profit:
-            /// Updated trigger price in quote units scaled by 1e6.
+            /// Updated trigger price in quote units scaled by 1e9.
             ///
             /// Field 10: `trigger_price_ticks`
             #[must_use]
             pub fn trigger_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().trigger_price_ticks
             }
-            /// Updated limit price in quote units scaled by 1e6 for LIMIT child orders.
+            /// Updated limit price in quote units scaled by 1e9 for LIMIT child orders.
             ///
             /// Field 11: `limit_price_ticks`
             #[must_use]
             pub fn limit_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().limit_price_ticks
             }
-            /// Updated activation price in quote units scaled by 1e6. Set to zero to
+            /// Updated activation price in quote units scaled by 1e9. Set to zero to
             /// clear an existing activation price; omit to leave it unchanged.
             ///
             /// Field 14: `activation_price_ticks`
@@ -23959,7 +23959,7 @@ pub mod __buffa {
         /// StopDetails contains configuration for STOP_LOSS and TAKE_PROFIT triggers.
         #[derive(Clone, Debug, Default)]
         pub struct StopDetailsView<'a> {
-            /// Trigger threshold price in quote units scaled by 1e6.
+            /// Trigger threshold price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
@@ -24263,7 +24263,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger threshold price in quote units scaled by 1e6.
+            /// Trigger threshold price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
@@ -24327,20 +24327,20 @@ pub mod __buffa {
         /// triggers.
         #[derive(Clone, Debug, Default)]
         pub struct TrailingDetailsView<'a> {
-            /// Trailing distance as a price delta in 1e-6 quote-unit ticks.
+            /// Trailing distance as a price delta in 1e-9 quote-unit ticks.
             ///
             /// Field 1: `trailing_distance_ticks`
             pub trailing_distance_ticks: i64,
             /// Optional activation price: trailing only starts after this price is
-            /// reached. Expressed in quote units scaled by 1e6.
+            /// reached. Expressed in quote units scaled by 1e9.
             ///
             /// Field 2: `activation_price_ticks`
             pub activation_price_ticks: i64,
-            /// Current peak price in quote units scaled by 1e6 for sell trailing stops.
+            /// Current peak price in quote units scaled by 1e9 for sell trailing stops.
             ///
             /// Field 3: `peak_price_ticks`
             pub peak_price_ticks: i64,
-            /// Current trough price in quote units scaled by 1e6 for buy trailing stops.
+            /// Current trough price in quote units scaled by 1e9 for buy trailing stops.
             ///
             /// Field 4: `trough_price_ticks`
             pub trough_price_ticks: i64,
@@ -24348,7 +24348,7 @@ pub mod __buffa {
             ///
             /// Field 5: `trailing_distance_bps`
             pub trailing_distance_bps: i32,
-            /// Optional maximum allowed slippage as a price delta in 1e-6 quote-unit ticks.
+            /// Optional maximum allowed slippage as a price delta in 1e-9 quote-unit ticks.
             ///
             /// Field 6: `max_slippage_ticks`
             pub max_slippage_ticks: i32,
@@ -24370,7 +24370,7 @@ pub mod __buffa {
             pub trigger_direction: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::TriggerDirection,
             >,
-            /// Current trailing trigger threshold in quote units scaled by 1e6. This is
+            /// Current trailing trigger threshold in quote units scaled by 1e9. This is
             /// evaluator-authored runtime state and moves when the peak or trough changes.
             /// It is absent until the trailing trigger is armed and a positive threshold exists.
             ///
@@ -24870,7 +24870,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trailing distance as a price delta in 1e-6 quote-unit ticks.
+            /// Trailing distance as a price delta in 1e-9 quote-unit ticks.
             ///
             /// Field 1: `trailing_distance_ticks`
             #[must_use]
@@ -24878,21 +24878,21 @@ pub mod __buffa {
                 self.0.reborrow().trailing_distance_ticks
             }
             /// Optional activation price: trailing only starts after this price is
-            /// reached. Expressed in quote units scaled by 1e6.
+            /// reached. Expressed in quote units scaled by 1e9.
             ///
             /// Field 2: `activation_price_ticks`
             #[must_use]
             pub fn activation_price_ticks(&self) -> i64 {
                 self.0.reborrow().activation_price_ticks
             }
-            /// Current peak price in quote units scaled by 1e6 for sell trailing stops.
+            /// Current peak price in quote units scaled by 1e9 for sell trailing stops.
             ///
             /// Field 3: `peak_price_ticks`
             #[must_use]
             pub fn peak_price_ticks(&self) -> i64 {
                 self.0.reborrow().peak_price_ticks
             }
-            /// Current trough price in quote units scaled by 1e6 for buy trailing stops.
+            /// Current trough price in quote units scaled by 1e9 for buy trailing stops.
             ///
             /// Field 4: `trough_price_ticks`
             #[must_use]
@@ -24906,7 +24906,7 @@ pub mod __buffa {
             pub fn trailing_distance_bps(&self) -> i32 {
                 self.0.reborrow().trailing_distance_bps
             }
-            /// Optional maximum allowed slippage as a price delta in 1e-6 quote-unit ticks.
+            /// Optional maximum allowed slippage as a price delta in 1e-9 quote-unit ticks.
             ///
             /// Field 6: `max_slippage_ticks`
             #[must_use]
@@ -24944,7 +24944,7 @@ pub mod __buffa {
             > {
                 self.0.reborrow().trigger_direction
             }
-            /// Current trailing trigger threshold in quote units scaled by 1e6. This is
+            /// Current trailing trigger threshold in quote units scaled by 1e9. This is
             /// evaluator-authored runtime state and moves when the peak or trough changes.
             /// It is absent until the trailing trigger is armed and a positive threshold exists.
             ///
@@ -25413,11 +25413,11 @@ pub mod __buffa {
         /// LadderDetails contains configuration and aggregate execution progress for LADDER triggers.
         #[derive(Clone, Debug, Default)]
         pub struct LadderDetailsView<'a> {
-            /// Minimum price in quote units scaled by 1e6 for the ladder range.
+            /// Minimum price in quote units scaled by 1e9 for the ladder range.
             ///
             /// Field 1: `ladder_price_min_ticks`
             pub ladder_price_min_ticks: i64,
-            /// Maximum price in quote units scaled by 1e6 for the ladder range.
+            /// Maximum price in quote units scaled by 1e9 for the ladder range.
             ///
             /// Field 2: `ladder_price_max_ticks`
             pub ladder_price_max_ticks: i64,
@@ -25824,14 +25824,14 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Minimum price in quote units scaled by 1e6 for the ladder range.
+            /// Minimum price in quote units scaled by 1e9 for the ladder range.
             ///
             /// Field 1: `ladder_price_min_ticks`
             #[must_use]
             pub fn ladder_price_min_ticks(&self) -> i64 {
                 self.0.reborrow().ladder_price_min_ticks
             }
-            /// Maximum price in quote units scaled by 1e6 for the ladder range.
+            /// Maximum price in quote units scaled by 1e9 for the ladder range.
             ///
             /// Field 2: `ladder_price_max_ticks`
             #[must_use]
