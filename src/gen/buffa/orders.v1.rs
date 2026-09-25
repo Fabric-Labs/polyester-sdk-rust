@@ -19726,7 +19726,8 @@ pub struct GetUserTradesRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub after_match_id: ::core::option::Option<u64>,
-    /// Inclusive generation ceiling. Does not freeze an actively filling generation.
+    /// Inclusive generation ceiling; requires lineage_id.
+    /// Does not freeze an actively filling generation.
     ///
     /// Field 17: `through_generation`
     #[serde(
@@ -47119,7 +47120,8 @@ pub mod __buffa {
             ///
             /// Field 14: `after_match_id`
             pub after_match_id: ::core::option::Option<u64>,
-            /// Inclusive generation ceiling. Does not freeze an actively filling generation.
+            /// Inclusive generation ceiling; requires lineage_id.
+            /// Does not freeze an actively filling generation.
             ///
             /// Field 17: `through_generation`
             pub through_generation: ::core::option::Option<u32>,
@@ -47705,7 +47707,8 @@ pub mod __buffa {
             pub fn after_match_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().after_match_id
             }
-            /// Inclusive generation ceiling. Does not freeze an actively filling generation.
+            /// Inclusive generation ceiling; requires lineage_id.
+            /// Does not freeze an actively filling generation.
             ///
             /// Field 17: `through_generation`
             #[must_use]
@@ -51183,6 +51186,7 @@ pub mod __buffa {
             #[allow(unused_imports)]
             use super::*;
             /// Optional execution scope. Omitting it returns all matching account fills.
+            /// order_id and lineage_id are mutually exclusive.
             #[derive(Clone, PartialEq, Debug)]
             pub enum ExecutionScope {
                 OrderId(u64),
