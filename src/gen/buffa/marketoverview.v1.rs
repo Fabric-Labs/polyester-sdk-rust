@@ -179,7 +179,7 @@ pub enum MarketOrderBy {
     ORDER_BY_CHANGE_24H_BPS = 1i32,
     /// Sort by canonical USD 24h volume. Unvalued markets sort last in either direction.
     ORDER_BY_VOLUME_24H_USD = 2i32,
-    /// Sort by last price in quote units scaled by 1e6.
+    /// Sort by last price in quote units scaled by 1e9.
     ORDER_BY_LAST_PRICE = 3i32,
     /// Sort by listing time (new listings first).
     ORDER_BY_DATE_ADDED = 4i32,
@@ -816,7 +816,7 @@ pub struct Sparkline {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub interval: ::buffa::EnumValue<SparklineInterval>,
-    /// Newest-first close prices in quote units scaled by 1e6.
+    /// Newest-first close prices in quote units scaled by 1e9.
     ///
     /// Field 2: `close_ticks`
     #[serde(
@@ -1014,7 +1014,7 @@ pub struct MarketOverview {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub symbol_id: u32,
-    /// Last traded price in quote units scaled by 1e6.
+    /// Last traded price in quote units scaled by 1e9.
     ///
     /// Field 3: `last_price_ticks`
     #[serde(
@@ -1045,7 +1045,7 @@ pub struct MarketOverview {
     )]
     pub change_24h_bps: i32,
     /// Rolling 24h stats.
-    /// Highest traded price in the 24h window, in quote units scaled by 1e6.
+    /// Highest traded price in the 24h window, in quote units scaled by 1e9.
     ///
     /// Field 6: `high_24h_ticks`
     #[serde(
@@ -1055,7 +1055,7 @@ pub struct MarketOverview {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub high_24h_ticks: i64,
-    /// Lowest traded price in the 24h window, in quote units scaled by 1e6.
+    /// Lowest traded price in the 24h window, in quote units scaled by 1e9.
     ///
     /// Field 7: `low_24h_ticks`
     #[serde(
@@ -1111,7 +1111,7 @@ pub struct MarketOverview {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub listed_ts_ns: u64,
-    /// Current best bid price in quote units scaled by 1e6.
+    /// Current best bid price in quote units scaled by 1e9.
     ///
     /// Field 9: `best_bid_ticks`
     #[serde(
@@ -1132,7 +1132,7 @@ pub struct MarketOverview {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub best_bid_qty_scaled: i64,
-    /// Current best ask price in quote units scaled by 1e6.
+    /// Current best ask price in quote units scaled by 1e9.
     ///
     /// Field 11: `best_ask_ticks`
     #[serde(
@@ -1162,7 +1162,7 @@ pub struct MarketOverview {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub sparklines: ::buffa::alloc::vec::Vec<Sparkline>,
-    /// Current multi-venue index price in quote units scaled by 1e6.
+    /// Current multi-venue index price in quote units scaled by 1e9.
     /// Zero when no fresh, valid index price is available.
     ///
     /// Field 16: `index_price_ticks`
@@ -4551,7 +4551,7 @@ pub mod __buffa {
             ///
             /// Field 1: `interval`
             pub interval: ::buffa::EnumValue<super::super::SparklineInterval>,
-            /// Newest-first close prices in quote units scaled by 1e6.
+            /// Newest-first close prices in quote units scaled by 1e9.
             ///
             /// Field 2: `close_ticks`
             pub close_ticks: ::buffa::RepeatedView<'a, i64>,
@@ -4838,7 +4838,7 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::SparklineInterval> {
                 self.0.reborrow().interval
             }
-            /// Newest-first close prices in quote units scaled by 1e6.
+            /// Newest-first close prices in quote units scaled by 1e9.
             ///
             /// Field 2: `close_ticks`
             #[must_use]
@@ -4882,7 +4882,7 @@ pub mod __buffa {
             ///
             /// Field 1: `symbol_id`
             pub symbol_id: u32,
-            /// Last traded price in quote units scaled by 1e6.
+            /// Last traded price in quote units scaled by 1e9.
             ///
             /// Field 3: `last_price_ticks`
             pub last_price_ticks: i64,
@@ -4895,11 +4895,11 @@ pub mod __buffa {
             /// Field 5: `change_24h_bps`
             pub change_24h_bps: i32,
             /// Rolling 24h stats.
-            /// Highest traded price in the 24h window, in quote units scaled by 1e6.
+            /// Highest traded price in the 24h window, in quote units scaled by 1e9.
             ///
             /// Field 6: `high_24h_ticks`
             pub high_24h_ticks: i64,
-            /// Lowest traded price in the 24h window, in quote units scaled by 1e6.
+            /// Lowest traded price in the 24h window, in quote units scaled by 1e9.
             ///
             /// Field 7: `low_24h_ticks`
             pub low_24h_ticks: i64,
@@ -4925,7 +4925,7 @@ pub mod __buffa {
             ///
             /// Field 15: `listed_ts_ns`
             pub listed_ts_ns: u64,
-            /// Current best bid price in quote units scaled by 1e6.
+            /// Current best bid price in quote units scaled by 1e9.
             ///
             /// Field 9: `best_bid_ticks`
             pub best_bid_ticks: i64,
@@ -4934,7 +4934,7 @@ pub mod __buffa {
             ///
             /// Field 10: `best_bid_qty_scaled`
             pub best_bid_qty_scaled: i64,
-            /// Current best ask price in quote units scaled by 1e6.
+            /// Current best ask price in quote units scaled by 1e9.
             ///
             /// Field 11: `best_ask_ticks`
             pub best_ask_ticks: i64,
@@ -4950,7 +4950,7 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::SparklineView<'a>,
             >,
-            /// Current multi-venue index price in quote units scaled by 1e6.
+            /// Current multi-venue index price in quote units scaled by 1e9.
             /// Zero when no fresh, valid index price is available.
             ///
             /// Field 16: `index_price_ticks`
@@ -5579,7 +5579,7 @@ pub mod __buffa {
             pub fn symbol_id(&self) -> u32 {
                 self.0.reborrow().symbol_id
             }
-            /// Last traded price in quote units scaled by 1e6.
+            /// Last traded price in quote units scaled by 1e9.
             ///
             /// Field 3: `last_price_ticks`
             #[must_use]
@@ -5601,14 +5601,14 @@ pub mod __buffa {
                 self.0.reborrow().change_24h_bps
             }
             /// Rolling 24h stats.
-            /// Highest traded price in the 24h window, in quote units scaled by 1e6.
+            /// Highest traded price in the 24h window, in quote units scaled by 1e9.
             ///
             /// Field 6: `high_24h_ticks`
             #[must_use]
             pub fn high_24h_ticks(&self) -> i64 {
                 self.0.reborrow().high_24h_ticks
             }
-            /// Lowest traded price in the 24h window, in quote units scaled by 1e6.
+            /// Lowest traded price in the 24h window, in quote units scaled by 1e9.
             ///
             /// Field 7: `low_24h_ticks`
             #[must_use]
@@ -5649,7 +5649,7 @@ pub mod __buffa {
             pub fn listed_ts_ns(&self) -> u64 {
                 self.0.reborrow().listed_ts_ns
             }
-            /// Current best bid price in quote units scaled by 1e6.
+            /// Current best bid price in quote units scaled by 1e9.
             ///
             /// Field 9: `best_bid_ticks`
             #[must_use]
@@ -5664,7 +5664,7 @@ pub mod __buffa {
             pub fn best_bid_qty_scaled(&self) -> i64 {
                 self.0.reborrow().best_bid_qty_scaled
             }
-            /// Current best ask price in quote units scaled by 1e6.
+            /// Current best ask price in quote units scaled by 1e9.
             ///
             /// Field 11: `best_ask_ticks`
             #[must_use]
@@ -5691,7 +5691,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().sparklines
             }
-            /// Current multi-venue index price in quote units scaled by 1e6.
+            /// Current multi-venue index price in quote units scaled by 1e9.
             /// Zero when no fresh, valid index price is available.
             ///
             /// Field 16: `index_price_ticks`

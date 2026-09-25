@@ -1008,7 +1008,7 @@ pub const __GET_ORDERBOOK_HEATMAP_REQUEST_JSON_ANY: ::buffa::type_registry::Json
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct HeatmapLevels {
-    /// Price levels in quote units scaled by 1e6.
+    /// Price levels in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -1241,7 +1241,7 @@ pub const __HEATMAP_LEVELS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct HeatmapDeltaLevels {
-    /// Price levels in quote units scaled by 1e6.
+    /// Price levels in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -1482,7 +1482,7 @@ pub struct HeatmapKeyframe {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// Best bid price in quote units scaled by 1e6.
+    /// Best bid price in quote units scaled by 1e9.
     ///
     /// Field 2: `best_bid_ticks`
     #[serde(
@@ -1492,7 +1492,7 @@ pub struct HeatmapKeyframe {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub best_bid_ticks: i64,
-    /// Best ask price in quote units scaled by 1e6.
+    /// Best ask price in quote units scaled by 1e9.
     ///
     /// Field 3: `best_ask_ticks`
     #[serde(
@@ -1502,7 +1502,7 @@ pub struct HeatmapKeyframe {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub best_ask_ticks: i64,
-    /// Mid price in quote units scaled by 1e6.
+    /// Mid price in quote units scaled by 1e9.
     ///
     /// Field 4: `mid_ticks`
     #[serde(
@@ -2135,7 +2135,7 @@ pub struct HeatmapLiveBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub quantity_mode: ::buffa::EnumValue<HeatmapQuantityMode>,
-    /// Effective bin stride for this symbol as a price delta in 1e-6 quote-unit
+    /// Effective bin stride for this symbol as a price delta in 1e-9 quote-unit
     /// ticks.
     ///
     /// Field 11: `effective_bin_ticks`
@@ -3941,7 +3941,7 @@ pub struct MarketTrade {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_buy: bool,
-    /// Trade price in quote-asset units scaled by 1e6.
+    /// Trade price in quote-asset units scaled by 1e9.
     ///
     /// Field 4: `price_ticks`
     #[serde(
@@ -5030,7 +5030,7 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// Opening price in quote units. Primary candles use scale 6; composite
+    /// Opening price in quote units. Primary candles use scale 9; composite
     /// reference candles use the pair's reference_price_scale from GetSpotConfig.
     ///
     /// Field 2: `open`
@@ -5611,7 +5611,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub ts_sec: ::buffa::alloc::vec::Vec<u64>,
-    /// Opening primary-market prices use scale 6. Reference prices use the pair's
+    /// Opening primary-market prices use scale 9. Reference prices use the pair's
     /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 4: `open`
@@ -5621,7 +5621,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub open: ::buffa::alloc::vec::Vec<i64>,
-    /// Highest primary-market prices use scale 6. Reference prices use the pair's
+    /// Highest primary-market prices use scale 9. Reference prices use the pair's
     /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 5: `high`
@@ -5631,7 +5631,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub high: ::buffa::alloc::vec::Vec<i64>,
-    /// Lowest primary-market prices use scale 6. Reference prices use the pair's
+    /// Lowest primary-market prices use scale 9. Reference prices use the pair's
     /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 6: `low`
@@ -5641,7 +5641,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub low: ::buffa::alloc::vec::Vec<i64>,
-    /// Closing primary-market prices use scale 6. Reference prices use the pair's
+    /// Closing primary-market prices use scale 9. Reference prices use the pair's
     /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 7: `close`
@@ -6579,7 +6579,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// opening primary-market price in scale 6
+    /// opening primary-market price in scale 9
     ///
     /// Field 4: `open`
     #[serde(
@@ -6588,7 +6588,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub open: i64,
-    /// highest primary-market price in scale 6
+    /// highest primary-market price in scale 9
     ///
     /// Field 5: `high`
     #[serde(
@@ -6597,7 +6597,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub high: i64,
-    /// lowest primary-market price in scale 6
+    /// lowest primary-market price in scale 9
     ///
     /// Field 6: `low`
     #[serde(
@@ -6606,7 +6606,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub low: i64,
-    /// closing primary-market price in scale 6
+    /// closing primary-market price in scale 9
     ///
     /// Field 7: `close`
     #[serde(
@@ -7347,7 +7347,7 @@ pub struct PairConfig {
     )]
     pub quote_asset: ::buffa::alloc::string::String,
     /// Minimum allowed price increment as a decimal string in quote-asset units.
-    /// Prices use 6 decimal places in scaled integer fields; for example "0.01"
+    /// Prices use 9 decimal places in scaled integer fields; for example "0.01"
     /// means orders must be priced in 0.01 quote-asset increments.
     ///
     /// Field 5: `tick_size`
@@ -7491,7 +7491,7 @@ pub struct PairConfig {
     )]
     pub max_client_ref_drift_bps: i32,
     /// Integer scale for composite reference prices in candle responses (0..18).
-    /// Primary market and execution prices continue to use scale 6.
+    /// Primary market and execution prices use the fixed scale 9.
     ///
     /// Field 19: `reference_price_scale`
     #[serde(
@@ -9209,7 +9209,7 @@ pub mod __buffa {
         /// - price_ticks\[i\] \<-\> qty_scaled\[i\]
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapLevelsView<'a> {
-            /// Price levels in quote units scaled by 1e6.
+            /// Price levels in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: ::buffa::RepeatedView<'a, i64>,
@@ -9530,7 +9530,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Price levels in quote units scaled by 1e6.
+            /// Price levels in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -9582,7 +9582,7 @@ pub mod __buffa {
         /// Delete semantics: qty_scaled\[i\] = 0 means delete level at price_ticks\[i\].
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapDeltaLevelsView<'a> {
-            /// Price levels in quote units scaled by 1e6.
+            /// Price levels in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: ::buffa::RepeatedView<'a, i64>,
@@ -9904,7 +9904,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Price levels in quote units scaled by 1e6.
+            /// Price levels in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -9958,15 +9958,15 @@ pub mod __buffa {
             ///
             /// Field 1: `ts_sec`
             pub ts_sec: u64,
-            /// Best bid price in quote units scaled by 1e6.
+            /// Best bid price in quote units scaled by 1e9.
             ///
             /// Field 2: `best_bid_ticks`
             pub best_bid_ticks: i64,
-            /// Best ask price in quote units scaled by 1e6.
+            /// Best ask price in quote units scaled by 1e9.
             ///
             /// Field 3: `best_ask_ticks`
             pub best_ask_ticks: i64,
-            /// Mid price in quote units scaled by 1e6.
+            /// Mid price in quote units scaled by 1e9.
             ///
             /// Field 4: `mid_ticks`
             pub mid_ticks: i64,
@@ -10421,21 +10421,21 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// Best bid price in quote units scaled by 1e6.
+            /// Best bid price in quote units scaled by 1e9.
             ///
             /// Field 2: `best_bid_ticks`
             #[must_use]
             pub fn best_bid_ticks(&self) -> i64 {
                 self.0.reborrow().best_bid_ticks
             }
-            /// Best ask price in quote units scaled by 1e6.
+            /// Best ask price in quote units scaled by 1e9.
             ///
             /// Field 3: `best_ask_ticks`
             #[must_use]
             pub fn best_ask_ticks(&self) -> i64 {
                 self.0.reborrow().best_ask_ticks
             }
-            /// Mid price in quote units scaled by 1e6.
+            /// Mid price in quote units scaled by 1e9.
             ///
             /// Field 4: `mid_ticks`
             #[must_use]
@@ -11073,7 +11073,7 @@ pub mod __buffa {
             ///
             /// Field 10: `quantity_mode`
             pub quantity_mode: ::buffa::EnumValue<super::super::HeatmapQuantityMode>,
-            /// Effective bin stride for this symbol as a price delta in 1e-6 quote-unit
+            /// Effective bin stride for this symbol as a price delta in 1e-9 quote-unit
             /// ticks.
             ///
             /// Field 11: `effective_bin_ticks`
@@ -11696,7 +11696,7 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::HeatmapQuantityMode> {
                 self.0.reborrow().quantity_mode
             }
-            /// Effective bin stride for this symbol as a price delta in 1e-6 quote-unit
+            /// Effective bin stride for this symbol as a price delta in 1e-9 quote-unit
             /// ticks.
             ///
             /// Field 11: `effective_bin_ticks`
@@ -13389,7 +13389,7 @@ pub mod __buffa {
             ///
             /// Field 3: `is_buy`
             pub is_buy: bool,
-            /// Trade price in quote-asset units scaled by 1e6.
+            /// Trade price in quote-asset units scaled by 1e9.
             ///
             /// Field 4: `price_ticks`
             pub price_ticks: i64,
@@ -13756,7 +13756,7 @@ pub mod __buffa {
             pub fn is_buy(&self) -> bool {
                 self.0.reborrow().is_buy
             }
-            /// Trade price in quote-asset units scaled by 1e6.
+            /// Trade price in quote-asset units scaled by 1e9.
             ///
             /// Field 4: `price_ticks`
             #[must_use]
@@ -15367,7 +15367,7 @@ pub mod __buffa {
             ///
             /// Field 1: `ts_sec`
             pub ts_sec: u64,
-            /// Opening price in quote units. Primary candles use scale 6; composite
+            /// Opening price in quote units. Primary candles use scale 9; composite
             /// reference candles use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 2: `open`
@@ -15772,7 +15772,7 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// Opening price in quote units. Primary candles use scale 6; composite
+            /// Opening price in quote units. Primary candles use scale 9; composite
             /// reference candles use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 2: `open`
@@ -16338,22 +16338,22 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: ::buffa::RepeatedView<'a, u64>,
-            /// Opening primary-market prices use scale 6. Reference prices use the pair's
+            /// Opening primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 4: `open`
             pub open: ::buffa::RepeatedView<'a, i64>,
-            /// Highest primary-market prices use scale 6. Reference prices use the pair's
+            /// Highest primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 5: `high`
             pub high: ::buffa::RepeatedView<'a, i64>,
-            /// Lowest primary-market prices use scale 6. Reference prices use the pair's
+            /// Lowest primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 6: `low`
             pub low: ::buffa::RepeatedView<'a, i64>,
-            /// Closing primary-market prices use scale 6. Reference prices use the pair's
+            /// Closing primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 7: `close`
@@ -17350,7 +17350,7 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> &::buffa::RepeatedView<'_, u64> {
                 &self.0.reborrow().ts_sec
             }
-            /// Opening primary-market prices use scale 6. Reference prices use the pair's
+            /// Opening primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 4: `open`
@@ -17358,7 +17358,7 @@ pub mod __buffa {
             pub fn open(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().open
             }
-            /// Highest primary-market prices use scale 6. Reference prices use the pair's
+            /// Highest primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 5: `high`
@@ -17366,7 +17366,7 @@ pub mod __buffa {
             pub fn high(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().high
             }
-            /// Lowest primary-market prices use scale 6. Reference prices use the pair's
+            /// Lowest primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 6: `low`
@@ -17374,7 +17374,7 @@ pub mod __buffa {
             pub fn low(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().low
             }
-            /// Closing primary-market prices use scale 6. Reference prices use the pair's
+            /// Closing primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 7: `close`
@@ -17504,19 +17504,19 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: u64,
-            /// opening primary-market price in scale 6
+            /// opening primary-market price in scale 9
             ///
             /// Field 4: `open`
             pub open: i64,
-            /// highest primary-market price in scale 6
+            /// highest primary-market price in scale 9
             ///
             /// Field 5: `high`
             pub high: i64,
-            /// lowest primary-market price in scale 6
+            /// lowest primary-market price in scale 9
             ///
             /// Field 6: `low`
             pub low: i64,
-            /// closing primary-market price in scale 6
+            /// closing primary-market price in scale 9
             ///
             /// Field 7: `close`
             pub close: i64,
@@ -17940,28 +17940,28 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// opening primary-market price in scale 6
+            /// opening primary-market price in scale 9
             ///
             /// Field 4: `open`
             #[must_use]
             pub fn open(&self) -> i64 {
                 self.0.reborrow().open
             }
-            /// highest primary-market price in scale 6
+            /// highest primary-market price in scale 9
             ///
             /// Field 5: `high`
             #[must_use]
             pub fn high(&self) -> i64 {
                 self.0.reborrow().high
             }
-            /// lowest primary-market price in scale 6
+            /// lowest primary-market price in scale 9
             ///
             /// Field 6: `low`
             #[must_use]
             pub fn low(&self) -> i64 {
                 self.0.reborrow().low
             }
-            /// closing primary-market price in scale 6
+            /// closing primary-market price in scale 9
             ///
             /// Field 7: `close`
             #[must_use]
@@ -18799,7 +18799,7 @@ pub mod __buffa {
             /// Field 4: `quote_asset`
             pub quote_asset: &'a str,
             /// Minimum allowed price increment as a decimal string in quote-asset units.
-            /// Prices use 6 decimal places in scaled integer fields; for example "0.01"
+            /// Prices use 9 decimal places in scaled integer fields; for example "0.01"
             /// means orders must be priced in 0.01 quote-asset increments.
             ///
             /// Field 5: `tick_size`
@@ -18870,7 +18870,7 @@ pub mod __buffa {
             /// Field 18: `max_client_ref_drift_bps`
             pub max_client_ref_drift_bps: i32,
             /// Integer scale for composite reference prices in candle responses (0..18).
-            /// Primary market and execution prices continue to use scale 6.
+            /// Primary market and execution prices use the fixed scale 9.
             ///
             /// Field 19: `reference_price_scale`
             pub reference_price_scale: u32,
@@ -19694,7 +19694,7 @@ pub mod __buffa {
                 self.0.reborrow().quote_asset
             }
             /// Minimum allowed price increment as a decimal string in quote-asset units.
-            /// Prices use 6 decimal places in scaled integer fields; for example "0.01"
+            /// Prices use 9 decimal places in scaled integer fields; for example "0.01"
             /// means orders must be priced in 0.01 quote-asset increments.
             ///
             /// Field 5: `tick_size`
@@ -19813,7 +19813,7 @@ pub mod __buffa {
                 self.0.reborrow().max_client_ref_drift_bps
             }
             /// Integer scale for composite reference prices in candle responses (0..18).
-            /// Primary market and execution prices continue to use scale 6.
+            /// Primary market and execution prices use the fixed scale 9.
             ///
             /// Field 19: `reference_price_scale`
             #[must_use]
