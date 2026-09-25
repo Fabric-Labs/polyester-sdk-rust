@@ -36811,6 +36811,8 @@ pub enum AuthErrorCode {
     AUTH_SOCIAL_VERIFICATION_INVALID_STATE = 43i32,
     /// Sub-account authorization is expired, replaced, replayed, or invalid.
     AUTH_SUBACCOUNT_CHALLENGE_INVALID = 44i32,
+    /// Social account is already linked to another Polyester account.
+    AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED = 45i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -36945,6 +36947,9 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthSubaccountChallengeInvalid: Self = Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID;
+    ///Idiomatic alias for [`Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthSocialAccountAlreadyLinked: Self = Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -37100,6 +37105,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             44i32 => {
                 ::core::option::Option::Some(Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID)
             }
+            45i32 => {
+                ::core::option::Option::Some(Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -37163,6 +37171,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             }
             Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID => {
                 "AUTH_SUBACCOUNT_CHALLENGE_INVALID"
+            }
+            Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED => {
+                "AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED"
             }
         }
     }
@@ -37300,6 +37311,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_SUBACCOUNT_CHALLENGE_INVALID" => {
                 ::core::option::Option::Some(Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID)
             }
+            "AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED" => {
+                ::core::option::Option::Some(Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -37349,6 +37363,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_SOCIAL_VERIFICATION_EXPIRED,
             Self::AUTH_SOCIAL_VERIFICATION_INVALID_STATE,
             Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID,
+            Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED,
         ]
     }
 }
@@ -42731,6 +42746,17 @@ pub struct SocialVerification {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub last_error: ::buffa::alloc::string::String,
+    /// Stable machine-readable error code for the current failed verification.
+    /// AUTH_UNSPECIFIED when no typed error applies.
+    ///
+    /// Field 16: `error_code`
+    #[serde(
+        rename = "errorCode",
+        alias = "error_code",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub error_code: ::buffa::EnumValue<AuthErrorCode>,
     /// Time in UTC when this verification state last changed.
     ///
     /// Field 15: `updated_at`
@@ -42759,6 +42785,7 @@ impl ::core::fmt::Debug for SocialVerification {
             .field("verified_at", &self.verified_at)
             .field("attempts", &self.attempts)
             .field("last_error", &self.last_error)
+            .field("error_code", &self.error_code)
             .field("updated_at", &self.updated_at)
             .finish()
     }
@@ -42860,6 +42887,12 @@ impl ::buffa::Message for SocialVerification {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        {
+            let val = self.error_code.to_i32();
+            if val != 0 {
+                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -42921,6 +42954,12 @@ impl ::buffa::Message for SocialVerification {
         if self.updated_at.is_set() {
             ::buffa::types::put_len_delimited_header(15u32, __cache.consume_next(), buf);
             self.updated_at.write_to(__cache, buf);
+        }
+        {
+            let val = self.error_code.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(16u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -43048,6 +43087,15 @@ impl ::buffa::Message for SocialVerification {
                     ctx,
                 )?;
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.error_code = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -43069,6 +43117,7 @@ impl ::buffa::Message for SocialVerification {
         self.id = 0i64;
         self.challenge_code.clear();
         self.updated_at = ::buffa::MessageField::none();
+        self.error_code = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -114832,6 +114881,11 @@ pub mod __buffa {
             ///
             /// Field 10: `last_error`
             pub last_error: &'a str,
+            /// Stable machine-readable error code for the current failed verification.
+            /// AUTH_UNSPECIFIED when no typed error applies.
+            ///
+            /// Field 16: `error_code`
+            pub error_code: ::buffa::EnumValue<super::super::AuthErrorCode>,
             /// Time in UTC when this verification state last changed.
             ///
             /// Field 15: `updated_at`
@@ -115015,6 +115069,15 @@ pub mod __buffa {
                         )?;
                         view.last_error = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.error_code = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     15u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -115102,6 +115165,7 @@ pub mod __buffa {
                     },
                     attempts: self.attempts,
                     last_error: self.last_error.to_string(),
+                    error_code: self.error_code,
                     updated_at: match self.updated_at.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -115205,6 +115269,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                {
+                    let val = self.error_code.to_i32();
+                    if val != 0 {
+                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -115283,6 +115353,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.updated_at.write_to(__cache, buf);
+                }
+                {
+                    let val = self.error_code.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(16u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -115365,6 +115441,11 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.last_error) {
                     __map.serialize_entry("lastError", self.last_error)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.error_code,
+                ) {
+                    __map.serialize_entry("errorCode", &self.error_code)?;
                 }
                 {
                     if let ::core::option::Option::Some(__v) = self
@@ -115574,6 +115655,14 @@ pub mod __buffa {
             #[must_use]
             pub fn last_error(&self) -> &'_ str {
                 self.0.reborrow().last_error
+            }
+            /// Stable machine-readable error code for the current failed verification.
+            /// AUTH_UNSPECIFIED when no typed error applies.
+            ///
+            /// Field 16: `error_code`
+            #[must_use]
+            pub fn error_code(&self) -> ::buffa::EnumValue<super::super::AuthErrorCode> {
+                self.0.reborrow().error_code
             }
             /// Time in UTC when this verification state last changed.
             ///
