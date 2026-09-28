@@ -849,6 +849,8 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS = 50i32,
     /// Account policy had halted trading.
     TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED = 51i32,
+    /// The maximum slippage could not produce a valid execution price bound.
+    TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID = 53i32,
     /// The terminal state did not contain a failure reason.
     TRIGGER_FAILURE_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure caused the trigger to fail.
@@ -969,6 +971,9 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const PolicyTradingHalted: Self = Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxSlippageInvalid: Self = Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE;
@@ -1227,6 +1232,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED,
                 )
             }
+            53i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID,
+                )
+            }
             998i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -1352,6 +1362,9 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             }
             Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED => {
                 "TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID => {
+                "TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID"
             }
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE"
@@ -1523,6 +1536,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED,
                 )
             }
+            "TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID,
+                )
+            }
             "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -1574,6 +1592,7 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL,
             Self::TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS,
             Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED,
+            Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID,
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR,
         ]
