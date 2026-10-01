@@ -377,7 +377,7 @@ pub const __GET_ORDER_BOOK_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct PriceLevel {
-    /// Price in quote units scaled by 1e6.
+    /// Price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -1423,7 +1423,7 @@ pub mod __buffa {
         /// REST surfaces expose decimal strings via DTO conversion.
         #[derive(Clone, Debug, Default)]
         pub struct PriceLevelView<'a> {
-            /// Price in quote units scaled by 1e6.
+            /// Price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -1670,7 +1670,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Price in quote units scaled by 1e6.
+            /// Price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]

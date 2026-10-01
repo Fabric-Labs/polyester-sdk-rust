@@ -14112,6 +14112,7 @@ pub trait SocialVerificationService: Send + Sync + 'static {
         >,
     > + Send;
     /// Get current verification status for the caller.
+    /// A failed verification uses error_code for its machine-readable outcome.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

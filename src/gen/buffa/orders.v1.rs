@@ -2429,7 +2429,7 @@ impl ::buffa::Enumeration for ModifyActionTaken {
 pub enum BatchReplaceAdmissionStatus {
     /// Admission status is unavailable.
     BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED = 0i32,
-    /// Every requested replacement was admitted.
+    /// Every requested operation was admitted, including cancel-only outcomes.
     BATCH_REPLACE_ADMISSION_STATUS_ADMITTED = 1i32,
     /// Some requested replacements were admitted and others were rejected.
     BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED = 2i32,
@@ -2629,7 +2629,7 @@ impl ::buffa::Enumeration for BatchReplaceAdmissionStatus {
 pub enum BatchReplaceItemAdmissionStatus {
     /// Item admission status is unavailable.
     BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED = 0i32,
-    /// The replacement was admitted and handed to execution.
+    /// The operation was admitted and handed to execution. Check action_taken for cancel-only outcomes.
     BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED = 1i32,
     /// The replacement was rejected before execution handoff.
     BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED = 2i32,
@@ -2816,7 +2816,7 @@ impl ::buffa::Enumeration for BatchReplaceItemAdmissionStatus {
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct MarketIoc {
-    /// Optional client reference price in quote units scaled by 1e6. When
+    /// Optional client reference price in quote units scaled by 1e9. When
     /// omitted, admission uses server-side reference pricing.
     ///
     /// Field 3: `client_ref_price_ticks`
@@ -2869,7 +2869,7 @@ impl ::buffa::Message for MarketIoc {
         if let ::core::option::Option::Some(ref v) = self.max_slippage {
             match v {
                 __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(v) => {
-                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                 }
                 __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageBps(v) => {
                     size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
@@ -2895,7 +2895,7 @@ impl ::buffa::Message for MarketIoc {
         if let ::core::option::Option::Some(ref v) = self.max_slippage {
             match v {
                 __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(x) => {
-                    ::buffa::types::put_int32_field(1u32, *x, buf);
+                    ::buffa::types::put_int64_field(1u32, *x, buf);
                 }
                 __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageBps(x) => {
                     ::buffa::types::put_int32_field(2u32, *x, buf);
@@ -2925,7 +2925,7 @@ impl ::buffa::Message for MarketIoc {
                 )?;
                 self.max_slippage = ::core::option::Option::Some(
                     __buffa::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
-                        ::buffa::types::decode_int32(buf)?,
+                        ::buffa::types::decode_int64(buf)?,
                     ),
                 );
             }
@@ -3008,15 +3008,15 @@ impl<'de> serde::Deserialize<'de> for MarketIoc {
                         "maxSlippageTicks" | "max_slippage_ticks" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
+                                type Value = i64;
                                 fn deserialize<D: serde::Deserializer<'de>>(
                                     self,
                                     d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
                                 }
                             }
-                            let v: ::core::option::Option<i32> = map
+                            let v: ::core::option::Option<i64> = map
                                 .next_value_seed(
                                     ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
                                 )?;
@@ -3110,7 +3110,7 @@ pub mod market_ioc {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitGtc {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -3265,7 +3265,7 @@ pub const __LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitGtd {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -3454,7 +3454,7 @@ pub const __LIMIT_GTD_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitIoc {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -3580,7 +3580,7 @@ pub const __LIMIT_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitFok {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -3728,8 +3728,9 @@ pub struct OrderIntent {
     pub side: ::buffa::EnumValue<Side>,
     /// Optional account-scoped identifier for correlation, lookup, and cancellation.
     /// While this identifier is retained, reuse returns
-    /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID, even for identical input, a rejected
-    /// request, or a terminal order. CreateOrder does not replay the earlier result.
+    /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID for every new submission, even with the
+    /// same payload. This identifier enables GetOrder reconciliation after a
+    /// timeout; it does not provide exact replay.
     ///
     /// Field 20: `client_order_id`
     #[serde(
@@ -4578,7 +4579,11 @@ pub mod order_intent {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::order_intent::Execution as ExecutionView;
 }
-/// CreateOrderRequest submits one order intent for admission.
+/// CreateOrderRequest submits one independent order intent for admission.
+/// Single creates do not provide exact replay and are not automatically retried
+/// after an ambiguous transport timeout. Supply client_order_id to reconcile
+/// through GetOrder; without it, a lost acknowledgement may leave the outcome
+/// unknown. An immediate lookup miss does not prove that admission failed.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -5351,7 +5356,7 @@ pub struct PreviewOrderResponse {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub resolved_base_qty_scaled: ::core::option::Option<i64>,
-    /// Protective execution boundary in quote units scaled by 1e6. This is not an
+    /// Protective execution boundary in quote units scaled by 1e9. This is not an
     /// expected fill price. Present when price protection was resolved.
     ///
     /// Field 4: `protected_price_bound_ticks`
@@ -6787,7 +6792,7 @@ pub const __RISK_MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct RiskLimitGtc {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -7191,7 +7196,7 @@ pub mod risk_execution {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TakeProfitPolicy {
-    /// Trigger price in quote units scaled by 1e6.
+    /// Trigger price in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -7355,7 +7360,7 @@ pub const __TAKE_PROFIT_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct StopLossPolicy {
-    /// Trigger price in quote units scaled by 1e6.
+    /// Trigger price in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -7522,7 +7527,7 @@ pub const __STOP_LOSS_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
 pub struct TrailingStopPolicy {
     /// Optional activation price: trailing only starts after this price is
     /// reached. If omitted, trailing starts immediately after the parent order
-    /// fills. Expressed in quote units scaled by 1e6.
+    /// fills. Expressed in quote units scaled by 1e9.
     ///
     /// Field 3: `activation_price_ticks`
     #[serde(
@@ -7603,7 +7608,7 @@ impl ::buffa::Message for TrailingStopPolicy {
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
                     v,
                 ) => {
-                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                 }
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageBps(v) => {
                     size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
@@ -7642,7 +7647,7 @@ impl ::buffa::Message for TrailingStopPolicy {
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
                     x,
                 ) => {
-                    ::buffa::types::put_int32_field(6u32, *x, buf);
+                    ::buffa::types::put_int64_field(6u32, *x, buf);
                 }
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageBps(x) => {
                     ::buffa::types::put_int32_field(7u32, *x, buf);
@@ -7698,7 +7703,7 @@ impl ::buffa::Message for TrailingStopPolicy {
                 )?;
                 self.max_slippage = ::core::option::Option::Some(
                     __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
-                        ::buffa::types::decode_int32(buf)?,
+                        ::buffa::types::decode_int64(buf)?,
                     ),
                 );
             }
@@ -7838,15 +7843,15 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                         "maxSlippageTicks" | "max_slippage_ticks" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
+                                type Value = i64;
                                 fn deserialize<D: serde::Deserializer<'de>>(
                                     self,
                                     d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
                                 }
                             }
-                            let v: ::core::option::Option<i32> = map
+                            let v: ::core::option::Option<i64> = map
                                 .next_value_seed(
                                     ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
                                 )?;
@@ -10458,9 +10463,10 @@ pub struct BatchCreateOrdersRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Required idempotency key for the entire ordered batch. Reusing it with the
-    /// same payload replays the original per-item results; reusing it with a
-    /// different payload returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
+    /// Required account-scoped idempotency key for the entire ordered batch.
+    /// Reusing it with the same payload within 15 minutes replays the original
+    /// per-item results and timestamp. Reusing it with a different payload during
+    /// that window returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
     ///
     /// Field 2: `request_id`
     #[serde(
@@ -10918,7 +10924,7 @@ pub struct ModifyOrderRequest {
     )]
     pub request_id: ::buffa::alloc::string::String,
     /// Patch fields (presence-based).
-    /// New limit price in quote units scaled by 1e6. Required for price changes.
+    /// New limit price in quote units scaled by 1e9. Required for price changes.
     ///
     /// Field 5: `new_price_ticks`
     #[serde(
@@ -11937,7 +11943,7 @@ pub const __MODIFY_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct BatchReplaceOrderItem {
-    /// New limit price in quote units scaled by 1e6.
+    /// New limit price in quote units scaled by 1e9.
     ///
     /// Field 3: `new_price_ticks`
     #[serde(
@@ -12426,7 +12432,7 @@ pub struct BatchReplaceAdmissionItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub old_order_id: u64,
-    /// Assigned successor order ID. Zero when rejected before assignment.
+    /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
     ///
     /// Field 4: `replacement_order_id`
     #[serde(
@@ -12463,6 +12469,18 @@ pub struct BatchReplaceAdmissionItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub error: ::buffa::MessageField<ErrorDetail>,
+    /// REPLACED admits a successor. AMENDED cancels the original order's remaining quantity
+    /// without a successor; keep tracking old_order_id until its terminal state is confirmed.
+    /// Unspecified for rejected items.
+    ///
+    /// Field 8: `action_taken`
+    #[serde(
+        rename = "actionTaken",
+        alias = "action_taken",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub action_taken: ::buffa::EnumValue<ModifyActionTaken>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -12477,6 +12495,7 @@ impl ::core::fmt::Debug for BatchReplaceAdmissionItem {
             .field("client_order_id", &self.client_order_id)
             .field("code", &self.code)
             .field("error", &self.error)
+            .field("action_taken", &self.action_taken)
             .finish()
     }
 }
@@ -12536,6 +12555,12 @@ impl ::buffa::Message for BatchReplaceAdmissionItem {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        {
+            let val = self.action_taken.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -12570,6 +12595,12 @@ impl ::buffa::Message for BatchReplaceAdmissionItem {
         if self.error.is_set() {
             ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
             self.error.write_to(__cache, buf);
+        }
+        {
+            let val = self.action_taken.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -12639,6 +12670,15 @@ impl ::buffa::Message for BatchReplaceAdmissionItem {
                     ctx,
                 )?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.action_taken = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -12654,6 +12694,7 @@ impl ::buffa::Message for BatchReplaceAdmissionItem {
         self.client_order_id.clear();
         self.code.clear();
         self.error = ::buffa::MessageField::none();
+        self.action_taken = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -14423,13 +14464,13 @@ impl ::buffa::Enumeration for OrderStatus {
 pub enum BatchReplacePhase {
     /// Phase is unavailable.
     BATCH_REPLACE_PHASE_UNSPECIFIED = 0i32,
-    /// The replacement was admitted and handed to execution.
+    /// The operation was admitted and handed to execution, including cancel-only outcomes.
     BATCH_REPLACE_PHASE_ADMITTED = 1i32,
     /// The successor order is active.
     BATCH_REPLACE_PHASE_WORKING = 2i32,
     /// The replacement was rejected.
     BATCH_REPLACE_PHASE_REJECTED = 3i32,
-    /// The successor reached a terminal order state.
+    /// The successor, or original order for a cancel-only outcome, reached a terminal state.
     BATCH_REPLACE_PHASE_TERMINAL = 4i32,
 }
 impl BatchReplacePhase {
@@ -16724,7 +16765,7 @@ pub struct Order {
     )]
     pub leaves_qty_scaled: i64,
     /// Average execution price across the lineage through this generation,
-    /// in quote units scaled by 1e6. Zero if no fills.
+    /// in quote units scaled by 1e9. Zero if no fills.
     ///
     /// Field 14: `avg_price_ticks`
     #[serde(
@@ -16734,7 +16775,7 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub avg_price_ticks: i64,
-    /// Limit price in quote units scaled by 1e6. Zero for MARKET orders.
+    /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
     ///
     /// Field 15: `price_ticks`
     #[serde(
@@ -16804,7 +16845,7 @@ pub struct Order {
     )]
     pub origin: ::buffa::MessageField<OrderOrigin>,
     /// Optional client-side reference price used for MARKET slippage protection,
-    /// in quote units scaled by 1e6.
+    /// in quote units scaled by 1e9.
     ///
     /// Field 23: `market_client_ref_price_ticks`
     #[serde(
@@ -16814,16 +16855,17 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub market_client_ref_price_ticks: i64,
-    /// Optional MARKET max slippage as a price delta in 1e-6 quote-unit ticks.
+    /// Non-negative MARKET maximum absolute price delta in Q9 execution-price ticks
+    /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
     ///
     /// Field 24: `market_max_slippage_ticks`
     #[serde(
         rename = "marketMaxSlippageTicks",
         alias = "market_max_slippage_ticks",
-        with = "::buffa::json_helpers::int32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
-    pub market_max_slippage_ticks: i32,
+    pub market_max_slippage_ticks: i64,
     /// Optional MARKET max slippage in basis points (1 bp = 0.01%).
     ///
     /// Field 25: `market_max_slippage_bps`
@@ -17073,10 +17115,10 @@ impl ::buffa::Message for Order {
                         self.market_client_ref_price_ticks,
                     ) as u32;
         }
-        if self.market_max_slippage_ticks != 0i32 {
+        if self.market_max_slippage_ticks != 0i64 {
             size
                 += 2u32
-                    + ::buffa::types::int32_encoded_len(self.market_max_slippage_ticks)
+                    + ::buffa::types::int64_encoded_len(self.market_max_slippage_ticks)
                         as u32;
         }
         if self.market_max_slippage_bps != 0i32 {
@@ -17216,8 +17258,8 @@ impl ::buffa::Message for Order {
                 buf,
             );
         }
-        if self.market_max_slippage_ticks != 0i32 {
-            ::buffa::types::put_int32_field(24u32, self.market_max_slippage_ticks, buf);
+        if self.market_max_slippage_ticks != 0i64 {
+            ::buffa::types::put_int64_field(24u32, self.market_max_slippage_ticks, buf);
         }
         if self.market_max_slippage_bps != 0i32 {
             ::buffa::types::put_int32_field(25u32, self.market_max_slippage_bps, buf);
@@ -17432,7 +17474,7 @@ impl ::buffa::Message for Order {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.market_max_slippage_ticks = ::buffa::types::decode_int32(buf)?;
+                self.market_max_slippage_ticks = ::buffa::types::decode_int64(buf)?;
             }
             25u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -17523,7 +17565,7 @@ impl ::buffa::Message for Order {
         self.attached_risk = ::buffa::MessageField::none();
         self.origin = ::buffa::MessageField::none();
         self.market_client_ref_price_ticks = 0i64;
-        self.market_max_slippage_ticks = 0i32;
+        self.market_max_slippage_ticks = 0i64;
         self.market_max_slippage_bps = 0i32;
         self.version = 0u32;
         self.batch_request_id = 0u64;
@@ -17617,7 +17659,7 @@ pub struct UserTrade {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_maker: bool,
-    /// Execution price in quote units scaled by 1e6.
+    /// Execution price in quote units scaled by 1e9.
     ///
     /// Field 7: `price_ticks`
     #[serde(
@@ -19684,7 +19726,8 @@ pub struct GetUserTradesRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub after_match_id: ::core::option::Option<u64>,
-    /// Inclusive generation ceiling. Does not freeze an actively filling generation.
+    /// Inclusive generation ceiling; requires lineage_id.
+    /// Does not freeze an actively filling generation.
     ///
     /// Field 17: `through_generation`
     #[serde(
@@ -21559,7 +21602,7 @@ pub struct BatchReplaceStatusItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub old_order_id: u64,
-    /// Assigned successor order ID. Zero when rejected before assignment.
+    /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
     ///
     /// Field 4: `replacement_order_id`
     #[serde(
@@ -21569,7 +21612,7 @@ pub struct BatchReplaceStatusItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub replacement_order_id: u64,
-    /// Current successor order status when available.
+    /// Current successor status, or original order status for a cancel-only outcome, when available.
     ///
     /// Field 5: `order_status`
     #[serde(
@@ -21598,6 +21641,17 @@ pub struct BatchReplaceStatusItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub updated_ts_ns: u64,
+    /// REPLACED admits a successor. AMENDED is cancel-only: no successor exists and
+    /// order_status describes old_order_id. Unspecified for rejected items.
+    ///
+    /// Field 8: `action_taken`
+    #[serde(
+        rename = "actionTaken",
+        alias = "action_taken",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub action_taken: ::buffa::EnumValue<ModifyActionTaken>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -21612,6 +21666,7 @@ impl ::core::fmt::Debug for BatchReplaceStatusItem {
             .field("order_status", &self.order_status)
             .field("code", &self.code)
             .field("updated_ts_ns", &self.updated_ts_ns)
+            .field("action_taken", &self.action_taken)
             .finish()
     }
 }
@@ -21667,6 +21722,12 @@ impl ::buffa::Message for BatchReplaceStatusItem {
         if self.updated_ts_ns != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.updated_ts_ns) as u32;
         }
+        {
+            let val = self.action_taken.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -21703,6 +21764,12 @@ impl ::buffa::Message for BatchReplaceStatusItem {
         }
         if self.updated_ts_ns != 0u64 {
             ::buffa::types::put_uint64_field(7u32, self.updated_ts_ns, buf);
+        }
+        {
+            let val = self.action_taken.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -21770,6 +21837,15 @@ impl ::buffa::Message for BatchReplaceStatusItem {
                 )?;
                 self.updated_ts_ns = ::buffa::types::decode_uint64(buf)?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.action_taken = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -21785,6 +21861,7 @@ impl ::buffa::Message for BatchReplaceStatusItem {
         self.order_status = ::buffa::EnumValue::from(0);
         self.code.clear();
         self.updated_ts_ns = 0u64;
+        self.action_taken = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -22138,7 +22215,7 @@ pub mod __buffa {
         /// immediate-or-cancel and therefore cannot rest or be post-only.
         #[derive(Clone, Debug, Default)]
         pub struct MarketIocView<'a> {
-            /// Optional client reference price in quote units scaled by 1e6. When
+            /// Optional client reference price in quote units scaled by 1e9. When
             /// omitted, admission uses server-side reference pricing.
             ///
             /// Field 3: `client_ref_price_ticks`
@@ -22195,7 +22272,7 @@ pub mod __buffa {
                         )?;
                         view.max_slippage = Some(
                             super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
-                                ::buffa::types::decode_int32(&mut cur)?,
+                                ::buffa::types::decode_int64(&mut cur)?,
                             ),
                         );
                     }
@@ -22272,7 +22349,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
                             v,
                         ) => {
-                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                         }
                         super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
                             v,
@@ -22304,7 +22381,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageTicks(
                             x,
                         ) => {
-                            ::buffa::types::put_int32_field(1u32, *x, buf);
+                            ::buffa::types::put_int64_field(1u32, *x, buf);
                         }
                         super::super::__buffa::view::oneof::market_ioc::MaxSlippage::MaxSlippageBps(
                             x,
@@ -22465,7 +22542,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional client reference price in quote units scaled by 1e6. When
+            /// Optional client reference price in quote units scaled by 1e9. When
             /// omitted, admission uses server-side reference pricing.
             ///
             /// Field 3: `client_ref_price_ticks`
@@ -22516,7 +22593,7 @@ pub mod __buffa {
         /// LimitGtc configures a good-til-canceled limit order.
         #[derive(Clone, Debug, Default)]
         pub struct LimitGtcView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -22758,7 +22835,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -22808,7 +22885,7 @@ pub mod __buffa {
         /// exact expiry time.
         #[derive(Clone, Debug, Default)]
         pub struct LimitGtdView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -23112,7 +23189,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -23173,7 +23250,7 @@ pub mod __buffa {
         /// LimitIoc configures an immediate-or-cancel limit order.
         #[derive(Clone, Debug, Default)]
         pub struct LimitIocView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -23393,7 +23470,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -23434,7 +23511,7 @@ pub mod __buffa {
         /// LimitFok configures a fill-or-kill limit order.
         #[derive(Clone, Debug, Default)]
         pub struct LimitFokView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -23654,7 +23731,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -23706,8 +23783,9 @@ pub mod __buffa {
             pub side: ::buffa::EnumValue<super::super::Side>,
             /// Optional account-scoped identifier for correlation, lookup, and cancellation.
             /// While this identifier is retained, reuse returns
-            /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID, even for identical input, a rejected
-            /// request, or a terminal order. CreateOrder does not replay the earlier result.
+            /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID for every new submission, even with the
+            /// same payload. This identifier enables GetOrder reconciliation after a
+            /// timeout; it does not provide exact replay.
             ///
             /// Field 20: `client_order_id`
             pub client_order_id: &'a str,
@@ -24572,8 +24650,9 @@ pub mod __buffa {
             }
             /// Optional account-scoped identifier for correlation, lookup, and cancellation.
             /// While this identifier is retained, reuse returns
-            /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID, even for identical input, a rejected
-            /// request, or a terminal order. CreateOrder does not replay the earlier result.
+            /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID for every new submission, even with the
+            /// same payload. This identifier enables GetOrder reconciliation after a
+            /// timeout; it does not provide exact replay.
             ///
             /// Field 20: `client_order_id`
             #[must_use]
@@ -24657,7 +24736,11 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// CreateOrderRequest submits one order intent for admission.
+        /// CreateOrderRequest submits one independent order intent for admission.
+        /// Single creates do not provide exact replay and are not automatically retried
+        /// after an ambiguous transport timeout. Supply client_order_id to reconcile
+        /// through GetOrder; without it, a lost acknowledgement may leave the outcome
+        /// unknown. An immediate lookup miss does not prove that admission failed.
         #[derive(Clone, Debug, Default)]
         pub struct CreateOrderRequestView<'a> {
             /// Target sub-account numeric ID. When omitted, uses caller's root account.
@@ -25982,7 +26065,7 @@ pub mod __buffa {
             ///
             /// Field 3: `resolved_base_qty_scaled`
             pub resolved_base_qty_scaled: ::core::option::Option<i64>,
-            /// Protective execution boundary in quote units scaled by 1e6. This is not an
+            /// Protective execution boundary in quote units scaled by 1e9. This is not an
             /// expected fill price. Present when price protection was resolved.
             ///
             /// Field 4: `protected_price_bound_ticks`
@@ -26403,7 +26486,7 @@ pub mod __buffa {
             pub fn resolved_base_qty_scaled(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().resolved_base_qty_scaled
             }
-            /// Protective execution boundary in quote units scaled by 1e6. This is not an
+            /// Protective execution boundary in quote units scaled by 1e9. This is not an
             /// expected fill price. Present when price protection was resolved.
             ///
             /// Field 4: `protected_price_bound_ticks`
@@ -28255,7 +28338,7 @@ pub mod __buffa {
         /// child. Attached risk legs do not support post-only.
         #[derive(Clone, Debug, Default)]
         pub struct RiskLimitGtcView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -28484,7 +28567,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -28928,7 +29011,7 @@ pub mod __buffa {
         /// last trade price, arms after the parent fills, and submits the selected child.
         #[derive(Clone, Debug, Default)]
         pub struct TakeProfitPolicyView<'a> {
-            /// Trigger price in quote units scaled by 1e6.
+            /// Trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
@@ -29224,7 +29307,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger price in quote units scaled by 1e6.
+            /// Trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
@@ -29277,7 +29360,7 @@ pub mod __buffa {
         /// trade price, arms after the parent fills, and submits the selected child.
         #[derive(Clone, Debug, Default)]
         pub struct StopLossPolicyView<'a> {
-            /// Trigger price in quote units scaled by 1e6.
+            /// Trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
@@ -29573,7 +29656,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger price in quote units scaled by 1e6.
+            /// Trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
@@ -29629,7 +29712,7 @@ pub mod __buffa {
         pub struct TrailingStopPolicyView<'a> {
             /// Optional activation price: trailing only starts after this price is
             /// reached. If omitted, trailing starts immediately after the parent order
-            /// fills. Expressed in quote units scaled by 1e6.
+            /// fills. Expressed in quote units scaled by 1e9.
             ///
             /// Field 3: `activation_price_ticks`
             pub activation_price_ticks: i64,
@@ -29710,7 +29793,7 @@ pub mod __buffa {
                         )?;
                         view.max_slippage = Some(
                             super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
-                                ::buffa::types::decode_int32(&mut cur)?,
+                                ::buffa::types::decode_int64(&mut cur)?,
                             ),
                         );
                     }
@@ -29833,7 +29916,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
                             v,
                         ) => {
-                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                         }
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageBps(
                             v,
@@ -29879,7 +29962,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
                             x,
                         ) => {
-                            ::buffa::types::put_int32_field(6u32, *x, buf);
+                            ::buffa::types::put_int64_field(6u32, *x, buf);
                         }
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageBps(
                             x,
@@ -30062,7 +30145,7 @@ pub mod __buffa {
             }
             /// Optional activation price: trailing only starts after this price is
             /// reached. If omitted, trailing starts immediately after the parent order
-            /// fills. Expressed in quote units scaled by 1e6.
+            /// fills. Expressed in quote units scaled by 1e9.
             ///
             /// Field 3: `activation_price_ticks`
             #[must_use]
@@ -33677,9 +33760,10 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Required idempotency key for the entire ordered batch. Reusing it with the
-            /// same payload replays the original per-item results; reusing it with a
-            /// different payload returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
+            /// Required account-scoped idempotency key for the entire ordered batch.
+            /// Reusing it with the same payload within 15 minutes replays the original
+            /// per-item results and timestamp. Reusing it with a different payload during
+            /// that window returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
             ///
             /// Field 2: `request_id`
             pub request_id: &'a str,
@@ -33987,9 +34071,10 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Required idempotency key for the entire ordered batch. Reusing it with the
-            /// same payload replays the original per-item results; reusing it with a
-            /// different payload returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
+            /// Required account-scoped idempotency key for the entire ordered batch.
+            /// Reusing it with the same payload within 15 minutes replays the original
+            /// per-item results and timestamp. Reusing it with a different payload during
+            /// that window returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
             ///
             /// Field 2: `request_id`
             #[must_use]
@@ -34542,7 +34627,7 @@ pub mod __buffa {
             /// Field 4: `request_id`
             pub request_id: &'a str,
             /// Patch fields (presence-based).
-            /// New limit price in quote units scaled by 1e6. Required for price changes.
+            /// New limit price in quote units scaled by 1e9. Required for price changes.
             ///
             /// Field 5: `new_price_ticks`
             pub new_price_ticks: ::core::option::Option<i64>,
@@ -35103,7 +35188,7 @@ pub mod __buffa {
                 self.0.reborrow().request_id
             }
             /// Patch fields (presence-based).
-            /// New limit price in quote units scaled by 1e6. Required for price changes.
+            /// New limit price in quote units scaled by 1e9. Required for price changes.
             ///
             /// Field 5: `new_price_ticks`
             #[must_use]
@@ -35773,7 +35858,7 @@ pub mod __buffa {
         /// BatchReplaceOrderItem identifies one replacement inside a quote-refresh batch.
         #[derive(Clone, Debug, Default)]
         pub struct BatchReplaceOrderItemView<'a> {
-            /// New limit price in quote units scaled by 1e6.
+            /// New limit price in quote units scaled by 1e9.
             ///
             /// Field 3: `new_price_ticks`
             pub new_price_ticks: ::core::option::Option<i64>,
@@ -36216,7 +36301,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// New limit price in quote units scaled by 1e6.
+            /// New limit price in quote units scaled by 1e9.
             ///
             /// Field 3: `new_price_ticks`
             #[must_use]
@@ -36310,7 +36395,7 @@ pub mod __buffa {
             ///
             /// Field 3: `old_order_id`
             pub old_order_id: u64,
-            /// Assigned successor order ID. Zero when rejected before assignment.
+            /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
             ///
             /// Field 4: `replacement_order_id`
             pub replacement_order_id: u64,
@@ -36328,6 +36413,12 @@ pub mod __buffa {
             pub error: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ErrorDetailView<'a>,
             >,
+            /// REPLACED admits a successor. AMENDED cancels the original order's remaining quantity
+            /// without a successor; keep tracking old_order_id until its terminal state is confirmed.
+            /// Unspecified for rejected items.
+            ///
+            /// Field 8: `action_taken`
+            pub action_taken: ::buffa::EnumValue<super::super::ModifyActionTaken>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BatchReplaceAdmissionItemView<'a> {
@@ -36432,6 +36523,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.action_taken = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -36475,6 +36575,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    action_taken: self.action_taken,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -36523,6 +36624,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                {
+                    let val = self.action_taken.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -36566,6 +36673,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.error.write_to(__cache, buf);
+                }
+                {
+                    let val = self.action_taken.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(8u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -36624,6 +36737,11 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.error.as_option() {
                         __map.serialize_entry("error", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.action_taken,
+                ) {
+                    __map.serialize_entry("actionTaken", &self.action_taken)?;
                 }
                 __map.end()
             }
@@ -36748,7 +36866,7 @@ pub mod __buffa {
             pub fn old_order_id(&self) -> u64 {
                 self.0.reborrow().old_order_id
             }
-            /// Assigned successor order ID. Zero when rejected before assignment.
+            /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
             ///
             /// Field 4: `replacement_order_id`
             #[must_use]
@@ -36779,6 +36897,17 @@ pub mod __buffa {
                 super::super::__buffa::view::ErrorDetailView<'_>,
             > {
                 &self.0.reborrow().error
+            }
+            /// REPLACED admits a successor. AMENDED cancels the original order's remaining quantity
+            /// without a successor; keep tracking old_order_id until its terminal state is confirmed.
+            /// Unspecified for rejected items.
+            ///
+            /// Field 8: `action_taken`
+            #[must_use]
+            pub fn action_taken(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::ModifyActionTaken> {
+                self.0.reborrow().action_taken
             }
         }
         impl ::core::convert::From<
@@ -42265,11 +42394,11 @@ pub mod __buffa {
             /// Field 20: `leaves_qty_scaled`
             pub leaves_qty_scaled: i64,
             /// Average execution price across the lineage through this generation,
-            /// in quote units scaled by 1e6. Zero if no fills.
+            /// in quote units scaled by 1e9. Zero if no fills.
             ///
             /// Field 14: `avg_price_ticks`
             pub avg_price_ticks: i64,
-            /// Limit price in quote units scaled by 1e6. Zero for MARKET orders.
+            /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
             ///
             /// Field 15: `price_ticks`
             pub price_ticks: i64,
@@ -42304,14 +42433,15 @@ pub mod __buffa {
                 super::super::__buffa::view::OrderOriginView<'a>,
             >,
             /// Optional client-side reference price used for MARKET slippage protection,
-            /// in quote units scaled by 1e6.
+            /// in quote units scaled by 1e9.
             ///
             /// Field 23: `market_client_ref_price_ticks`
             pub market_client_ref_price_ticks: i64,
-            /// Optional MARKET max slippage as a price delta in 1e-6 quote-unit ticks.
+            /// Non-negative MARKET maximum absolute price delta in Q9 execution-price ticks
+            /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
             ///
             /// Field 24: `market_max_slippage_ticks`
-            pub market_max_slippage_ticks: i32,
+            pub market_max_slippage_ticks: i64,
             /// Optional MARKET max slippage in basis points (1 bp = 0.01%).
             ///
             /// Field 25: `market_max_slippage_bps`
@@ -42599,7 +42729,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.market_max_slippage_ticks = ::buffa::types::decode_int32(
+                        view.market_max_slippage_ticks = ::buffa::types::decode_int64(
                             &mut cur,
                         )?;
                     }
@@ -42913,10 +43043,10 @@ pub mod __buffa {
                                 self.market_client_ref_price_ticks,
                             ) as u32;
                 }
-                if self.market_max_slippage_ticks != 0i32 {
+                if self.market_max_slippage_ticks != 0i64 {
                     size
                         += 2u32
-                            + ::buffa::types::int32_encoded_len(
+                            + ::buffa::types::int64_encoded_len(
                                 self.market_max_slippage_ticks,
                             ) as u32;
                 }
@@ -43074,8 +43204,8 @@ pub mod __buffa {
                         buf,
                     );
                 }
-                if self.market_max_slippage_ticks != 0i32 {
-                    ::buffa::types::put_int32_field(
+                if self.market_max_slippage_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(
                         24u32,
                         self.market_max_slippage_ticks,
                         buf,
@@ -43289,7 +43419,7 @@ pub mod __buffa {
                             ),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i32(
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
                     &self.market_max_slippage_ticks,
                 ) {
                     __map
@@ -43545,14 +43675,14 @@ pub mod __buffa {
                 self.0.reborrow().leaves_qty_scaled
             }
             /// Average execution price across the lineage through this generation,
-            /// in quote units scaled by 1e6. Zero if no fills.
+            /// in quote units scaled by 1e9. Zero if no fills.
             ///
             /// Field 14: `avg_price_ticks`
             #[must_use]
             pub fn avg_price_ticks(&self) -> i64 {
                 self.0.reborrow().avg_price_ticks
             }
-            /// Limit price in quote units scaled by 1e6. Zero for MARKET orders.
+            /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
             ///
             /// Field 15: `price_ticks`
             #[must_use]
@@ -43612,18 +43742,19 @@ pub mod __buffa {
                 &self.0.reborrow().origin
             }
             /// Optional client-side reference price used for MARKET slippage protection,
-            /// in quote units scaled by 1e6.
+            /// in quote units scaled by 1e9.
             ///
             /// Field 23: `market_client_ref_price_ticks`
             #[must_use]
             pub fn market_client_ref_price_ticks(&self) -> i64 {
                 self.0.reborrow().market_client_ref_price_ticks
             }
-            /// Optional MARKET max slippage as a price delta in 1e-6 quote-unit ticks.
+            /// Non-negative MARKET maximum absolute price delta in Q9 execution-price ticks
+            /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
             ///
             /// Field 24: `market_max_slippage_ticks`
             #[must_use]
-            pub fn market_max_slippage_ticks(&self) -> i32 {
+            pub fn market_max_slippage_ticks(&self) -> i64 {
                 self.0.reborrow().market_max_slippage_ticks
             }
             /// Optional MARKET max slippage in basis points (1 bp = 0.01%).
@@ -43738,7 +43869,7 @@ pub mod __buffa {
             ///
             /// Field 6: `is_maker`
             pub is_maker: bool,
-            /// Execution price in quote units scaled by 1e6.
+            /// Execution price in quote units scaled by 1e9.
             ///
             /// Field 7: `price_ticks`
             pub price_ticks: i64,
@@ -44403,7 +44534,7 @@ pub mod __buffa {
             pub fn is_maker(&self) -> bool {
                 self.0.reborrow().is_maker
             }
-            /// Execution price in quote units scaled by 1e6.
+            /// Execution price in quote units scaled by 1e9.
             ///
             /// Field 7: `price_ticks`
             #[must_use]
@@ -46989,7 +47120,8 @@ pub mod __buffa {
             ///
             /// Field 14: `after_match_id`
             pub after_match_id: ::core::option::Option<u64>,
-            /// Inclusive generation ceiling. Does not freeze an actively filling generation.
+            /// Inclusive generation ceiling; requires lineage_id.
+            /// Does not freeze an actively filling generation.
             ///
             /// Field 17: `through_generation`
             pub through_generation: ::core::option::Option<u32>,
@@ -47575,7 +47707,8 @@ pub mod __buffa {
             pub fn after_match_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().after_match_id
             }
-            /// Inclusive generation ceiling. Does not freeze an actively filling generation.
+            /// Inclusive generation ceiling; requires lineage_id.
+            /// Does not freeze an actively filling generation.
             ///
             /// Field 17: `through_generation`
             #[must_use]
@@ -49348,11 +49481,11 @@ pub mod __buffa {
             ///
             /// Field 3: `old_order_id`
             pub old_order_id: u64,
-            /// Assigned successor order ID. Zero when rejected before assignment.
+            /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
             ///
             /// Field 4: `replacement_order_id`
             pub replacement_order_id: u64,
-            /// Current successor order status when available.
+            /// Current successor status, or original order status for a cancel-only outcome, when available.
             ///
             /// Field 5: `order_status`
             pub order_status: ::buffa::EnumValue<super::super::OrderStatus>,
@@ -49364,6 +49497,11 @@ pub mod __buffa {
             ///
             /// Field 7: `updated_ts_ns`
             pub updated_ts_ns: u64,
+            /// REPLACED admits a successor. AMENDED is cancel-only: no successor exists and
+            /// order_status describes old_order_id. Unspecified for rejected items.
+            ///
+            /// Field 8: `action_taken`
+            pub action_taken: ::buffa::EnumValue<super::super::ModifyActionTaken>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BatchReplaceStatusItemView<'a> {
@@ -49452,6 +49590,15 @@ pub mod __buffa {
                         )?;
                         view.updated_ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.action_taken = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -49488,6 +49635,7 @@ pub mod __buffa {
                     order_status: self.order_status,
                     code: self.code.to_string(),
                     updated_ts_ns: self.updated_ts_ns,
+                    action_taken: self.action_taken,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -49534,6 +49682,12 @@ pub mod __buffa {
                             + ::buffa::types::uint64_encoded_len(self.updated_ts_ns)
                                 as u32;
                 }
+                {
+                    let val = self.action_taken.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -49575,6 +49729,12 @@ pub mod __buffa {
                 }
                 if self.updated_ts_ns != 0u64 {
                     ::buffa::types::put_uint64_field(7u32, self.updated_ts_ns, buf);
+                }
+                {
+                    let val = self.action_taken.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(8u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -49637,6 +49797,11 @@ pub mod __buffa {
                             "updatedTsNs",
                             &::buffa::json_helpers::ProtoJson(&self.updated_ts_ns),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.action_taken,
+                ) {
+                    __map.serialize_entry("actionTaken", &self.action_taken)?;
                 }
                 __map.end()
             }
@@ -49755,14 +49920,14 @@ pub mod __buffa {
             pub fn old_order_id(&self) -> u64 {
                 self.0.reborrow().old_order_id
             }
-            /// Assigned successor order ID. Zero when rejected before assignment.
+            /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
             ///
             /// Field 4: `replacement_order_id`
             #[must_use]
             pub fn replacement_order_id(&self) -> u64 {
                 self.0.reborrow().replacement_order_id
             }
-            /// Current successor order status when available.
+            /// Current successor status, or original order status for a cancel-only outcome, when available.
             ///
             /// Field 5: `order_status`
             #[must_use]
@@ -49782,6 +49947,16 @@ pub mod __buffa {
             #[must_use]
             pub fn updated_ts_ns(&self) -> u64 {
                 self.0.reborrow().updated_ts_ns
+            }
+            /// REPLACED admits a successor. AMENDED is cancel-only: no successor exists and
+            /// order_status describes old_order_id. Unspecified for rejected items.
+            ///
+            /// Field 8: `action_taken`
+            #[must_use]
+            pub fn action_taken(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::ModifyActionTaken> {
+                self.0.reborrow().action_taken
             }
         }
         impl ::core::convert::From<
@@ -50350,7 +50525,7 @@ pub mod __buffa {
                 use super::*;
                 #[derive(Clone, Debug)]
                 pub enum MaxSlippage {
-                    MaxSlippageTicks(i32),
+                    MaxSlippageTicks(i64),
                     MaxSlippageBps(i32),
                 }
             }
@@ -50431,7 +50606,7 @@ pub mod __buffa {
                 }
                 #[derive(Clone, Debug)]
                 pub enum MaxSlippage {
-                    MaxSlippageTicks(i32),
+                    MaxSlippageTicks(i64),
                     MaxSlippageBps(i32),
                 }
             }
@@ -50524,7 +50699,7 @@ pub mod __buffa {
             /// Optional max slippage override. If omitted, the pair default is used.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
-                MaxSlippageTicks(i32),
+                MaxSlippageTicks(i64),
                 MaxSlippageBps(i32),
             }
             impl ::buffa::Oneof for MaxSlippage {}
@@ -50805,7 +50980,7 @@ pub mod __buffa {
             /// Exactly one of these should be set (or neither for unprotected behavior).
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
-                MaxSlippageTicks(i32),
+                MaxSlippageTicks(i64),
                 MaxSlippageBps(i32),
             }
             impl ::buffa::Oneof for MaxSlippage {}
@@ -51011,6 +51186,7 @@ pub mod __buffa {
             #[allow(unused_imports)]
             use super::*;
             /// Optional execution scope. Omitting it returns all matching account fills.
+            /// order_id and lineage_id are mutually exclusive.
             #[derive(Clone, PartialEq, Debug)]
             pub enum ExecutionScope {
                 OrderId(u64),

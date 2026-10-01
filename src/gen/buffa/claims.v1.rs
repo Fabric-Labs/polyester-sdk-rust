@@ -29,6 +29,8 @@ pub enum ErrorCode {
     ERROR_CODE_PERMISSION_DENIED = 10i32,
     /// A required condition for completing the claim was not satisfied.
     ERROR_CODE_FAILED_PRECONDITION = 11i32,
+    /// Verify an X or Discord account before claiming a reward.
+    ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED = 12i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -67,6 +69,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_FAILED_PRECONDITION`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const FailedPrecondition: Self = Self::ERROR_CODE_FAILED_PRECONDITION;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SocialVerificationRequired: Self = Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -178,6 +183,11 @@ impl ::buffa::Enumeration for ErrorCode {
             9i32 => ::core::option::Option::Some(Self::ERROR_CODE_INTERNAL_ERROR),
             10i32 => ::core::option::Option::Some(Self::ERROR_CODE_PERMISSION_DENIED),
             11i32 => ::core::option::Option::Some(Self::ERROR_CODE_FAILED_PRECONDITION),
+            12i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -200,6 +210,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_INTERNAL_ERROR => "ERROR_CODE_INTERNAL_ERROR",
             Self::ERROR_CODE_PERMISSION_DENIED => "ERROR_CODE_PERMISSION_DENIED",
             Self::ERROR_CODE_FAILED_PRECONDITION => "ERROR_CODE_FAILED_PRECONDITION",
+            Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED => {
+                "ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -242,6 +255,11 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_FAILED_PRECONDITION" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_FAILED_PRECONDITION)
             }
+            "ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -259,6 +277,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_INTERNAL_ERROR,
             Self::ERROR_CODE_PERMISSION_DENIED,
             Self::ERROR_CODE_FAILED_PRECONDITION,
+            Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED,
         ]
     }
 }
