@@ -320,7 +320,7 @@ impl ::buffa::Enumeration for RewardFulfillmentState {
         ]
     }
 }
-/// RewardAward is a published immutable award for the authenticated root account.
+/// RewardAward contains immutable published terms and current delivery details for the authenticated root account.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -404,6 +404,45 @@ pub struct RewardAward {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub published_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Campaign payout network. Interpret destination_address in this network.
+    ///
+    /// Field 9: `network`
+    #[serde(
+        rename = "network",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub network: ::buffa::alloc::string::String,
+    /// Current fulfillment revision for optimistic concurrency.
+    ///
+    /// Field 10: `fulfillment_revision`
+    #[serde(
+        rename = "fulfillmentRevision",
+        alias = "fulfillment_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub fulfillment_revision: u64,
+    /// Recipient payout destination once submitted. Empty until provided.
+    ///
+    /// Field 11: `destination_address`
+    #[serde(
+        rename = "destinationAddress",
+        alias = "destination_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub destination_address: ::buffa::alloc::string::String,
+    /// External transaction identifier once staff records delivery. Empty until delivered.
+    ///
+    /// Field 12: `transaction_id`
+    #[serde(
+        rename = "transactionId",
+        alias = "transaction_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub transaction_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -419,6 +458,10 @@ impl ::core::fmt::Debug for RewardAward {
             .field("fulfillment_method", &self.fulfillment_method)
             .field("fulfillment_state", &self.fulfillment_state)
             .field("published_at", &self.published_at)
+            .field("network", &self.network)
+            .field("fulfillment_revision", &self.fulfillment_revision)
+            .field("destination_address", &self.destination_address)
+            .field("transaction_id", &self.transaction_id)
             .finish()
     }
 }
@@ -485,6 +528,26 @@ impl ::buffa::Message for RewardAward {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if !self.network.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.network) as u32;
+        }
+        if self.fulfillment_revision != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.fulfillment_revision)
+                        as u32;
+        }
+        if !self.destination_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.destination_address)
+                        as u32;
+        }
+        if !self.transaction_id.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.transaction_id) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -525,6 +588,18 @@ impl ::buffa::Message for RewardAward {
         if self.published_at.is_set() {
             ::buffa::types::put_len_delimited_header(8u32, __cache.consume_next(), buf);
             self.published_at.write_to(__cache, buf);
+        }
+        if !self.network.is_empty() {
+            ::buffa::types::put_string_field(9u32, &self.network, buf);
+        }
+        if self.fulfillment_revision != 0u64 {
+            ::buffa::types::put_uint64_field(10u32, self.fulfillment_revision, buf);
+        }
+        if !self.destination_address.is_empty() {
+            ::buffa::types::put_string_field(11u32, &self.destination_address, buf);
+        }
+        if !self.transaction_id.is_empty() {
+            ::buffa::types::put_string_field(12u32, &self.transaction_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -603,6 +678,34 @@ impl ::buffa::Message for RewardAward {
                     ctx,
                 )?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.network, buf)?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fulfillment_revision = ::buffa::types::decode_uint64(buf)?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.destination_address, buf)?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.transaction_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -619,6 +722,10 @@ impl ::buffa::Message for RewardAward {
         self.fulfillment_method = ::buffa::EnumValue::from(0);
         self.fulfillment_state = ::buffa::EnumValue::from(0);
         self.published_at = ::buffa::MessageField::none();
+        self.network.clear();
+        self.fulfillment_revision = 0u64;
+        self.destination_address.clear();
+        self.transaction_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -649,6 +756,350 @@ pub const __REWARD_AWARD_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
     type_url: "type.googleapis.com/rewards.v1.RewardAward",
     to_json: ::buffa::type_registry::any_to_json::<RewardAward>,
     from_json: ::buffa::type_registry::any_from_json::<RewardAward>,
+    is_wkt: false,
+};
+/// SetMyRewardDestinationRequest records the authenticated recipient's payout destination.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetMyRewardDestinationRequest {
+    /// Award owned by the authenticated root account.
+    ///
+    /// Field 1: `award_id`
+    #[serde(
+        rename = "awardId",
+        alias = "award_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub award_id: ::buffa::alloc::string::String,
+    /// Destination address interpreted according to the award campaign's network.
+    ///
+    /// Field 2: `destination_address`
+    #[serde(
+        rename = "destinationAddress",
+        alias = "destination_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub destination_address: ::buffa::alloc::string::String,
+    /// Fulfillment revision observed by the recipient.
+    ///
+    /// Field 3: `expected_revision`
+    #[serde(
+        rename = "expectedRevision",
+        alias = "expected_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub expected_revision: u64,
+    /// Client-generated idempotency identifier. Maximum 128 characters.
+    ///
+    /// Field 4: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetMyRewardDestinationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetMyRewardDestinationRequest")
+            .field("award_id", &self.award_id)
+            .field("destination_address", &self.destination_address)
+            .field("expected_revision", &self.expected_revision)
+            .field("request_id", &self.request_id)
+            .finish()
+    }
+}
+impl SetMyRewardDestinationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.SetMyRewardDestinationRequest";
+}
+::buffa::impl_default_instance!(SetMyRewardDestinationRequest);
+impl ::buffa::MessageName for SetMyRewardDestinationRequest {
+    const PACKAGE: &'static str = "rewards.v1";
+    const NAME: &'static str = "SetMyRewardDestinationRequest";
+    const FULL_NAME: &'static str = "rewards.v1.SetMyRewardDestinationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.SetMyRewardDestinationRequest";
+}
+impl ::buffa::Message for SetMyRewardDestinationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.award_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.award_id) as u32;
+        }
+        if !self.destination_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.destination_address)
+                        as u32;
+        }
+        if self.expected_revision != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.expected_revision) as u32;
+        }
+        if !self.request_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.award_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.award_id, buf);
+        }
+        if !self.destination_address.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.destination_address, buf);
+        }
+        if self.expected_revision != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.expected_revision, buf);
+        }
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.request_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.award_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.destination_address, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.expected_revision = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.award_id.clear();
+        self.destination_address.clear();
+        self.expected_revision = 0u64;
+        self.request_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetMyRewardDestinationRequest {
+    const PROTO_FQN: &'static str = "rewards.v1.SetMyRewardDestinationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetMyRewardDestinationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_MY_REWARD_DESTINATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/rewards.v1.SetMyRewardDestinationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SetMyRewardDestinationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<SetMyRewardDestinationRequest>,
+    is_wkt: false,
+};
+/// SetMyRewardDestinationResponse returns the updated award.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetMyRewardDestinationResponse {
+    /// Award with the persisted destination and updated fulfillment state.
+    ///
+    /// Field 1: `award`
+    #[serde(
+        rename = "award",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub award: ::buffa::MessageField<RewardAward>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetMyRewardDestinationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetMyRewardDestinationResponse")
+            .field("award", &self.award)
+            .finish()
+    }
+}
+impl SetMyRewardDestinationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.SetMyRewardDestinationResponse";
+}
+::buffa::impl_default_instance!(SetMyRewardDestinationResponse);
+impl ::buffa::MessageName for SetMyRewardDestinationResponse {
+    const PACKAGE: &'static str = "rewards.v1";
+    const NAME: &'static str = "SetMyRewardDestinationResponse";
+    const FULL_NAME: &'static str = "rewards.v1.SetMyRewardDestinationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.SetMyRewardDestinationResponse";
+}
+impl ::buffa::Message for SetMyRewardDestinationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.award.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.award.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.award.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.award.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.award.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.award = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetMyRewardDestinationResponse {
+    const PROTO_FQN: &'static str = "rewards.v1.SetMyRewardDestinationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetMyRewardDestinationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_MY_REWARD_DESTINATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/rewards.v1.SetMyRewardDestinationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SetMyRewardDestinationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<SetMyRewardDestinationResponse>,
     is_wkt: false,
 };
 /// ListMyRewardAwardsRequest requests a page of awards for the authenticated root account.
@@ -982,7 +1433,7 @@ pub mod __buffa {
     pub mod view {
         #[allow(unused_imports)]
         use super::*;
-        /// RewardAward is a published immutable award for the authenticated root account.
+        /// RewardAward contains immutable published terms and current delivery details for the authenticated root account.
         #[derive(Clone, Debug, Default)]
         pub struct RewardAwardView<'a> {
             /// Stable opaque award identifier.
@@ -1023,6 +1474,22 @@ pub mod __buffa {
             pub published_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Campaign payout network. Interpret destination_address in this network.
+            ///
+            /// Field 9: `network`
+            pub network: &'a str,
+            /// Current fulfillment revision for optimistic concurrency.
+            ///
+            /// Field 10: `fulfillment_revision`
+            pub fulfillment_revision: u64,
+            /// Recipient payout destination once submitted. Empty until provided.
+            ///
+            /// Field 11: `destination_address`
+            pub destination_address: &'a str,
+            /// External transaction identifier once staff records delivery. Empty until delivered.
+            ///
+            /// Field 12: `transaction_id`
+            pub transaction_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for RewardAwardView<'a> {
@@ -1134,6 +1601,36 @@ pub mod __buffa {
                             }
                         }
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.network = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fulfillment_revision = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.destination_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.transaction_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -1178,6 +1675,10 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    network: self.network.to_string(),
+                    fulfillment_revision: self.fulfillment_revision,
+                    destination_address: self.destination_address.to_string(),
+                    transaction_id: self.transaction_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -1240,6 +1741,31 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if !self.network.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.network) as u32;
+                }
+                if self.fulfillment_revision != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.fulfillment_revision,
+                            ) as u32;
+                }
+                if !self.destination_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.destination_address,
+                            ) as u32;
+                }
+                if !self.transaction_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.transaction_id)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -1285,6 +1811,26 @@ pub mod __buffa {
                         buf,
                     );
                     self.published_at.write_to(__cache, buf);
+                }
+                if !self.network.is_empty() {
+                    ::buffa::types::put_string_field(9u32, &self.network, buf);
+                }
+                if self.fulfillment_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        10u32,
+                        self.fulfillment_revision,
+                        buf,
+                    );
+                }
+                if !self.destination_address.is_empty() {
+                    ::buffa::types::put_string_field(
+                        11u32,
+                        &self.destination_address,
+                        buf,
+                    );
+                }
+                if !self.transaction_id.is_empty() {
+                    ::buffa::types::put_string_field(12u32, &self.transaction_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -1346,6 +1892,30 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("publishedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.network) {
+                    __map.serialize_entry("network", self.network)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.fulfillment_revision,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "fulfillmentRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.fulfillment_revision),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.destination_address,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "destinationAddress",
+                            self.destination_address,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.transaction_id) {
+                    __map.serialize_entry("transactionId", self.transaction_id)?;
                 }
                 __map.end()
             }
@@ -1505,6 +2075,34 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().published_at
             }
+            /// Campaign payout network. Interpret destination_address in this network.
+            ///
+            /// Field 9: `network`
+            #[must_use]
+            pub fn network(&self) -> &'_ str {
+                self.0.reborrow().network
+            }
+            /// Current fulfillment revision for optimistic concurrency.
+            ///
+            /// Field 10: `fulfillment_revision`
+            #[must_use]
+            pub fn fulfillment_revision(&self) -> u64 {
+                self.0.reborrow().fulfillment_revision
+            }
+            /// Recipient payout destination once submitted. Empty until provided.
+            ///
+            /// Field 11: `destination_address`
+            #[must_use]
+            pub fn destination_address(&self) -> &'_ str {
+                self.0.reborrow().destination_address
+            }
+            /// External transaction identifier once staff records delivery. Empty until delivered.
+            ///
+            /// Field 12: `transaction_id`
+            #[must_use]
+            pub fn transaction_id(&self) -> &'_ str {
+                self.0.reborrow().transaction_id
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<RewardAwardView<'static>>>
         for RewardAwardOwnedView {
@@ -1529,6 +2127,715 @@ pub mod __buffa {
             type ViewHandle = RewardAwardOwnedView;
         }
         impl ::serde::Serialize for RewardAwardOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// SetMyRewardDestinationRequest records the authenticated recipient's payout destination.
+        #[derive(Clone, Debug, Default)]
+        pub struct SetMyRewardDestinationRequestView<'a> {
+            /// Award owned by the authenticated root account.
+            ///
+            /// Field 1: `award_id`
+            pub award_id: &'a str,
+            /// Destination address interpreted according to the award campaign's network.
+            ///
+            /// Field 2: `destination_address`
+            pub destination_address: &'a str,
+            /// Fulfillment revision observed by the recipient.
+            ///
+            /// Field 3: `expected_revision`
+            pub expected_revision: u64,
+            /// Client-generated idempotency identifier. Maximum 128 characters.
+            ///
+            /// Field 4: `request_id`
+            pub request_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SetMyRewardDestinationRequestView<'a> {
+            type Owned = super::super::SetMyRewardDestinationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.award_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.destination_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.expected_revision = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetMyRewardDestinationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SetMyRewardDestinationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SetMyRewardDestinationRequest {
+                    award_id: self.award_id.to_string(),
+                    destination_address: self.destination_address.to_string(),
+                    expected_revision: self.expected_revision,
+                    request_id: self.request_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SetMyRewardDestinationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.award_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.award_id) as u32;
+                }
+                if !self.destination_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.destination_address,
+                            ) as u32;
+                }
+                if self.expected_revision != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.expected_revision)
+                                as u32;
+                }
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.award_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.award_id, buf);
+                }
+                if !self.destination_address.is_empty() {
+                    ::buffa::types::put_string_field(
+                        2u32,
+                        &self.destination_address,
+                        buf,
+                    );
+                }
+                if self.expected_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(3u32, self.expected_revision, buf);
+                }
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.request_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SetMyRewardDestinationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.award_id) {
+                    __map.serialize_entry("awardId", self.award_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.destination_address,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "destinationAddress",
+                            self.destination_address,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.expected_revision,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "expectedRevision",
+                            &::buffa::json_helpers::ProtoJson(&self.expected_revision),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SetMyRewardDestinationRequestView<'a> {
+            const PACKAGE: &'static str = "rewards.v1";
+            const NAME: &'static str = "SetMyRewardDestinationRequest";
+            const FULL_NAME: &'static str = "rewards.v1.SetMyRewardDestinationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.SetMyRewardDestinationRequest";
+        }
+        ::buffa::impl_default_view_instance!(SetMyRewardDestinationRequestView);
+        ::buffa::impl_view_reborrow!(SetMyRewardDestinationRequestView);
+        /** Self-contained, `'static` owned view of a `SetMyRewardDestinationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SetMyRewardDestinationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetMyRewardDestinationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SetMyRewardDestinationRequestOwnedView(
+            ::buffa::OwnedView<SetMyRewardDestinationRequestView<'static>>,
+        );
+        impl SetMyRewardDestinationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetMyRewardDestinationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetMyRewardDestinationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SetMyRewardDestinationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetMyRewardDestinationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`SetMyRewardDestinationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SetMyRewardDestinationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetMyRewardDestinationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Award owned by the authenticated root account.
+            ///
+            /// Field 1: `award_id`
+            #[must_use]
+            pub fn award_id(&self) -> &'_ str {
+                self.0.reborrow().award_id
+            }
+            /// Destination address interpreted according to the award campaign's network.
+            ///
+            /// Field 2: `destination_address`
+            #[must_use]
+            pub fn destination_address(&self) -> &'_ str {
+                self.0.reborrow().destination_address
+            }
+            /// Fulfillment revision observed by the recipient.
+            ///
+            /// Field 3: `expected_revision`
+            #[must_use]
+            pub fn expected_revision(&self) -> u64 {
+                self.0.reborrow().expected_revision
+            }
+            /// Client-generated idempotency identifier. Maximum 128 characters.
+            ///
+            /// Field 4: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<SetMyRewardDestinationRequestView<'static>>,
+        > for SetMyRewardDestinationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SetMyRewardDestinationRequestView<'static>>,
+            ) -> Self {
+                SetMyRewardDestinationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SetMyRewardDestinationRequestOwnedView>
+        for ::buffa::OwnedView<SetMyRewardDestinationRequestView<'static>> {
+            fn from(wrapper: SetMyRewardDestinationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SetMyRewardDestinationRequestView<'static>>,
+        > for SetMyRewardDestinationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<SetMyRewardDestinationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SetMyRewardDestinationRequest {
+            type View<'a> = SetMyRewardDestinationRequestView<'a>;
+            type ViewHandle = SetMyRewardDestinationRequestOwnedView;
+        }
+        impl ::serde::Serialize for SetMyRewardDestinationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// SetMyRewardDestinationResponse returns the updated award.
+        #[derive(Clone, Debug, Default)]
+        pub struct SetMyRewardDestinationResponseView<'a> {
+            /// Award with the persisted destination and updated fulfillment state.
+            ///
+            /// Field 1: `award`
+            pub award: ::buffa::MessageFieldView<
+                super::super::__buffa::view::RewardAwardView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SetMyRewardDestinationResponseView<'a> {
+            type Owned = super::super::SetMyRewardDestinationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.award.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.award = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::RewardAwardView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetMyRewardDestinationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SetMyRewardDestinationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SetMyRewardDestinationResponse {
+                    award: match self.award.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::RewardAward,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SetMyRewardDestinationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.award.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.award.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.award.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.award.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SetMyRewardDestinationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.award.as_option() {
+                        __map.serialize_entry("award", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SetMyRewardDestinationResponseView<'a> {
+            const PACKAGE: &'static str = "rewards.v1";
+            const NAME: &'static str = "SetMyRewardDestinationResponse";
+            const FULL_NAME: &'static str = "rewards.v1.SetMyRewardDestinationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.SetMyRewardDestinationResponse";
+        }
+        ::buffa::impl_default_view_instance!(SetMyRewardDestinationResponseView);
+        ::buffa::impl_view_reborrow!(SetMyRewardDestinationResponseView);
+        /** Self-contained, `'static` owned view of a `SetMyRewardDestinationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SetMyRewardDestinationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetMyRewardDestinationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SetMyRewardDestinationResponseOwnedView(
+            ::buffa::OwnedView<SetMyRewardDestinationResponseView<'static>>,
+        );
+        impl SetMyRewardDestinationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetMyRewardDestinationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetMyRewardDestinationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SetMyRewardDestinationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetMyRewardDestinationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`SetMyRewardDestinationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SetMyRewardDestinationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetMyRewardDestinationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Award with the persisted destination and updated fulfillment state.
+            ///
+            /// Field 1: `award`
+            #[must_use]
+            pub fn award(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::RewardAwardView<'_>,
+            > {
+                &self.0.reborrow().award
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<SetMyRewardDestinationResponseView<'static>>,
+        > for SetMyRewardDestinationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SetMyRewardDestinationResponseView<'static>>,
+            ) -> Self {
+                SetMyRewardDestinationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SetMyRewardDestinationResponseOwnedView>
+        for ::buffa::OwnedView<SetMyRewardDestinationResponseView<'static>> {
+            fn from(wrapper: SetMyRewardDestinationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SetMyRewardDestinationResponseView<'static>>,
+        > for SetMyRewardDestinationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<SetMyRewardDestinationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SetMyRewardDestinationResponse {
+            type View<'a> = SetMyRewardDestinationResponseView<'a>;
+            type ViewHandle = SetMyRewardDestinationResponseOwnedView;
+        }
+        impl ::serde::Serialize for SetMyRewardDestinationResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -2188,6 +3495,8 @@ pub mod __buffa {
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
         reg.register_json_any(super::__REWARD_AWARD_JSON_ANY);
+        reg.register_json_any(super::__SET_MY_REWARD_DESTINATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_MY_REWARD_DESTINATION_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_MY_REWARD_AWARDS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_MY_REWARD_AWARDS_RESPONSE_JSON_ANY);
     }
@@ -2196,6 +3505,14 @@ pub mod __buffa {
 pub use self::__buffa::view::RewardAwardView;
 #[doc(inline)]
 pub use self::__buffa::view::RewardAwardOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMyRewardDestinationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMyRewardDestinationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMyRewardDestinationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMyRewardDestinationResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListMyRewardAwardsRequestView;
 #[doc(inline)]

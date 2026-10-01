@@ -8,6 +8,14 @@ pub type OwnedListMyRewardAwardsRequestView = ::buffa::view::OwnedView<
 pub type OwnedListMyRewardAwardsResponseView = ::buffa::view::OwnedView<
     crate::proto::rewards::v1::__buffa::view::ListMyRewardAwardsResponseView<'static>,
 >;
+///Shorthand for `OwnedView<SetMyRewardDestinationRequestView<'static>>`.
+pub type OwnedSetMyRewardDestinationRequestView = ::buffa::view::OwnedView<
+    crate::proto::rewards::v1::__buffa::view::SetMyRewardDestinationRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SetMyRewardDestinationResponseView<'static>>`.
+pub type OwnedSetMyRewardDestinationResponseView = ::buffa::view::OwnedView<
+    crate::proto::rewards::v1::__buffa::view::SetMyRewardDestinationResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::rewards::v1::ListMyRewardAwardsResponse>
 for crate::proto::rewards::v1::__buffa::view::ListMyRewardAwardsResponseView<'_> {
     fn encode(
@@ -28,6 +36,26 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::rewards::v1::SetMyRewardDestinationResponse>
+for crate::proto::rewards::v1::__buffa::view::SetMyRewardDestinationResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::rewards::v1::SetMyRewardDestinationResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::rewards::v1::__buffa::view::SetMyRewardDestinationResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const REWARD_CAMPAIGN_SERVICE_SERVICE_NAME: &str = "rewards.v1.RewardCampaignService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `ListMyRewardAwards` RPC.
@@ -36,6 +64,15 @@ pub const REWARD_CAMPAIGN_SERVICE_SERVICE_NAME: &str = "rewards.v1.RewardCampaig
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const REWARD_CAMPAIGN_SERVICE_LIST_MY_REWARD_AWARDS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/rewards.v1.RewardCampaignService/ListMyRewardAwards",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `SetMyRewardDestination` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const REWARD_CAMPAIGN_SERVICE_SET_MY_REWARD_DESTINATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/rewards.v1.RewardCampaignService/SetMyRewardDestination",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -113,6 +150,29 @@ pub trait RewardCampaignService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Record a write-once external payout destination for an award owned by the authenticated root account.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_my_reward_destination<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::rewards::v1::SetMyRewardDestinationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::rewards::v1::SetMyRewardDestinationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -174,6 +234,35 @@ impl<S: RewardCampaignService> RewardCampaignServiceExt for S {
                 },
             )
             .with_spec(REWARD_CAMPAIGN_SERVICE_LIST_MY_REWARD_AWARDS_SPEC)
+            .route_view(
+                REWARD_CAMPAIGN_SERVICE_SERVICE_NAME,
+                "SetMyRewardDestination",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::rewards::v1::__buffa::view::SetMyRewardDestinationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::rewards::v1::SetMyRewardDestinationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_my_reward_destination(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::rewards::v1::SetMyRewardDestinationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(REWARD_CAMPAIGN_SERVICE_SET_MY_REWARD_DESTINATION_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -237,6 +326,14 @@ for RewardCampaignServiceServer<T> {
                         .with_spec(REWARD_CAMPAIGN_SERVICE_LIST_MY_REWARD_AWARDS_SPEC),
                 )
             }
+            "SetMyRewardDestination" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            REWARD_CAMPAIGN_SERVICE_SET_MY_REWARD_DESTINATION_SPEC,
+                        ),
+                )
+            }
             _ => None,
         }
     }
@@ -270,6 +367,27 @@ for RewardCampaignServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::rewards::v1::ListMyRewardAwardsResponse,
+                        >(format)
+                })
+            }
+            "SetMyRewardDestination" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::rewards::v1::SetMyRewardDestinationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::rewards::v1::__buffa::view::SetMyRewardDestinationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::rewards::v1::SetMyRewardDestinationRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_my_reward_destination(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::rewards::v1::SetMyRewardDestinationResponse,
                         >(format)
                 })
             }
@@ -415,6 +533,51 @@ where
                 &self.config,
                 REWARD_CAMPAIGN_SERVICE_SERVICE_NAME,
                 "ListMyRewardAwards",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetMyRewardDestination RPC. Sends a request to /rewards.v1.RewardCampaignService/SetMyRewardDestination.
+    pub async fn set_my_reward_destination(
+        &self,
+        request: crate::proto::rewards::v1::SetMyRewardDestinationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::rewards::v1::__buffa::view::SetMyRewardDestinationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_my_reward_destination_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetMyRewardDestination RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_my_reward_destination_with_options(
+        &self,
+        request: crate::proto::rewards::v1::SetMyRewardDestinationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::rewards::v1::__buffa::view::SetMyRewardDestinationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                REWARD_CAMPAIGN_SERVICE_SERVICE_NAME,
+                "SetMyRewardDestination",
                 request,
                 options,
             )
