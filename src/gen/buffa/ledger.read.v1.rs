@@ -5581,6 +5581,18 @@ pub struct TransferRow {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub destination: ::buffa::MessageField<TransferSide>,
+    /// Stable transfer identifier, an unsigned 128-bit integer as a decimal
+    /// string. Both legs of a transfer share it; with account_code and is_debit
+    /// it identifies this row.
+    ///
+    /// Field 15: `transfer_id`
+    #[serde(
+        rename = "transferId",
+        alias = "transfer_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub transfer_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5599,6 +5611,7 @@ impl ::core::fmt::Debug for TransferRow {
             .field("flow_id", &self.flow_id)
             .field("source", &self.source)
             .field("destination", &self.destination)
+            .field("transfer_id", &self.transfer_id)
             .finish()
     }
 }
@@ -5686,6 +5699,9 @@ impl ::buffa::Message for TransferRow {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if !self.transfer_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.transfer_id) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5738,6 +5754,9 @@ impl ::buffa::Message for TransferRow {
         if self.destination.is_set() {
             ::buffa::types::put_len_delimited_header(14u32, __cache.consume_next(), buf);
             self.destination.write_to(__cache, buf);
+        }
+        if !self.transfer_id.is_empty() {
+            ::buffa::types::put_string_field(15u32, &self.transfer_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5849,6 +5868,13 @@ impl ::buffa::Message for TransferRow {
                     ctx,
                 )?;
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.transfer_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5868,6 +5894,7 @@ impl ::buffa::Message for TransferRow {
         self.flow_id.clear();
         self.source = ::buffa::MessageField::none();
         self.destination = ::buffa::MessageField::none();
+        self.transfer_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5898,6 +5925,149 @@ pub const __TRANSFER_ROW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
     type_url: "type.googleapis.com/ledger.read.v1.TransferRow",
     to_json: ::buffa::type_registry::any_to_json::<TransferRow>,
     from_json: ::buffa::type_registry::any_from_json::<TransferRow>,
+    is_wkt: false,
+};
+/// TransferRowBatch is one realtime publication on an account's transfer
+/// stream: every transfer leg queued for the stream when it was sent, at most
+/// 256 and at most 64 KiB. Legs arrive in the order the account's transfers
+/// settled, except that a leg of a deposit or withdrawal still waiting for its
+/// lifecycle details arrives once they are known.
+///
+/// (transfer_id, account_code, is_debit) identifies a leg. Apply legs in array
+/// order and in publication order; a leg whose identity was already received
+/// replaces the earlier copy, for example when the leg is published again with
+/// its flow_id. When the subscription reports that missed publications could
+/// not be recovered, reload recent transfers over REST.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TransferRowBatch {
+    /// Transfer legs, oldest first. At least one leg.
+    ///
+    /// Field 1: `events`
+    #[serde(
+        rename = "events",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub events: ::buffa::alloc::vec::Vec<TransferRow>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TransferRowBatch {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TransferRowBatch").field("events", &self.events).finish()
+    }
+}
+impl TransferRowBatch {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.TransferRowBatch";
+}
+::buffa::impl_default_instance!(TransferRowBatch);
+impl ::buffa::MessageName for TransferRowBatch {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "TransferRowBatch";
+    const FULL_NAME: &'static str = "ledger.read.v1.TransferRowBatch";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.TransferRowBatch";
+}
+impl ::buffa::Message for TransferRowBatch {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.events {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.events {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.events.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.events.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TransferRowBatch {
+    const PROTO_FQN: &'static str = "ledger.read.v1.TransferRowBatch";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TransferRowBatch {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRANSFER_ROW_BATCH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.TransferRowBatch",
+    to_json: ::buffa::type_registry::any_to_json::<TransferRowBatch>,
+    from_json: ::buffa::type_registry::any_from_json::<TransferRowBatch>,
     is_wkt: false,
 };
 /// ListTransfersResponse contains transfer rows and an optional continuation cursor.
@@ -15067,6 +15237,12 @@ pub mod __buffa {
             pub destination: ::buffa::MessageFieldView<
                 super::super::__buffa::view::TransferSideView<'a>,
             >,
+            /// Stable transfer identifier, an unsigned 128-bit integer as a decimal
+            /// string. Both legs of a transfer share it; with account_code and is_debit
+            /// it identifies this row.
+            ///
+            /// Field 15: `transfer_id`
+            pub transfer_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for TransferRowView<'a> {
@@ -15253,6 +15429,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.transfer_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -15321,6 +15504,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    transfer_id: self.transfer_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -15400,6 +15584,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if !self.transfer_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.transfer_id)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -15469,6 +15659,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.destination.write_to(__cache, buf);
+                }
+                if !self.transfer_id.is_empty() {
+                    ::buffa::types::put_string_field(15u32, &self.transfer_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -15556,6 +15749,9 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("destination", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.transfer_id) {
+                    __map.serialize_entry("transferId", self.transfer_id)?;
                 }
                 __map.end()
             }
@@ -15755,6 +15951,15 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().destination
             }
+            /// Stable transfer identifier, an unsigned 128-bit integer as a decimal
+            /// string. Both legs of a transfer share it; with account_code and is_debit
+            /// it identifies this row.
+            ///
+            /// Field 15: `transfer_id`
+            #[must_use]
+            pub fn transfer_id(&self) -> &'_ str {
+                self.0.reborrow().transfer_id
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<TransferRowView<'static>>>
         for TransferRowOwnedView {
@@ -15779,6 +15984,312 @@ pub mod __buffa {
             type ViewHandle = TransferRowOwnedView;
         }
         impl ::serde::Serialize for TransferRowOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TransferRowBatch is one realtime publication on an account's transfer
+        /// stream: every transfer leg queued for the stream when it was sent, at most
+        /// 256 and at most 64 KiB. Legs arrive in the order the account's transfers
+        /// settled, except that a leg of a deposit or withdrawal still waiting for its
+        /// lifecycle details arrives once they are known.
+        ///
+        /// (transfer_id, account_code, is_debit) identifies a leg. Apply legs in array
+        /// order and in publication order; a leg whose identity was already received
+        /// replaces the earlier copy, for example when the leg is published again with
+        /// its flow_id. When the subscription reports that missed publications could
+        /// not be recovered, reload recent transfers over REST.
+        #[derive(Clone, Debug, Default)]
+        pub struct TransferRowBatchView<'a> {
+            /// Transfer legs, oldest first. At least one leg.
+            ///
+            /// Field 1: `events`
+            pub events: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::TransferRowView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TransferRowBatchView<'a> {
+            type Owned = super::super::TransferRowBatch;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.events
+                            .push(
+                                <super::super::__buffa::view::TransferRowView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TransferRowBatch,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TransferRowBatch,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TransferRowBatch {
+                    events: self
+                        .events
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TransferRowBatchView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.events {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.events {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TransferRowBatchView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.events.is_empty() {
+                    __map.serialize_entry("events", &*self.events)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TransferRowBatchView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "TransferRowBatch";
+            const FULL_NAME: &'static str = "ledger.read.v1.TransferRowBatch";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.TransferRowBatch";
+        }
+        ::buffa::impl_default_view_instance!(TransferRowBatchView);
+        ::buffa::impl_view_reborrow!(TransferRowBatchView);
+        /** Self-contained, `'static` owned view of a `TransferRowBatch` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TransferRowBatchView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TransferRowBatchView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TransferRowBatchOwnedView(
+            ::buffa::OwnedView<TransferRowBatchView<'static>>,
+        );
+        impl TransferRowBatchOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TransferRowBatchOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TransferRowBatchOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TransferRowBatch,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TransferRowBatchOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TransferRowBatchView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TransferRowBatchView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TransferRowBatch,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Transfer legs, oldest first. At least one leg.
+            ///
+            /// Field 1: `events`
+            #[must_use]
+            pub fn events(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::TransferRowView<'_>,
+            > {
+                &self.0.reborrow().events
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TransferRowBatchView<'static>>>
+        for TransferRowBatchOwnedView {
+            fn from(inner: ::buffa::OwnedView<TransferRowBatchView<'static>>) -> Self {
+                TransferRowBatchOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TransferRowBatchOwnedView>
+        for ::buffa::OwnedView<TransferRowBatchView<'static>> {
+            fn from(wrapper: TransferRowBatchOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TransferRowBatchView<'static>>>
+        for TransferRowBatchOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TransferRowBatchView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TransferRowBatch {
+            type View<'a> = TransferRowBatchView<'a>;
+            type ViewHandle = TransferRowBatchOwnedView;
+        }
+        impl ::serde::Serialize for TransferRowBatchOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -17626,6 +18137,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_TRANSFERS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__TRANSFER_SIDE_JSON_ANY);
         reg.register_json_any(super::__TRANSFER_ROW_JSON_ANY);
+        reg.register_json_any(super::__TRANSFER_ROW_BATCH_JSON_ANY);
         reg.register_json_any(super::__LIST_TRANSFERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_HOLDS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__HOLD_ROW_JSON_ANY);
@@ -17717,6 +18229,10 @@ pub use self::__buffa::view::TransferSideOwnedView;
 pub use self::__buffa::view::TransferRowView;
 #[doc(inline)]
 pub use self::__buffa::view::TransferRowOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TransferRowBatchView;
+#[doc(inline)]
+pub use self::__buffa::view::TransferRowBatchOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListTransfersResponseView;
 #[doc(inline)]

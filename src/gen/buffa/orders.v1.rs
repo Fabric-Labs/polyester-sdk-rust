@@ -796,7 +796,11 @@ pub enum ErrorCode {
     ERROR_CODE_MIN_NOTIONAL = 7i32,
     /// Quantity does not align with the pair step size.
     ERROR_CODE_QTY_STEP_SIZE = 8i32,
-    /// Client order ID is already in use for a different active order.
+    /// Client order ID is already in use on this account, by an open order or by
+    /// an order that ended recently; an ended order keeps its client order ID
+    /// reserved for at least 15 minutes. Reuse returns this code even with the
+    /// same payload. Use GetOrder to reconcile, then retry with a new client
+    /// order ID.
     ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID = 9i32,
     /// Service is temporarily unavailable.
     ERROR_CODE_UNAVAILABLE = 10i32,
@@ -905,9 +909,15 @@ pub enum ErrorCode {
     ERROR_CODE_TRIGGER_STATUS_INVALID = 45i32,
     /// Trigger type/state does not support requested lifecycle operation.
     ERROR_CODE_TRIGGER_NOT_MODIFIABLE = 46i32,
-    /// Duplicate client trigger ID was reused with a different trigger payload.
+    /// Client trigger ID is already used, either by a trigger with a different
+    /// payload or by an earlier create that failed or was rolled back. List
+    /// triggers to reconcile by client trigger ID, then retry with a new client
+    /// trigger ID.
     ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID = 47i32,
-    /// Trailing-stop max slippage (ticks or bps) is invalid.
+    /// Max slippage (ticks or bps) is out of range or leaves no valid execution
+    /// price bound. Applies to market orders and to standalone and attached
+    /// trailing stops, on create and on modify; for example, a 10000 bps cap on a
+    /// market order or trailing stop that sells.
     ERROR_CODE_MAX_SLIPPAGE_INVALID = 48i32,
     /// Client reference price is stale compared to server-side BBO/drift policy.
     ERROR_CODE_STALE_QUOTE = 65i32,
@@ -8621,7 +8631,10 @@ pub struct CancelAllOrdersResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub status: ::buffa::EnumValue<cancel_all_orders_response::Status>,
-    /// Number of orders that matched the filter.
+    /// Number of open orders that matched the filter when the request was
+    /// accepted, including orders whose cancellation was already in progress.
+    /// Orders placed after acceptance are not counted. Unless `dry_run` is set,
+    /// equals `submitted_cancels` plus `failed_cancels`.
     ///
     /// Field 2: `matched_orders`
     #[serde(
@@ -8631,7 +8644,9 @@ pub struct CancelAllOrdersResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub matched_orders: u32,
-    /// Number of cancel requests submitted for processing.
+    /// Number of matched orders submitted for cancellation, including orders
+    /// whose cancellation was already in progress. Each moves to `CANCELED`
+    /// asynchronously after the response. Zero when `dry_run` is set.
     ///
     /// Field 3: `submitted_cancels`
     #[serde(
@@ -8641,7 +8656,10 @@ pub struct CancelAllOrdersResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub submitted_cancels: u32,
-    /// Number of cancels that could not be submitted (already canceled, etc.).
+    /// Number of matched orders that could not be submitted for cancellation
+    /// because the cancel-all could not be recorded for their symbol. This
+    /// request does not cancel them; send a new cancel-all with a new
+    /// `request_id` if they are still open. Zero when `dry_run` is set.
     ///
     /// Field 4: `failed_cancels`
     #[serde(
@@ -12422,7 +12440,9 @@ pub struct BatchReplaceAdmissionItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub status: ::buffa::EnumValue<BatchReplaceItemAdmissionStatus>,
-    /// Original order targeted by the replacement.
+    /// Original order targeted by the replacement: the requested order ID, or the
+    /// order the requested client order ID names. Rejected items keep it too. Unset
+    /// only when the requested client order ID names no order.
     ///
     /// Field 3: `old_order_id`
     #[serde(
@@ -12432,7 +12452,7 @@ pub struct BatchReplaceAdmissionItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub old_order_id: u64,
-    /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
+    /// Assigned successor order ID. Unset for cancel-only outcomes and rejected items.
     ///
     /// Field 4: `replacement_order_id`
     #[serde(
@@ -18076,6 +18096,148 @@ pub const __USER_TRADE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa:
     from_json: ::buffa::type_registry::any_from_json::<UserTrade>,
     is_wkt: false,
 };
+/// UserTradeBatch is one realtime publication on an account's trade stream:
+/// every fill queued for the stream when it was sent, at most 256 and at most
+/// 64 KiB. Fills of one trading symbol arrive in execution order; fills of
+/// different symbols have no defined order relative to each other.
+///
+/// (match_id, order_id) identifies a fill; order_id tells apart the two fills
+/// of a trade between two orders of the same account. Apply fills in array
+/// order and in publication order; a fill whose identity was already received
+/// replaces the earlier copy. When the subscription reports that missed
+/// publications could not be recovered, reload recent fills over REST.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UserTradeBatch {
+    /// Fills, oldest first per trading symbol. At least one fill.
+    ///
+    /// Field 1: `events`
+    #[serde(
+        rename = "events",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub events: ::buffa::alloc::vec::Vec<UserTrade>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UserTradeBatch {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UserTradeBatch").field("events", &self.events).finish()
+    }
+}
+impl UserTradeBatch {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.UserTradeBatch";
+}
+::buffa::impl_default_instance!(UserTradeBatch);
+impl ::buffa::MessageName for UserTradeBatch {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "UserTradeBatch";
+    const FULL_NAME: &'static str = "orders.v1.UserTradeBatch";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.UserTradeBatch";
+}
+impl ::buffa::Message for UserTradeBatch {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.events {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.events {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.events.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.events.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UserTradeBatch {
+    const PROTO_FQN: &'static str = "orders.v1.UserTradeBatch";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UserTradeBatch {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __USER_TRADE_BATCH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.UserTradeBatch",
+    to_json: ::buffa::type_registry::any_to_json::<UserTradeBatch>,
+    from_json: ::buffa::type_registry::any_from_json::<UserTradeBatch>,
+    is_wkt: false,
+};
 /// OrderTransfer is the Connect-facing minimal per-leg transfer view.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -19491,7 +19653,9 @@ pub struct GetOrderHistoryResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub orders: ::buffa::alloc::vec::Vec<Order>,
-    /// Opaque cursor for the next page. Empty when no more results exist.
+    /// Opaque cursor for the next page. A page may hold fewer orders than
+    /// requested, or none; continue while this token is non-empty. Empty when no
+    /// more results exist.
     ///
     /// Field 2: `next_page_token`
     #[serde(
@@ -31157,15 +31321,23 @@ pub mod __buffa {
             pub status: ::buffa::EnumValue<
                 super::super::cancel_all_orders_response::Status,
             >,
-            /// Number of orders that matched the filter.
+            /// Number of open orders that matched the filter when the request was
+            /// accepted, including orders whose cancellation was already in progress.
+            /// Orders placed after acceptance are not counted. Unless `dry_run` is set,
+            /// equals `submitted_cancels` plus `failed_cancels`.
             ///
             /// Field 2: `matched_orders`
             pub matched_orders: u32,
-            /// Number of cancel requests submitted for processing.
+            /// Number of matched orders submitted for cancellation, including orders
+            /// whose cancellation was already in progress. Each moves to `CANCELED`
+            /// asynchronously after the response. Zero when `dry_run` is set.
             ///
             /// Field 3: `submitted_cancels`
             pub submitted_cancels: u32,
-            /// Number of cancels that could not be submitted (already canceled, etc.).
+            /// Number of matched orders that could not be submitted for cancellation
+            /// because the cancel-all could not be recorded for their symbol. This
+            /// request does not cancel them; send a new cancel-all with a new
+            /// `request_id` if they are still open. Zero when `dry_run` is set.
             ///
             /// Field 4: `failed_cancels`
             pub failed_cancels: u32,
@@ -31570,21 +31742,29 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::cancel_all_orders_response::Status> {
                 self.0.reborrow().status
             }
-            /// Number of orders that matched the filter.
+            /// Number of open orders that matched the filter when the request was
+            /// accepted, including orders whose cancellation was already in progress.
+            /// Orders placed after acceptance are not counted. Unless `dry_run` is set,
+            /// equals `submitted_cancels` plus `failed_cancels`.
             ///
             /// Field 2: `matched_orders`
             #[must_use]
             pub fn matched_orders(&self) -> u32 {
                 self.0.reborrow().matched_orders
             }
-            /// Number of cancel requests submitted for processing.
+            /// Number of matched orders submitted for cancellation, including orders
+            /// whose cancellation was already in progress. Each moves to `CANCELED`
+            /// asynchronously after the response. Zero when `dry_run` is set.
             ///
             /// Field 3: `submitted_cancels`
             #[must_use]
             pub fn submitted_cancels(&self) -> u32 {
                 self.0.reborrow().submitted_cancels
             }
-            /// Number of cancels that could not be submitted (already canceled, etc.).
+            /// Number of matched orders that could not be submitted for cancellation
+            /// because the cancel-all could not be recorded for their symbol. This
+            /// request does not cancel them; send a new cancel-all with a new
+            /// `request_id` if they are still open. Zero when `dry_run` is set.
             ///
             /// Field 4: `failed_cancels`
             #[must_use]
@@ -36391,11 +36571,13 @@ pub mod __buffa {
             pub status: ::buffa::EnumValue<
                 super::super::BatchReplaceItemAdmissionStatus,
             >,
-            /// Original order targeted by the replacement.
+            /// Original order targeted by the replacement: the requested order ID, or the
+            /// order the requested client order ID names. Rejected items keep it too. Unset
+            /// only when the requested client order ID names no order.
             ///
             /// Field 3: `old_order_id`
             pub old_order_id: u64,
-            /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
+            /// Assigned successor order ID. Unset for cancel-only outcomes and rejected items.
             ///
             /// Field 4: `replacement_order_id`
             pub replacement_order_id: u64,
@@ -36859,14 +37041,16 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::BatchReplaceItemAdmissionStatus> {
                 self.0.reborrow().status
             }
-            /// Original order targeted by the replacement.
+            /// Original order targeted by the replacement: the requested order ID, or the
+            /// order the requested client order ID names. Rejected items keep it too. Unset
+            /// only when the requested client order ID names no order.
             ///
             /// Field 3: `old_order_id`
             #[must_use]
             pub fn old_order_id(&self) -> u64 {
                 self.0.reborrow().old_order_id
             }
-            /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
+            /// Assigned successor order ID. Unset for cancel-only outcomes and rejected items.
             ///
             /// Field 4: `replacement_order_id`
             #[must_use]
@@ -44639,6 +44823,311 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// UserTradeBatch is one realtime publication on an account's trade stream:
+        /// every fill queued for the stream when it was sent, at most 256 and at most
+        /// 64 KiB. Fills of one trading symbol arrive in execution order; fills of
+        /// different symbols have no defined order relative to each other.
+        ///
+        /// (match_id, order_id) identifies a fill; order_id tells apart the two fills
+        /// of a trade between two orders of the same account. Apply fills in array
+        /// order and in publication order; a fill whose identity was already received
+        /// replaces the earlier copy. When the subscription reports that missed
+        /// publications could not be recovered, reload recent fills over REST.
+        #[derive(Clone, Debug, Default)]
+        pub struct UserTradeBatchView<'a> {
+            /// Fills, oldest first per trading symbol. At least one fill.
+            ///
+            /// Field 1: `events`
+            pub events: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::UserTradeView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UserTradeBatchView<'a> {
+            type Owned = super::super::UserTradeBatch;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.events
+                            .push(
+                                <super::super::__buffa::view::UserTradeView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UserTradeBatch,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UserTradeBatch,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UserTradeBatch {
+                    events: self
+                        .events
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UserTradeBatchView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.events {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.events {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UserTradeBatchView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.events.is_empty() {
+                    __map.serialize_entry("events", &*self.events)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UserTradeBatchView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "UserTradeBatch";
+            const FULL_NAME: &'static str = "orders.v1.UserTradeBatch";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.UserTradeBatch";
+        }
+        ::buffa::impl_default_view_instance!(UserTradeBatchView);
+        ::buffa::impl_view_reborrow!(UserTradeBatchView);
+        /** Self-contained, `'static` owned view of a `UserTradeBatch` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UserTradeBatchView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UserTradeBatchView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UserTradeBatchOwnedView(
+            ::buffa::OwnedView<UserTradeBatchView<'static>>,
+        );
+        impl UserTradeBatchOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UserTradeBatchOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UserTradeBatchOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UserTradeBatch,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UserTradeBatchOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`UserTradeBatchView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UserTradeBatchView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UserTradeBatch,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Fills, oldest first per trading symbol. At least one fill.
+            ///
+            /// Field 1: `events`
+            #[must_use]
+            pub fn events(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::UserTradeView<'_>,
+            > {
+                &self.0.reborrow().events
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<UserTradeBatchView<'static>>>
+        for UserTradeBatchOwnedView {
+            fn from(inner: ::buffa::OwnedView<UserTradeBatchView<'static>>) -> Self {
+                UserTradeBatchOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UserTradeBatchOwnedView>
+        for ::buffa::OwnedView<UserTradeBatchView<'static>> {
+            fn from(wrapper: UserTradeBatchOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<UserTradeBatchView<'static>>>
+        for UserTradeBatchOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<UserTradeBatchView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::UserTradeBatch {
+            type View<'a> = UserTradeBatchView<'a>;
+            type ViewHandle = UserTradeBatchOwnedView;
+        }
+        impl ::serde::Serialize for UserTradeBatchOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// OrderTransfer is the Connect-facing minimal per-leg transfer view.
         #[derive(Clone, Debug, Default)]
         pub struct OrderTransferView<'a> {
@@ -46759,7 +47248,9 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::OrderView<'a>,
             >,
-            /// Opaque cursor for the next page. Empty when no more results exist.
+            /// Opaque cursor for the next page. A page may hold fewer orders than
+            /// requested, or none; continue while this token is non-empty. Empty when no
+            /// more results exist.
             ///
             /// Field 2: `next_page_token`
             pub next_page_token: &'a str,
@@ -47037,7 +47528,9 @@ pub mod __buffa {
             ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::OrderView<'_>> {
                 &self.0.reborrow().orders
             }
-            /// Opaque cursor for the next page. Empty when no more results exist.
+            /// Opaque cursor for the next page. A page may hold fewer orders than
+            /// requested, or none; continue while this token is non-empty. Empty when no
+            /// more results exist.
             ///
             /// Field 2: `next_page_token`
             #[must_use]
@@ -51302,6 +51795,7 @@ pub mod __buffa {
         reg.register_json_any(super::__ORDER_LINEAGE_JSON_ANY);
         reg.register_json_any(super::__ORDER_JSON_ANY);
         reg.register_json_any(super::__USER_TRADE_JSON_ANY);
+        reg.register_json_any(super::__USER_TRADE_BATCH_JSON_ANY);
         reg.register_json_any(super::__ORDER_TRANSFER_JSON_ANY);
         reg.register_json_any(super::__GET_OPEN_ORDERS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_OPEN_ORDERS_RESPONSE_JSON_ANY);
@@ -51512,6 +52006,10 @@ pub use self::__buffa::view::OrderOwnedView;
 pub use self::__buffa::view::UserTradeView;
 #[doc(inline)]
 pub use self::__buffa::view::UserTradeOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UserTradeBatchView;
+#[doc(inline)]
+pub use self::__buffa::view::UserTradeBatchOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::OrderTransferView;
 #[doc(inline)]

@@ -88,6 +88,12 @@ pub enum ZipperReasonCode {
     WITHDRAWAL_LIQUIDITY_INSUFFICIENT = 3001i32,
     /// Request address was classified as high risk.
     COMPLIANCE_HIGH_RISK_ADDRESS = 3002i32,
+    /// Deposit source address was blocked by compliance screening. The deposit
+    /// is held for manual review.
+    COMPLIANCE_ADDRESS_BLOCKED = 3003i32,
+    /// Deposit source address did not pass compliance screening. The deposit is
+    /// eligible to be returned to its registered return address.
+    COMPLIANCE_ADDRESS_RETURN = 3004i32,
     /// Request verification was rejected without a more specific reason.
     REQUEST_VERIFICATION_REJECTED = 3901i32,
     /// Request processing completed with a rejected result.
@@ -229,6 +235,12 @@ impl ZipperReasonCode {
     ///Idiomatic alias for [`Self::COMPLIANCE_HIGH_RISK_ADDRESS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ComplianceHighRiskAddress: Self = Self::COMPLIANCE_HIGH_RISK_ADDRESS;
+    ///Idiomatic alias for [`Self::COMPLIANCE_ADDRESS_BLOCKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ComplianceAddressBlocked: Self = Self::COMPLIANCE_ADDRESS_BLOCKED;
+    ///Idiomatic alias for [`Self::COMPLIANCE_ADDRESS_RETURN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ComplianceAddressReturn: Self = Self::COMPLIANCE_ADDRESS_RETURN;
     ///Idiomatic alias for [`Self::REQUEST_VERIFICATION_REJECTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const RequestVerificationRejected: Self = Self::REQUEST_VERIFICATION_REJECTED;
@@ -443,6 +455,8 @@ impl ::buffa::Enumeration for ZipperReasonCode {
                 ::core::option::Option::Some(Self::WITHDRAWAL_LIQUIDITY_INSUFFICIENT)
             }
             3002i32 => ::core::option::Option::Some(Self::COMPLIANCE_HIGH_RISK_ADDRESS),
+            3003i32 => ::core::option::Option::Some(Self::COMPLIANCE_ADDRESS_BLOCKED),
+            3004i32 => ::core::option::Option::Some(Self::COMPLIANCE_ADDRESS_RETURN),
             3901i32 => ::core::option::Option::Some(Self::REQUEST_VERIFICATION_REJECTED),
             3902i32 => ::core::option::Option::Some(Self::REJECTED),
             9000i32 => ::core::option::Option::Some(Self::ERROR_UNMAPPED),
@@ -534,6 +548,8 @@ impl ::buffa::Enumeration for ZipperReasonCode {
                 "WITHDRAWAL_LIQUIDITY_INSUFFICIENT"
             }
             Self::COMPLIANCE_HIGH_RISK_ADDRESS => "COMPLIANCE_HIGH_RISK_ADDRESS",
+            Self::COMPLIANCE_ADDRESS_BLOCKED => "COMPLIANCE_ADDRESS_BLOCKED",
+            Self::COMPLIANCE_ADDRESS_RETURN => "COMPLIANCE_ADDRESS_RETURN",
             Self::REQUEST_VERIFICATION_REJECTED => "REQUEST_VERIFICATION_REJECTED",
             Self::REJECTED => "REJECTED",
             Self::ERROR_UNMAPPED => "ERROR_UNMAPPED",
@@ -677,6 +693,12 @@ impl ::buffa::Enumeration for ZipperReasonCode {
             "COMPLIANCE_HIGH_RISK_ADDRESS" => {
                 ::core::option::Option::Some(Self::COMPLIANCE_HIGH_RISK_ADDRESS)
             }
+            "COMPLIANCE_ADDRESS_BLOCKED" => {
+                ::core::option::Option::Some(Self::COMPLIANCE_ADDRESS_BLOCKED)
+            }
+            "COMPLIANCE_ADDRESS_RETURN" => {
+                ::core::option::Option::Some(Self::COMPLIANCE_ADDRESS_RETURN)
+            }
             "REQUEST_VERIFICATION_REJECTED" => {
                 ::core::option::Option::Some(Self::REQUEST_VERIFICATION_REJECTED)
             }
@@ -743,6 +765,8 @@ impl ::buffa::Enumeration for ZipperReasonCode {
             Self::XRP_WITHDRAWAL_DESTINATION_TAG_INVALID,
             Self::WITHDRAWAL_LIQUIDITY_INSUFFICIENT,
             Self::COMPLIANCE_HIGH_RISK_ADDRESS,
+            Self::COMPLIANCE_ADDRESS_BLOCKED,
+            Self::COMPLIANCE_ADDRESS_RETURN,
             Self::REQUEST_VERIFICATION_REJECTED,
             Self::REJECTED,
             Self::ERROR_UNMAPPED,

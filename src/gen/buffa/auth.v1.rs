@@ -36809,7 +36809,8 @@ pub enum AuthErrorCode {
     AUTH_SOCIAL_VERIFICATION_EXPIRED = 42i32,
     /// Social verification cannot accept a ready mark in its current state.
     AUTH_SOCIAL_VERIFICATION_INVALID_STATE = 43i32,
-    /// Sub-account authorization is expired, replaced, replayed, or invalid.
+    /// Sub-account authorization is expired, replaced, consumed, or has an invalid signature.
+    /// Temporary verification failures return Unavailable; retry the same signed challenge.
     AUTH_SUBACCOUNT_CHALLENGE_INVALID = 44i32,
     /// Social account is already linked to another Polyester account.
     AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED = 45i32,

@@ -193,9 +193,13 @@ pub enum TriggerStatus {
     STATUS_ARMED = 2i32,
     /// Trigger is actively executing (for example, TWAP slices in progress).
     STATUS_RUNNING = 3i32,
-    /// Trigger completed successfully (all child orders placed/filled).
+    /// Trigger completed successfully. A ladder completes only when every child
+    /// order filled; a ladder whose child orders were canceled or rejected ends
+    /// canceled or failed instead.
     STATUS_COMPLETED = 4i32,
-    /// Trigger was canceled by user.
+    /// Trigger was canceled. The cancel reason states why, for example a user
+    /// request, a linked one-cancels-the-other trigger, self-trade prevention, or,
+    /// for a ladder, the cancellation of its child orders.
     STATUS_CANCELED = 5i32,
     /// Trigger failed (for example, reservation failure, child order rejection).
     STATUS_FAILED = 6i32,
@@ -565,6 +569,10 @@ pub enum TriggerCancelReason {
     TRIGGER_CANCEL_REASON_OCO = 2i32,
     /// The parent order ended without a fill, so its attached trigger was canceled.
     TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL = 3i32,
+    /// Self-trade prevention canceled the trigger's child orders. For a ladder,
+    /// no child order was canceled by the user, and the first child order to be
+    /// canceled was canceled by self-trade prevention.
+    TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION = 4i32,
     /// The terminal state did not contain a cancellation reason.
     TRIGGER_CANCEL_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure canceled the trigger.
@@ -583,6 +591,9 @@ impl TriggerCancelReason {
     ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ParentCanceledNoFill: Self = Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SelfTradePrevention: Self = Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION;
     ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE;
@@ -697,6 +708,11 @@ impl ::buffa::Enumeration for TriggerCancelReason {
                     Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL,
                 )
             }
+            4i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION,
+                )
+            }
             998i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
@@ -723,6 +739,9 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL => {
                 "TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL"
             }
+            Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION => {
+                "TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION"
+            }
             Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE"
             }
@@ -747,6 +766,11 @@ impl ::buffa::Enumeration for TriggerCancelReason {
                     Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL,
                 )
             }
+            "TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION,
+                )
+            }
             "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
@@ -764,6 +788,7 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             Self::TRIGGER_CANCEL_REASON_USER_REQUEST,
             Self::TRIGGER_CANCEL_REASON_OCO,
             Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL,
+            Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION,
             Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR,
         ]
@@ -4448,7 +4473,10 @@ pub struct TriggerIntent {
     pub self_trade_prevention_mode: ::buffa::EnumValue<
         super::super::orders::v1::SelfTradePreventionMode,
     >,
-    /// Client-provided trigger ID for idempotency.
+    /// Client-provided trigger ID for idempotency. Retrying an accepted create
+    /// with the identical intent returns the same trigger. After a create fails
+    /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
+    /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
     ///
     /// Field 5: `client_trigger_id`
     #[serde(
@@ -7270,6 +7298,149 @@ pub mod trigger_event {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::trigger_event::TerminalReason as TerminalReasonView;
 }
+/// TriggerEventBatch is one realtime publication on an account's trigger event
+/// stream: every event queued for the stream when it was sent, at most 256 and
+/// at most 64 KiB. Events of one trading symbol arrive in the order they
+/// happened; events of different symbols have no defined order relative to each
+/// other.
+///
+/// (trigger_id, event_type, child_seq, ts_ns) identifies an event. Apply events
+/// in array order and in publication order; an event whose identity was
+/// already received replaces the earlier copy. When the subscription reports
+/// that missed publications could not be recovered, reload recent events over
+/// REST.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TriggerEventBatch {
+    /// Trigger events, oldest first per trading symbol. At least one event.
+    ///
+    /// Field 1: `events`
+    #[serde(
+        rename = "events",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub events: ::buffa::alloc::vec::Vec<TriggerEvent>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TriggerEventBatch {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TriggerEventBatch").field("events", &self.events).finish()
+    }
+}
+impl TriggerEventBatch {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerEventBatch";
+}
+::buffa::impl_default_instance!(TriggerEventBatch);
+impl ::buffa::MessageName for TriggerEventBatch {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "TriggerEventBatch";
+    const FULL_NAME: &'static str = "triggers.v1.TriggerEventBatch";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerEventBatch";
+}
+impl ::buffa::Message for TriggerEventBatch {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.events {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.events {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.events.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.events.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TriggerEventBatch {
+    const PROTO_FQN: &'static str = "triggers.v1.TriggerEventBatch";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TriggerEventBatch {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRIGGER_EVENT_BATCH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TriggerEventBatch",
+    to_json: ::buffa::type_registry::any_to_json::<TriggerEventBatch>,
+    from_json: ::buffa::type_registry::any_from_json::<TriggerEventBatch>,
+    is_wkt: false,
+};
 /// ListTriggerEventsResponse returns historical events ordered newest-first.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -10435,8 +10606,9 @@ pub struct LadderDetails {
     )]
     pub ladder_distribution: ::buffa::EnumValue<LadderDistribution>,
     /// Cumulative filled child-order base quantity scaled by the pair's
-    /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed,
-    /// including when the parent completed because all children were canceled.
+    /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed.
+    /// The total is kept when the ladder ends, whether it is completed, canceled
+    /// or failed.
     ///
     /// Field 5: `executed_qty_scaled`
     #[serde(
@@ -16269,7 +16441,10 @@ pub mod __buffa {
             pub self_trade_prevention_mode: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::SelfTradePreventionMode,
             >,
-            /// Client-provided trigger ID for idempotency.
+            /// Client-provided trigger ID for idempotency. Retrying an accepted create
+            /// with the identical intent returns the same trigger. After a create fails
+            /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
+            /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
             ///
             /// Field 5: `client_trigger_id`
             pub client_trigger_id: &'a str,
@@ -16986,7 +17161,10 @@ pub mod __buffa {
             > {
                 self.0.reborrow().self_trade_prevention_mode
             }
-            /// Client-provided trigger ID for idempotency.
+            /// Client-provided trigger ID for idempotency. Retrying an accepted create
+            /// with the identical intent returns the same trigger. After a create fails
+            /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
+            /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
             ///
             /// Field 5: `client_trigger_id`
             #[must_use]
@@ -20354,6 +20532,312 @@ pub mod __buffa {
             type ViewHandle = TriggerEventOwnedView;
         }
         impl ::serde::Serialize for TriggerEventOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TriggerEventBatch is one realtime publication on an account's trigger event
+        /// stream: every event queued for the stream when it was sent, at most 256 and
+        /// at most 64 KiB. Events of one trading symbol arrive in the order they
+        /// happened; events of different symbols have no defined order relative to each
+        /// other.
+        ///
+        /// (trigger_id, event_type, child_seq, ts_ns) identifies an event. Apply events
+        /// in array order and in publication order; an event whose identity was
+        /// already received replaces the earlier copy. When the subscription reports
+        /// that missed publications could not be recovered, reload recent events over
+        /// REST.
+        #[derive(Clone, Debug, Default)]
+        pub struct TriggerEventBatchView<'a> {
+            /// Trigger events, oldest first per trading symbol. At least one event.
+            ///
+            /// Field 1: `events`
+            pub events: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::TriggerEventView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TriggerEventBatchView<'a> {
+            type Owned = super::super::TriggerEventBatch;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.events
+                            .push(
+                                <super::super::__buffa::view::TriggerEventView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerEventBatch,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TriggerEventBatch,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TriggerEventBatch {
+                    events: self
+                        .events
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TriggerEventBatchView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.events {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.events {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TriggerEventBatchView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.events.is_empty() {
+                    __map.serialize_entry("events", &*self.events)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TriggerEventBatchView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TriggerEventBatch";
+            const FULL_NAME: &'static str = "triggers.v1.TriggerEventBatch";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerEventBatch";
+        }
+        ::buffa::impl_default_view_instance!(TriggerEventBatchView);
+        ::buffa::impl_view_reborrow!(TriggerEventBatchView);
+        /** Self-contained, `'static` owned view of a `TriggerEventBatch` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TriggerEventBatchView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TriggerEventBatchView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TriggerEventBatchOwnedView(
+            ::buffa::OwnedView<TriggerEventBatchView<'static>>,
+        );
+        impl TriggerEventBatchOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerEventBatchOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerEventBatchOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TriggerEventBatch,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerEventBatchOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TriggerEventBatchView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TriggerEventBatchView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerEventBatch,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Trigger events, oldest first per trading symbol. At least one event.
+            ///
+            /// Field 1: `events`
+            #[must_use]
+            pub fn events(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::TriggerEventView<'_>,
+            > {
+                &self.0.reborrow().events
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TriggerEventBatchView<'static>>>
+        for TriggerEventBatchOwnedView {
+            fn from(inner: ::buffa::OwnedView<TriggerEventBatchView<'static>>) -> Self {
+                TriggerEventBatchOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TriggerEventBatchOwnedView>
+        for ::buffa::OwnedView<TriggerEventBatchView<'static>> {
+            fn from(wrapper: TriggerEventBatchOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TriggerEventBatchView<'static>>>
+        for TriggerEventBatchOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TriggerEventBatchView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TriggerEventBatch {
+            type View<'a> = TriggerEventBatchView<'a>;
+            type ViewHandle = TriggerEventBatchOwnedView;
+        }
+        impl ::serde::Serialize for TriggerEventBatchOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -25454,8 +25938,9 @@ pub mod __buffa {
                 super::super::LadderDistribution,
             >,
             /// Cumulative filled child-order base quantity scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed,
-            /// including when the parent completed because all children were canceled.
+            /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed.
+            /// The total is kept when the ladder ends, whether it is completed, canceled
+            /// or failed.
             ///
             /// Field 5: `executed_qty_scaled`
             pub executed_qty_scaled: i64,
@@ -25877,8 +26362,9 @@ pub mod __buffa {
                 self.0.reborrow().ladder_distribution
             }
             /// Cumulative filled child-order base quantity scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed,
-            /// including when the parent completed because all children were canceled.
+            /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed.
+            /// The total is kept when the ladder ends, whether it is completed, canceled
+            /// or failed.
             ///
             /// Field 5: `executed_qty_scaled`
             #[must_use]
@@ -28416,6 +28902,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_TRIGGERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_TRIGGER_EVENTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__TRIGGER_EVENT_JSON_ANY);
+        reg.register_json_any(super::__TRIGGER_EVENT_BATCH_JSON_ANY);
         reg.register_json_any(super::__LIST_TRIGGER_EVENTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CANCEL_TRIGGER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CANCEL_TRIGGER_RESPONSE_JSON_ANY);
@@ -28512,6 +28999,10 @@ pub use self::__buffa::view::ListTriggerEventsRequestOwnedView;
 pub use self::__buffa::view::TriggerEventView;
 #[doc(inline)]
 pub use self::__buffa::view::TriggerEventOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerEventBatchView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerEventBatchOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListTriggerEventsResponseView;
 #[doc(inline)]

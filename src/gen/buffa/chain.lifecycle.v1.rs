@@ -800,7 +800,7 @@ impl ::buffa::Enumeration for FlowDomain {
 #[repr(i32)]
 pub enum LifecycleSource {
     SOURCE_UNSPECIFIED = 0i32,
-    /// Off-chain relayer or source-chain watcher.
+    /// Source-chain observation of the external transaction.
     SOURCE_RELAYER = 1i32,
     /// Polyester Chain contract event or other chain-owned lifecycle fact.
     SOURCE_POLYESTER_CHAIN = 2i32,
@@ -2171,7 +2171,7 @@ impl ::buffa::Enumeration for ListOrderBy {
 pub enum FlowStep {
     /// Step is not specified.
     FLOW_STEP_UNSPECIFIED = 0i32,
-    /// External-chain / relayer source tracking before Polyester can continue.
+    /// External-chain source tracking before Polyester can continue.
     FLOW_STEP_SOURCE = 1i32,
     /// Deposit-side mint and downstream crediting / transfer stage.
     FLOW_STEP_TRANSFER = 2i32,
