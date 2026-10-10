@@ -193,9 +193,13 @@ pub enum TriggerStatus {
     STATUS_ARMED = 2i32,
     /// Trigger is actively executing (for example, TWAP slices in progress).
     STATUS_RUNNING = 3i32,
-    /// Trigger completed successfully (all child orders placed/filled).
+    /// Trigger completed successfully. A ladder completes only when every child
+    /// order filled; a ladder whose child orders were canceled or rejected ends
+    /// canceled or failed instead.
     STATUS_COMPLETED = 4i32,
-    /// Trigger was canceled by user.
+    /// Trigger was canceled. The cancel reason states why, for example a user
+    /// request, a linked one-cancels-the-other trigger, self-trade prevention, or,
+    /// for a ladder, the cancellation of its child orders.
     STATUS_CANCELED = 5i32,
     /// Trigger failed (for example, reservation failure, child order rejection).
     STATUS_FAILED = 6i32,
@@ -390,6 +394,8 @@ pub enum TriggerEventType {
     EVENT_UPDATED = 3i32,
     /// Trigger became terminal after its next child order could not be admitted.
     EVENT_FAILED = 4i32,
+    /// A standalone trailing trigger's activation condition was satisfied and tracking began.
+    EVENT_ACTIVATED = 5i32,
 }
 impl TriggerEventType {
     ///Idiomatic alias for [`Self::EVENT_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -407,6 +413,9 @@ impl TriggerEventType {
     ///Idiomatic alias for [`Self::EVENT_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const EventFailed: Self = Self::EVENT_FAILED;
+    ///Idiomatic alias for [`Self::EVENT_ACTIVATED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const EventActivated: Self = Self::EVENT_ACTIVATED;
 }
 impl ::core::default::Default for TriggerEventType {
     fn default() -> Self {
@@ -509,6 +518,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             2i32 => ::core::option::Option::Some(Self::EVENT_CANCELED),
             3i32 => ::core::option::Option::Some(Self::EVENT_UPDATED),
             4i32 => ::core::option::Option::Some(Self::EVENT_FAILED),
+            5i32 => ::core::option::Option::Some(Self::EVENT_ACTIVATED),
             _ => ::core::option::Option::None,
         }
     }
@@ -522,6 +532,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             Self::EVENT_CANCELED => "EVENT_CANCELED",
             Self::EVENT_UPDATED => "EVENT_UPDATED",
             Self::EVENT_FAILED => "EVENT_FAILED",
+            Self::EVENT_ACTIVATED => "EVENT_ACTIVATED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -531,6 +542,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             "EVENT_CANCELED" => ::core::option::Option::Some(Self::EVENT_CANCELED),
             "EVENT_UPDATED" => ::core::option::Option::Some(Self::EVENT_UPDATED),
             "EVENT_FAILED" => ::core::option::Option::Some(Self::EVENT_FAILED),
+            "EVENT_ACTIVATED" => ::core::option::Option::Some(Self::EVENT_ACTIVATED),
             _ => ::core::option::Option::None,
         }
     }
@@ -541,6 +553,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             Self::EVENT_CANCELED,
             Self::EVENT_UPDATED,
             Self::EVENT_FAILED,
+            Self::EVENT_ACTIVATED,
         ]
     }
 }
@@ -556,6 +569,10 @@ pub enum TriggerCancelReason {
     TRIGGER_CANCEL_REASON_OCO = 2i32,
     /// The parent order ended without a fill, so its attached trigger was canceled.
     TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL = 3i32,
+    /// Self-trade prevention canceled the trigger's child orders. For a ladder,
+    /// no child order was canceled by the user, and the first child order to be
+    /// canceled was canceled by self-trade prevention.
+    TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION = 4i32,
     /// The terminal state did not contain a cancellation reason.
     TRIGGER_CANCEL_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure canceled the trigger.
@@ -574,6 +591,9 @@ impl TriggerCancelReason {
     ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ParentCanceledNoFill: Self = Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SelfTradePrevention: Self = Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION;
     ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE;
@@ -688,6 +708,11 @@ impl ::buffa::Enumeration for TriggerCancelReason {
                     Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL,
                 )
             }
+            4i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION,
+                )
+            }
             998i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
@@ -714,6 +739,9 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL => {
                 "TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL"
             }
+            Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION => {
+                "TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION"
+            }
             Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE"
             }
@@ -738,6 +766,11 @@ impl ::buffa::Enumeration for TriggerCancelReason {
                     Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL,
                 )
             }
+            "TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION,
+                )
+            }
             "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
@@ -755,6 +788,7 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             Self::TRIGGER_CANCEL_REASON_USER_REQUEST,
             Self::TRIGGER_CANCEL_REASON_OCO,
             Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL,
+            Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION,
             Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR,
         ]
@@ -840,6 +874,8 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS = 50i32,
     /// Account policy had halted trading.
     TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED = 51i32,
+    /// The maximum slippage could not produce a valid execution price bound.
+    TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID = 53i32,
     /// The terminal state did not contain a failure reason.
     TRIGGER_FAILURE_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure caused the trigger to fail.
@@ -960,6 +996,9 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const PolicyTradingHalted: Self = Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxSlippageInvalid: Self = Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE;
@@ -1218,6 +1257,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED,
                 )
             }
+            53i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID,
+                )
+            }
             998i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -1343,6 +1387,9 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             }
             Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED => {
                 "TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID => {
+                "TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID"
             }
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE"
@@ -1514,6 +1561,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED,
                 )
             }
+            "TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID,
+                )
+            }
             "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -1565,6 +1617,7 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_POLICY_MAX_NOTIONAL,
             Self::TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS,
             Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED,
+            Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID,
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR,
         ]
@@ -1844,7 +1897,7 @@ pub const __TRIGGER_MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TriggerLimitGtc {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -1997,7 +2050,7 @@ pub const __TRIGGER_LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TriggerLimitIoc {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -2125,7 +2178,7 @@ pub const __TRIGGER_LIMIT_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TriggerLimitFok {
-    /// Limit price in quote units scaled by 1e6.
+    /// Limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -2660,7 +2713,7 @@ pub mod conditional_child_execution {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ConditionalTrigger {
-    /// Trigger threshold in quote units scaled by 1e6.
+    /// Trigger threshold in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -2855,7 +2908,7 @@ pub const __CONDITIONAL_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct TrailingStopTrigger {
-    /// Optional activation price in quote units scaled by 1e6.
+    /// Optional activation price in quote units scaled by 1e9.
     ///
     /// Field 3: `activation_price_ticks`
     #[serde(
@@ -2946,7 +2999,7 @@ impl ::buffa::Message for TrailingStopTrigger {
                 __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
                     v,
                 ) => {
-                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                 }
                 __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
                     v,
@@ -2993,7 +3046,7 @@ impl ::buffa::Message for TrailingStopTrigger {
                 __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
                     x,
                 ) => {
-                    ::buffa::types::put_int32_field(4u32, *x, buf);
+                    ::buffa::types::put_int64_field(4u32, *x, buf);
                 }
                 __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
                     x,
@@ -3057,7 +3110,7 @@ impl ::buffa::Message for TrailingStopTrigger {
                 )?;
                 self.max_slippage = ::core::option::Option::Some(
                     __buffa::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
-                        ::buffa::types::decode_int32(buf)?,
+                        ::buffa::types::decode_int64(buf)?,
                     ),
                 );
             }
@@ -3228,15 +3281,15 @@ impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
                         "maxSlippageTicks" | "max_slippage_ticks" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
+                                type Value = i64;
                                 fn deserialize<D: serde::Deserializer<'de>>(
                                     self,
                                     d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
                                 }
                             }
-                            let v: ::core::option::Option<i32> = map
+                            let v: ::core::option::Option<i64> = map
                                 .next_value_seed(
                                     ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
                                 )?;
@@ -3385,7 +3438,7 @@ impl ::buffa::Message for TwapMarketIoc {
         if let ::core::option::Option::Some(ref v) = self.max_slippage {
             match v {
                 __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(v) => {
-                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                 }
                 __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(v) => {
                     size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
@@ -3405,7 +3458,7 @@ impl ::buffa::Message for TwapMarketIoc {
         if let ::core::option::Option::Some(ref v) = self.max_slippage {
             match v {
                 __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(x) => {
-                    ::buffa::types::put_int32_field(1u32, *x, buf);
+                    ::buffa::types::put_int64_field(1u32, *x, buf);
                 }
                 __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(x) => {
                     ::buffa::types::put_int32_field(2u32, *x, buf);
@@ -3432,7 +3485,7 @@ impl ::buffa::Message for TwapMarketIoc {
                 )?;
                 self.max_slippage = ::core::option::Option::Some(
                     __buffa::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
-                        ::buffa::types::decode_int32(buf)?,
+                        ::buffa::types::decode_int64(buf)?,
                     ),
                 );
             }
@@ -3491,15 +3544,15 @@ impl<'de> serde::Deserialize<'de> for TwapMarketIoc {
                         "maxSlippageTicks" | "max_slippage_ticks" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
+                                type Value = i64;
                                 fn deserialize<D: serde::Deserializer<'de>>(
                                     self,
                                     d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
                                 }
                             }
-                            let v: ::core::option::Option<i32> = map
+                            let v: ::core::option::Option<i64> = map
                                 .next_value_seed(
                                     ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
                                 )?;
@@ -3595,7 +3648,7 @@ pub mod twap_market_ioc {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TwapLimitGtc {
-    /// Slice limit price in quote units scaled by 1e6.
+    /// Slice limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -4153,7 +4206,7 @@ pub struct LadderTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
-    /// Minimum generated level price in quote units scaled by 1e6.
+    /// Minimum generated level price in quote units scaled by 1e9.
     ///
     /// Field 2: `price_min_ticks`
     #[serde(
@@ -4163,7 +4216,7 @@ pub struct LadderTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub price_min_ticks: i64,
-    /// Maximum generated level price in quote units scaled by 1e6.
+    /// Maximum generated level price in quote units scaled by 1e9.
     ///
     /// Field 3: `price_max_ticks`
     #[serde(
@@ -4420,7 +4473,10 @@ pub struct TriggerIntent {
     pub self_trade_prevention_mode: ::buffa::EnumValue<
         super::super::orders::v1::SelfTradePreventionMode,
     >,
-    /// Client-provided trigger ID for idempotency.
+    /// Client-provided trigger ID for idempotency. Retrying an accepted create
+    /// with the identical intent returns the same trigger. After a create fails
+    /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
+    /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
     ///
     /// Field 5: `client_trigger_id`
     #[serde(
@@ -6645,7 +6701,7 @@ pub struct TriggerEvent {
     )]
     pub child_order_id: u64,
     /// Price that caused a conditional trigger to fire, in quote units scaled by
-    /// 1e6. Absent for time-scheduled triggers such as TWAP.
+    /// 1e9. Absent for time-scheduled triggers such as TWAP.
     ///
     /// Field 13: `fire_price_ticks`
     #[serde(
@@ -7242,6 +7298,149 @@ pub mod trigger_event {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::trigger_event::TerminalReason as TerminalReasonView;
 }
+/// TriggerEventBatch is one realtime publication on an account's trigger event
+/// stream: every event queued for the stream when it was sent, at most 256 and
+/// at most 64 KiB. Events of one trading symbol arrive in the order they
+/// happened; events of different symbols have no defined order relative to each
+/// other.
+///
+/// (trigger_id, event_type, child_seq, ts_ns) identifies an event. Apply events
+/// in array order and in publication order; an event whose identity was
+/// already received replaces the earlier copy. When the subscription reports
+/// that missed publications could not be recovered, reload recent events over
+/// REST.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TriggerEventBatch {
+    /// Trigger events, oldest first per trading symbol. At least one event.
+    ///
+    /// Field 1: `events`
+    #[serde(
+        rename = "events",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub events: ::buffa::alloc::vec::Vec<TriggerEvent>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TriggerEventBatch {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TriggerEventBatch").field("events", &self.events).finish()
+    }
+}
+impl TriggerEventBatch {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerEventBatch";
+}
+::buffa::impl_default_instance!(TriggerEventBatch);
+impl ::buffa::MessageName for TriggerEventBatch {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "TriggerEventBatch";
+    const FULL_NAME: &'static str = "triggers.v1.TriggerEventBatch";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerEventBatch";
+}
+impl ::buffa::Message for TriggerEventBatch {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.events {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.events {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.events.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.events.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TriggerEventBatch {
+    const PROTO_FQN: &'static str = "triggers.v1.TriggerEventBatch";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TriggerEventBatch {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRIGGER_EVENT_BATCH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.TriggerEventBatch",
+    to_json: ::buffa::type_registry::any_to_json::<TriggerEventBatch>,
+    from_json: ::buffa::type_registry::any_from_json::<TriggerEventBatch>,
+    is_wkt: false,
+};
 /// ListTriggerEventsResponse returns historical events ordered newest-first.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -7833,7 +8032,7 @@ pub struct ModifyTriggerRequest {
     pub symbol_id: u32,
     /// Patch fields for safe price, trailing-distance, and slippage edits.
     /// For stop/take-profit:
-    /// Updated trigger price in quote units scaled by 1e6.
+    /// Updated trigger price in quote units scaled by 1e9.
     ///
     /// Field 10: `trigger_price_ticks`
     #[serde(
@@ -7843,7 +8042,7 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub trigger_price_ticks: ::core::option::Option<i64>,
-    /// Updated limit price in quote units scaled by 1e6 for LIMIT child orders.
+    /// Updated limit price in quote units scaled by 1e9 for LIMIT child orders.
     ///
     /// Field 11: `limit_price_ticks`
     #[serde(
@@ -7853,7 +8052,7 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub limit_price_ticks: ::core::option::Option<i64>,
-    /// Updated activation price in quote units scaled by 1e6. Set to zero to
+    /// Updated activation price in quote units scaled by 1e9. Set to zero to
     /// clear an existing activation price; omit to leave it unchanged.
     ///
     /// Field 14: `activation_price_ticks`
@@ -7982,7 +8181,7 @@ impl ::buffa::Message for ModifyTriggerRequest {
                 __buffa::oneof::modify_trigger_request::MaxSlippage::MaxSlippageTicks(
                     v,
                 ) => {
-                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                 }
                 __buffa::oneof::modify_trigger_request::MaxSlippage::MaxSlippageBps(
                     v,
@@ -8038,7 +8237,7 @@ impl ::buffa::Message for ModifyTriggerRequest {
                 __buffa::oneof::modify_trigger_request::MaxSlippage::MaxSlippageTicks(
                     x,
                 ) => {
-                    ::buffa::types::put_int32_field(15u32, *x, buf);
+                    ::buffa::types::put_int64_field(15u32, *x, buf);
                 }
                 __buffa::oneof::modify_trigger_request::MaxSlippage::MaxSlippageBps(
                     x,
@@ -8139,7 +8338,7 @@ impl ::buffa::Message for ModifyTriggerRequest {
                 )?;
                 self.max_slippage = ::core::option::Option::Some(
                     __buffa::oneof::modify_trigger_request::MaxSlippage::MaxSlippageTicks(
-                        ::buffa::types::decode_int32(buf)?,
+                        ::buffa::types::decode_int64(buf)?,
                     ),
                 );
             }
@@ -8384,15 +8583,15 @@ impl<'de> serde::Deserialize<'de> for ModifyTriggerRequest {
                         "maxSlippageTicks" | "max_slippage_ticks" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = i32;
+                                type Value = i64;
                                 fn deserialize<D: serde::Deserializer<'de>>(
                                     self,
                                     d: D,
-                                ) -> ::core::result::Result<i32, D::Error> {
-                                    ::buffa::json_helpers::int32::deserialize(d)
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
                                 }
                             }
-                            let v: ::core::option::Option<i32> = map
+                            let v: ::core::option::Option<i64> = map
                                 .next_value_seed(
                                     ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
                                 )?;
@@ -9522,7 +9721,7 @@ pub const __RESUME_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct StopDetails {
-    /// Trigger threshold price in quote units scaled by 1e6.
+    /// Trigger threshold price in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -9723,7 +9922,7 @@ pub const __STOP_DETAILS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TrailingDetails {
-    /// Trailing distance as a price delta in 1e-6 quote-unit ticks.
+    /// Trailing distance as a price delta in 1e-9 quote-unit ticks.
     ///
     /// Field 1: `trailing_distance_ticks`
     #[serde(
@@ -9734,7 +9933,7 @@ pub struct TrailingDetails {
     )]
     pub trailing_distance_ticks: i64,
     /// Optional activation price: trailing only starts after this price is
-    /// reached. Expressed in quote units scaled by 1e6.
+    /// reached. Expressed in quote units scaled by 1e9.
     ///
     /// Field 2: `activation_price_ticks`
     #[serde(
@@ -9744,7 +9943,7 @@ pub struct TrailingDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub activation_price_ticks: i64,
-    /// Current peak price in quote units scaled by 1e6 for sell trailing stops.
+    /// Current peak price in quote units scaled by 1e9 for sell trailing stops.
     ///
     /// Field 3: `peak_price_ticks`
     #[serde(
@@ -9754,7 +9953,7 @@ pub struct TrailingDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub peak_price_ticks: i64,
-    /// Current trough price in quote units scaled by 1e6 for buy trailing stops.
+    /// Current trough price in quote units scaled by 1e9 for buy trailing stops.
     ///
     /// Field 4: `trough_price_ticks`
     #[serde(
@@ -9774,16 +9973,17 @@ pub struct TrailingDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub trailing_distance_bps: i32,
-    /// Optional maximum allowed slippage as a price delta in 1e-6 quote-unit ticks.
+    /// Non-negative maximum absolute price delta in Q9 execution-price ticks
+    /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
     ///
     /// Field 6: `max_slippage_ticks`
     #[serde(
         rename = "maxSlippageTicks",
         alias = "max_slippage_ticks",
-        with = "::buffa::json_helpers::int32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
-    pub max_slippage_ticks: i32,
+    pub max_slippage_ticks: i64,
     /// Optional maximum allowed slippage in basis points (1 bp = 0.01%).
     ///
     /// Field 7: `max_slippage_bps`
@@ -9820,6 +10020,18 @@ pub struct TrailingDetails {
     pub trigger_direction: ::buffa::EnumValue<
         super::super::orders::v1::TriggerDirection,
     >,
+    /// Current trailing trigger threshold in quote units scaled by 1e9. This is
+    /// evaluator-authored runtime state and moves when the peak or trough changes.
+    /// It is absent until the trailing trigger is armed and a positive threshold exists.
+    ///
+    /// Field 10: `trigger_price_ticks`
+    #[serde(
+        rename = "triggerPriceTicks",
+        alias = "trigger_price_ticks",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub trigger_price_ticks: ::core::option::Option<i64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9836,6 +10048,7 @@ impl ::core::fmt::Debug for TrailingDetails {
             .field("max_slippage_bps", &self.max_slippage_bps)
             .field("trigger_price_source", &self.trigger_price_source)
             .field("trigger_direction", &self.trigger_direction)
+            .field("trigger_price_ticks", &self.trigger_price_ticks)
             .finish()
     }
 }
@@ -9845,6 +10058,15 @@ impl TrailingDetails {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TrailingDetails";
+}
+impl TrailingDetails {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::trigger_price_ticks`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_trigger_price_ticks(mut self, value: i64) -> Self {
+        self.trigger_price_ticks = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(TrailingDetails);
 impl ::buffa::MessageName for TrailingDetails {
@@ -9892,10 +10114,10 @@ impl ::buffa::Message for TrailingDetails {
                     + ::buffa::types::int32_encoded_len(self.trailing_distance_bps)
                         as u32;
         }
-        if self.max_slippage_ticks != 0i32 {
+        if self.max_slippage_ticks != 0i64 {
             size
                 += 1u32
-                    + ::buffa::types::int32_encoded_len(self.max_slippage_ticks) as u32;
+                    + ::buffa::types::int64_encoded_len(self.max_slippage_ticks) as u32;
         }
         if self.max_slippage_bps != 0i32 {
             size
@@ -9913,6 +10135,9 @@ impl ::buffa::Message for TrailingDetails {
             if val != 0 {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
+        }
+        if let Some(v) = self.trigger_price_ticks {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -9939,8 +10164,8 @@ impl ::buffa::Message for TrailingDetails {
         if self.trailing_distance_bps != 0i32 {
             ::buffa::types::put_int32_field(5u32, self.trailing_distance_bps, buf);
         }
-        if self.max_slippage_ticks != 0i32 {
-            ::buffa::types::put_int32_field(6u32, self.max_slippage_ticks, buf);
+        if self.max_slippage_ticks != 0i64 {
+            ::buffa::types::put_int64_field(6u32, self.max_slippage_ticks, buf);
         }
         if self.max_slippage_bps != 0i32 {
             ::buffa::types::put_int32_field(7u32, self.max_slippage_bps, buf);
@@ -9956,6 +10181,9 @@ impl ::buffa::Message for TrailingDetails {
             if val != 0 {
                 ::buffa::types::put_int32_field(9u32, val, buf);
             }
+        }
+        if let Some(v) = self.trigger_price_ticks {
+            ::buffa::types::put_int64_field(10u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -10010,7 +10238,7 @@ impl ::buffa::Message for TrailingDetails {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.max_slippage_ticks = ::buffa::types::decode_int32(buf)?;
+                self.max_slippage_ticks = ::buffa::types::decode_int64(buf)?;
             }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -10037,6 +10265,15 @@ impl ::buffa::Message for TrailingDetails {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_ticks = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -10050,10 +10287,11 @@ impl ::buffa::Message for TrailingDetails {
         self.peak_price_ticks = 0i64;
         self.trough_price_ticks = 0i64;
         self.trailing_distance_bps = 0i32;
-        self.max_slippage_ticks = 0i32;
+        self.max_slippage_ticks = 0i64;
         self.max_slippage_bps = 0i32;
         self.trigger_price_source = ::buffa::EnumValue::from(0);
         self.trigger_direction = ::buffa::EnumValue::from(0);
+        self.trigger_price_ticks = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -10327,7 +10565,7 @@ pub const __TWAP_DETAILS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LadderDetails {
-    /// Minimum price in quote units scaled by 1e6 for the ladder range.
+    /// Minimum price in quote units scaled by 1e9 for the ladder range.
     ///
     /// Field 1: `ladder_price_min_ticks`
     #[serde(
@@ -10337,7 +10575,7 @@ pub struct LadderDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub ladder_price_min_ticks: i64,
-    /// Maximum price in quote units scaled by 1e6 for the ladder range.
+    /// Maximum price in quote units scaled by 1e9 for the ladder range.
     ///
     /// Field 2: `ladder_price_max_ticks`
     #[serde(
@@ -10368,8 +10606,9 @@ pub struct LadderDetails {
     )]
     pub ladder_distribution: ::buffa::EnumValue<LadderDistribution>,
     /// Cumulative filled child-order base quantity scaled by the pair's
-    /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed,
-    /// including when the parent completed because all children were canceled.
+    /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed.
+    /// The total is kept when the ladder ends, whether it is completed, canceled
+    /// or failed.
     ///
     /// Field 5: `executed_qty_scaled`
     #[serde(
@@ -12347,7 +12586,7 @@ pub mod __buffa {
         /// TriggerLimitGtc configures a resting limit child.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerLimitGtcView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -12599,7 +12838,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -12647,7 +12886,7 @@ pub mod __buffa {
         /// TriggerLimitIoc configures an immediate-or-cancel limit child.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerLimitIocView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -12878,7 +13117,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -12919,7 +13158,7 @@ pub mod __buffa {
         /// TriggerLimitFok configures a fill-or-kill limit child.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerLimitFokView<'a> {
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -13150,7 +13389,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e6.
+            /// Limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -13737,7 +13976,7 @@ pub mod __buffa {
         /// ConditionalTrigger configures a standalone stop-loss or take-profit.
         #[derive(Clone, Debug, Default)]
         pub struct ConditionalTriggerView<'a> {
-            /// Trigger threshold in quote units scaled by 1e6.
+            /// Trigger threshold in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
@@ -14062,7 +14301,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger threshold in quote units scaled by 1e6.
+            /// Trigger threshold in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
@@ -14125,7 +14364,7 @@ pub mod __buffa {
         /// trailing stops may use either side, opposite their parent order.
         #[derive(Clone, Debug, Default)]
         pub struct TrailingStopTriggerView<'a> {
-            /// Optional activation price in quote units scaled by 1e6.
+            /// Optional activation price in quote units scaled by 1e9.
             ///
             /// Field 3: `activation_price_ticks`
             pub activation_price_ticks: i64,
@@ -14219,7 +14458,7 @@ pub mod __buffa {
                         )?;
                         view.max_slippage = Some(
                             super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
-                                ::buffa::types::decode_int32(&mut cur)?,
+                                ::buffa::types::decode_int64(&mut cur)?,
                             ),
                         );
                     }
@@ -14343,7 +14582,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
                             v,
                         ) => {
-                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                         }
                         super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
                             v,
@@ -14395,7 +14634,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(
                             x,
                         ) => {
-                            ::buffa::types::put_int32_field(4u32, *x, buf);
+                            ::buffa::types::put_int64_field(4u32, *x, buf);
                         }
                         super::super::__buffa::view::oneof::trailing_stop_trigger::MaxSlippage::MaxSlippageBps(
                             x,
@@ -14585,7 +14824,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional activation price in quote units scaled by 1e6.
+            /// Optional activation price in quote units scaled by 1e9.
             ///
             /// Field 3: `activation_price_ticks`
             #[must_use]
@@ -14698,7 +14937,7 @@ pub mod __buffa {
                         )?;
                         view.max_slippage = Some(
                             super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
-                                ::buffa::types::decode_int32(&mut cur)?,
+                                ::buffa::types::decode_int64(&mut cur)?,
                             ),
                         );
                     }
@@ -14780,7 +15019,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
                             v,
                         ) => {
-                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                         }
                         super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(
                             v,
@@ -14805,7 +15044,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageTicks(
                             x,
                         ) => {
-                            ::buffa::types::put_int32_field(1u32, *x, buf);
+                            ::buffa::types::put_int64_field(1u32, *x, buf);
                         }
                         super::super::__buffa::view::oneof::twap_market_ioc::MaxSlippage::MaxSlippageBps(
                             x,
@@ -14997,7 +15236,7 @@ pub mod __buffa {
         /// slice is canceled before the next interval.
         #[derive(Clone, Debug, Default)]
         pub struct TwapLimitGtcView<'a> {
-            /// Slice limit price in quote units scaled by 1e6.
+            /// Slice limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -15226,7 +15465,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Slice limit price in quote units scaled by 1e6.
+            /// Slice limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -15780,11 +16019,11 @@ pub mod __buffa {
             ///
             /// Field 1: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
-            /// Minimum generated level price in quote units scaled by 1e6.
+            /// Minimum generated level price in quote units scaled by 1e9.
             ///
             /// Field 2: `price_min_ticks`
             pub price_min_ticks: i64,
-            /// Maximum generated level price in quote units scaled by 1e6.
+            /// Maximum generated level price in quote units scaled by 1e9.
             ///
             /// Field 3: `price_max_ticks`
             pub price_max_ticks: i64,
@@ -16120,14 +16359,14 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
                 self.0.reborrow().side
             }
-            /// Minimum generated level price in quote units scaled by 1e6.
+            /// Minimum generated level price in quote units scaled by 1e9.
             ///
             /// Field 2: `price_min_ticks`
             #[must_use]
             pub fn price_min_ticks(&self) -> i64 {
                 self.0.reborrow().price_min_ticks
             }
-            /// Maximum generated level price in quote units scaled by 1e6.
+            /// Maximum generated level price in quote units scaled by 1e9.
             ///
             /// Field 3: `price_max_ticks`
             #[must_use]
@@ -16202,7 +16441,10 @@ pub mod __buffa {
             pub self_trade_prevention_mode: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::SelfTradePreventionMode,
             >,
-            /// Client-provided trigger ID for idempotency.
+            /// Client-provided trigger ID for idempotency. Retrying an accepted create
+            /// with the identical intent returns the same trigger. After a create fails
+            /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
+            /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
             ///
             /// Field 5: `client_trigger_id`
             pub client_trigger_id: &'a str,
@@ -16919,7 +17161,10 @@ pub mod __buffa {
             > {
                 self.0.reborrow().self_trade_prevention_mode
             }
-            /// Client-provided trigger ID for idempotency.
+            /// Client-provided trigger ID for idempotency. Retrying an accepted create
+            /// with the identical intent returns the same trigger. After a create fails
+            /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
+            /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
             ///
             /// Field 5: `client_trigger_id`
             #[must_use]
@@ -19681,7 +19926,7 @@ pub mod __buffa {
             /// Field 12: `child_order_id`
             pub child_order_id: u64,
             /// Price that caused a conditional trigger to fire, in quote units scaled by
-            /// 1e6. Absent for time-scheduled triggers such as TWAP.
+            /// 1e9. Absent for time-scheduled triggers such as TWAP.
             ///
             /// Field 13: `fire_price_ticks`
             pub fire_price_ticks: ::core::option::Option<i64>,
@@ -20247,7 +20492,7 @@ pub mod __buffa {
                 self.0.reborrow().child_order_id
             }
             /// Price that caused a conditional trigger to fire, in quote units scaled by
-            /// 1e6. Absent for time-scheduled triggers such as TWAP.
+            /// 1e9. Absent for time-scheduled triggers such as TWAP.
             ///
             /// Field 13: `fire_price_ticks`
             #[must_use]
@@ -20287,6 +20532,312 @@ pub mod __buffa {
             type ViewHandle = TriggerEventOwnedView;
         }
         impl ::serde::Serialize for TriggerEventOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TriggerEventBatch is one realtime publication on an account's trigger event
+        /// stream: every event queued for the stream when it was sent, at most 256 and
+        /// at most 64 KiB. Events of one trading symbol arrive in the order they
+        /// happened; events of different symbols have no defined order relative to each
+        /// other.
+        ///
+        /// (trigger_id, event_type, child_seq, ts_ns) identifies an event. Apply events
+        /// in array order and in publication order; an event whose identity was
+        /// already received replaces the earlier copy. When the subscription reports
+        /// that missed publications could not be recovered, reload recent events over
+        /// REST.
+        #[derive(Clone, Debug, Default)]
+        pub struct TriggerEventBatchView<'a> {
+            /// Trigger events, oldest first per trading symbol. At least one event.
+            ///
+            /// Field 1: `events`
+            pub events: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::TriggerEventView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TriggerEventBatchView<'a> {
+            type Owned = super::super::TriggerEventBatch;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.events
+                            .push(
+                                <super::super::__buffa::view::TriggerEventView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerEventBatch,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TriggerEventBatch,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TriggerEventBatch {
+                    events: self
+                        .events
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TriggerEventBatchView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.events {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.events {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TriggerEventBatchView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.events.is_empty() {
+                    __map.serialize_entry("events", &*self.events)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TriggerEventBatchView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "TriggerEventBatch";
+            const FULL_NAME: &'static str = "triggers.v1.TriggerEventBatch";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.TriggerEventBatch";
+        }
+        ::buffa::impl_default_view_instance!(TriggerEventBatchView);
+        ::buffa::impl_view_reborrow!(TriggerEventBatchView);
+        /** Self-contained, `'static` owned view of a `TriggerEventBatch` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TriggerEventBatchView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TriggerEventBatchView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TriggerEventBatchOwnedView(
+            ::buffa::OwnedView<TriggerEventBatchView<'static>>,
+        );
+        impl TriggerEventBatchOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerEventBatchOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerEventBatchOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TriggerEventBatch,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TriggerEventBatchOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TriggerEventBatchView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TriggerEventBatchView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TriggerEventBatch,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Trigger events, oldest first per trading symbol. At least one event.
+            ///
+            /// Field 1: `events`
+            #[must_use]
+            pub fn events(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::TriggerEventView<'_>,
+            > {
+                &self.0.reborrow().events
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TriggerEventBatchView<'static>>>
+        for TriggerEventBatchOwnedView {
+            fn from(inner: ::buffa::OwnedView<TriggerEventBatchView<'static>>) -> Self {
+                TriggerEventBatchOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TriggerEventBatchOwnedView>
+        for ::buffa::OwnedView<TriggerEventBatchView<'static>> {
+            fn from(wrapper: TriggerEventBatchOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TriggerEventBatchView<'static>>>
+        for TriggerEventBatchOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TriggerEventBatchView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TriggerEventBatch {
+            type View<'a> = TriggerEventBatchView<'a>;
+            type ViewHandle = TriggerEventBatchOwnedView;
+        }
+        impl ::serde::Serialize for TriggerEventBatchOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -21379,15 +21930,15 @@ pub mod __buffa {
             pub symbol_id: u32,
             /// Patch fields for safe price, trailing-distance, and slippage edits.
             /// For stop/take-profit:
-            /// Updated trigger price in quote units scaled by 1e6.
+            /// Updated trigger price in quote units scaled by 1e9.
             ///
             /// Field 10: `trigger_price_ticks`
             pub trigger_price_ticks: ::core::option::Option<i64>,
-            /// Updated limit price in quote units scaled by 1e6 for LIMIT child orders.
+            /// Updated limit price in quote units scaled by 1e9 for LIMIT child orders.
             ///
             /// Field 11: `limit_price_ticks`
             pub limit_price_ticks: ::core::option::Option<i64>,
-            /// Updated activation price in quote units scaled by 1e6. Set to zero to
+            /// Updated activation price in quote units scaled by 1e9. Set to zero to
             /// clear an existing activation price; omit to leave it unchanged.
             ///
             /// Field 14: `activation_price_ticks`
@@ -21510,7 +22061,7 @@ pub mod __buffa {
                         )?;
                         view.max_slippage = Some(
                             super::super::__buffa::view::oneof::modify_trigger_request::MaxSlippage::MaxSlippageTicks(
-                                ::buffa::types::decode_int32(&mut cur)?,
+                                ::buffa::types::decode_int64(&mut cur)?,
                             ),
                         );
                     }
@@ -21651,7 +22202,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::modify_trigger_request::MaxSlippage::MaxSlippageTicks(
                             v,
                         ) => {
-                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                         }
                         super::super::__buffa::view::oneof::modify_trigger_request::MaxSlippage::MaxSlippageBps(
                             v,
@@ -21708,7 +22259,7 @@ pub mod __buffa {
                         super::super::__buffa::view::oneof::modify_trigger_request::MaxSlippage::MaxSlippageTicks(
                             x,
                         ) => {
-                            ::buffa::types::put_int32_field(15u32, *x, buf);
+                            ::buffa::types::put_int64_field(15u32, *x, buf);
                         }
                         super::super::__buffa::view::oneof::modify_trigger_request::MaxSlippage::MaxSlippageBps(
                             x,
@@ -21944,21 +22495,21 @@ pub mod __buffa {
             }
             /// Patch fields for safe price, trailing-distance, and slippage edits.
             /// For stop/take-profit:
-            /// Updated trigger price in quote units scaled by 1e6.
+            /// Updated trigger price in quote units scaled by 1e9.
             ///
             /// Field 10: `trigger_price_ticks`
             #[must_use]
             pub fn trigger_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().trigger_price_ticks
             }
-            /// Updated limit price in quote units scaled by 1e6 for LIMIT child orders.
+            /// Updated limit price in quote units scaled by 1e9 for LIMIT child orders.
             ///
             /// Field 11: `limit_price_ticks`
             #[must_use]
             pub fn limit_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().limit_price_ticks
             }
-            /// Updated activation price in quote units scaled by 1e6. Set to zero to
+            /// Updated activation price in quote units scaled by 1e9. Set to zero to
             /// clear an existing activation price; omit to leave it unchanged.
             ///
             /// Field 14: `activation_price_ticks`
@@ -23912,7 +24463,7 @@ pub mod __buffa {
         /// StopDetails contains configuration for STOP_LOSS and TAKE_PROFIT triggers.
         #[derive(Clone, Debug, Default)]
         pub struct StopDetailsView<'a> {
-            /// Trigger threshold price in quote units scaled by 1e6.
+            /// Trigger threshold price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
@@ -24216,7 +24767,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger threshold price in quote units scaled by 1e6.
+            /// Trigger threshold price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
@@ -24280,20 +24831,20 @@ pub mod __buffa {
         /// triggers.
         #[derive(Clone, Debug, Default)]
         pub struct TrailingDetailsView<'a> {
-            /// Trailing distance as a price delta in 1e-6 quote-unit ticks.
+            /// Trailing distance as a price delta in 1e-9 quote-unit ticks.
             ///
             /// Field 1: `trailing_distance_ticks`
             pub trailing_distance_ticks: i64,
             /// Optional activation price: trailing only starts after this price is
-            /// reached. Expressed in quote units scaled by 1e6.
+            /// reached. Expressed in quote units scaled by 1e9.
             ///
             /// Field 2: `activation_price_ticks`
             pub activation_price_ticks: i64,
-            /// Current peak price in quote units scaled by 1e6 for sell trailing stops.
+            /// Current peak price in quote units scaled by 1e9 for sell trailing stops.
             ///
             /// Field 3: `peak_price_ticks`
             pub peak_price_ticks: i64,
-            /// Current trough price in quote units scaled by 1e6 for buy trailing stops.
+            /// Current trough price in quote units scaled by 1e9 for buy trailing stops.
             ///
             /// Field 4: `trough_price_ticks`
             pub trough_price_ticks: i64,
@@ -24301,10 +24852,11 @@ pub mod __buffa {
             ///
             /// Field 5: `trailing_distance_bps`
             pub trailing_distance_bps: i32,
-            /// Optional maximum allowed slippage as a price delta in 1e-6 quote-unit ticks.
+            /// Non-negative maximum absolute price delta in Q9 execution-price ticks
+            /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
             ///
             /// Field 6: `max_slippage_ticks`
-            pub max_slippage_ticks: i32,
+            pub max_slippage_ticks: i64,
             /// Optional maximum allowed slippage in basis points (1 bp = 0.01%).
             ///
             /// Field 7: `max_slippage_bps`
@@ -24323,6 +24875,12 @@ pub mod __buffa {
             pub trigger_direction: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::TriggerDirection,
             >,
+            /// Current trailing trigger threshold in quote units scaled by 1e9. This is
+            /// evaluator-authored runtime state and moves when the peak or trough changes.
+            /// It is absent until the trailing trigger is armed and a positive threshold exists.
+            ///
+            /// Field 10: `trigger_price_ticks`
+            pub trigger_price_ticks: ::core::option::Option<i64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for TrailingDetailsView<'a> {
@@ -24404,7 +24962,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.max_slippage_ticks = ::buffa::types::decode_int32(
+                        view.max_slippage_ticks = ::buffa::types::decode_int64(
                             &mut cur,
                         )?;
                     }
@@ -24431,6 +24989,15 @@ pub mod __buffa {
                         )?;
                         view.trigger_direction = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_ticks = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
                         );
                     }
                     _ => {
@@ -24471,6 +25038,7 @@ pub mod __buffa {
                     max_slippage_bps: self.max_slippage_bps,
                     trigger_price_source: self.trigger_price_source,
                     trigger_direction: self.trigger_direction,
+                    trigger_price_ticks: self.trigger_price_ticks,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -24518,10 +25086,10 @@ pub mod __buffa {
                                 self.trailing_distance_bps,
                             ) as u32;
                 }
-                if self.max_slippage_ticks != 0i32 {
+                if self.max_slippage_ticks != 0i64 {
                     size
                         += 1u32
-                            + ::buffa::types::int32_encoded_len(self.max_slippage_ticks)
+                            + ::buffa::types::int64_encoded_len(self.max_slippage_ticks)
                                 as u32;
                 }
                 if self.max_slippage_bps != 0i32 {
@@ -24541,6 +25109,9 @@ pub mod __buffa {
                     if val != 0 {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
+                }
+                if let Some(v) = self.trigger_price_ticks {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -24580,8 +25151,8 @@ pub mod __buffa {
                         buf,
                     );
                 }
-                if self.max_slippage_ticks != 0i32 {
-                    ::buffa::types::put_int32_field(6u32, self.max_slippage_ticks, buf);
+                if self.max_slippage_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(6u32, self.max_slippage_ticks, buf);
                 }
                 if self.max_slippage_bps != 0i32 {
                     ::buffa::types::put_int32_field(7u32, self.max_slippage_bps, buf);
@@ -24597,6 +25168,9 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(9u32, val, buf);
                     }
+                }
+                if let Some(v) = self.trigger_price_ticks {
+                    ::buffa::types::put_int64_field(10u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -24668,7 +25242,7 @@ pub mod __buffa {
                             ),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_i32(
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
                     &self.max_slippage_ticks,
                 ) {
                     __map
@@ -24697,6 +25271,13 @@ pub mod __buffa {
                     &self.trigger_direction,
                 ) {
                     __map.serialize_entry("triggerDirection", &self.trigger_direction)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.trigger_price_ticks {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -24794,7 +25375,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trailing distance as a price delta in 1e-6 quote-unit ticks.
+            /// Trailing distance as a price delta in 1e-9 quote-unit ticks.
             ///
             /// Field 1: `trailing_distance_ticks`
             #[must_use]
@@ -24802,21 +25383,21 @@ pub mod __buffa {
                 self.0.reborrow().trailing_distance_ticks
             }
             /// Optional activation price: trailing only starts after this price is
-            /// reached. Expressed in quote units scaled by 1e6.
+            /// reached. Expressed in quote units scaled by 1e9.
             ///
             /// Field 2: `activation_price_ticks`
             #[must_use]
             pub fn activation_price_ticks(&self) -> i64 {
                 self.0.reborrow().activation_price_ticks
             }
-            /// Current peak price in quote units scaled by 1e6 for sell trailing stops.
+            /// Current peak price in quote units scaled by 1e9 for sell trailing stops.
             ///
             /// Field 3: `peak_price_ticks`
             #[must_use]
             pub fn peak_price_ticks(&self) -> i64 {
                 self.0.reborrow().peak_price_ticks
             }
-            /// Current trough price in quote units scaled by 1e6 for buy trailing stops.
+            /// Current trough price in quote units scaled by 1e9 for buy trailing stops.
             ///
             /// Field 4: `trough_price_ticks`
             #[must_use]
@@ -24830,11 +25411,12 @@ pub mod __buffa {
             pub fn trailing_distance_bps(&self) -> i32 {
                 self.0.reborrow().trailing_distance_bps
             }
-            /// Optional maximum allowed slippage as a price delta in 1e-6 quote-unit ticks.
+            /// Non-negative maximum absolute price delta in Q9 execution-price ticks
+            /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
             ///
             /// Field 6: `max_slippage_ticks`
             #[must_use]
-            pub fn max_slippage_ticks(&self) -> i32 {
+            pub fn max_slippage_ticks(&self) -> i64 {
                 self.0.reborrow().max_slippage_ticks
             }
             /// Optional maximum allowed slippage in basis points (1 bp = 0.01%).
@@ -24867,6 +25449,15 @@ pub mod __buffa {
                 super::super::super::super::orders::v1::TriggerDirection,
             > {
                 self.0.reborrow().trigger_direction
+            }
+            /// Current trailing trigger threshold in quote units scaled by 1e9. This is
+            /// evaluator-authored runtime state and moves when the peak or trough changes.
+            /// It is absent until the trailing trigger is armed and a positive threshold exists.
+            ///
+            /// Field 10: `trigger_price_ticks`
+            #[must_use]
+            pub fn trigger_price_ticks(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().trigger_price_ticks
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<TrailingDetailsView<'static>>>
@@ -25328,11 +25919,11 @@ pub mod __buffa {
         /// LadderDetails contains configuration and aggregate execution progress for LADDER triggers.
         #[derive(Clone, Debug, Default)]
         pub struct LadderDetailsView<'a> {
-            /// Minimum price in quote units scaled by 1e6 for the ladder range.
+            /// Minimum price in quote units scaled by 1e9 for the ladder range.
             ///
             /// Field 1: `ladder_price_min_ticks`
             pub ladder_price_min_ticks: i64,
-            /// Maximum price in quote units scaled by 1e6 for the ladder range.
+            /// Maximum price in quote units scaled by 1e9 for the ladder range.
             ///
             /// Field 2: `ladder_price_max_ticks`
             pub ladder_price_max_ticks: i64,
@@ -25347,8 +25938,9 @@ pub mod __buffa {
                 super::super::LadderDistribution,
             >,
             /// Cumulative filled child-order base quantity scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed,
-            /// including when the parent completed because all children were canceled.
+            /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed.
+            /// The total is kept when the ladder ends, whether it is completed, canceled
+            /// or failed.
             ///
             /// Field 5: `executed_qty_scaled`
             pub executed_qty_scaled: i64,
@@ -25739,14 +26331,14 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Minimum price in quote units scaled by 1e6 for the ladder range.
+            /// Minimum price in quote units scaled by 1e9 for the ladder range.
             ///
             /// Field 1: `ladder_price_min_ticks`
             #[must_use]
             pub fn ladder_price_min_ticks(&self) -> i64 {
                 self.0.reborrow().ladder_price_min_ticks
             }
-            /// Maximum price in quote units scaled by 1e6 for the ladder range.
+            /// Maximum price in quote units scaled by 1e9 for the ladder range.
             ///
             /// Field 2: `ladder_price_max_ticks`
             #[must_use]
@@ -25770,8 +26362,9 @@ pub mod __buffa {
                 self.0.reborrow().ladder_distribution
             }
             /// Cumulative filled child-order base quantity scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed,
-            /// including when the parent completed because all children were canceled.
+            /// base_quantity_scale from GetSpotConfig. Zero means no quantity executed.
+            /// The total is kept when the ladder ends, whether it is completed, canceled
+            /// or failed.
             ///
             /// Field 5: `executed_qty_scaled`
             #[must_use]
@@ -27472,7 +28065,7 @@ pub mod __buffa {
                 }
                 #[derive(Clone, Debug)]
                 pub enum MaxSlippage {
-                    MaxSlippageTicks(i32),
+                    MaxSlippageTicks(i64),
                     MaxSlippageBps(i32),
                 }
             }
@@ -27481,7 +28074,7 @@ pub mod __buffa {
                 use super::*;
                 #[derive(Clone, Debug)]
                 pub enum MaxSlippage {
-                    MaxSlippageTicks(i32),
+                    MaxSlippageTicks(i64),
                     MaxSlippageBps(i32),
                 }
             }
@@ -27575,7 +28168,7 @@ pub mod __buffa {
                 }
                 #[derive(Clone, Debug)]
                 pub enum MaxSlippage {
-                    MaxSlippageTicks(i32),
+                    MaxSlippageTicks(i64),
                     MaxSlippageBps(i32),
                 }
             }
@@ -27795,7 +28388,7 @@ pub mod __buffa {
             /// Optional protection applied when the market child fires.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
-                MaxSlippageTicks(i32),
+                MaxSlippageTicks(i64),
                 MaxSlippageBps(i32),
             }
             impl ::buffa::Oneof for MaxSlippage {}
@@ -27833,7 +28426,7 @@ pub mod __buffa {
             /// TWAP duration or guarantee that every slice fills.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
-                MaxSlippageTicks(i32),
+                MaxSlippageTicks(i64),
                 MaxSlippageBps(i32),
             }
             impl ::buffa::Oneof for MaxSlippage {}
@@ -28066,7 +28659,7 @@ pub mod __buffa {
             /// an existing max-slippage cap; omit the oneof to leave it unchanged.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
-                MaxSlippageTicks(i32),
+                MaxSlippageTicks(i64),
                 MaxSlippageBps(i32),
             }
             impl ::buffa::Oneof for MaxSlippage {}
@@ -28309,6 +28902,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_TRIGGERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_TRIGGER_EVENTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__TRIGGER_EVENT_JSON_ANY);
+        reg.register_json_any(super::__TRIGGER_EVENT_BATCH_JSON_ANY);
         reg.register_json_any(super::__LIST_TRIGGER_EVENTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CANCEL_TRIGGER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CANCEL_TRIGGER_RESPONSE_JSON_ANY);
@@ -28405,6 +28999,10 @@ pub use self::__buffa::view::ListTriggerEventsRequestOwnedView;
 pub use self::__buffa::view::TriggerEventView;
 #[doc(inline)]
 pub use self::__buffa::view::TriggerEventOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerEventBatchView;
+#[doc(inline)]
+pub use self::__buffa::view::TriggerEventBatchOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListTriggerEventsResponseView;
 #[doc(inline)]

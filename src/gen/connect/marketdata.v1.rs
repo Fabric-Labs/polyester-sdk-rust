@@ -675,7 +675,7 @@ pub trait MarketDataService: Send + Sync + 'static {
     > + Send;
     /// GetCandlesColumns returns OHLCV candles in a columnar representation optimized for charting.
     /// This method is intended for ConnectRPC clients and returns scaled integers.
-    /// Primary OHLC prices use scale 6, reference OHLC prices use the pair's
+    /// Primary OHLC prices use scale 9, reference OHLC prices use the pair's
     /// reference_price_scale, and volumes use the base asset's
     /// market_data_volume_scale from GetSpotConfig.
     ///

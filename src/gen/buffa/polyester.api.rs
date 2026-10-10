@@ -172,6 +172,9 @@ pub enum AuthenticationMethod {
     SESSION_TOKEN = 1i32,
     /// A signed API key request.
     API_KEY = 2i32,
+    /// A broker API key, sent as a bearer token. Brokers receive it at
+    /// onboarding; it is not an account API key.
+    BROKER_API_KEY = 3i32,
 }
 impl AuthenticationMethod {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -183,6 +186,9 @@ impl AuthenticationMethod {
     ///Idiomatic alias for [`Self::API_KEY`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ApiKey: Self = Self::API_KEY;
+    ///Idiomatic alias for [`Self::BROKER_API_KEY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BrokerApiKey: Self = Self::BROKER_API_KEY;
 }
 impl ::core::default::Default for AuthenticationMethod {
     fn default() -> Self {
@@ -284,6 +290,7 @@ impl ::buffa::Enumeration for AuthenticationMethod {
             0i32 => ::core::option::Option::Some(Self::AUTH_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::SESSION_TOKEN),
             2i32 => ::core::option::Option::Some(Self::API_KEY),
+            3i32 => ::core::option::Option::Some(Self::BROKER_API_KEY),
             _ => ::core::option::Option::None,
         }
     }
@@ -295,6 +302,7 @@ impl ::buffa::Enumeration for AuthenticationMethod {
             Self::AUTH_UNSPECIFIED => "AUTH_UNSPECIFIED",
             Self::SESSION_TOKEN => "SESSION_TOKEN",
             Self::API_KEY => "API_KEY",
+            Self::BROKER_API_KEY => "BROKER_API_KEY",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -302,11 +310,17 @@ impl ::buffa::Enumeration for AuthenticationMethod {
             "AUTH_UNSPECIFIED" => ::core::option::Option::Some(Self::AUTH_UNSPECIFIED),
             "SESSION_TOKEN" => ::core::option::Option::Some(Self::SESSION_TOKEN),
             "API_KEY" => ::core::option::Option::Some(Self::API_KEY),
+            "BROKER_API_KEY" => ::core::option::Option::Some(Self::BROKER_API_KEY),
             _ => ::core::option::Option::None,
         }
     }
     fn values() -> &'static [Self] {
-        &[Self::AUTH_UNSPECIFIED, Self::SESSION_TOKEN, Self::API_KEY]
+        &[
+            Self::AUTH_UNSPECIFIED,
+            Self::SESSION_TOKEN,
+            Self::API_KEY,
+            Self::BROKER_API_KEY,
+        ]
     }
 }
 #[allow(
