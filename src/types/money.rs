@@ -1,8 +1,8 @@
 //! Money scalar types for write/read surfaces.
 
 use crate::codecs::scalars::{
-    format_price_ticks, format_qty_scaled, parse_price_ticks, parse_price_ticks_str,
-    parse_qty_scaled, parse_qty_scaled_str,
+    PRICE_TICK_SCALE, format_price_ticks, format_qty_scaled, parse_price_ticks,
+    parse_price_ticks_str, parse_qty_scaled, parse_qty_scaled_str,
 };
 use crate::errors::{Error, Result};
 use rust_decimal::Decimal;
@@ -49,7 +49,7 @@ impl QtyScaled {
     }
 }
 
-/// Resolved protocol price units (protobuf `price_ticks`, fixed 1e6).
+/// Resolved protocol price units (protobuf `price_ticks`, fixed 1e9).
 ///
 /// Fields are private so metadata cannot be changed independently of the
 /// validated ticks. Use [`Price::symbol`] to inspect the immutable metadata.
@@ -89,9 +89,9 @@ impl Price {
     }
 
     pub fn as_decimal(&self) -> Decimal {
-        // Price ticks always use the protocol's fixed 1e6 scale, so this
+        // Price ticks always use the protocol's fixed 1e9 scale, so this
         // conversion is exact and cannot silently substitute Decimal::ZERO.
-        Decimal::new(self.ticks.get(), 6)
+        Decimal::new(self.ticks.get(), PRICE_TICK_SCALE)
     }
 
     pub fn format(&self) -> String {
@@ -526,7 +526,7 @@ mod tests {
     #[test]
     fn price_as_decimal_is_exact_at_the_maximum_tick_value() {
         let price = Price::from_ticks(i64::MAX, None).unwrap();
-        assert_eq!(price.as_decimal(), Decimal::new(i64::MAX, 6));
+        assert_eq!(price.as_decimal(), Decimal::new(i64::MAX, PRICE_TICK_SCALE));
     }
 
     #[test]
@@ -539,7 +539,7 @@ mod tests {
         let price = Price::from_decimal_str("42.5", Some("BTC-USDT".into())).unwrap();
         assert_eq!(
             resolve_price_ticks(&price, Some("BTC-USDT")).unwrap(),
-            42_500_000
+            42_500_000_000
         );
         let qty = Quantity::from_decimal_str("1.25", 8, Some("BTC-USDT".into()), Some(1)).unwrap();
         assert_eq!(
@@ -550,9 +550,9 @@ mod tests {
 
     #[test]
     fn price_and_quantity_metadata_getters_preserve_compatibility() {
-        let price = Price::from_ticks(42_500_000, Some("BTC-USDT".into())).unwrap();
+        let price = Price::from_ticks(42_500_000_000, Some("BTC-USDT".into())).unwrap();
         assert_eq!(price.symbol(), Some("BTC-USDT"));
-        assert_eq!(price.as_ticks(), 42_500_000);
+        assert_eq!(price.as_ticks(), 42_500_000_000);
         assert_eq!(price.format(), "42.5");
         assert_eq!(price.clone(), price);
         assert!(format!("{price:?}").contains("BTC-USDT"));

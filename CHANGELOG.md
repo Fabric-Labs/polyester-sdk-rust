@@ -8,11 +8,18 @@
   `trigger_event_type_from_label("activated")` filters for them.
 
 ### Changed
+- **Trading prices now use the published fixed scale of 9 decimals: one
+  price tick is 0.000000001 quote units.** `PRICE_TICK_SCALE` is `9`, so
+  `Price::from_decimal_str`, `Price::as_decimal`, `Price::format`, order,
+  trigger, trade, orderbook, market-overview and primary candle prices
+  encode and decode at 1e-9. Earlier releases used 1e-6 and are 1,000
+  times off against the current API. Code that builds `Price::from_ticks`
+  values by hand must multiply its old tick values by 1,000.
 - `MaxSlippage::Ticks` and the trigger create/modify `max_slippage_ticks`
   are now `i64` absolute price ticks, matching the 64-bit contract fields.
 - Candle and market-overview base volume now use the base asset
   `market_data_volume_scale` from `get_spot_config`. Primary candle prices
-  stay on scale 6.
+  use the fixed price scale of 9.
 - Composite reference-candle OHLC uses the pair `reference_price_scale`.
   `GetCandlesOpts.include_reference` requests that series.
   `MarketOverviewEntry.volume_24h_base` is the decoded decimal when the

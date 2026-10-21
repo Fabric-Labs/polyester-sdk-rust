@@ -1619,7 +1619,7 @@ mod tests {
                 Some(7),
             )
             .unwrap(),
-            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+            Price::from_ticks(50_000_000_000_000, Some("BTC-USDT".into())).unwrap(),
         );
 
         let decimal_wire = client.orders.encode_create_params(&decimal).unwrap();
@@ -1649,7 +1649,7 @@ mod tests {
             Some(Quantity::from_decimal_str("0.2", 8, Some("BTC-USDT".into()), Some(7)).unwrap()),
         );
         let scaled = modify_params(
-            Some(Price::from_ticks(50_001_000_000, Some("BTC-USDT".into())).unwrap()),
+            Some(Price::from_ticks(50_001_000_000_000, Some("BTC-USDT".into())).unwrap()),
             Some(
                 Quantity::from_scaled(
                     20_000_000,

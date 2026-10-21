@@ -6,10 +6,10 @@ use polyester::types::{AssetAmount, Price, Quantity, QuantityDomain, resolve_ass
 #[test]
 fn price_quantity_dual_constructors() {
     let p = Price::from_decimal_str("1.5", Some("BTC-USDT".into())).unwrap();
-    assert_eq!(p.as_ticks(), 1_500_000);
+    assert_eq!(p.as_ticks(), 1_500_000_000);
     assert_eq!(
-        Price::from_ticks(1_500_000, None).unwrap().as_ticks(),
-        1_500_000
+        Price::from_ticks(1_500_000_000, None).unwrap().as_ticks(),
+        1_500_000_000
     );
 
     let q = Quantity::from_decimal_str("0.01", 8, Some("BTC-USDT".into()), None).unwrap();
@@ -21,9 +21,9 @@ fn price_quantity_dual_constructors() {
 
 #[test]
 fn money_rejects_excess_precision() {
-    let err = Price::from_decimal_str("1.1234567", None).unwrap_err();
+    let err = Price::from_decimal_str("1.1234567891", None).unwrap_err();
     assert!(matches!(err, Error::Validation(_)));
-    assert!(err.to_string().contains("at most 6"));
+    assert!(err.to_string().contains("at most 9"));
 
     let err = Quantity::from_decimal_str("1.123456789", 8, None, None).unwrap_err();
     assert!(matches!(err, Error::Validation(_)));

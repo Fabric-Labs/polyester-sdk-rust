@@ -768,8 +768,8 @@ mod tests {
                 Some(7),
             )
             .unwrap(),
-            crate::Price::from_ticks(49_000_000_000, Some("BTC-USDT".into())).unwrap(),
-            crate::Price::from_ticks(48_950_000_000, Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_ticks(49_000_000_000_000, Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_ticks(48_950_000_000_000, Some("BTC-USDT".into())).unwrap(),
         );
 
         let decimal_wire = client.triggers.encode_create_params(&decimal).unwrap();
@@ -1196,9 +1196,9 @@ mod tests {
             Some(crate::Price::from_decimal_str("49500", Some("BTC-USDT".into())).unwrap()),
         );
         let scaled = modify_params(
-            Some(crate::Price::from_ticks(49_000_000_000, Some("BTC-USDT".into())).unwrap()),
-            Some(crate::Price::from_ticks(48_950_000_000, Some("BTC-USDT".into())).unwrap()),
-            Some(crate::Price::from_ticks(49_500_000_000, Some("BTC-USDT".into())).unwrap()),
+            Some(crate::Price::from_ticks(49_000_000_000_000, Some("BTC-USDT".into())).unwrap()),
+            Some(crate::Price::from_ticks(48_950_000_000_000, Some("BTC-USDT".into())).unwrap()),
+            Some(crate::Price::from_ticks(49_500_000_000_000, Some("BTC-USDT".into())).unwrap()),
         );
         let decimal_wire = client.triggers.encode_modify_params(&decimal).unwrap();
         let scaled_wire = client.triggers.encode_modify_params(&scaled).unwrap();

@@ -369,7 +369,7 @@ before overriding `market_max_slippage`.
 
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
 Do **not** pass floats. Price ticks are Polyester protocol price units (fixed
-1e6), not market tick-size alignment (server validates tick size).
+1e9: one tick is 0.000000001 quote units), not market tick-size alignment (server validates tick size).
 
 ### For bots (scaled integers)
 
@@ -385,7 +385,7 @@ let params = OrdersService::create_params(
     CreateSide::Buy,
     CreateOrderType::Limit,
     Quantity::from_scaled(1_000_000, Some(8), Default::default(), None, None)?,
-    Some(Price::from_ticks(100_000_000, None)?), // 100.000000 at 1e6
+    Some(Price::from_ticks(100_000_000_000, None)?), // 100.000000000 at 1e9
     Some("my-scaled-bot-001"),
 );
 let _ = client.orders.create(params).await?;
@@ -489,7 +489,7 @@ Public order/trigger write paths take **`Price` / `Quantity` wrappers only**:
 - **Reject floats** (`f32`/`f64`); they are not accepted on these APIs.
 - **Reject bare integers** on public order APIs; use the named constructors.
 - **Reject excess fractional digits** on decimal→scaled conversion (no silent floor).
-- Price ticks are fixed **1e6**; qty scale comes from pair `base_quantity_scale` (catalog).
+- Price ticks are fixed **1e9** (one tick is 0.000000001 quote units); qty scale comes from pair `base_quantity_scale` (catalog).
 - Quote budgets use pair `quote_quantity_scale`; retrieve it with
   `Catalogs::quote_quantity_scale_for_symbol[_id]` and construct an
   `OrderQuote` `Quantity`.
