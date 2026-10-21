@@ -248,8 +248,8 @@ pub enum TrailingDistance {
 /// Optional max slippage for trailing-stop MARKET children.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MaxSlippage {
-    /// Quote ticks (proto field is int32).
-    Ticks(i32),
+    /// Absolute Q9 price ticks (proto field is int64).
+    Ticks(i64),
     Bps(i32),
 }
 

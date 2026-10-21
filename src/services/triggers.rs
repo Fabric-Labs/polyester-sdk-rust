@@ -1044,6 +1044,24 @@ mod tests {
 
         params.max_slippage_bps = Some(10_001);
         assert!(client.triggers.encode_create_params(&params).is_err());
+
+        // 5 quote units at Q9 exceeds the i32 range the field used to have.
+        params.max_slippage_bps = None;
+        params.max_slippage_ticks = Some(5_000_000_000);
+        let req = client.triggers.encode_create_params(&params).unwrap();
+        let intent = req.trigger.expect("trigger intent");
+        let Some(trigger_intent::Strategy::Twap(twap)) = intent.strategy.as_ref() else {
+            panic!("expected twap strategy");
+        };
+        let Some(twap_trigger::Execution::MarketIoc(ioc)) = twap.execution.as_ref() else {
+            panic!("expected market_ioc");
+        };
+        assert_eq!(
+            ioc.max_slippage,
+            Some(twap_market_ioc::MaxSlippage::MaxSlippageTicks(
+                5_000_000_000
+            ))
+        );
     }
 
     #[test]

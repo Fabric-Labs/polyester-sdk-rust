@@ -2,7 +2,14 @@
 
 ## Unreleased
 
+### Added
+- Trigger events report `event_type = "activated"` when a standalone
+  trailing trigger's activation condition is met and tracking begins.
+  `trigger_event_type_from_label("activated")` filters for them.
+
 ### Changed
+- `MaxSlippage::Ticks` and the trigger create/modify `max_slippage_ticks`
+  are now `i64` absolute price ticks, matching the 64-bit contract fields.
 - Candle and market-overview base volume now use the base asset
   `market_data_volume_scale` from `get_spot_config`. Primary candle prices
   stay on scale 6.

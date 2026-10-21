@@ -199,7 +199,7 @@ fn trigger_details_from_proto(
                     None
                 },
                 max_slippage: if trailing.max_slippage_ticks > 0 {
-                    decode_price_ticks(i64::from(trailing.max_slippage_ticks), symbol.clone())
+                    decode_price_ticks(trailing.max_slippage_ticks, symbol.clone())
                 } else {
                     None
                 },
@@ -501,6 +501,7 @@ fn trigger_event_type_label(value: buffa::EnumValue<TriggerEventType>) -> String
         Some(TriggerEventType::EventCanceled) => "canceled".to_owned(),
         Some(TriggerEventType::EventUpdated) => "updated".to_owned(),
         Some(TriggerEventType::EventFailed) => "failed".to_owned(),
+        Some(TriggerEventType::EventActivated) => "activated".to_owned(),
         Some(TriggerEventType::EventUnspecified) => String::new(),
         None => format!("UNKNOWN({})", value.to_i32()),
     }
@@ -524,8 +525,9 @@ pub fn trigger_event_type_from_label(label: &str) -> Result<TriggerEventType, St
         "canceled" | "cancelled" => Ok(TriggerEventType::EventCanceled),
         "updated" => Ok(TriggerEventType::EventUpdated),
         "failed" => Ok(TriggerEventType::EventFailed),
+        "activated" => Ok(TriggerEventType::EventActivated),
         other => Err(format!(
-            "invalid trigger event type {other:?}; expected one of: fired, canceled, updated, failed"
+            "invalid trigger event type {other:?}; expected one of: fired, canceled, updated, failed, activated"
         )),
     }
 }
@@ -924,7 +926,23 @@ mod tests {
             trigger_event_type_from_label("failed").unwrap(),
             TriggerEventType::EventFailed
         );
+        assert_eq!(
+            trigger_event_type_from_label("activated").unwrap(),
+            TriggerEventType::EventActivated
+        );
         assert!(trigger_event_type_from_label("nope").is_err());
+    }
+
+    #[test]
+    fn trigger_event_decodes_trailing_activation() {
+        let event = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 4,
+            trigger_type: TriggerType::TrailingStop.into(),
+            event_type: TriggerEventType::EventActivated.into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(event.event_type, "activated");
     }
 
     #[test]
