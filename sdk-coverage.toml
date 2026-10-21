@@ -89,3 +89,35 @@ reason = "Terms acceptance requires an interactive JWT session; API keys are not
 [[allowlist]]
 service = "claims.v1.ClaimsService"
 reason = "Daily claims require an interactive root-account session; API keys are not accepted."
+
+[[allowlist]]
+service = "rewards.v1.RewardCampaignService"
+reason = "Reward award listing and payout destinations require an interactive root-account session; API keys are not accepted."
+
+[[allowlist]]
+service = "swap.quickswap.v1.QuickSwapService"
+reason = "Quick Swap authenticates with a broker API key, which is outside the API-key SDK surface."
+
+[[allowlist]]
+service = "swap.quickswap.v1.QuickSwapBrokerService"
+reason = "Quick Swap broker management authenticates with a broker API key or an interactive session; outside the API-key SDK surface."
+
+[[allowlist]]
+procedure = "/chain.withdraw.v1.AutoWithdrawService/SetAutoWithdrawRule"
+reason = "Auto-withdraw rule changes require an interactive session with a fresh MFA step-up; API keys are not accepted."
+
+[[allowlist]]
+procedure = "/chain.withdraw.v1.AutoWithdrawService/DisableAutoWithdrawRule"
+reason = "Auto-withdraw rule changes require an interactive session with a fresh MFA step-up; API keys are not accepted."
+
+[[allowlist]]
+procedure = "/chain.withdraw.v1.AutoWithdrawService/GetAutoWithdrawRule"
+reason = "Auto-withdraw rule reads are not wrapped in the API-key SDK."
+
+[[allowlist]]
+procedure = "/chain.withdraw.v1.AutoWithdrawService/ListAutoWithdrawRuns"
+reason = "Auto-withdraw run reads are not wrapped in the API-key SDK."
+
+[[allowlist]]
+service = "swap.v1.SwapService"
+reason = "Swap quote, create and get are not wrapped in the API-key SDK."
