@@ -937,6 +937,12 @@ pub enum ErrorCode {
     ERROR_CODE_API_KEY_SPOT_READ_DENY = 72i32,
     /// The cancel request exceeded its bounded internal replay window.
     ERROR_CODE_CANCEL_REQUEST_EXPIRED = 73i32,
+    /// Quantity is above the pair maximum: the market-order maximum for MARKET
+    /// orders, the limit-order maximum otherwise (base units).
+    ERROR_CODE_MAX_QTY = 74i32,
+    /// Order notional is above the pair maximum (quote units). A stricter
+    /// sub-account policy cap returns POLICY_MAX_NOTIONAL instead.
+    ERROR_CODE_MAX_NOTIONAL = 75i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1152,6 +1158,12 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const CancelRequestExpired: Self = Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MAX_QTY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxQty: Self = Self::ERROR_CODE_MAX_QTY;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MAX_NOTIONAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxNotional: Self = Self::ERROR_CODE_MAX_NOTIONAL;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -1374,6 +1386,8 @@ impl ::buffa::Enumeration for ErrorCode {
             73i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED)
             }
+            74i32 => ::core::option::Option::Some(Self::ERROR_CODE_MAX_QTY),
+            75i32 => ::core::option::Option::Some(Self::ERROR_CODE_MAX_NOTIONAL),
             _ => ::core::option::Option::None,
         }
     }
@@ -1497,6 +1511,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED => {
                 "ERROR_CODE_CANCEL_REQUEST_EXPIRED"
             }
+            Self::ERROR_CODE_MAX_QTY => "ERROR_CODE_MAX_QTY",
+            Self::ERROR_CODE_MAX_NOTIONAL => "ERROR_CODE_MAX_NOTIONAL",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1726,6 +1742,12 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_CANCEL_REQUEST_EXPIRED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED)
             }
+            "ERROR_CODE_MAX_QTY" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MAX_QTY)
+            }
+            "ERROR_CODE_MAX_NOTIONAL" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MAX_NOTIONAL)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1802,6 +1824,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_POLICY_SPOT_READ_DENY,
             Self::ERROR_CODE_API_KEY_SPOT_READ_DENY,
             Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED,
+            Self::ERROR_CODE_MAX_QTY,
+            Self::ERROR_CODE_MAX_NOTIONAL,
         ]
     }
 }

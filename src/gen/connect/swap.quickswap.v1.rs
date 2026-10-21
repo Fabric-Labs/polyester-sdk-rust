@@ -123,16 +123,19 @@ pub const QUICK_SWAP_SERVICE_GET_QUICK_SWAP_SPEC: ::connectrpc::Spec = ::connect
 /// request. End users need no account. Brokers see only their
 /// own QuickSwaps.
 /// The broker API key is a server credential. Call this API from the broker's
-/// backend, never from a browser or mobile app. Polyester issues keys at
-/// broker onboarding; contact Polyester to obtain or rotate one.
+/// backend, never from a browser or mobile app. The broker's members create,
+/// rotate and revoke keys with QuickSwapBrokerService, and a key may rotate
+/// itself.
 /// A QuickSwap's status advances as the deposit and execution progress; poll
 /// GetQuickSwap to follow it, at most once every 5 seconds per QuickSwap while
 /// it is not terminal. Polling can stop once is_terminal is true.
 /// REST errors are application/problem+json (see ErrorDetail) with these HTTP
 /// statuses: 400 for INVALID_ARGUMENT and FAILED_PRECONDITION, 401 for
-/// UNAUTHENTICATED, 404 for NOT_FOUND, 409 for IDEMPOTENCY_CONFLICT, 413 when
-/// a request body is too large, 429 when the caller is rate limited, 500 for
-/// an internal error, 503 for UNAVAILABLE and 504 for DEADLINE_EXCEEDED.
+/// UNAUTHENTICATED, 403 for PERMISSION_DENIED, 404 for NOT_FOUND, 409 for
+/// IDEMPOTENCY_CONFLICT, 413 when a request body is too large, 429 for
+/// RESOURCE_EXHAUSTED (with a Retry-After header when the request rate was
+/// exceeded), 500 for an internal error, 503 for UNAVAILABLE and 504 for
+/// DEADLINE_EXCEEDED.
 ///
 /// # Implementing handlers
 ///
@@ -187,10 +190,13 @@ pub trait QuickSwapService: Send + Sync + 'static {
     /// deposit address. The quote states whether the route needs a refund
     /// address.
     /// Errors:
-    /// - INVALID_ARGUMENT: malformed request, AMOUNT_OUT_OF_RANGE or
-    /// DECIMALS_MISMATCH.
-    /// - FAILED_PRECONDITION: ROUTE_UNSUPPORTED or PROTECTION_UNACHIEVABLE.
+    /// - INVALID_ARGUMENT: malformed request, AMOUNT_OUT_OF_RANGE,
+    /// DECIMALS_MISMATCH or FEES_INVALID.
+    /// - FAILED_PRECONDITION: ROUTE_UNSUPPORTED, PROTECTION_UNACHIEVABLE or
+    /// AFFILIATE_VAULT_UNKNOWN.
     /// - UNAVAILABLE: QUOTE_UNAVAILABLE; retry later.
+    /// - PERMISSION_DENIED: BROKER_DISABLED.
+    /// - RESOURCE_EXHAUSTED: BROKER_LIMIT, the quote request rate of the key.
     /// - UNAUTHENTICATED: missing or invalid broker API key.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -222,15 +228,19 @@ pub trait QuickSwapService: Send + Sync + 'static {
     /// Errors:
     /// - INVALID_ARGUMENT: malformed request, AMOUNT_OUT_OF_RANGE,
     /// DECIMALS_MISMATCH, DESTINATION_ADDRESS_INVALID, RETURN_ADDRESS_INVALID,
-    /// REFUND_ADDRESS_INVALID, SOURCE_WALLET_INVALID or AFFILIATES_INVALID.
+    /// REFUND_ADDRESS_INVALID, SOURCE_WALLET_INVALID or FEES_INVALID.
     /// - FAILED_PRECONDITION: ROUTE_UNSUPPORTED, PROTECTION_UNACHIEVABLE,
-    /// REFUND_ADDRESS_REQUIRED, or AFFILIATES_INVALID when affiliates are not
-    /// enabled for the broker; nothing is bound to the key.
+    /// REFUND_ADDRESS_REQUIRED or AFFILIATE_VAULT_UNKNOWN; nothing is bound to
+    /// the key.
     /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original QuickSwap stands.
     /// - UNAVAILABLE: ADDRESS_UNAVAILABLE; the QuickSwap is kept and gets its
     /// address automatically; follow it with GetQuickSwap or the same request.
+    /// - ABORTED: ADDRESS_CONFLICT; the QuickSwap never gets an address; create
+    /// a new one with a new idempotency key.
     /// - UNAVAILABLE, DEADLINE_EXCEEDED: unknown outcome or QUOTE_UNAVAILABLE;
     /// retry the same request.
+    /// - PERMISSION_DENIED: BROKER_DISABLED; nothing is bound to the key.
+    /// - RESOURCE_EXHAUSTED: BROKER_LIMIT; nothing is bound to the key.
     /// - UNAUTHENTICATED: missing or invalid broker API key.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -259,6 +269,7 @@ pub trait QuickSwapService: Send + Sync + 'static {
     /// Errors:
     /// - INVALID_ARGUMENT: malformed selector.
     /// - NOT_FOUND: SWAP_NOT_FOUND.
+    /// - RESOURCE_EXHAUSTED: BROKER_LIMIT, the read request rate of the key.
     /// - UNAUTHENTICATED: missing or invalid broker API key.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -783,6 +794,3465 @@ where
                 &self.config,
                 QUICK_SWAP_SERVICE_SERVICE_NAME,
                 "GetQuickSwap",
+                request,
+                options,
+            )
+            .await
+    }
+}
+
+///Shorthand for `OwnedView<GetBrokerRequestView<'static>>`.
+pub type OwnedGetBrokerRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetBrokerResponseView<'static>>`.
+pub type OwnedGetBrokerResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ListMyBrokersRequestView<'static>>`.
+pub type OwnedListMyBrokersRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListMyBrokersRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListMyBrokersResponseView<'static>>`.
+pub type OwnedListMyBrokersResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListMyBrokersResponseView<'static>,
+>;
+///Shorthand for `OwnedView<RespondToInviteRequestView<'static>>`.
+pub type OwnedRespondToInviteRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RespondToInviteRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RespondToInviteResponseView<'static>>`.
+pub type OwnedRespondToInviteResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RespondToInviteResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListMembersRequestView<'static>>`.
+pub type OwnedListMembersRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListMembersRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListMembersResponseView<'static>>`.
+pub type OwnedListMembersResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListMembersResponseView<'static>,
+>;
+///Shorthand for `OwnedView<InviteMemberRequestView<'static>>`.
+pub type OwnedInviteMemberRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::InviteMemberRequestView<'static>,
+>;
+///Shorthand for `OwnedView<InviteMemberResponseView<'static>>`.
+pub type OwnedInviteMemberResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::InviteMemberResponseView<'static>,
+>;
+///Shorthand for `OwnedView<SetMemberRoleRequestView<'static>>`.
+pub type OwnedSetMemberRoleRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::SetMemberRoleRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SetMemberRoleResponseView<'static>>`.
+pub type OwnedSetMemberRoleResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::SetMemberRoleResponseView<'static>,
+>;
+///Shorthand for `OwnedView<RemoveMemberRequestView<'static>>`.
+pub type OwnedRemoveMemberRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RemoveMemberRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RemoveMemberResponseView<'static>>`.
+pub type OwnedRemoveMemberResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RemoveMemberResponseView<'static>,
+>;
+///Shorthand for `OwnedView<TransferOwnershipRequestView<'static>>`.
+pub type OwnedTransferOwnershipRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::TransferOwnershipRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<TransferOwnershipResponseView<'static>>`.
+pub type OwnedTransferOwnershipResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::TransferOwnershipResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListKeysRequestView<'static>>`.
+pub type OwnedListKeysRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListKeysRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListKeysResponseView<'static>>`.
+pub type OwnedListKeysResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListKeysResponseView<'static>,
+>;
+///Shorthand for `OwnedView<CreateKeyRequestView<'static>>`.
+pub type OwnedCreateKeyRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::CreateKeyRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CreateKeyResponseView<'static>>`.
+pub type OwnedCreateKeyResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::CreateKeyResponseView<'static>,
+>;
+///Shorthand for `OwnedView<RotateKeyRequestView<'static>>`.
+pub type OwnedRotateKeyRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RotateKeyRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RotateKeyResponseView<'static>>`.
+pub type OwnedRotateKeyResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RotateKeyResponseView<'static>,
+>;
+///Shorthand for `OwnedView<RevokeKeyRequestView<'static>>`.
+pub type OwnedRevokeKeyRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RevokeKeyRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RevokeKeyResponseView<'static>>`.
+pub type OwnedRevokeKeyResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RevokeKeyResponseView<'static>,
+>;
+///Shorthand for `OwnedView<CreateAffiliateVaultRequestView<'static>>`.
+pub type OwnedCreateAffiliateVaultRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::CreateAffiliateVaultRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateAffiliateVaultResponseView<'static>>`.
+pub type OwnedCreateAffiliateVaultResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::CreateAffiliateVaultResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListVaultsRequestView<'static>>`.
+pub type OwnedListVaultsRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListVaultsResponseView<'static>>`.
+pub type OwnedListVaultsResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<GetVaultRequestView<'static>>`.
+pub type OwnedGetVaultRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetVaultRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetVaultResponseView<'static>>`.
+pub type OwnedGetVaultResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetVaultResponseView<'static>,
+>;
+///Shorthand for `OwnedView<SetVaultStatusRequestView<'static>>`.
+pub type OwnedSetVaultStatusRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::SetVaultStatusRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SetVaultStatusResponseView<'static>>`.
+pub type OwnedSetVaultStatusResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::SetVaultStatusResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ListQuickSwapsRequestView<'static>>`.
+pub type OwnedListQuickSwapsRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListQuickSwapsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListQuickSwapsResponseView<'static>>`.
+pub type OwnedListQuickSwapsResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListQuickSwapsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<GetFeeTotalsRequestView<'static>>`.
+pub type OwnedGetFeeTotalsRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetFeeTotalsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetFeeTotalsResponseView<'static>>`.
+pub type OwnedGetFeeTotalsResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetFeeTotalsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<GetBrokerStatsRequestView<'static>>`.
+pub type OwnedGetBrokerStatsRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerStatsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetBrokerStatsResponseView<'static>>`.
+pub type OwnedGetBrokerStatsResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerStatsResponseView<'static>,
+>;
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetBrokerResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetBrokerResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListMyBrokersResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::ListMyBrokersResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListMyBrokersResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListMyBrokersResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::RespondToInviteResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::RespondToInviteResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::RespondToInviteResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RespondToInviteResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListMembersResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::ListMembersResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListMembersResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListMembersResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::InviteMemberResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::InviteMemberResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::InviteMemberResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::InviteMemberResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::SetMemberRoleResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::SetMemberRoleResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::SetMemberRoleResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::SetMemberRoleResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::RemoveMemberResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::RemoveMemberResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::RemoveMemberResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RemoveMemberResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::TransferOwnershipResponse,
+>
+for crate::proto::swap::quickswap::v1::__buffa::view::TransferOwnershipResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::TransferOwnershipResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::TransferOwnershipResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListKeysResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::ListKeysResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListKeysResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListKeysResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::CreateKeyResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::CreateKeyResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::CreateKeyResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::CreateKeyResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::RotateKeyResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::RotateKeyResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::RotateKeyResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RotateKeyResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::RevokeKeyResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::RevokeKeyResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::RevokeKeyResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RevokeKeyResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::CreateAffiliateVaultResponse,
+>
+for crate::proto::swap::quickswap::v1::__buffa::view::CreateAffiliateVaultResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::CreateAffiliateVaultResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::CreateAffiliateVaultResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListVaultsResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::ListVaultsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListVaultsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetVaultResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::GetVaultResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetVaultResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetVaultResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::SetVaultStatusResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::SetVaultStatusResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::SetVaultStatusResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::SetVaultStatusResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListQuickSwapsResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::ListQuickSwapsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListQuickSwapsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListQuickSwapsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetFeeTotalsResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::GetFeeTotalsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetFeeTotalsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetFeeTotalsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetBrokerStatsResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerStatsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetBrokerStatsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerStatsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+/// Full service name for this service.
+pub const QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME: &str = "swap.quickswap.v1.QuickSwapBrokerService";
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetBroker` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_GET_BROKER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/GetBroker",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListMyBrokers` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_LIST_MY_BROKERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/ListMyBrokers",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `RespondToInvite` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_RESPOND_TO_INVITE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/RespondToInvite",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListMembers` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_LIST_MEMBERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/ListMembers",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `InviteMember` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_INVITE_MEMBER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/InviteMember",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `SetMemberRole` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_SET_MEMBER_ROLE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/SetMemberRole",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `RemoveMember` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_REMOVE_MEMBER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/RemoveMember",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `TransferOwnership` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_TRANSFER_OWNERSHIP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/TransferOwnership",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListKeys` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_LIST_KEYS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/ListKeys",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CreateKey` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_CREATE_KEY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/CreateKey",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `RotateKey` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_ROTATE_KEY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/RotateKey",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `RevokeKey` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_REVOKE_KEY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/RevokeKey",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CreateAffiliateVault` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_CREATE_AFFILIATE_VAULT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/CreateAffiliateVault",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListVaults` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_LIST_VAULTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/ListVaults",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetVault` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_GET_VAULT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/GetVault",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `SetVaultStatus` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_SET_VAULT_STATUS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/SetVaultStatus",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListQuickSwaps` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_LIST_QUICK_SWAPS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/ListQuickSwaps",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetFeeTotals` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_GET_FEE_TOTALS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/GetFeeTotals",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetBrokerStats` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_GET_BROKER_STATS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/GetBrokerStats",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// QuickSwapBrokerService administers a broker org, over ConnectRPC and REST.
+/// Every request names its broker. The caller is either the broker's API key,
+/// sent as a bearer token (see QuickSwapService), or a member's interactive
+/// session token; a person who is not a member of the broker gets NOT_FOUND /
+/// BROKER_NOT_FOUND. Each RPC maps to one broker action:
+/// | Action | Owner | Admin | Finance | Affiliate manager | Viewer | API key |
+/// | --- | --- | --- | --- | --- | --- | --- |
+/// | Read (GetBroker, ListKeys, ListVaults, GetVault, ListMembers, ListQuickSwaps, GetFeeTotals, GetBrokerStats) | yes | yes | yes | yes | yes | yes, except ListMembers |
+/// | Create vaults (CreateAffiliateVault, SetVaultStatus) | yes | yes | no | yes | no | yes |
+/// | Manage keys (CreateKey, RotateKey, RevokeKey) | yes | yes | no | no | no | RotateKey of itself only |
+/// | Manage members (InviteMember, SetMemberRole, RemoveMember) | yes | yes, never the Owner | no | no | no | no |
+/// | Transfer ownership | yes | no | no | no | no | no |
+/// A member managing keys or members must also send a fresh step-up proof in
+/// the X-Auth-Step-Up header, obtained by completing an MFA challenge for
+/// fresh step-up; each proof authorizes one change. Reads, vaults and a key
+/// rotating itself need none. A denied action fails with PERMISSION_DENIED /
+/// ACTION_DENIED, a missing or used proof with PERMISSION_DENIED /
+/// STEP_UP_REQUIRED.
+/// REST errors are application/problem+json (see ErrorDetail) with the HTTP
+/// statuses of QuickSwapService.
+///
+/// # Implementing handlers
+///
+/// Implement methods with plain `async fn`; the returned future satisfies
+/// the `Send` bound automatically.
+///
+/// **Unary and server-streaming requests** arrive as
+/// [`ServiceRequest<'_, Req>`](::connectrpc::ServiceRequest): a zero-copy
+/// view of the request plus its body, valid for the duration of the call.
+/// Fields are read directly (`request.name` is a `&str` into the decoded
+/// buffer) and the borrow may be held across `.await` points. Anything
+/// that must outlive the call — `tokio::spawn`, channels, server state,
+/// or data captured by a returned response stream — takes owned data:
+/// call `request.to_owned_message()` (or copy the specific fields)
+/// first.
+///
+/// **Client-streaming and bidi requests** arrive as
+/// [`InboundStream<Req>`](::connectrpc::InboundStream) — a
+/// `ServiceStream` of [`StreamMessage`](::connectrpc::StreamMessage)s.
+/// Each item owns its decoded buffer and is `Send + 'static`, so items
+/// can be buffered or moved into spawned tasks; read fields zero-copy
+/// through the generated accessor methods (`item.name()`) or `.view()`,
+/// convert with `.to_owned_message()`, or yield an item back unchanged —
+/// `StreamMessage<M>` implements `Encodable<M>`.
+///
+/// Request types resolved through `extern_path` (e.g. well-known types
+/// from another crate) use the same wrappers; the crate that owns the
+/// type must be generated with buffa ≥ 0.8.0 and views enabled so the
+/// backing `HasMessageView` impl exists.
+///
+/// The `impl Encodable<Out>` return bound accepts the owned `Out`, the
+/// generated `OutView<'_>` / `OwnedOutView`,
+/// [`MaybeBorrowed`](::connectrpc::MaybeBorrowed), or
+/// [`PreEncoded`](::connectrpc::PreEncoded) for handlers that encode a
+/// non-`'static` view internally and pass the bytes across the handler
+/// boundary. View bodies are not emitted for output types mapped via
+/// `extern_path` (the impl would be an orphan); return owned for
+/// WKT/extern outputs.
+///
+/// Server-streaming and bidi-streaming methods return
+/// `ServiceStream<impl Encodable<Out> + Send + use<Self>>`. The
+/// `use<Self>` precise-capturing clause excludes `&self`'s lifetime and
+/// the request's lifetime (unary methods use `use<'a, Self>` and may
+/// borrow from `&self`), so stream items must be `'static` and cannot
+/// borrow from the request. To stream view-encoded data, encode each
+/// item inside the stream body and yield
+/// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
+/// example` doc.
+#[allow(clippy::type_complexity)]
+pub trait QuickSwapBrokerService: Send + Sync + 'static {
+    /// GetBroker returns the broker, its limits and current usage of them, and
+    /// the caller's role.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_broker<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::GetBrokerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::GetBrokerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListMyBrokers lists the brokers the caller is a member of and the
+    /// invites addressed to the caller. Session token only.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_my_brokers<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::ListMyBrokersRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::ListMyBrokersResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// RespondToInvite accepts or declines a pending invite addressed to the
+    /// caller. Session token only; no step-up proof is needed.
+    /// Errors:
+    /// - NOT_FOUND: INVITE_NOT_FOUND.
+    /// - ALREADY_EXISTS: ALREADY_MEMBER.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn respond_to_invite<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::RespondToInviteRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::RespondToInviteResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListMembers lists the broker's members and pending invites. Session
+    /// token only.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND.
+    /// - PERMISSION_DENIED: ACTION_DENIED.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_members<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::ListMembersRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::ListMembersResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// InviteMember invites a person with any role but OWNER; the person
+    /// accepts with their own login. Inviting again replaces the pending invite.
+    /// Session token and step-up proof only.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND, or MEMBER_NOT_FOUND when the account does
+    /// not exist.
+    /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
+    /// - ALREADY_EXISTS: ALREADY_MEMBER.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn invite_member<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::InviteMemberRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::InviteMemberResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// SetMemberRole changes a member's role to any role but OWNER. The Owner's
+    /// role cannot be changed; transfer ownership instead. Session token and
+    /// step-up proof only.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or MEMBER_NOT_FOUND.
+    /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
+    /// - FAILED_PRECONDITION: OWNER_IMMUTABLE.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_member_role<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::SetMemberRoleRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::SetMemberRoleResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// RemoveMember removes a member, ending their access immediately, or
+    /// cancels the person's pending invite. The Owner cannot be removed. Session
+    /// token and step-up proof only.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or MEMBER_NOT_FOUND.
+    /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
+    /// - FAILED_PRECONDITION: OWNER_IMMUTABLE.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn remove_member<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::RemoveMemberRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::RemoveMemberResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// TransferOwnership makes another member the Owner; the caller, the
+    /// current Owner, becomes an Admin in the same change. Session token and
+    /// step-up proof only.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or MEMBER_NOT_FOUND.
+    /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn transfer_ownership<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::TransferOwnershipRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::TransferOwnershipResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListKeys lists the broker's API keys, without secrets, a page at a time.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND.
+    /// - INVALID_ARGUMENT: a page_token from another broker or malformed.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_keys<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::ListKeysRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::ListKeysResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// CreateKey creates an API key. A broker has at most two working keys.
+    /// Session token and step-up proof only.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND.
+    /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
+    /// - FAILED_PRECONDITION: KEY_LIMIT.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_key<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::CreateKeyRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::CreateKeyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// RotateKey replaces a working key by a new one. The old key keeps working
+    /// until the overlap ends, then only the new key does. A broker API key may
+    /// rotate itself without a step-up proof; a member needs a session token and
+    /// step-up proof.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or KEY_NOT_FOUND.
+    /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
+    /// - FAILED_PRECONDITION: KEY_LIMIT, when the broker would have more than
+    /// two working keys during the overlap.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn rotate_key<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::RotateKeyRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::RotateKeyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// RevokeKey revokes a key immediately. The broker's last key that works
+    /// without an expiry cannot be revoked. Session token and step-up proof
+    /// only.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or KEY_NOT_FOUND.
+    /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
+    /// - FAILED_PRECONDITION: LAST_KEY.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn revoke_key<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::RevokeKeyRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::RevokeKeyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// CreateAffiliateVault creates, or returns, the affiliate vault with label.
+    /// Create a vault before the first QuickSwap that credits it: a QuickSwap
+    /// naming a vault that does not exist yet is refused. Concurrent and
+    /// repeated requests with the same label return the same vault. No step-up
+    /// proof is needed.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND.
+    /// - PERMISSION_DENIED: ACTION_DENIED.
+    /// - RESOURCE_EXHAUSTED: BROKER_LIMIT, the broker's vault limit.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_affiliate_vault<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::CreateAffiliateVaultRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::CreateAffiliateVaultResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListVaults lists the broker's affiliate vaults.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND.
+    /// - INVALID_ARGUMENT: a page_token from another broker or malformed.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_vaults<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::ListVaultsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::ListVaultsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetVault returns one affiliate vault.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_vault<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::GetVaultRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::GetVaultResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// SetVaultStatus enables or disables an affiliate vault for new
+    /// QuickSwaps. No step-up proof is needed.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND.
+    /// - PERMISSION_DENIED: ACTION_DENIED.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_vault_status<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::SetVaultStatusRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::SetVaultStatusResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListQuickSwaps lists the broker's QuickSwaps, newest first, filtered by
+    /// vault, status and creation time.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND.
+    /// - INVALID_ARGUMENT: a page_token from another broker, other filters or
+    /// malformed.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_quick_swaps<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::ListQuickSwapsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::ListQuickSwapsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetFeeTotals totals the broker and affiliate fees charged to the
+    /// broker's QuickSwaps in a window, per asset, by vault, day or month.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_fee_totals<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::GetFeeTotalsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::GetFeeTotalsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetBrokerStats reads the broker's QuickSwap activity in a window, per UTC
+    /// day or month: QuickSwaps created by status, deposits credited and
+    /// payouts delivered per asset, and the service, broker and affiliate fees
+    /// charged per asset.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND.
+    /// - INTERNAL: STATS_INCOMPLETE, with the swap_id of a QuickSwap whose
+    /// records the stats cannot read.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_broker_stats<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::GetBrokerStatsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::GetBrokerStatsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+}
+/// Extension trait for registering a service implementation with a Router.
+///
+/// This trait is automatically implemented for all types that implement the service trait.
+/// Prefer [`Router::add_service`](::connectrpc::Router::add_service) for
+/// top-down registration; `register` remains available for compatibility
+/// and cases where the service-first call shape is more convenient.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use std::sync::Arc;
+///
+/// let service = Arc::new(MyServiceImpl);
+/// let router = service.register(Router::new());
+/// ```
+pub trait QuickSwapBrokerServiceExt: QuickSwapBrokerService {
+    /// Register this service implementation with a Router.
+    ///
+    /// Takes ownership of the `Arc<Self>` and returns a new Router with
+    /// this service's methods registered.
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router;
+}
+impl<S: QuickSwapBrokerService> QuickSwapBrokerServiceExt for S {
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router {
+        router
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "GetBroker",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::GetBrokerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_broker(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::GetBrokerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_GET_BROKER_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListMyBrokers",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::ListMyBrokersRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::ListMyBrokersRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_my_brokers(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::ListMyBrokersResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_MY_BROKERS_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "RespondToInvite",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::RespondToInviteRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::RespondToInviteRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.respond_to_invite(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::RespondToInviteResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_RESPOND_TO_INVITE_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListMembers",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::ListMembersRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::ListMembersRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_members(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::ListMembersResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_MEMBERS_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "InviteMember",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::InviteMemberRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::InviteMemberRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.invite_member(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::InviteMemberResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_INVITE_MEMBER_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "SetMemberRole",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::SetMemberRoleRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::SetMemberRoleRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_member_role(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::SetMemberRoleResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_SET_MEMBER_ROLE_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "RemoveMember",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::RemoveMemberRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::RemoveMemberRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.remove_member(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::RemoveMemberResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_REMOVE_MEMBER_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "TransferOwnership",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::TransferOwnershipRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::TransferOwnershipRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.transfer_ownership(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::TransferOwnershipResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_TRANSFER_OWNERSHIP_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListKeys",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::ListKeysRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::ListKeysRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_keys(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::ListKeysResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_KEYS_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "CreateKey",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::CreateKeyRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::CreateKeyRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_key(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::CreateKeyResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_CREATE_KEY_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "RotateKey",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::RotateKeyRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::RotateKeyRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.rotate_key(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::RotateKeyResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_ROTATE_KEY_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "RevokeKey",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::RevokeKeyRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::RevokeKeyRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.revoke_key(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::RevokeKeyResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_REVOKE_KEY_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "CreateAffiliateVault",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::CreateAffiliateVaultRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::CreateAffiliateVaultRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_affiliate_vault(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::CreateAffiliateVaultResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_CREATE_AFFILIATE_VAULT_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListVaults",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::ListVaultsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::ListVaultsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_vaults(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::ListVaultsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_VAULTS_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "GetVault",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::GetVaultRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::GetVaultRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_vault(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::GetVaultResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_GET_VAULT_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "SetVaultStatus",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::SetVaultStatusRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::SetVaultStatusRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_vault_status(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::SetVaultStatusResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_SET_VAULT_STATUS_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListQuickSwaps",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::ListQuickSwapsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::ListQuickSwapsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_quick_swaps(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::ListQuickSwapsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_QUICK_SWAPS_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "GetFeeTotals",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::GetFeeTotalsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::GetFeeTotalsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_fee_totals(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::GetFeeTotalsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_GET_FEE_TOTALS_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "GetBrokerStats",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerStatsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::GetBrokerStatsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_broker_stats(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::GetBrokerStatsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_GET_BROKER_STATS_SPEC)
+    }
+}
+/// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
+#[doc(hidden)]
+pub struct QuickSwapBrokerServiceRegisterMarker;
+impl<
+    S: QuickSwapBrokerService,
+> ::connectrpc::ServiceRegister<QuickSwapBrokerServiceRegisterMarker>
+for ::std::sync::Arc<S> {
+    fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
+        <S as QuickSwapBrokerServiceExt>::register(self, router)
+    }
+}
+/// Monomorphic dispatcher for `QuickSwapBrokerService`.
+///
+/// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use connectrpc::ConnectRpcService;
+///
+/// let server = QuickSwapBrokerServiceServer::new(MyImpl);
+/// let service = ConnectRpcService::new(server);
+/// // hand `service` to axum/hyper as a fallback_service
+/// ```
+pub struct QuickSwapBrokerServiceServer<T> {
+    inner: ::std::sync::Arc<T>,
+}
+impl<T: QuickSwapBrokerService> QuickSwapBrokerServiceServer<T> {
+    /// Wrap a service implementation in a monomorphic dispatcher.
+    pub fn new(service: T) -> Self {
+        Self {
+            inner: ::std::sync::Arc::new(service),
+        }
+    }
+    /// Wrap an already-`Arc`'d service implementation.
+    pub fn from_arc(inner: ::std::sync::Arc<T>) -> Self {
+        Self { inner }
+    }
+}
+impl<T> Clone for QuickSwapBrokerServiceServer<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: ::std::sync::Arc::clone(&self.inner),
+        }
+    }
+}
+impl<T: QuickSwapBrokerService> ::connectrpc::Dispatcher
+for QuickSwapBrokerServiceServer<T> {
+    #[inline]
+    fn lookup(
+        &self,
+        path: &str,
+    ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
+        let method = path.strip_prefix("swap.quickswap.v1.QuickSwapBrokerService/")?;
+        match method {
+            "GetBroker" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_GET_BROKER_SPEC),
+                )
+            }
+            "ListMyBrokers" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_MY_BROKERS_SPEC),
+                )
+            }
+            "RespondToInvite" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_RESPOND_TO_INVITE_SPEC),
+                )
+            }
+            "ListMembers" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_MEMBERS_SPEC),
+                )
+            }
+            "InviteMember" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_INVITE_MEMBER_SPEC),
+                )
+            }
+            "SetMemberRole" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_SET_MEMBER_ROLE_SPEC),
+                )
+            }
+            "RemoveMember" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_REMOVE_MEMBER_SPEC),
+                )
+            }
+            "TransferOwnership" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_TRANSFER_OWNERSHIP_SPEC),
+                )
+            }
+            "ListKeys" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_KEYS_SPEC),
+                )
+            }
+            "CreateKey" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_CREATE_KEY_SPEC),
+                )
+            }
+            "RotateKey" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_ROTATE_KEY_SPEC),
+                )
+            }
+            "RevokeKey" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_REVOKE_KEY_SPEC),
+                )
+            }
+            "CreateAffiliateVault" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_CREATE_AFFILIATE_VAULT_SPEC),
+                )
+            }
+            "ListVaults" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_VAULTS_SPEC),
+                )
+            }
+            "GetVault" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_GET_VAULT_SPEC),
+                )
+            }
+            "SetVaultStatus" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_SET_VAULT_STATUS_SPEC),
+                )
+            }
+            "ListQuickSwaps" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_QUICK_SWAPS_SPEC),
+                )
+            }
+            "GetFeeTotals" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_GET_FEE_TOTALS_SPEC),
+                )
+            }
+            "GetBrokerStats" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_GET_BROKER_STATS_SPEC),
+                )
+            }
+            _ => None,
+        }
+    }
+    fn call_unary(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::Payload,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("swap.quickswap.v1.QuickSwapBrokerService/")
+        else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            "GetBroker" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::GetBrokerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::GetBrokerRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_broker(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::GetBrokerResponse,
+                        >(format)
+                })
+            }
+            "ListMyBrokers" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::ListMyBrokersRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::ListMyBrokersRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::ListMyBrokersRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_my_brokers(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::ListMyBrokersResponse,
+                        >(format)
+                })
+            }
+            "RespondToInvite" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::RespondToInviteRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::RespondToInviteRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::RespondToInviteRequest,
+                    >::from_parts(&req, &body);
+                    svc.respond_to_invite(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::RespondToInviteResponse,
+                        >(format)
+                })
+            }
+            "ListMembers" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::ListMembersRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::ListMembersRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::ListMembersRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_members(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::ListMembersResponse,
+                        >(format)
+                })
+            }
+            "InviteMember" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::InviteMemberRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::InviteMemberRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::InviteMemberRequest,
+                    >::from_parts(&req, &body);
+                    svc.invite_member(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::InviteMemberResponse,
+                        >(format)
+                })
+            }
+            "SetMemberRole" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::SetMemberRoleRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::SetMemberRoleRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::SetMemberRoleRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_member_role(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::SetMemberRoleResponse,
+                        >(format)
+                })
+            }
+            "RemoveMember" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::RemoveMemberRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::RemoveMemberRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::RemoveMemberRequest,
+                    >::from_parts(&req, &body);
+                    svc.remove_member(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::RemoveMemberResponse,
+                        >(format)
+                })
+            }
+            "TransferOwnership" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::TransferOwnershipRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::TransferOwnershipRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::TransferOwnershipRequest,
+                    >::from_parts(&req, &body);
+                    svc.transfer_ownership(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::TransferOwnershipResponse,
+                        >(format)
+                })
+            }
+            "ListKeys" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::ListKeysRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::ListKeysRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::ListKeysRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_keys(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::ListKeysResponse,
+                        >(format)
+                })
+            }
+            "CreateKey" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::CreateKeyRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::CreateKeyRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::CreateKeyRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_key(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::CreateKeyResponse,
+                        >(format)
+                })
+            }
+            "RotateKey" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::RotateKeyRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::RotateKeyRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::RotateKeyRequest,
+                    >::from_parts(&req, &body);
+                    svc.rotate_key(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::RotateKeyResponse,
+                        >(format)
+                })
+            }
+            "RevokeKey" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::RevokeKeyRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::RevokeKeyRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::RevokeKeyRequest,
+                    >::from_parts(&req, &body);
+                    svc.revoke_key(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::RevokeKeyResponse,
+                        >(format)
+                })
+            }
+            "CreateAffiliateVault" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::CreateAffiliateVaultRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::CreateAffiliateVaultRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::CreateAffiliateVaultRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_affiliate_vault(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::CreateAffiliateVaultResponse,
+                        >(format)
+                })
+            }
+            "ListVaults" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::ListVaultsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::ListVaultsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::ListVaultsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_vaults(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::ListVaultsResponse,
+                        >(format)
+                })
+            }
+            "GetVault" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::GetVaultRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::GetVaultRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::GetVaultRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_vault(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::GetVaultResponse,
+                        >(format)
+                })
+            }
+            "SetVaultStatus" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::SetVaultStatusRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::SetVaultStatusRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::SetVaultStatusRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_vault_status(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::SetVaultStatusResponse,
+                        >(format)
+                })
+            }
+            "ListQuickSwaps" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::ListQuickSwapsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::ListQuickSwapsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::ListQuickSwapsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_quick_swaps(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::ListQuickSwapsResponse,
+                        >(format)
+                })
+            }
+            "GetFeeTotals" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::GetFeeTotalsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::GetFeeTotalsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::GetFeeTotalsRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_fee_totals(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::GetFeeTotalsResponse,
+                        >(format)
+                })
+            }
+            "GetBrokerStats" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::GetBrokerStatsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerStatsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::GetBrokerStatsRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_broker_stats(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::GetBrokerStatsResponse,
+                        >(format)
+                })
+            }
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_server_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::buffa::bytes::Bytes,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("swap.quickswap.v1.QuickSwapBrokerService/")
+        else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+    fn call_client_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("swap.quickswap.v1.QuickSwapBrokerService/")
+        else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_bidi_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("swap.quickswap.v1.QuickSwapBrokerService/")
+        else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+}
+/// Client for this service.
+///
+/// Generic over `T: ClientTransport`. For **gRPC** (HTTP/2), use
+/// `Http2Connection` — it has honest `poll_ready` and composes with
+/// `tower::balance` for multi-connection load balancing. For **Connect
+/// over HTTP/1.1** (or unknown protocol), use `HttpClient`.
+///
+/// # Working with the response
+///
+/// Unary calls return [`UnaryResponse<OwnedView<FooView>>`](::connectrpc::client::UnaryResponse).
+/// [`view()`](::connectrpc::client::UnaryResponse::view) borrows the response
+/// message, so field access is zero-copy:
+///
+/// ```rust,ignore
+/// let resp = client.get_broker(request).await?;
+/// let name: &str = resp.view().name;  // borrow into the response buffer
+/// ```
+///
+/// If you need the owned struct (e.g. to store or pass by value), use
+/// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
+///
+/// ```rust,ignore
+/// let owned = client.get_broker(request).await?.into_owned();
+/// ```
+///
+/// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
+/// zero-copy decoded body (an `OwnedView`) without copying; field access on it
+/// goes through `.reborrow()`. Streaming responses yield one
+/// [`StreamMessage`](::connectrpc::StreamMessage) per received message from
+/// `.message().await` — read fields zero-copy through the generated accessor
+/// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
+#[derive(Clone)]
+pub struct QuickSwapBrokerServiceClient<T> {
+    transport: T,
+    config: ::connectrpc::client::ClientConfig,
+}
+impl<T> QuickSwapBrokerServiceClient<T>
+where
+    T: ::connectrpc::client::ClientTransport,
+    <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
+{
+    /// Create a new client with the given transport and configuration.
+    pub fn new(transport: T, config: ::connectrpc::client::ClientConfig) -> Self {
+        Self { transport, config }
+    }
+    /// Get the client configuration.
+    pub fn config(&self) -> &::connectrpc::client::ClientConfig {
+        &self.config
+    }
+    /// Get a mutable reference to the client configuration.
+    pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
+        &mut self.config
+    }
+    /// Call the GetBroker RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/GetBroker.
+    pub async fn get_broker(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetBrokerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_broker_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetBroker RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_broker_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetBrokerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "GetBroker",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListMyBrokers RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/ListMyBrokers.
+    pub async fn list_my_brokers(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListMyBrokersRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListMyBrokersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_my_brokers_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListMyBrokers RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_my_brokers_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListMyBrokersRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListMyBrokersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListMyBrokers",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RespondToInvite RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/RespondToInvite.
+    pub async fn respond_to_invite(
+        &self,
+        request: crate::proto::swap::quickswap::v1::RespondToInviteRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::RespondToInviteResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.respond_to_invite_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RespondToInvite RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn respond_to_invite_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::RespondToInviteRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::RespondToInviteResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "RespondToInvite",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListMembers RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/ListMembers.
+    pub async fn list_members(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListMembersRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListMembersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_members_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListMembers RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_members_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListMembersRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListMembersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListMembers",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the InviteMember RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/InviteMember.
+    pub async fn invite_member(
+        &self,
+        request: crate::proto::swap::quickswap::v1::InviteMemberRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::InviteMemberResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.invite_member_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the InviteMember RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn invite_member_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::InviteMemberRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::InviteMemberResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "InviteMember",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetMemberRole RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/SetMemberRole.
+    pub async fn set_member_role(
+        &self,
+        request: crate::proto::swap::quickswap::v1::SetMemberRoleRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::SetMemberRoleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_member_role_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetMemberRole RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_member_role_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::SetMemberRoleRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::SetMemberRoleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "SetMemberRole",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RemoveMember RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/RemoveMember.
+    pub async fn remove_member(
+        &self,
+        request: crate::proto::swap::quickswap::v1::RemoveMemberRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::RemoveMemberResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.remove_member_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RemoveMember RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn remove_member_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::RemoveMemberRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::RemoveMemberResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "RemoveMember",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the TransferOwnership RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/TransferOwnership.
+    pub async fn transfer_ownership(
+        &self,
+        request: crate::proto::swap::quickswap::v1::TransferOwnershipRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::TransferOwnershipResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.transfer_ownership_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the TransferOwnership RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn transfer_ownership_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::TransferOwnershipRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::TransferOwnershipResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "TransferOwnership",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListKeys RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/ListKeys.
+    pub async fn list_keys(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListKeysRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListKeysResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_keys_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListKeys RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_keys_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListKeysRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListKeysResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListKeys",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateKey RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/CreateKey.
+    pub async fn create_key(
+        &self,
+        request: crate::proto::swap::quickswap::v1::CreateKeyRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::CreateKeyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_key_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateKey RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_key_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::CreateKeyRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::CreateKeyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "CreateKey",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RotateKey RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/RotateKey.
+    pub async fn rotate_key(
+        &self,
+        request: crate::proto::swap::quickswap::v1::RotateKeyRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::RotateKeyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.rotate_key_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RotateKey RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn rotate_key_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::RotateKeyRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::RotateKeyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "RotateKey",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RevokeKey RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/RevokeKey.
+    pub async fn revoke_key(
+        &self,
+        request: crate::proto::swap::quickswap::v1::RevokeKeyRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::RevokeKeyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.revoke_key_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RevokeKey RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn revoke_key_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::RevokeKeyRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::RevokeKeyResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "RevokeKey",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateAffiliateVault RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/CreateAffiliateVault.
+    pub async fn create_affiliate_vault(
+        &self,
+        request: crate::proto::swap::quickswap::v1::CreateAffiliateVaultRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::CreateAffiliateVaultResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_affiliate_vault_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateAffiliateVault RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_affiliate_vault_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::CreateAffiliateVaultRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::CreateAffiliateVaultResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "CreateAffiliateVault",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListVaults RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/ListVaults.
+    pub async fn list_vaults(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListVaultsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListVaultsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_vaults_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListVaults RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_vaults_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListVaultsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListVaultsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListVaults",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetVault RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/GetVault.
+    pub async fn get_vault(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetVaultRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetVaultResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_vault_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetVault RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_vault_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetVaultRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetVaultResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "GetVault",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetVaultStatus RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/SetVaultStatus.
+    pub async fn set_vault_status(
+        &self,
+        request: crate::proto::swap::quickswap::v1::SetVaultStatusRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::SetVaultStatusResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_vault_status_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetVaultStatus RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_vault_status_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::SetVaultStatusRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::SetVaultStatusResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "SetVaultStatus",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListQuickSwaps RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/ListQuickSwaps.
+    pub async fn list_quick_swaps(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListQuickSwapsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListQuickSwapsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_quick_swaps_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListQuickSwaps RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_quick_swaps_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListQuickSwapsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListQuickSwapsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListQuickSwaps",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetFeeTotals RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/GetFeeTotals.
+    pub async fn get_fee_totals(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetFeeTotalsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetFeeTotalsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_fee_totals_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetFeeTotals RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_fee_totals_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetFeeTotalsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetFeeTotalsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "GetFeeTotals",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetBrokerStats RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/GetBrokerStats.
+    pub async fn get_broker_stats(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetBrokerStatsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerStatsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_broker_stats_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetBrokerStats RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_broker_stats_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetBrokerStatsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerStatsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "GetBrokerStats",
                 request,
                 options,
             )

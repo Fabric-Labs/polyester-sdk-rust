@@ -172,8 +172,8 @@ pub enum AuthenticationMethod {
     SESSION_TOKEN = 1i32,
     /// A signed API key request.
     API_KEY = 2i32,
-    /// A broker API key, sent as a bearer token. Brokers receive it at
-    /// onboarding; it is not an account API key.
+    /// A broker API key, sent as a bearer token. A broker's members create it
+    /// in the QuickSwap broker API; it is not an account API key.
     BROKER_API_KEY = 3i32,
 }
 impl AuthenticationMethod {

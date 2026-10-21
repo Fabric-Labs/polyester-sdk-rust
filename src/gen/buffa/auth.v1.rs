@@ -2531,6 +2531,17 @@ pub enum PolicyAction {
     /// Allow creating, updating, deleting, and copying saved destination entries,
     /// including reading the address book.
     MANAGE_ADDRESS_BOOK = 12i32,
+    /// Allow reading the auto-withdraw rule and its runs.
+    READ_AUTO_WITHDRAW = 14i32,
+    /// Allow creating, changing, and disabling the auto-withdraw rule, including
+    /// reading it. A rule pays value out, so changing one also requires
+    /// EXTERNAL_WITHDRAW, and API keys can never change one.
+    MANAGE_AUTO_WITHDRAW = 15i32,
+    /// Allow quoting, creating, and reading Swaps: market conversions of the
+    /// account's own Trading balance from one asset into another. Each Swap places
+    /// spot orders on the account's behalf, which also remain subject to the
+    /// sub-account's spot trading policy.
+    SWAP = 16i32,
 }
 impl PolicyAction {
     ///Idiomatic alias for [`Self::UNSPECIFIED`]; `Debug` prints the variant name.
@@ -2560,6 +2571,15 @@ impl PolicyAction {
     ///Idiomatic alias for [`Self::MANAGE_ADDRESS_BOOK`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ManageAddressBook: Self = Self::MANAGE_ADDRESS_BOOK;
+    ///Idiomatic alias for [`Self::READ_AUTO_WITHDRAW`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadAutoWithdraw: Self = Self::READ_AUTO_WITHDRAW;
+    ///Idiomatic alias for [`Self::MANAGE_AUTO_WITHDRAW`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageAutoWithdraw: Self = Self::MANAGE_AUTO_WITHDRAW;
+    ///Idiomatic alias for [`Self::SWAP`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Swap: Self = Self::SWAP;
 }
 impl ::core::default::Default for PolicyAction {
     fn default() -> Self {
@@ -2664,6 +2684,9 @@ impl ::buffa::Enumeration for PolicyAction {
             8i32 => ::core::option::Option::Some(Self::READ_INTERNAL_TRANSFERS),
             11i32 => ::core::option::Option::Some(Self::READ_ADDRESS_BOOK),
             12i32 => ::core::option::Option::Some(Self::MANAGE_ADDRESS_BOOK),
+            14i32 => ::core::option::Option::Some(Self::READ_AUTO_WITHDRAW),
+            15i32 => ::core::option::Option::Some(Self::MANAGE_AUTO_WITHDRAW),
+            16i32 => ::core::option::Option::Some(Self::SWAP),
             _ => ::core::option::Option::None,
         }
     }
@@ -2681,6 +2704,9 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_INTERNAL_TRANSFERS => "READ_INTERNAL_TRANSFERS",
             Self::READ_ADDRESS_BOOK => "READ_ADDRESS_BOOK",
             Self::MANAGE_ADDRESS_BOOK => "MANAGE_ADDRESS_BOOK",
+            Self::READ_AUTO_WITHDRAW => "READ_AUTO_WITHDRAW",
+            Self::MANAGE_AUTO_WITHDRAW => "MANAGE_AUTO_WITHDRAW",
+            Self::SWAP => "SWAP",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -2698,6 +2724,13 @@ impl ::buffa::Enumeration for PolicyAction {
             "MANAGE_ADDRESS_BOOK" => {
                 ::core::option::Option::Some(Self::MANAGE_ADDRESS_BOOK)
             }
+            "READ_AUTO_WITHDRAW" => {
+                ::core::option::Option::Some(Self::READ_AUTO_WITHDRAW)
+            }
+            "MANAGE_AUTO_WITHDRAW" => {
+                ::core::option::Option::Some(Self::MANAGE_AUTO_WITHDRAW)
+            }
+            "SWAP" => ::core::option::Option::Some(Self::SWAP),
             _ => ::core::option::Option::None,
         }
     }
@@ -2712,6 +2745,9 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_INTERNAL_TRANSFERS,
             Self::READ_ADDRESS_BOOK,
             Self::MANAGE_ADDRESS_BOOK,
+            Self::READ_AUTO_WITHDRAW,
+            Self::MANAGE_AUTO_WITHDRAW,
+            Self::SWAP,
         ]
     }
 }
@@ -8964,6 +9000,13 @@ pub enum SubaccountPermission {
     SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS = 24i32,
     /// Create, sign with, rotate, or export the sub-account Guard Signer wallet.
     SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER = 25i32,
+    /// View the sub-account's auto-withdraw rule and its runs.
+    SUBACCOUNT_PERMISSION_READ_AUTO_WITHDRAW = 26i32,
+    /// Create, change, or disable the sub-account's auto-withdraw rule; requires
+    /// fresh MFA and is never available to API keys.
+    SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW = 27i32,
+    /// Quote, create, and view Swaps of the sub-account's Trading balance.
+    SUBACCOUNT_PERMISSION_SWAP = 28i32,
 }
 impl SubaccountPermission {
     ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -9044,6 +9087,15 @@ impl SubaccountPermission {
     ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ManageGuardSigner: Self = Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_AUTO_WITHDRAW`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadAutoWithdraw: Self = Self::SUBACCOUNT_PERMISSION_READ_AUTO_WITHDRAW;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageAutoWithdraw: Self = Self::SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_SWAP`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Swap: Self = Self::SUBACCOUNT_PERMISSION_SWAP;
 }
 impl ::core::default::Default for SubaccountPermission {
     fn default() -> Self {
@@ -9242,6 +9294,17 @@ impl ::buffa::Enumeration for SubaccountPermission {
                     Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER,
                 )
             }
+            26i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_AUTO_WITHDRAW,
+                )
+            }
+            27i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW,
+                )
+            }
+            28i32 => ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_SWAP),
             _ => ::core::option::Option::None,
         }
     }
@@ -9324,6 +9387,13 @@ impl ::buffa::Enumeration for SubaccountPermission {
             Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER => {
                 "SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER"
             }
+            Self::SUBACCOUNT_PERMISSION_READ_AUTO_WITHDRAW => {
+                "SUBACCOUNT_PERMISSION_READ_AUTO_WITHDRAW"
+            }
+            Self::SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW => {
+                "SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW"
+            }
+            Self::SUBACCOUNT_PERMISSION_SWAP => "SUBACCOUNT_PERMISSION_SWAP",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -9434,6 +9504,19 @@ impl ::buffa::Enumeration for SubaccountPermission {
                     Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER,
                 )
             }
+            "SUBACCOUNT_PERMISSION_READ_AUTO_WITHDRAW" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_AUTO_WITHDRAW,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW,
+                )
+            }
+            "SUBACCOUNT_PERMISSION_SWAP" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_SWAP)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -9465,6 +9548,9 @@ impl ::buffa::Enumeration for SubaccountPermission {
             Self::SUBACCOUNT_PERMISSION_READ_DEPOSIT_ADDRESSES,
             Self::SUBACCOUNT_PERMISSION_READ_GUARD_SIGNER_STATUS,
             Self::SUBACCOUNT_PERMISSION_MANAGE_GUARD_SIGNER,
+            Self::SUBACCOUNT_PERMISSION_READ_AUTO_WITHDRAW,
+            Self::SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW,
+            Self::SUBACCOUNT_PERMISSION_SWAP,
         ]
     }
 }
