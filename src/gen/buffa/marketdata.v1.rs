@@ -1008,7 +1008,7 @@ pub const __GET_ORDERBOOK_HEATMAP_REQUEST_JSON_ANY: ::buffa::type_registry::Json
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct HeatmapLevels {
-    /// Price levels in quote units scaled by 1e6.
+    /// Price levels in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -1241,7 +1241,7 @@ pub const __HEATMAP_LEVELS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct HeatmapDeltaLevels {
-    /// Price levels in quote units scaled by 1e6.
+    /// Price levels in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -1482,7 +1482,7 @@ pub struct HeatmapKeyframe {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// Best bid price in quote units scaled by 1e6.
+    /// Best bid price in quote units scaled by 1e9.
     ///
     /// Field 2: `best_bid_ticks`
     #[serde(
@@ -1492,7 +1492,7 @@ pub struct HeatmapKeyframe {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub best_bid_ticks: i64,
-    /// Best ask price in quote units scaled by 1e6.
+    /// Best ask price in quote units scaled by 1e9.
     ///
     /// Field 3: `best_ask_ticks`
     #[serde(
@@ -1502,7 +1502,7 @@ pub struct HeatmapKeyframe {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub best_ask_ticks: i64,
-    /// Mid price in quote units scaled by 1e6.
+    /// Mid price in quote units scaled by 1e9.
     ///
     /// Field 4: `mid_ticks`
     #[serde(
@@ -2135,7 +2135,7 @@ pub struct HeatmapLiveBucket {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub quantity_mode: ::buffa::EnumValue<HeatmapQuantityMode>,
-    /// Effective bin stride for this symbol as a price delta in 1e-6 quote-unit
+    /// Effective bin stride for this symbol as a price delta in 1e-9 quote-unit
     /// ticks.
     ///
     /// Field 11: `effective_bin_ticks`
@@ -3941,7 +3941,7 @@ pub struct MarketTrade {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_buy: bool,
-    /// Trade price in quote-asset units scaled by 1e6.
+    /// Trade price in quote-asset units scaled by 1e9.
     ///
     /// Field 4: `price_ticks`
     #[serde(
@@ -4158,6 +4158,146 @@ pub const __MARKET_TRADE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
     type_url: "type.googleapis.com/marketdata.v1.MarketTrade",
     to_json: ::buffa::type_registry::any_to_json::<MarketTrade>,
     from_json: ::buffa::type_registry::any_from_json::<MarketTrade>,
+    is_wkt: false,
+};
+/// MarketTradeBatch is one realtime publication on a symbol's public trade
+/// stream: every trade queued for the stream when it was sent, at most 256 and
+/// at most 64 KiB, in execution order.
+///
+/// match_id identifies a trade. Apply trades in array order and in publication
+/// order; a trade whose match_id was already received replaces the earlier copy.
+/// When the subscription reports that missed publications could not be
+/// recovered, reload recent trades over REST.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MarketTradeBatch {
+    /// Trades in execution order, oldest first. At least one trade.
+    ///
+    /// Field 1: `events`
+    #[serde(
+        rename = "events",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub events: ::buffa::alloc::vec::Vec<MarketTrade>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MarketTradeBatch {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MarketTradeBatch").field("events", &self.events).finish()
+    }
+}
+impl MarketTradeBatch {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.MarketTradeBatch";
+}
+::buffa::impl_default_instance!(MarketTradeBatch);
+impl ::buffa::MessageName for MarketTradeBatch {
+    const PACKAGE: &'static str = "marketdata.v1";
+    const NAME: &'static str = "MarketTradeBatch";
+    const FULL_NAME: &'static str = "marketdata.v1.MarketTradeBatch";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.MarketTradeBatch";
+}
+impl ::buffa::Message for MarketTradeBatch {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.events {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.events {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.events.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.events.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MarketTradeBatch {
+    const PROTO_FQN: &'static str = "marketdata.v1.MarketTradeBatch";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MarketTradeBatch {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MARKET_TRADE_BATCH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketdata.v1.MarketTradeBatch",
+    to_json: ::buffa::type_registry::any_to_json::<MarketTradeBatch>,
+    from_json: ::buffa::type_registry::any_from_json::<MarketTradeBatch>,
     is_wkt: false,
 };
 /// GetTradesResponse contains public trades for one spot market.
@@ -5030,7 +5170,7 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// Opening price in quote units. Primary candles use scale 6; composite
+    /// Opening price in quote units. Primary candles use scale 9; composite
     /// reference candles use the pair's reference_price_scale from GetSpotConfig.
     ///
     /// Field 2: `open`
@@ -5611,7 +5751,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub ts_sec: ::buffa::alloc::vec::Vec<u64>,
-    /// Opening primary-market prices use scale 6. Reference prices use the pair's
+    /// Opening primary-market prices use scale 9. Reference prices use the pair's
     /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 4: `open`
@@ -5621,7 +5761,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub open: ::buffa::alloc::vec::Vec<i64>,
-    /// Highest primary-market prices use scale 6. Reference prices use the pair's
+    /// Highest primary-market prices use scale 9. Reference prices use the pair's
     /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 5: `high`
@@ -5631,7 +5771,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub high: ::buffa::alloc::vec::Vec<i64>,
-    /// Lowest primary-market prices use scale 6. Reference prices use the pair's
+    /// Lowest primary-market prices use scale 9. Reference prices use the pair's
     /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 6: `low`
@@ -5641,7 +5781,7 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub low: ::buffa::alloc::vec::Vec<i64>,
-    /// Closing primary-market prices use scale 6. Reference prices use the pair's
+    /// Closing primary-market prices use scale 9. Reference prices use the pair's
     /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 7: `close`
@@ -6579,7 +6719,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// opening primary-market price in scale 6
+    /// opening primary-market price in scale 9
     ///
     /// Field 4: `open`
     #[serde(
@@ -6588,7 +6728,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub open: i64,
-    /// highest primary-market price in scale 6
+    /// highest primary-market price in scale 9
     ///
     /// Field 5: `high`
     #[serde(
@@ -6597,7 +6737,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub high: i64,
-    /// lowest primary-market price in scale 6
+    /// lowest primary-market price in scale 9
     ///
     /// Field 6: `low`
     #[serde(
@@ -6606,7 +6746,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub low: i64,
-    /// closing primary-market price in scale 6
+    /// closing primary-market price in scale 9
     ///
     /// Field 7: `close`
     #[serde(
@@ -7347,7 +7487,7 @@ pub struct PairConfig {
     )]
     pub quote_asset: ::buffa::alloc::string::String,
     /// Minimum allowed price increment as a decimal string in quote-asset units.
-    /// Prices use 6 decimal places in scaled integer fields; for example "0.01"
+    /// Prices use 9 decimal places in scaled integer fields; for example "0.01"
     /// means orders must be priced in 0.01 quote-asset increments.
     ///
     /// Field 5: `tick_size`
@@ -7491,7 +7631,7 @@ pub struct PairConfig {
     )]
     pub max_client_ref_drift_bps: i32,
     /// Integer scale for composite reference prices in candle responses (0..18).
-    /// Primary market and execution prices continue to use scale 6.
+    /// Primary market and execution prices use the fixed scale 9.
     ///
     /// Field 19: `reference_price_scale`
     #[serde(
@@ -9209,7 +9349,7 @@ pub mod __buffa {
         /// - price_ticks\[i\] \<-\> qty_scaled\[i\]
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapLevelsView<'a> {
-            /// Price levels in quote units scaled by 1e6.
+            /// Price levels in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: ::buffa::RepeatedView<'a, i64>,
@@ -9530,7 +9670,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Price levels in quote units scaled by 1e6.
+            /// Price levels in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -9582,7 +9722,7 @@ pub mod __buffa {
         /// Delete semantics: qty_scaled\[i\] = 0 means delete level at price_ticks\[i\].
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapDeltaLevelsView<'a> {
-            /// Price levels in quote units scaled by 1e6.
+            /// Price levels in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: ::buffa::RepeatedView<'a, i64>,
@@ -9904,7 +10044,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Price levels in quote units scaled by 1e6.
+            /// Price levels in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -9958,15 +10098,15 @@ pub mod __buffa {
             ///
             /// Field 1: `ts_sec`
             pub ts_sec: u64,
-            /// Best bid price in quote units scaled by 1e6.
+            /// Best bid price in quote units scaled by 1e9.
             ///
             /// Field 2: `best_bid_ticks`
             pub best_bid_ticks: i64,
-            /// Best ask price in quote units scaled by 1e6.
+            /// Best ask price in quote units scaled by 1e9.
             ///
             /// Field 3: `best_ask_ticks`
             pub best_ask_ticks: i64,
-            /// Mid price in quote units scaled by 1e6.
+            /// Mid price in quote units scaled by 1e9.
             ///
             /// Field 4: `mid_ticks`
             pub mid_ticks: i64,
@@ -10421,21 +10561,21 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// Best bid price in quote units scaled by 1e6.
+            /// Best bid price in quote units scaled by 1e9.
             ///
             /// Field 2: `best_bid_ticks`
             #[must_use]
             pub fn best_bid_ticks(&self) -> i64 {
                 self.0.reborrow().best_bid_ticks
             }
-            /// Best ask price in quote units scaled by 1e6.
+            /// Best ask price in quote units scaled by 1e9.
             ///
             /// Field 3: `best_ask_ticks`
             #[must_use]
             pub fn best_ask_ticks(&self) -> i64 {
                 self.0.reborrow().best_ask_ticks
             }
-            /// Mid price in quote units scaled by 1e6.
+            /// Mid price in quote units scaled by 1e9.
             ///
             /// Field 4: `mid_ticks`
             #[must_use]
@@ -11073,7 +11213,7 @@ pub mod __buffa {
             ///
             /// Field 10: `quantity_mode`
             pub quantity_mode: ::buffa::EnumValue<super::super::HeatmapQuantityMode>,
-            /// Effective bin stride for this symbol as a price delta in 1e-6 quote-unit
+            /// Effective bin stride for this symbol as a price delta in 1e-9 quote-unit
             /// ticks.
             ///
             /// Field 11: `effective_bin_ticks`
@@ -11696,7 +11836,7 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::HeatmapQuantityMode> {
                 self.0.reborrow().quantity_mode
             }
-            /// Effective bin stride for this symbol as a price delta in 1e-6 quote-unit
+            /// Effective bin stride for this symbol as a price delta in 1e-9 quote-unit
             /// ticks.
             ///
             /// Field 11: `effective_bin_ticks`
@@ -13389,7 +13529,7 @@ pub mod __buffa {
             ///
             /// Field 3: `is_buy`
             pub is_buy: bool,
-            /// Trade price in quote-asset units scaled by 1e6.
+            /// Trade price in quote-asset units scaled by 1e9.
             ///
             /// Field 4: `price_ticks`
             pub price_ticks: i64,
@@ -13756,7 +13896,7 @@ pub mod __buffa {
             pub fn is_buy(&self) -> bool {
                 self.0.reborrow().is_buy
             }
-            /// Trade price in quote-asset units scaled by 1e6.
+            /// Trade price in quote-asset units scaled by 1e9.
             ///
             /// Field 4: `price_ticks`
             #[must_use]
@@ -13802,6 +13942,309 @@ pub mod __buffa {
             type ViewHandle = MarketTradeOwnedView;
         }
         impl ::serde::Serialize for MarketTradeOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// MarketTradeBatch is one realtime publication on a symbol's public trade
+        /// stream: every trade queued for the stream when it was sent, at most 256 and
+        /// at most 64 KiB, in execution order.
+        ///
+        /// match_id identifies a trade. Apply trades in array order and in publication
+        /// order; a trade whose match_id was already received replaces the earlier copy.
+        /// When the subscription reports that missed publications could not be
+        /// recovered, reload recent trades over REST.
+        #[derive(Clone, Debug, Default)]
+        pub struct MarketTradeBatchView<'a> {
+            /// Trades in execution order, oldest first. At least one trade.
+            ///
+            /// Field 1: `events`
+            pub events: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::MarketTradeView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MarketTradeBatchView<'a> {
+            type Owned = super::super::MarketTradeBatch;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.events
+                            .push(
+                                <super::super::__buffa::view::MarketTradeView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MarketTradeBatch,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MarketTradeBatch,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MarketTradeBatch {
+                    events: self
+                        .events
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MarketTradeBatchView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.events {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.events {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MarketTradeBatchView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.events.is_empty() {
+                    __map.serialize_entry("events", &*self.events)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MarketTradeBatchView<'a> {
+            const PACKAGE: &'static str = "marketdata.v1";
+            const NAME: &'static str = "MarketTradeBatch";
+            const FULL_NAME: &'static str = "marketdata.v1.MarketTradeBatch";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.MarketTradeBatch";
+        }
+        ::buffa::impl_default_view_instance!(MarketTradeBatchView);
+        ::buffa::impl_view_reborrow!(MarketTradeBatchView);
+        /** Self-contained, `'static` owned view of a `MarketTradeBatch` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MarketTradeBatchView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MarketTradeBatchView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MarketTradeBatchOwnedView(
+            ::buffa::OwnedView<MarketTradeBatchView<'static>>,
+        );
+        impl MarketTradeBatchOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarketTradeBatchOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarketTradeBatchOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MarketTradeBatch,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MarketTradeBatchOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MarketTradeBatchView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MarketTradeBatchView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MarketTradeBatch,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Trades in execution order, oldest first. At least one trade.
+            ///
+            /// Field 1: `events`
+            #[must_use]
+            pub fn events(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::MarketTradeView<'_>,
+            > {
+                &self.0.reborrow().events
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<MarketTradeBatchView<'static>>>
+        for MarketTradeBatchOwnedView {
+            fn from(inner: ::buffa::OwnedView<MarketTradeBatchView<'static>>) -> Self {
+                MarketTradeBatchOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MarketTradeBatchOwnedView>
+        for ::buffa::OwnedView<MarketTradeBatchView<'static>> {
+            fn from(wrapper: MarketTradeBatchOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<MarketTradeBatchView<'static>>>
+        for MarketTradeBatchOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<MarketTradeBatchView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MarketTradeBatch {
+            type View<'a> = MarketTradeBatchView<'a>;
+            type ViewHandle = MarketTradeBatchOwnedView;
+        }
+        impl ::serde::Serialize for MarketTradeBatchOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -15367,7 +15810,7 @@ pub mod __buffa {
             ///
             /// Field 1: `ts_sec`
             pub ts_sec: u64,
-            /// Opening price in quote units. Primary candles use scale 6; composite
+            /// Opening price in quote units. Primary candles use scale 9; composite
             /// reference candles use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 2: `open`
@@ -15772,7 +16215,7 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// Opening price in quote units. Primary candles use scale 6; composite
+            /// Opening price in quote units. Primary candles use scale 9; composite
             /// reference candles use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 2: `open`
@@ -16338,22 +16781,22 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: ::buffa::RepeatedView<'a, u64>,
-            /// Opening primary-market prices use scale 6. Reference prices use the pair's
+            /// Opening primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 4: `open`
             pub open: ::buffa::RepeatedView<'a, i64>,
-            /// Highest primary-market prices use scale 6. Reference prices use the pair's
+            /// Highest primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 5: `high`
             pub high: ::buffa::RepeatedView<'a, i64>,
-            /// Lowest primary-market prices use scale 6. Reference prices use the pair's
+            /// Lowest primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 6: `low`
             pub low: ::buffa::RepeatedView<'a, i64>,
-            /// Closing primary-market prices use scale 6. Reference prices use the pair's
+            /// Closing primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 7: `close`
@@ -17350,7 +17793,7 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> &::buffa::RepeatedView<'_, u64> {
                 &self.0.reborrow().ts_sec
             }
-            /// Opening primary-market prices use scale 6. Reference prices use the pair's
+            /// Opening primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 4: `open`
@@ -17358,7 +17801,7 @@ pub mod __buffa {
             pub fn open(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().open
             }
-            /// Highest primary-market prices use scale 6. Reference prices use the pair's
+            /// Highest primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 5: `high`
@@ -17366,7 +17809,7 @@ pub mod __buffa {
             pub fn high(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().high
             }
-            /// Lowest primary-market prices use scale 6. Reference prices use the pair's
+            /// Lowest primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 6: `low`
@@ -17374,7 +17817,7 @@ pub mod __buffa {
             pub fn low(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().low
             }
-            /// Closing primary-market prices use scale 6. Reference prices use the pair's
+            /// Closing primary-market prices use scale 9. Reference prices use the pair's
             /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 7: `close`
@@ -17504,19 +17947,19 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: u64,
-            /// opening primary-market price in scale 6
+            /// opening primary-market price in scale 9
             ///
             /// Field 4: `open`
             pub open: i64,
-            /// highest primary-market price in scale 6
+            /// highest primary-market price in scale 9
             ///
             /// Field 5: `high`
             pub high: i64,
-            /// lowest primary-market price in scale 6
+            /// lowest primary-market price in scale 9
             ///
             /// Field 6: `low`
             pub low: i64,
-            /// closing primary-market price in scale 6
+            /// closing primary-market price in scale 9
             ///
             /// Field 7: `close`
             pub close: i64,
@@ -17940,28 +18383,28 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// opening primary-market price in scale 6
+            /// opening primary-market price in scale 9
             ///
             /// Field 4: `open`
             #[must_use]
             pub fn open(&self) -> i64 {
                 self.0.reborrow().open
             }
-            /// highest primary-market price in scale 6
+            /// highest primary-market price in scale 9
             ///
             /// Field 5: `high`
             #[must_use]
             pub fn high(&self) -> i64 {
                 self.0.reborrow().high
             }
-            /// lowest primary-market price in scale 6
+            /// lowest primary-market price in scale 9
             ///
             /// Field 6: `low`
             #[must_use]
             pub fn low(&self) -> i64 {
                 self.0.reborrow().low
             }
-            /// closing primary-market price in scale 6
+            /// closing primary-market price in scale 9
             ///
             /// Field 7: `close`
             #[must_use]
@@ -18799,7 +19242,7 @@ pub mod __buffa {
             /// Field 4: `quote_asset`
             pub quote_asset: &'a str,
             /// Minimum allowed price increment as a decimal string in quote-asset units.
-            /// Prices use 6 decimal places in scaled integer fields; for example "0.01"
+            /// Prices use 9 decimal places in scaled integer fields; for example "0.01"
             /// means orders must be priced in 0.01 quote-asset increments.
             ///
             /// Field 5: `tick_size`
@@ -18870,7 +19313,7 @@ pub mod __buffa {
             /// Field 18: `max_client_ref_drift_bps`
             pub max_client_ref_drift_bps: i32,
             /// Integer scale for composite reference prices in candle responses (0..18).
-            /// Primary market and execution prices continue to use scale 6.
+            /// Primary market and execution prices use the fixed scale 9.
             ///
             /// Field 19: `reference_price_scale`
             pub reference_price_scale: u32,
@@ -19694,7 +20137,7 @@ pub mod __buffa {
                 self.0.reborrow().quote_asset
             }
             /// Minimum allowed price increment as a decimal string in quote-asset units.
-            /// Prices use 6 decimal places in scaled integer fields; for example "0.01"
+            /// Prices use 9 decimal places in scaled integer fields; for example "0.01"
             /// means orders must be priced in 0.01 quote-asset increments.
             ///
             /// Field 5: `tick_size`
@@ -19813,7 +20256,7 @@ pub mod __buffa {
                 self.0.reborrow().max_client_ref_drift_bps
             }
             /// Integer scale for composite reference prices in candle responses (0..18).
-            /// Primary market and execution prices continue to use scale 6.
+            /// Primary market and execution prices use the fixed scale 9.
             ///
             /// Field 19: `reference_price_scale`
             #[must_use]
@@ -20497,6 +20940,7 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_ORDERBOOK_HEATMAP_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_TRADES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__MARKET_TRADE_JSON_ANY);
+        reg.register_json_any(super::__MARKET_TRADE_BATCH_JSON_ANY);
         reg.register_json_any(super::__GET_TRADES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_CANDLES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_CANDLES_COLUMNS_REQUEST_JSON_ANY);
@@ -20555,6 +20999,10 @@ pub use self::__buffa::view::GetTradesRequestOwnedView;
 pub use self::__buffa::view::MarketTradeView;
 #[doc(inline)]
 pub use self::__buffa::view::MarketTradeOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MarketTradeBatchView;
+#[doc(inline)]
+pub use self::__buffa::view::MarketTradeBatchOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetTradesResponseView;
 #[doc(inline)]

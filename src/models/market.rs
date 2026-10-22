@@ -17,7 +17,7 @@ pub struct GetCandlesOpts {
     pub end: Option<i64>,
     pub include_incomplete: bool,
     /// When true, request composite reference candles. Their OHLC uses
-    /// `reference_price_scale`; primary OHLC stays on scale 6.
+    /// `reference_price_scale`; primary OHLC uses the fixed price scale 9.
     pub include_reference: bool,
     pub page_token: Option<String>,
 }

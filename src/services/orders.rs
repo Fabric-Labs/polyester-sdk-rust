@@ -1619,7 +1619,7 @@ mod tests {
                 Some(7),
             )
             .unwrap(),
-            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+            Price::from_ticks(50_000_000_000_000, Some("BTC-USDT".into())).unwrap(),
         );
 
         let decimal_wire = client.orders.encode_create_params(&decimal).unwrap();
@@ -1649,7 +1649,7 @@ mod tests {
             Some(Quantity::from_decimal_str("0.2", 8, Some("BTC-USDT".into()), Some(7)).unwrap()),
         );
         let scaled = modify_params(
-            Some(Price::from_ticks(50_001_000_000, Some("BTC-USDT".into())).unwrap()),
+            Some(Price::from_ticks(50_001_000_000_000, Some("BTC-USDT".into())).unwrap()),
             Some(
                 Quantity::from_scaled(
                     20_000_000,
@@ -2270,6 +2270,18 @@ mod tests {
         params.price = None;
         params.market_max_slippage = Some(MaxSlippage::Ticks(0));
         assert!(client.orders.encode_create_params(&params).is_err());
+
+        // 5 quote units at Q9 exceeds the i32 range the field used to have.
+        params.market_max_slippage = Some(MaxSlippage::Ticks(5_000_000_000));
+        let wire = client.orders.encode_create_params(&params).unwrap();
+        let intent = wire.order.as_option().unwrap();
+        let Some(order_intent::Execution::MarketIoc(market)) = intent.execution.as_ref() else {
+            panic!("expected market execution");
+        };
+        assert_eq!(
+            market.max_slippage,
+            Some(market_ioc::MaxSlippage::MaxSlippageTicks(5_000_000_000))
+        );
 
         params.market_max_slippage = Some(MaxSlippage::Bps(25));
         params.order_type = CreateOrderType::Limit;

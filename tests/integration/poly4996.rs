@@ -432,7 +432,7 @@ async fn twap_market_ioc_accepts_slippage() {
 
     for (ticks, bps, prefix) in [
         (None, Some(25_i32), "trg-twap-bps"),
-        (Some(1_i32), None, "trg-twap-ticks"),
+        (Some(1_i64), None, "trg-twap-ticks"),
     ] {
         let params = CreateTriggerParams {
             symbol: symbol.clone(),

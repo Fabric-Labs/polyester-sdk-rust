@@ -32,7 +32,7 @@ pub struct CreateTriggerParams {
     pub activation_price: Option<Price>,
     pub trailing_distance_ticks: Option<i64>,
     pub trailing_distance_bps: Option<i32>,
-    pub max_slippage_ticks: Option<i32>,
+    pub max_slippage_ticks: Option<i64>,
     pub max_slippage_bps: Option<i32>,
     pub twap_duration_ms: Option<i64>,
     pub twap_slice_interval_ms: Option<i64>,
@@ -63,7 +63,7 @@ pub struct ModifyTriggerParams {
     pub activation_price: Option<Price>,
     pub trailing_distance_ticks: Option<i64>,
     pub trailing_distance_bps: Option<i32>,
-    pub max_slippage_ticks: Option<i32>,
+    pub max_slippage_ticks: Option<i64>,
     pub max_slippage_bps: Option<i32>,
 }
 

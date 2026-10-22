@@ -4,7 +4,8 @@ use crate::errors::{Error, Result};
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
-pub const PRICE_TICK_SCALE: u32 = 6;
+/// Fixed decimal scale of trading price ticks: one tick is 1e-9 quote units.
+pub const PRICE_TICK_SCALE: u32 = 9;
 pub const LEDGER_SCALE: u32 = 18;
 /// Maximum accepted quantity/ledger scale for public formatters and catalog hydration.
 ///
@@ -404,14 +405,27 @@ mod tests {
     #[test]
     fn price_ticks_round_trip() {
         let ticks = parse_price_ticks_str("1.5", "price").unwrap();
-        assert_eq!(ticks, 1_500_000);
+        assert_eq!(ticks, 1_500_000_000);
         assert_eq!(format_price_ticks(ticks), "1.5");
     }
 
     #[test]
+    fn price_ticks_follow_published_q9_tick() {
+        // The public contract defines one price tick as 1e-9 quote units.
+        assert_eq!(PRICE_TICK_SCALE, 9);
+        assert_eq!(parse_price_ticks_str("0.000000001", "price").unwrap(), 1);
+        assert_eq!(format_price_ticks(1), "0.000000001");
+        assert_eq!(
+            parse_price_ticks_str("65000.123456789", "price").unwrap(),
+            65_000_123_456_789
+        );
+        assert_eq!(format_price_ticks(65_000_123_456_789), "65000.123456789");
+    }
+
+    #[test]
     fn reject_excess_precision() {
-        let err = parse_price_ticks_str("1.1234567", "price").unwrap_err();
-        assert!(err.to_string().contains("at most 6"));
+        let err = parse_price_ticks_str("1.1234567891", "price").unwrap_err();
+        assert!(err.to_string().contains("at most 9"));
     }
 
     #[test]
@@ -449,15 +463,15 @@ mod tests {
         // Leading/trailing whitespace is trimmed (TS `value.trim()` parity).
         assert_eq!(
             parse_price_ticks_str(" 65000", "price").unwrap(),
-            65_000_000_000
+            65_000_000_000_000
         );
         assert_eq!(
             parse_price_ticks_str("65000 ", "price").unwrap(),
-            65_000_000_000
+            65_000_000_000_000
         );
         assert_eq!(
             parse_price_ticks_str("65000.0", "price").unwrap(),
-            65_000_000_000
+            65_000_000_000_000
         );
     }
 

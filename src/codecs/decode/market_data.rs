@@ -423,10 +423,10 @@ mod tests {
             timeframe: Timeframe::Min1.into(),
             candles: vec![CandlePoint {
                 ts_sec: 10,
-                open: 1_000_000,
-                high: 2_000_000,
-                low: 500_000,
-                close: 1_500_000,
+                open: 1_000_000_000,
+                high: 2_000_000_000,
+                low: 500_000_000,
+                close: 1_500_000_000,
                 volume: 100_000_000,
                 quote_volume: "150.25".into(),
                 ..Default::default()
@@ -454,10 +454,10 @@ mod tests {
             timeframe: Timeframe::Min1.into(),
             candles: vec![CandlePoint {
                 ts_sec: 1,
-                open: 1_000_000,
-                high: 1_000_000,
-                low: 1_000_000,
-                close: 1_000_000,
+                open: 1_000_000_000,
+                high: 1_000_000_000,
+                low: 1_000_000_000,
+                close: 1_000_000_000,
                 volume: 100_000_000,
                 ..Default::default()
             }],

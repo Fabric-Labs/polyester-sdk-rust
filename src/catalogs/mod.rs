@@ -549,7 +549,7 @@ impl Manager {
             .copied()
     }
 
-    /// Pair scale for composite reference-candle prices. Primary prices stay on scale 6.
+    /// Pair scale for composite reference-candle prices. Primary prices use the fixed price scale 9.
     pub fn reference_price_scale_for_symbol_id(&self, id: u32) -> Option<u32> {
         read_unpoisoned(&self.inner)
             .id_to_reference_price_scale
