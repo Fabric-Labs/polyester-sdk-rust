@@ -150,7 +150,7 @@ pub trait ClaimsService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Claim today's reward once for the authenticated root account. All reward assets are transferred together, and retries return the same claim.
+    /// Claim today's reward once for the authenticated root account, paid to the root account or to a subaccount it owns. All reward assets are transferred together, and retries return the same claim.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

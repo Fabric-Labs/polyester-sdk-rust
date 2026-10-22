@@ -31,6 +31,10 @@ pub enum ErrorCode {
     ERROR_CODE_FAILED_PRECONDITION = 11i32,
     /// Verify an X or Discord account before claiming a reward.
     ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED = 12i32,
+    /// The selected subaccount does not exist or is not owned by the authenticated root account.
+    ERROR_CODE_SUBACCOUNT_NOT_FOUND = 13i32,
+    /// The selected subaccount is owned by the authenticated root account but is not active.
+    ERROR_CODE_SUBACCOUNT_INACTIVE = 14i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -72,6 +76,12 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const SocialVerificationRequired: Self = Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SUBACCOUNT_NOT_FOUND`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SubaccountNotFound: Self = Self::ERROR_CODE_SUBACCOUNT_NOT_FOUND;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SUBACCOUNT_INACTIVE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SubaccountInactive: Self = Self::ERROR_CODE_SUBACCOUNT_INACTIVE;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -188,6 +198,8 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED,
                 )
             }
+            13i32 => ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_NOT_FOUND),
+            14i32 => ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_INACTIVE),
             _ => ::core::option::Option::None,
         }
     }
@@ -213,6 +225,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED => {
                 "ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED"
             }
+            Self::ERROR_CODE_SUBACCOUNT_NOT_FOUND => "ERROR_CODE_SUBACCOUNT_NOT_FOUND",
+            Self::ERROR_CODE_SUBACCOUNT_INACTIVE => "ERROR_CODE_SUBACCOUNT_INACTIVE",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -260,6 +274,12 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED,
                 )
             }
+            "ERROR_CODE_SUBACCOUNT_NOT_FOUND" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_NOT_FOUND)
+            }
+            "ERROR_CODE_SUBACCOUNT_INACTIVE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_INACTIVE)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -278,6 +298,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_PERMISSION_DENIED,
             Self::ERROR_CODE_FAILED_PRECONDITION,
             Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED,
+            Self::ERROR_CODE_SUBACCOUNT_NOT_FOUND,
+            Self::ERROR_CODE_SUBACCOUNT_INACTIVE,
         ]
     }
 }
@@ -1270,6 +1292,17 @@ pub struct GetDailyClaimStatusResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub campaign: ::buffa::MessageField<ClaimCampaign>,
+    /// Subaccount public id that receives today's claimed reward. Zero or omitted when no claim
+    /// has been created yet or when the reward is paid to the root account.
+    ///
+    /// Field 6: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1282,6 +1315,7 @@ impl ::core::fmt::Debug for GetDailyClaimStatusResponse {
             .field("rewards", &self.rewards)
             .field("claim_id", &self.claim_id)
             .field("campaign", &self.campaign)
+            .field("subaccount_id", &self.subaccount_id)
             .finish()
     }
 }
@@ -1343,6 +1377,9 @@ impl ::buffa::Message for GetDailyClaimStatusResponse {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1373,6 +1410,9 @@ impl ::buffa::Message for GetDailyClaimStatusResponse {
         if self.campaign.is_set() {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.campaign.write_to(__cache, buf);
+        }
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(6u32, self.subaccount_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1434,6 +1474,13 @@ impl ::buffa::Message for GetDailyClaimStatusResponse {
                     ctx,
                 )?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1447,6 +1494,7 @@ impl ::buffa::Message for GetDailyClaimStatusResponse {
         self.rewards.clear();
         self.claim_id.clear();
         self.campaign = ::buffa::MessageField::none();
+        self.subaccount_id = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1484,13 +1532,28 @@ pub const __GET_DAILY_CLAIM_STATUS_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ClaimDailyRewardRequest {
+    /// Optional public id of a subaccount owned by the authenticated root account that receives
+    /// the reward. When omitted, the reward is paid to the root account. Subaccounts shared with
+    /// the caller but owned by another root account cannot be selected. The destination is fixed
+    /// when today's claim is created; retries return the existing claim and its destination.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ClaimDailyRewardRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ClaimDailyRewardRequest").finish()
+        f.debug_struct("ClaimDailyRewardRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .finish()
     }
 }
 impl ClaimDailyRewardRequest {
@@ -1518,6 +1581,9 @@ impl ::buffa::Message for ClaimDailyRewardRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1528,6 +1594,9 @@ impl ::buffa::Message for ClaimDailyRewardRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -1541,6 +1610,13 @@ impl ::buffa::Message for ClaimDailyRewardRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1549,6 +1625,7 @@ impl ::buffa::Message for ClaimDailyRewardRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
+        self.subaccount_id = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1802,6 +1879,17 @@ pub struct ClaimDailyRewardResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub campaign: ::buffa::MessageField<ClaimCampaign>,
+    /// Subaccount public id that receives this claim's reward. Zero or omitted when the reward is
+    /// paid to the root account.
+    ///
+    /// Field 8: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1816,6 +1904,7 @@ impl ::core::fmt::Debug for ClaimDailyRewardResponse {
             .field("transfers", &self.transfers)
             .field("reset_at", &self.reset_at)
             .field("campaign", &self.campaign)
+            .field("subaccount_id", &self.subaccount_id)
             .finish()
     }
 }
@@ -1893,6 +1982,9 @@ impl ::buffa::Message for ClaimDailyRewardResponse {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1931,6 +2023,9 @@ impl ::buffa::Message for ClaimDailyRewardResponse {
         if self.campaign.is_set() {
             ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
             self.campaign.write_to(__cache, buf);
+        }
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(8u32, self.subaccount_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2012,6 +2107,13 @@ impl ::buffa::Message for ClaimDailyRewardResponse {
                     ctx,
                 )?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2027,6 +2129,7 @@ impl ::buffa::Message for ClaimDailyRewardResponse {
         self.transfers.clear();
         self.reset_at = ::buffa::MessageField::none();
         self.campaign = ::buffa::MessageField::none();
+        self.subaccount_id = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3377,6 +3480,11 @@ pub mod __buffa {
             pub campaign: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ClaimCampaignView<'a>,
             >,
+            /// Subaccount public id that receives today's claimed reward. Zero or omitted when no claim
+            /// has been created yet or when the reward is paid to the root account.
+            ///
+            /// Field 6: `subaccount_id`
+            pub subaccount_id: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetDailyClaimStatusResponseView<'a> {
@@ -3476,6 +3584,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -3543,6 +3658,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    subaccount_id: self.subaccount_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -3592,6 +3708,9 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -3636,6 +3755,9 @@ pub mod __buffa {
                     );
                     self.campaign.write_to(__cache, buf);
                 }
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(6u32, self.subaccount_id, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -3677,6 +3799,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("campaign", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
                 }
                 __map.end()
             }
@@ -3826,6 +3955,14 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().campaign
             }
+            /// Subaccount public id that receives today's claimed reward. Zero or omitted when no claim
+            /// has been created yet or when the reward is paid to the root account.
+            ///
+            /// Field 6: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<GetDailyClaimStatusResponseView<'static>>,
@@ -3866,6 +4003,13 @@ pub mod __buffa {
         /// ClaimDailyRewardRequest claims today's reward for the authenticated root account.
         #[derive(Clone, Debug, Default)]
         pub struct ClaimDailyRewardRequestView<'a> {
+            /// Optional public id of a subaccount owned by the authenticated root account that receives
+            /// the reward. When omitted, the reward is paid to the root account. Subaccounts shared with
+            /// the caller but owned by another root account cannot be selected. The destination is fixed
+            /// when today's claim is created; retries return the existing claim and its destination.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ClaimDailyRewardRequestView<'a> {
@@ -3899,6 +4043,13 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -3928,6 +4079,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ClaimDailyRewardRequest {
+                    subaccount_id: self.subaccount_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -3942,6 +4094,9 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -3953,6 +4108,9 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -3974,6 +4132,13 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
                 __map.end()
             }
         }
@@ -4071,6 +4236,16 @@ pub mod __buffa {
             #[must_use]
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
+            }
+            /// Optional public id of a subaccount owned by the authenticated root account that receives
+            /// the reward. When omitted, the reward is paid to the root account. Subaccounts shared with
+            /// the caller but owned by another root account cannot be selected. The destination is fixed
+            /// when today's claim is created; retries return the existing claim and its destination.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
             }
         }
         impl ::core::convert::From<
@@ -4455,6 +4630,11 @@ pub mod __buffa {
             pub campaign: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ClaimCampaignView<'a>,
             >,
+            /// Subaccount public id that receives this claim's reward. Zero or omitted when the reward is
+            /// paid to the root account.
+            ///
+            /// Field 8: `subaccount_id`
+            pub subaccount_id: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ClaimDailyRewardResponseView<'a> {
@@ -4579,6 +4759,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -4674,6 +4861,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    subaccount_id: self.subaccount_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -4739,6 +4927,9 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -4799,6 +4990,9 @@ pub mod __buffa {
                     );
                     self.campaign.write_to(__cache, buf);
                 }
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(8u32, self.subaccount_id, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -4851,6 +5045,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("campaign", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
                 }
                 __map.end()
             }
@@ -5020,6 +5221,14 @@ pub mod __buffa {
                 super::super::__buffa::view::ClaimCampaignView<'_>,
             > {
                 &self.0.reborrow().campaign
+            }
+            /// Subaccount public id that receives this claim's reward. Zero or omitted when the reward is
+            /// paid to the root account.
+            ///
+            /// Field 8: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
             }
         }
         impl ::core::convert::From<
