@@ -115,6 +115,30 @@ impl ::buffa::Message for ClientFrame {
                         += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::client_frame::Payload::BatchCreateOrders(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::client_frame::Payload::BatchReplaceOrders(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::client_frame::Payload::BatchCancelOrders(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -170,6 +194,30 @@ impl ::buffa::Message for ClientFrame {
                 __buffa::oneof::client_frame::Payload::CancelAllOrders(x) => {
                     ::buffa::types::put_len_delimited_header(
                         14u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::client_frame::Payload::BatchCreateOrders(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        15u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::client_frame::Payload::BatchReplaceOrders(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        16u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::client_frame::Payload::BatchCancelOrders(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        17u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -301,6 +349,72 @@ impl ::buffa::Message for ClientFrame {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.payload = ::core::option::Option::Some(
                         __buffa::oneof::client_frame::Payload::CancelAllOrders(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::client_frame::Payload::BatchCreateOrders(
+                        ref mut existing,
+                    ),
+                ) = self.payload
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.payload = ::core::option::Option::Some(
+                        __buffa::oneof::client_frame::Payload::BatchCreateOrders(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::client_frame::Payload::BatchReplaceOrders(
+                        ref mut existing,
+                    ),
+                ) = self.payload
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.payload = ::core::option::Option::Some(
+                        __buffa::oneof::client_frame::Payload::BatchReplaceOrders(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::client_frame::Payload::BatchCancelOrders(
+                        ref mut existing,
+                    ),
+                ) = self.payload
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.payload = ::core::option::Option::Some(
+                        __buffa::oneof::client_frame::Payload::BatchCancelOrders(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -509,6 +623,84 @@ impl<'de> serde::Deserialize<'de> for ClientFrame {
                                 }
                                 __oneof_payload = Some(
                                     __buffa::oneof::client_frame::Payload::CancelAllOrders(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "batchCreateOrders" | "batch_create_orders" => {
+                            let v: ::core::option::Option<
+                                super::super::orders::v1::BatchCreateOrdersRequest,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::orders::v1::BatchCreateOrdersRequest,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_payload.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'payload'",
+                                        ),
+                                    );
+                                }
+                                __oneof_payload = Some(
+                                    __buffa::oneof::client_frame::Payload::BatchCreateOrders(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "batchReplaceOrders" | "batch_replace_orders" => {
+                            let v: ::core::option::Option<
+                                super::super::orders::v1::BatchReplaceOrdersRequest,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::orders::v1::BatchReplaceOrdersRequest,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_payload.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'payload'",
+                                        ),
+                                    );
+                                }
+                                __oneof_payload = Some(
+                                    __buffa::oneof::client_frame::Payload::BatchReplaceOrders(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "batchCancelOrders" | "batch_cancel_orders" => {
+                            let v: ::core::option::Option<
+                                super::super::orders::v1::BatchCancelOrdersRequest,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::orders::v1::BatchCancelOrdersRequest,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_payload.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'payload'",
+                                        ),
+                                    );
+                                }
+                                __oneof_payload = Some(
+                                    __buffa::oneof::client_frame::Payload::BatchCancelOrders(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -1436,6 +1628,30 @@ impl ::buffa::Message for AckResponse {
                         += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::ack_response::Result::BatchCreateOrders(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::ack_response::Result::BatchReplaceOrders(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::ack_response::Result::BatchCancelOrders(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -1477,6 +1693,30 @@ impl ::buffa::Message for AckResponse {
                 __buffa::oneof::ack_response::Result::CancelAllOrders(x) => {
                     ::buffa::types::put_len_delimited_header(
                         4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::ack_response::Result::BatchCreateOrders(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::ack_response::Result::BatchReplaceOrders(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::ack_response::Result::BatchCancelOrders(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -1574,6 +1814,72 @@ impl ::buffa::Message for AckResponse {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.result = ::core::option::Option::Some(
                         __buffa::oneof::ack_response::Result::CancelAllOrders(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::ack_response::Result::BatchCreateOrders(
+                        ref mut existing,
+                    ),
+                ) = self.result
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.result = ::core::option::Option::Some(
+                        __buffa::oneof::ack_response::Result::BatchCreateOrders(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::ack_response::Result::BatchReplaceOrders(
+                        ref mut existing,
+                    ),
+                ) = self.result
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.result = ::core::option::Option::Some(
+                        __buffa::oneof::ack_response::Result::BatchReplaceOrders(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::ack_response::Result::BatchCancelOrders(
+                        ref mut existing,
+                    ),
+                ) = self.result
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.result = ::core::option::Option::Some(
+                        __buffa::oneof::ack_response::Result::BatchCancelOrders(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -1719,6 +2025,84 @@ impl<'de> serde::Deserialize<'de> for AckResponse {
                                 }
                                 __oneof_result = Some(
                                     __buffa::oneof::ack_response::Result::CancelAllOrders(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "batchCreateOrders" | "batch_create_orders" => {
+                            let v: ::core::option::Option<
+                                super::super::orders::v1::BatchCreateOrdersResponse,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::orders::v1::BatchCreateOrdersResponse,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_result.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'result'",
+                                        ),
+                                    );
+                                }
+                                __oneof_result = Some(
+                                    __buffa::oneof::ack_response::Result::BatchCreateOrders(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "batchReplaceOrders" | "batch_replace_orders" => {
+                            let v: ::core::option::Option<
+                                super::super::orders::v1::BatchReplaceOrdersResponse,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::orders::v1::BatchReplaceOrdersResponse,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_result.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'result'",
+                                        ),
+                                    );
+                                }
+                                __oneof_result = Some(
+                                    __buffa::oneof::ack_response::Result::BatchReplaceOrders(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "batchCancelOrders" | "batch_cancel_orders" => {
+                            let v: ::core::option::Option<
+                                super::super::orders::v1::BatchCancelOrdersResponse,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::orders::v1::BatchCancelOrdersResponse,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_result.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'result'",
+                                        ),
+                                    );
+                                }
+                                __oneof_result = Some(
+                                    __buffa::oneof::ack_response::Result::BatchCancelOrders(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -2485,6 +2869,99 @@ pub mod __buffa {
                             );
                         }
                     }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::client_frame::Payload::BatchCreateOrders(
+                                ref mut existing,
+                            ),
+                        ) = view.payload
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.payload = Some(
+                                super::super::__buffa::view::oneof::client_frame::Payload::BatchCreateOrders(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::orders::v1::__buffa::view::BatchCreateOrdersRequestView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::client_frame::Payload::BatchReplaceOrders(
+                                ref mut existing,
+                            ),
+                        ) = view.payload
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.payload = Some(
+                                super::super::__buffa::view::oneof::client_frame::Payload::BatchReplaceOrders(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::orders::v1::__buffa::view::BatchReplaceOrdersRequestView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    17u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::client_frame::Payload::BatchCancelOrders(
+                                ref mut existing,
+                            ),
+                        ) = view.payload
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.payload = Some(
+                                super::super::__buffa::view::oneof::client_frame::Payload::BatchCancelOrders(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::orders::v1::__buffa::view::BatchCancelOrdersRequestView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -2560,6 +3037,33 @@ pub mod __buffa {
                                         v,
                                     ) => {
                                         super::super::__buffa::oneof::client_frame::Payload::CancelAllOrders(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::client_frame::Payload::BatchCreateOrders(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::client_frame::Payload::BatchCreateOrders(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::client_frame::Payload::BatchReplaceOrders(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::client_frame::Payload::BatchReplaceOrders(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::client_frame::Payload::BatchCancelOrders(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::client_frame::Payload::BatchCancelOrders(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
@@ -2645,6 +3149,36 @@ pub mod __buffa {
                                 += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
+                        super::super::__buffa::view::oneof::client_frame::Payload::BatchCreateOrders(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::BatchReplaceOrders(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::BatchCancelOrders(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
                     }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -2716,6 +3250,36 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::client_frame::Payload::BatchCreateOrders(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                15u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::BatchReplaceOrders(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                16u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::BatchCancelOrders(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                17u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -2775,6 +3339,21 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("cancelAllOrders", v)?;
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::BatchCreateOrders(
+                            v,
+                        ) => {
+                            __map.serialize_entry("batchCreateOrders", v)?;
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::BatchReplaceOrders(
+                            v,
+                        ) => {
+                            __map.serialize_entry("batchReplaceOrders", v)?;
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::BatchCancelOrders(
+                            v,
+                        ) => {
+                            __map.serialize_entry("batchCancelOrders", v)?;
                         }
                     }
                 }
@@ -4286,6 +4865,99 @@ pub mod __buffa {
                             );
                         }
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::ack_response::Result::BatchCreateOrders(
+                                ref mut existing,
+                            ),
+                        ) = view.result
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.result = Some(
+                                super::super::__buffa::view::oneof::ack_response::Result::BatchCreateOrders(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::orders::v1::__buffa::view::BatchCreateOrdersResponseView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::ack_response::Result::BatchReplaceOrders(
+                                ref mut existing,
+                            ),
+                        ) = view.result
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.result = Some(
+                                super::super::__buffa::view::oneof::ack_response::Result::BatchReplaceOrders(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::orders::v1::__buffa::view::BatchReplaceOrdersResponseView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::ack_response::Result::BatchCancelOrders(
+                                ref mut existing,
+                            ),
+                        ) = view.result
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.result = Some(
+                                super::super::__buffa::view::oneof::ack_response::Result::BatchCancelOrders(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::orders::v1::__buffa::view::BatchCancelOrdersResponseView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -4355,6 +5027,33 @@ pub mod __buffa {
                                             ),
                                         )
                                     }
+                                    super::super::__buffa::view::oneof::ack_response::Result::BatchCreateOrders(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::ack_response::Result::BatchCreateOrders(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::ack_response::Result::BatchReplaceOrders(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::ack_response::Result::BatchReplaceOrders(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::ack_response::Result::BatchCancelOrders(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::ack_response::Result::BatchCancelOrders(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
                                 },
                             )
                         }
@@ -4407,6 +5106,36 @@ pub mod __buffa {
                                     + inner;
                         }
                         super::super::__buffa::view::oneof::ack_response::Result::CancelAllOrders(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::BatchCreateOrders(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::BatchReplaceOrders(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::BatchCancelOrders(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -4471,6 +5200,36 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::ack_response::Result::BatchCreateOrders(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                5u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::BatchReplaceOrders(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                6u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::BatchCancelOrders(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                7u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -4515,6 +5274,21 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("cancelAllOrders", v)?;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::BatchCreateOrders(
+                            v,
+                        ) => {
+                            __map.serialize_entry("batchCreateOrders", v)?;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::BatchReplaceOrders(
+                            v,
+                        ) => {
+                            __map.serialize_entry("batchReplaceOrders", v)?;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::BatchCancelOrders(
+                            v,
+                        ) => {
+                            __map.serialize_entry("batchCancelOrders", v)?;
                         }
                     }
                 }
@@ -5661,6 +6435,27 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    BatchCreateOrders(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::orders::v1::__buffa::view::BatchCreateOrdersRequestView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    BatchReplaceOrders(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::orders::v1::__buffa::view::BatchReplaceOrdersRequestView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    BatchCancelOrders(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::orders::v1::__buffa::view::BatchCancelOrdersRequestView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
             pub mod server_frame {
@@ -5738,6 +6533,27 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    BatchCreateOrders(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::orders::v1::__buffa::view::BatchCreateOrdersResponseView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    BatchReplaceOrders(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::orders::v1::__buffa::view::BatchReplaceOrdersResponseView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    BatchCancelOrders(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::orders::v1::__buffa::view::BatchCancelOrdersResponseView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
         }
@@ -5769,6 +6585,21 @@ pub mod __buffa {
                 CancelAllOrders(
                     ::buffa::alloc::boxed::Box<
                         super::super::super::super::super::orders::v1::CancelAllOrdersRequest,
+                    >,
+                ),
+                BatchCreateOrders(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::orders::v1::BatchCreateOrdersRequest,
+                    >,
+                ),
+                BatchReplaceOrders(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::orders::v1::BatchReplaceOrdersRequest,
+                    >,
+                ),
+                BatchCancelOrders(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::orders::v1::BatchCancelOrdersRequest,
                     >,
                 ),
             }
@@ -5850,6 +6681,60 @@ pub mod __buffa {
                     Self::Some(Payload::from(v))
                 }
             }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchCreateOrdersRequest,
+            > for Payload {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchCreateOrdersRequest,
+                ) -> Self {
+                    Self::BatchCreateOrders(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchCreateOrdersRequest,
+            > for ::core::option::Option<Payload> {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchCreateOrdersRequest,
+                ) -> Self {
+                    Self::Some(Payload::from(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchReplaceOrdersRequest,
+            > for Payload {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchReplaceOrdersRequest,
+                ) -> Self {
+                    Self::BatchReplaceOrders(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchReplaceOrdersRequest,
+            > for ::core::option::Option<Payload> {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchReplaceOrdersRequest,
+                ) -> Self {
+                    Self::Some(Payload::from(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchCancelOrdersRequest,
+            > for Payload {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchCancelOrdersRequest,
+                ) -> Self {
+                    Self::BatchCancelOrders(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchCancelOrdersRequest,
+            > for ::core::option::Option<Payload> {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchCancelOrdersRequest,
+                ) -> Self {
+                    Self::Some(Payload::from(v))
+                }
+            }
             impl serde::Serialize for Payload {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -5872,6 +6757,15 @@ pub mod __buffa {
                         }
                         Self::CancelAllOrders(v) => {
                             map.serialize_entry("cancelAllOrders", v)?;
+                        }
+                        Self::BatchCreateOrders(v) => {
+                            map.serialize_entry("batchCreateOrders", v)?;
+                        }
+                        Self::BatchReplaceOrders(v) => {
+                            map.serialize_entry("batchReplaceOrders", v)?;
+                        }
+                        Self::BatchCancelOrders(v) => {
+                            map.serialize_entry("batchCancelOrders", v)?;
                         }
                     }
                     map.end()
@@ -6002,6 +6896,21 @@ pub mod __buffa {
                         super::super::super::super::super::orders::v1::CancelAllOrdersResponse,
                     >,
                 ),
+                BatchCreateOrders(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::orders::v1::BatchCreateOrdersResponse,
+                    >,
+                ),
+                BatchReplaceOrders(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::orders::v1::BatchReplaceOrdersResponse,
+                    >,
+                ),
+                BatchCancelOrders(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::orders::v1::BatchCancelOrdersResponse,
+                    >,
+                ),
             }
             impl ::buffa::Oneof for Result {}
             impl From<super::super::super::super::super::orders::v1::CreateOrderResponse>
@@ -6070,6 +6979,60 @@ pub mod __buffa {
                     Self::Some(Result::from(v))
                 }
             }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchCreateOrdersResponse,
+            > for Result {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchCreateOrdersResponse,
+                ) -> Self {
+                    Self::BatchCreateOrders(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchCreateOrdersResponse,
+            > for ::core::option::Option<Result> {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchCreateOrdersResponse,
+                ) -> Self {
+                    Self::Some(Result::from(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchReplaceOrdersResponse,
+            > for Result {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchReplaceOrdersResponse,
+                ) -> Self {
+                    Self::BatchReplaceOrders(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchReplaceOrdersResponse,
+            > for ::core::option::Option<Result> {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchReplaceOrdersResponse,
+                ) -> Self {
+                    Self::Some(Result::from(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchCancelOrdersResponse,
+            > for Result {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchCancelOrdersResponse,
+                ) -> Self {
+                    Self::BatchCancelOrders(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::BatchCancelOrdersResponse,
+            > for ::core::option::Option<Result> {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::BatchCancelOrdersResponse,
+                ) -> Self {
+                    Self::Some(Result::from(v))
+                }
+            }
             impl serde::Serialize for Result {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -6089,6 +7052,15 @@ pub mod __buffa {
                         }
                         Self::CancelAllOrders(v) => {
                             map.serialize_entry("cancelAllOrders", v)?;
+                        }
+                        Self::BatchCreateOrders(v) => {
+                            map.serialize_entry("batchCreateOrders", v)?;
+                        }
+                        Self::BatchReplaceOrders(v) => {
+                            map.serialize_entry("batchReplaceOrders", v)?;
+                        }
+                        Self::BatchCancelOrders(v) => {
+                            map.serialize_entry("batchCancelOrders", v)?;
                         }
                     }
                     map.end()

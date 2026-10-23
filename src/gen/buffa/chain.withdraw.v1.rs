@@ -3982,6 +3982,11 @@ pub enum ErrorCode {
     /// The auto-withdraw schedule is invalid: a field its cadence needs is
     /// missing or out of range, or a field of another cadence is set.
     ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE = 43i32,
+    /// The withdraw amount has more decimal places than the destination
+    /// network's token supports (AssetChainVariant.source_decimals). Round
+    /// amount_e18 down to a whole number of that token's smallest units before
+    /// signing.
+    ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION = 44i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -4116,6 +4121,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const InvalidAutoWithdrawSchedule: Self = Self::ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AmountExceedsRoutePrecision: Self = Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -4311,6 +4319,11 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE,
                 )
             }
+            44i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -4396,6 +4409,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CONFLICT => "ERROR_CODE_CONFLICT",
             Self::ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE => {
                 "ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE"
+            }
+            Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION => {
+                "ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION"
             }
         }
     }
@@ -4555,6 +4571,11 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE,
                 )
             }
+            "ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -4604,6 +4625,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_NOT_FOUND,
             Self::ERROR_CODE_CONFLICT,
             Self::ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE,
+            Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION,
         ]
     }
 }
@@ -5384,7 +5406,11 @@ pub struct TradingWithdrawIntentPayload {
     )]
     pub destination_chain_id: u64,
     /// Withdraw amount in canonical 18-decimal unified asset units.
-    /// For example, 0.5 is encoded as 500000000000000000.
+    /// For example, 0.5 is encoded as 500000000000000000. For TO_EXTERNAL_CHAIN,
+    /// it must be a whole number of the destination network token's smallest
+    /// units: a multiple of 10^(18 - AssetChainVariant.source_decimals) when the
+    /// token has fewer than 18 decimals. A finer amount is refused with
+    /// ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION before any funds are reserved.
     ///
     /// Field 4: `amount_e18`
     #[serde(
@@ -13583,7 +13609,11 @@ pub mod __buffa {
             /// Field 3: `destination_chain_id`
             pub destination_chain_id: u64,
             /// Withdraw amount in canonical 18-decimal unified asset units.
-            /// For example, 0.5 is encoded as 500000000000000000.
+            /// For example, 0.5 is encoded as 500000000000000000. For TO_EXTERNAL_CHAIN,
+            /// it must be a whole number of the destination network token's smallest
+            /// units: a multiple of 10^(18 - AssetChainVariant.source_decimals) when the
+            /// token has fewer than 18 decimals. A finer amount is refused with
+            /// ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION before any funds are reserved.
             ///
             /// Field 4: `amount_e18`
             pub amount_e18: ::buffa::MessageFieldView<
@@ -14119,7 +14149,11 @@ pub mod __buffa {
                 self.0.reborrow().destination_chain_id
             }
             /// Withdraw amount in canonical 18-decimal unified asset units.
-            /// For example, 0.5 is encoded as 500000000000000000.
+            /// For example, 0.5 is encoded as 500000000000000000. For TO_EXTERNAL_CHAIN,
+            /// it must be a whole number of the destination network token's smallest
+            /// units: a multiple of 10^(18 - AssetChainVariant.source_decimals) when the
+            /// token has fewer than 18 decimals. A finer amount is refused with
+            /// ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION before any funds are reserved.
             ///
             /// Field 4: `amount_e18`
             #[must_use]
