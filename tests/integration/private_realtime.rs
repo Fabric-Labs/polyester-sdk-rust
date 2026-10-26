@@ -214,15 +214,30 @@ async fn private_subscribe_connects_trigger_events() {
 
 #[tokio::test]
 async fn private_subscribe_connects_orders() {
+    use polyester::models::PrivateOrdersEvent;
+
     let Some(client) = require_live_client() else {
         return;
     };
     let Some(()) = require_account_id(&client) else {
         return;
     };
-    let Some(sub) = call_optional("orders.subscribe", || client.orders.subscribe(None)).await
+    let Some(mut sub) = call_optional("orders.subscribe", || client.orders.subscribe(None)).await
     else {
         return;
     };
-    wait_private_subscribe_optional("orders.subscribe", sub).await;
+    // The private WebSocket confirms the subscription, then sends the live view.
+    let wait = Duration::from_secs(10);
+    let mut connected = false;
+    loop {
+        match tokio::time::timeout(wait, sub.recv()).await {
+            Ok(Some(PrivateOrdersEvent::Connected)) => connected = true,
+            Ok(Some(PrivateOrdersEvent::Snapshot(_))) if connected => break,
+            Ok(Some(PrivateOrdersEvent::Error(err))) => panic!("orders.subscribe: {err}"),
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("orders.subscribe ended before its snapshot"),
+            Err(_) => panic!("orders.subscribe: no snapshot within {wait:?}"),
+        }
+    }
+    sub.close();
 }

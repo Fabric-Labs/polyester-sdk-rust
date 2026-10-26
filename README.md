@@ -72,9 +72,11 @@ Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
 still applies. In particular, whiteboard/social-verification and some
 layout/polychart routes may require a JWT session or may not be mounted.
 Private streams require an Account ID and the corresponding API-key permission.
-A successful subscribe call means the token exchange and realtime handshake
-completed. Treat a structured permission denial as non-transient and update the
-API-key policy before retrying.
+A successful Centrifugo subscribe call means the token exchange and realtime
+handshake completed. The order stream (`orders.subscribe`) returns at once and
+reports its handshake through `Connected` and `Error` events. Treat a
+structured permission denial as non-transient and update the API-key policy
+before retrying.
 
 ## Install
 
@@ -695,22 +697,57 @@ if let Some(markets) = sub.updates().recv().await {
 
 ## Realtime
 
-Realtime is binary-only. The client negotiates the `centrifuge-protobuf`
-WebSocket subprotocol, sends binary length-delimited Centrifugo commands, and
-decodes protobuf publication payloads from `:proto` channels. ConnectRPC's
-optional JSON wire mode does not apply to realtime. Incoming WebSocket messages,
-frames, and protobuf record lengths are capped at 8 MiB.
+Realtime is binary-only. Account orders stream over the private WebSocket;
+every other stream uses Centrifugo channels.
+
+Centrifugo streams negotiate the `centrifuge-protobuf` WebSocket subprotocol,
+send binary length-delimited Centrifugo commands, and decode protobuf
+publication payloads from `:proto` channels. ConnectRPC's optional JSON wire
+mode does not apply to realtime. Incoming WebSocket messages, frames, and
+protobuf record lengths are capped at 8 MiB.
 
 Realtime subscription handles stop their background tasks when explicitly
 closed or dropped. Call `close()` when prompt shutdown matters; `Drop` provides
 the cleanup safety net.
 
+### Order stream
+
+`orders.subscribe` streams an account's live orders over the private WebSocket
+(`/v1/ws/private` on the API host, subprotocol `polyester.v1.proto`). It
+authenticates with the same signed realtime tokens as the other private
+streams. Events arrive as `PrivateOrdersEvent`:
+
+| Event | Meaning |
+| --- | --- |
+| `Connected` | The server confirmed the subscription; again after each reconnect |
+| `Snapshot(orders)` | The account's full live view; replace local state with it |
+| `Unit(unit)` | One change: changed orders (complete), removed order IDs, and events (fills, cancels, rejections, command outcomes) |
+| `Stale(true)` / `Stale(false)` | The live view is temporarily behind / caught up again |
+| `Disconnected` | The stream dropped; it resumes by itself unless an error ended it |
+| `Error(error)` | A stream error; a terminal one is followed by `Disconnected` and the end of the stream |
+
+Orders use the same `Order` model as the order reads. Keep the copy with the
+higher `version`; equal versions are identical. The stream reconnects with
+backoff, resumes from its last applied position, and takes a fresh snapshot
+when it cannot resume. Several `orders.subscribe` calls for one account share
+one server subscription.
+
 ```rust,no_run
+use polyester::models::PrivateOrdersEvent;
 use polyester::services::CreateSubscriptionOptions;
 
 let mut orders = client.orders.subscribe(None).await?;
-if let Some(order) = orders.recv_result().await? {
-    println!("{} {}", order.order_id, order.status);
+while let Some(event) = orders.recv_result().await? {
+    match event {
+        PrivateOrdersEvent::Snapshot(live) => println!("{} live orders", live.len()),
+        PrivateOrdersEvent::Unit(unit) => {
+            for order in unit.orders {
+                println!("{} {} v{}", order.order_id, order.status, order.version);
+            }
+        }
+        PrivateOrdersEvent::Error(error) => eprintln!("order stream: {error}"),
+        _ => {}
+    }
 }
 
 let mut api_policies = client.policies.subscribe_api_policies(None).await?;
@@ -733,7 +770,7 @@ if let Some(snapshot) = book.updates().recv().await {
 }
 ```
 
-Private order protobufs carry scaled quantity integers but may not carry the
+Streamed orders carry scaled quantity integers but may not carry the
 base quantity scale, so `Quantity::scale()` can return `None`. A bot must
 resolve the scale from the hydrated catalog using `Quantity::symbol_id()` (or
 `Quantity::symbol()`), then pass that catalog scale to `Quantity::format`.

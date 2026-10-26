@@ -1,6 +1,6 @@
 //! Realtime protobuf publication decoders (Go `codecs/decode/realtime.go` parity).
 
-use buffa::Message;
+use buffa::{Enumeration, Message};
 
 use super::{
     account_identity_from_proto, address_book_invalidation_from_proto, api_key_from_proto,
@@ -10,13 +10,16 @@ use super::{
     trigger_event_from_proto, trigger_from_proto, user_trade_from_proto,
     zipped_asset_supply_batch_from_proto,
 };
+use super::{decode_price_ticks, decode_qty_scaled};
+use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
 use crate::models::{
     AccountIdentity, AddressBookViewInvalidation, ApiData, ApiKeySummary, ApiPolicy, AssetBalance,
-    Candle, LedgerTransfer, LifecycleFlowSummary, MarketOverviewList, MarketTrade, Order,
+    Candle, LedgerTransfer, LifecycleFlowSummary, MarketOverviewList, MarketTrade,
     OrderBookDeltaUpdate, PriceQtyPair, SubAccount, SubaccountPolicy, Trigger, TriggerEvent,
     UserTrade, ZippedAssetSupplyBatch,
 };
+use crate::models::{OrderCommandOutcome, OrderFill, OrderStreamEvent, OrderUnitEvent, OrdersUnit};
 use crate::proto::auth::v1::{
     AccountIdentity as ProtoAccountIdentity, AddressBookViewInvalidated, ApiKey as ProtoApiKey,
     ApiPolicyView, Subaccount, SubaccountPolicyView,
@@ -29,7 +32,8 @@ use crate::proto::marketdata::v1::{
 };
 use crate::proto::marketoverview::v1::MarketOverviewBatch;
 use crate::proto::orderbook::v1::OrderBookDelta;
-use crate::proto::orders::v1::{Order as ProtoOrder, UserTrade as ProtoUserTrade};
+use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, UserTrade as ProtoUserTrade};
+use crate::proto::privatews::v1::{Unit as ProtoUnit, unit_event};
 use crate::proto::triggers::v1::{Trigger as ProtoTrigger, TriggerEvent as ProtoTriggerEvent};
 
 fn decode_proto<M: Message + Default>(payload: &[u8]) -> Result<M> {
@@ -45,11 +49,6 @@ fn decode_proto<M: Message + Default>(payload: &[u8]) -> Result<M> {
         )));
     }
     M::decode_from_slice(payload).map_err(|e| Error::realtime(format!("proto decode: {e}")))
-}
-
-pub fn order_from_bytes(payload: &[u8]) -> Result<Order> {
-    let msg = decode_proto::<ProtoOrder>(payload)?;
-    order_from_proto(&msg)
 }
 
 pub fn user_trade_from_bytes(payload: &[u8]) -> Result<UserTrade> {
@@ -184,29 +183,176 @@ pub fn address_book_invalidation_from_bytes(payload: &[u8]) -> Result<AddressBoo
     Ok(address_book_invalidation_from_proto(&msg))
 }
 
+/// Decode one private order stream unit with the same order decoder the
+/// order reads use.
+pub fn orders_unit_from_proto(msg: &ProtoUnit) -> Result<OrdersUnit> {
+    Ok(OrdersUnit {
+        orders: msg
+            .orders
+            .iter()
+            .map(order_from_proto)
+            .collect::<Result<Vec<_>>>()?,
+        removed_order_ids: msg
+            .removed_order_ids
+            .iter()
+            .map(|id| format_uint64_id(*id))
+            .collect(),
+        events: msg
+            .events
+            .iter()
+            .filter_map(|event| event.kind.as_ref())
+            .map(order_unit_event_from_proto)
+            .collect(),
+    })
+}
+
+fn order_unit_event_from_proto(kind: &unit_event::Kind) -> OrderUnitEvent {
+    match kind {
+        unit_event::Kind::Order(event) => OrderUnitEvent::Order(OrderStreamEvent {
+            order_id: format_uint64_id(event.order_id),
+            version: event.version,
+            kind: lowercase_enum_label(event.kind),
+            reason_code: event.reason_code,
+            replacement_order_id: optional_public_id(event.replacement_order_id),
+            fill: event.fill.as_option().map(|fill| OrderFill {
+                match_id: if fill.match_id == 0 {
+                    String::new()
+                } else {
+                    fill.match_id.to_string()
+                },
+                ordinal: fill.ordinal,
+                role: lowercase_enum_label(fill.role),
+                qty: decode_qty_scaled(fill.qty_scaled, None, None, None),
+                price: decode_price_ticks(fill.price_ticks, None),
+            }),
+        }),
+        unit_event::Kind::Outcome(outcome) => OrderUnitEvent::Outcome(OrderCommandOutcome {
+            kind: lowercase_enum_label(outcome.kind),
+            order_id: optional_public_id(outcome.order_id),
+            new_order_id: optional_public_id(outcome.new_order_id),
+            client_order_id: outcome.client_order_id.clone(),
+            reason: match outcome.reason.as_known() {
+                Some(OrderErrorCode::ERROR_CODE_UNSPECIFIED) => String::new(),
+                Some(code) => code.proto_name().to_owned(),
+                None => format!("UNKNOWN({})", outcome.reason.to_i32()),
+            },
+        }),
+    }
+}
+
+fn optional_public_id(id: u64) -> Option<String> {
+    (id != 0).then(|| format_uint64_id(id))
+}
+
+fn lowercase_enum_label<E: Enumeration>(value: buffa::EnumValue<E>) -> String {
+    value
+        .as_known()
+        .map(|known| known.proto_name().to_ascii_lowercase())
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codecs::scalars::format_uint64_id;
+    use crate::proto::orders::v1::Order as ProtoOrder;
     use crate::proto::orders::v1::{OrderStatus, OrderType, Side, TimeInForce};
 
     #[test]
-    fn order_from_bytes_round_trip() {
-        let msg = ProtoOrder {
-            order_id: 42,
-            symbol_id: 3,
-            client_order_id: "coid".into(),
-            side: Side::Buy.into(),
-            status: OrderStatus::Working.into(),
-            order_type: OrderType::Limit.into(),
-            time_in_force: TimeInForce::Gtc.into(),
+    fn orders_unit_decodes_orders_removals_and_events() {
+        use crate::proto::orders::v1::ErrorCode;
+        use crate::proto::privatews::v1::{
+            CommandOutcome, Fill, OrderEvent, UnitEvent, command_outcome, fill, order_event,
+        };
+
+        let unit = ProtoUnit {
+            next_cursor: "c2".into(),
+            orders: vec![ProtoOrder {
+                order_id: 42,
+                symbol_id: 3,
+                client_order_id: "coid".into(),
+                side: Side::Buy.into(),
+                status: OrderStatus::Working.into(),
+                order_type: OrderType::Limit.into(),
+                time_in_force: TimeInForce::Gtc.into(),
+                price_ticks: 2_420_000_000_000,
+                version: 2,
+                ..Default::default()
+            }],
+            removed_order_ids: vec![7],
+            events: vec![
+                UnitEvent {
+                    kind: Some(
+                        OrderEvent {
+                            order_id: 42,
+                            version: 2,
+                            kind: order_event::Kind::FILLED.into(),
+                            fill: buffa::MessageField::some(Fill {
+                                match_id: 900,
+                                ordinal: 1,
+                                role: fill::Role::MAKER.into(),
+                                qty_scaled: 231_500,
+                                price_ticks: 2_420_000_000_000,
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }
+                        .into(),
+                    ),
+                    ..Default::default()
+                },
+                UnitEvent {
+                    kind: Some(
+                        CommandOutcome {
+                            kind: command_outcome::Kind::CANCEL_REJECTED.into(),
+                            order_id: 8,
+                            client_order_id: "late".into(),
+                            reason: ErrorCode::ERROR_CODE_ORDER_UNKNOWN.into(),
+                            ..Default::default()
+                        }
+                        .into(),
+                    ),
+                    ..Default::default()
+                },
+                // A future event kind is skipped.
+                UnitEvent::default(),
+            ],
             ..Default::default()
         };
-        let bytes = msg.encode_to_vec();
-        let order = order_from_bytes(&bytes).expect("decode");
+        let decoded = orders_unit_from_proto(&unit).expect("decode");
+        assert_eq!(decoded.orders.len(), 1);
+        let order = &decoded.orders[0];
+        assert_eq!(order, &order_from_proto(&unit.orders[0]).unwrap());
         assert_eq!(order.order_id, format_uint64_id(42));
         assert_eq!(order.side, "buy");
         assert_eq!(order.status, "working");
+        assert_eq!(order.price.as_ref().unwrap().format(), "2420");
+        assert_eq!(decoded.removed_order_ids, vec![format_uint64_id(7)]);
+        assert_eq!(
+            decoded.events,
+            vec![
+                OrderUnitEvent::Order(OrderStreamEvent {
+                    order_id: format_uint64_id(42),
+                    version: 2,
+                    kind: "filled".into(),
+                    reason_code: 0,
+                    replacement_order_id: None,
+                    fill: Some(OrderFill {
+                        match_id: "900".into(),
+                        ordinal: 1,
+                        role: "maker".into(),
+                        qty: decode_qty_scaled(231_500, None, None, None),
+                        price: decode_price_ticks(2_420_000_000_000, None),
+                    }),
+                }),
+                OrderUnitEvent::Outcome(OrderCommandOutcome {
+                    kind: "cancel_rejected".into(),
+                    order_id: Some(format_uint64_id(8)),
+                    new_order_id: None,
+                    client_order_id: "late".into(),
+                    reason: "ERROR_CODE_ORDER_UNKNOWN".into(),
+                }),
+            ]
+        );
     }
 
     #[test]
