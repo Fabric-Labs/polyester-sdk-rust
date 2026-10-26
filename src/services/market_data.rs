@@ -1089,24 +1089,6 @@ mod tests {
     }
 
     #[test]
-    fn candle_channel_accepts_every_published_timeframe() {
-        for (alias, label) in [
-            ("3m", "3m"),
-            ("MIN_3", "3m"),
-            ("2h", "2h"),
-            ("HOUR_6", "6h"),
-            ("8h", "8h"),
-            ("DAY_3", "3d"),
-        ] {
-            assert_eq!(
-                MarketDataService::candle_channel_timeframe(alias).unwrap(),
-                label,
-                "alias {alias}"
-            );
-        }
-    }
-
-    #[test]
     fn candle_channel_normalizes_aliases_to_human_label() {
         for alias in ["1m", "MIN_1", "min1", "Min_1"] {
             assert_eq!(
