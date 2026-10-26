@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0a50
+
+Package version: `0.1.0-alpha.50`. Git tag: `v0.1.0a50`.
+
 ### Added
 - Trigger events report `event_type = "activated"` when a standalone
   trailing trigger's activation condition is met and tracking begins.
