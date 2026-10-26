@@ -6,7 +6,9 @@ use super::common::api_data_from_proto;
 use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::{TsNs, format_price_ticks, format_qty_scaled};
 use crate::errors::{Error, Result};
-use crate::models::{Candle, CandlesResult, MarketTrade, MarketTradesResult, SpotConfig};
+use crate::models::{
+    Candle, CandlesResult, MarketTrade, MarketTradesResult, SpotConfig, TradeEpochEnd,
+};
 use crate::proto::marketdata::v1::{
     CandlePoint, GetCandlesColumnsResponse, GetCandlesResponse, GetSpotConfigResponse,
     GetTradesResponse, MarketTrade as ProtoMarketTrade, Timeframe,
@@ -120,6 +122,16 @@ pub fn market_trades_from_proto(
             .map(|trade| market_trade_from_proto(trade, quantity_scale))
             .collect::<Result<Vec<_>>>()?,
         next_page_token: msg.next_page_token.clone(),
+        complete_through_trade_id: msg.complete_through_trade_id,
+        next_after_trade_id: msg.next_after_trade_id,
+        epoch_ends: msg
+            .epoch_ends
+            .iter()
+            .map(|end| TradeEpochEnd {
+                epoch: end.epoch,
+                last_trade_id: end.last_trade_id,
+            })
+            .collect(),
     })
 }
 
@@ -344,6 +356,71 @@ fn reference_candles_from_columns(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gap_free_backfill_fields_decode() {
+        use crate::proto::marketdata::v1::TradeEpochEnd as ProtoTradeEpochEnd;
+
+        let msg = GetTradesResponse {
+            trades: vec![ProtoMarketTrade {
+                symbol_id: 1,
+                match_id: 1_099_511_627_777,
+                price_ticks: 83_589_000_000_000,
+                qty_scaled: 1_000_000,
+                ..Default::default()
+            }],
+            complete_through_trade_id: 1_099_511_627_790,
+            next_after_trade_id: 1_099_511_627_777,
+            epoch_ends: vec![ProtoTradeEpochEnd {
+                epoch: 1,
+                last_trade_id: 1_099_511_627_000,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let result = market_trades_from_proto(&msg, 8).unwrap();
+        assert_eq!(result.trades[0].match_id, "1099511627777");
+        assert_eq!(result.trades[0].price.as_ref().unwrap().format(), "83589");
+        assert_eq!(result.complete_through_trade_id, 1_099_511_627_790);
+        assert_eq!(result.next_after_trade_id, 1_099_511_627_777);
+        assert_eq!(
+            result.epoch_ends,
+            vec![TradeEpochEnd {
+                epoch: 1,
+                last_trade_id: 1_099_511_627_000,
+            }]
+        );
+        assert!(result.next_page_token.is_empty());
+    }
+
+    #[test]
+    fn an_empty_backfill_page_still_carries_its_cursors_and_epoch_ends() {
+        use crate::proto::marketdata::v1::TradeEpochEnd as ProtoTradeEpochEnd;
+
+        // No trades yet past the cursor, but the walk still moves across an
+        // empty epoch: all three fields must survive an empty page.
+        let msg = GetTradesResponse {
+            complete_through_trade_id: 2_199_023_255_552,
+            next_after_trade_id: 2_199_023_255_552,
+            epoch_ends: vec![ProtoTradeEpochEnd {
+                epoch: 2,
+                last_trade_id: 1_099_511_627_776,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let result = market_trades_from_proto(&msg, 8).unwrap();
+        assert!(result.trades.is_empty());
+        assert_eq!(result.complete_through_trade_id, 2_199_023_255_552);
+        assert_eq!(result.next_after_trade_id, 2_199_023_255_552);
+        assert_eq!(
+            result.epoch_ends,
+            vec![TradeEpochEnd {
+                epoch: 2,
+                last_trade_id: 1_099_511_627_776,
+            }]
+        );
+    }
 
     #[test]
     fn market_trades_maps_side_and_ids() {

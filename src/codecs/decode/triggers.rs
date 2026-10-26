@@ -5,19 +5,20 @@ use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::TsNs;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
-    Trigger, TriggerDetails, TriggerEvent, TriggerEventsList, TriggerLadderDetails,
+    MaxSlippage, Trigger, TriggerDetails, TriggerEvent, TriggerEventsList, TriggerLadderDetails,
     TriggerMutationResult, TriggerStopDetails, TriggerTrailingDetails, TriggerTwapDetails,
     TriggersList,
 };
 use crate::proto::orders::v1::{
-    FeeAsset, SelfTradePreventionMode, TriggerDirection, TriggerPriceSource,
+    FeeAsset, SelfTradePreventionMode, Side as TrailingSide, TriggerDirection, TriggerPriceSource,
 };
 use crate::proto::triggers::v1::{
     CancelTriggerResponse, ConditionalTrigger, CreateTriggerResponse, GetTriggerResponse,
     LadderDistribution, ListTriggerEventsResponse, ListTriggersResponse, ModifyTriggerResponse,
     PauseTriggerResponse, ResumeTriggerResponse, Trigger as ProtoTrigger,
     TriggerEvent as ProtoTriggerEvent, TriggerEventType, TriggerStatus, TriggerType,
-    conditional_child_execution, trigger, trigger_event, twap_trigger,
+    conditional_child_execution, trailing_stop_trigger, trigger, trigger_event, trigger_market_ioc,
+    twap_trigger,
 };
 use crate::types::Price;
 use buffa::Enumeration;
@@ -266,6 +267,7 @@ struct TriggerConfigProjection {
     post_only: bool,
     limit_price: Option<Price>,
     trigger_price: Option<Price>,
+    max_slippage: Option<MaxSlippage>,
 }
 
 /// Derive flat child fields (side/order_type/tif/post_only/limit_price) from a
@@ -273,17 +275,31 @@ struct TriggerConfigProjection {
 fn conditional_child_projection(
     cond: &ConditionalTrigger,
     symbol: Option<String>,
-) -> (String, String, String, bool, Option<Price>) {
+) -> (
+    String,
+    String,
+    String,
+    bool,
+    Option<Price>,
+    Option<MaxSlippage>,
+) {
     let side = enum_value_side(cond.side).to_owned();
+    let mut max_slippage = None;
     let mut order_type = String::new();
     let mut time_in_force = String::new();
     let mut post_only = false;
     let mut limit_price = None;
     if let Some(child) = cond.child.as_option() {
         match child.execution.as_ref() {
-            Some(conditional_child_execution::Execution::MarketIoc(_)) => {
+            Some(conditional_child_execution::Execution::MarketIoc(market)) => {
                 order_type = "market".to_owned();
                 time_in_force = "ioc".to_owned();
+                max_slippage = market.max_slippage.as_ref().map(|cap| match cap {
+                    trigger_market_ioc::MaxSlippage::MaxSlippageTicks(ticks) => {
+                        MaxSlippage::Ticks(*ticks)
+                    }
+                    trigger_market_ioc::MaxSlippage::MaxSlippageBps(bps) => MaxSlippage::Bps(*bps),
+                });
             }
             Some(conditional_child_execution::Execution::LimitGtc(limit)) => {
                 order_type = "limit".to_owned();
@@ -304,7 +320,14 @@ fn conditional_child_projection(
             None => {}
         }
     }
-    (side, order_type, time_in_force, post_only, limit_price)
+    (
+        side,
+        order_type,
+        time_in_force,
+        post_only,
+        limit_price,
+        max_slippage,
+    )
 }
 
 /// Derive the flat public trigger fields (type/side/order_type/tif/post_only/
@@ -317,40 +340,57 @@ fn trigger_config_projection(
     match msg.configuration.as_ref() {
         Some(trigger::Configuration::StopLoss(cond)) => {
             proj.trigger_type = "stop_loss".to_owned();
-            let (side, order_type, tif, post_only, limit_price) =
+            let (side, order_type, tif, post_only, limit_price, max_slippage) =
                 conditional_child_projection(cond, symbol.clone());
             proj.side = side;
             proj.order_type = order_type;
             proj.time_in_force = tif;
             proj.post_only = post_only;
             proj.limit_price = limit_price;
+            proj.max_slippage = max_slippage;
             if cond.trigger_price_ticks != 0 {
                 proj.trigger_price = decode_price_ticks(cond.trigger_price_ticks, symbol);
             }
         }
         Some(trigger::Configuration::TakeProfit(cond)) => {
             proj.trigger_type = "take_profit".to_owned();
-            let (side, order_type, tif, post_only, limit_price) =
+            let (side, order_type, tif, post_only, limit_price, max_slippage) =
                 conditional_child_projection(cond, symbol.clone());
             proj.side = side;
             proj.order_type = order_type;
             proj.time_in_force = tif;
             proj.post_only = post_only;
             proj.limit_price = limit_price;
+            proj.max_slippage = max_slippage;
             if cond.trigger_price_ticks != 0 {
                 proj.trigger_price = decode_price_ticks(cond.trigger_price_ticks, symbol);
             }
         }
         Some(trigger::Configuration::TrailingStop(trailing)) => {
-            // Trailing stop is market-IOC; side is carried on the wire (standalone
-            // creates are SELL; attached risk may be either side opposite parent).
+            // A SELL trailing stop fires a market IOC child. A standalone BUY
+            // one fires an IOC limit child at its maximum price (or at its
+            // slippage cap above the fire price when that is lower). An
+            // attached BUY trailing leg has no maximum price; its child is
+            // market IOC like a SELL one.
             proj.trigger_type = "trailing_stop".to_owned();
             proj.side = enum_value_side(trailing.side).to_owned();
             if proj.side.is_empty() {
                 proj.side = "sell".to_owned();
             }
-            proj.order_type = "market".to_owned();
             proj.time_in_force = "ioc".to_owned();
+            let max_price = decode_price_ticks(trailing.limit_price_ticks, symbol);
+            if trailing.side.as_known() == Some(TrailingSide::Buy) && max_price.is_some() {
+                proj.order_type = "limit".to_owned();
+                proj.limit_price = max_price;
+            } else {
+                proj.order_type = "market".to_owned();
+            }
+            proj.max_slippage = trailing.max_slippage.as_ref().map(|cap| match cap {
+                trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(ticks) => {
+                    MaxSlippage::Ticks(*ticks)
+                }
+                trailing_stop_trigger::MaxSlippage::MaxSlippageBps(bps) => MaxSlippage::Bps(*bps),
+            });
         }
         Some(trigger::Configuration::Twap(twap)) => {
             proj.trigger_type = "twap".to_owned();
@@ -412,6 +452,7 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         self_trade_prevention_mode: stp_mode_label(msg.self_trade_prevention_mode),
         post_only: proj.post_only,
         trigger_price,
+        max_slippage: proj.max_slippage,
         client_trigger_id: msg.client_trigger_id.clone(),
         created_at: clone_timestamp(msg.created_at.as_option()),
         updated_at: clone_timestamp(msg.updated_at.as_option()),
@@ -665,6 +706,143 @@ mod tests {
         assert_eq!(t.trigger_price.as_ref().unwrap().as_ticks(), 5000);
         assert_eq!(t.client_trigger_id, "cid");
         assert!(matches!(t.details, Some(TriggerDetails::Stop(_))));
+    }
+
+    #[test]
+    fn trigger_from_proto_reads_a_market_child_slippage_cap() {
+        use crate::proto::triggers::v1::{ConditionalChildExecution, TriggerMarketIoc};
+
+        let market = |cap: Option<trigger_market_ioc::MaxSlippage>| ProtoTrigger {
+            trigger_id: 13,
+            symbol_id: 1,
+            configuration: Some(trigger::Configuration::StopLoss(Box::new(
+                ConditionalTrigger {
+                    side: Side::Buy.into(),
+                    trigger_price_ticks: 85_000_000_000_000,
+                    child: buffa::MessageField::some(ConditionalChildExecution {
+                        execution: Some(conditional_child_execution::Execution::MarketIoc(
+                            Box::new(TriggerMarketIoc {
+                                max_slippage: cap,
+                                ..Default::default()
+                            }),
+                        )),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+            ))),
+            ..Default::default()
+        };
+        let t = trigger_from_proto(&market(Some(
+            trigger_market_ioc::MaxSlippage::MaxSlippageTicks(25_000_000_000),
+        )));
+        assert_eq!(t.side, "buy");
+        assert_eq!(t.order_type, "market");
+        assert_eq!(t.trigger_price.as_ref().unwrap().format(), "85000");
+        assert_eq!(t.max_slippage, Some(MaxSlippage::Ticks(25_000_000_000)));
+        assert_eq!(trigger_from_proto(&market(None)).max_slippage, None);
+
+        // Two triggers that differ only in their cap must not decode alike.
+        let ten = trigger_from_proto(&market(Some(
+            trigger_market_ioc::MaxSlippage::MaxSlippageBps(10),
+        )));
+        let fifty = trigger_from_proto(&market(Some(
+            trigger_market_ioc::MaxSlippage::MaxSlippageBps(50),
+        )));
+        assert_eq!(ten.max_slippage, Some(MaxSlippage::Bps(10)));
+        assert_eq!(fifty.max_slippage, Some(MaxSlippage::Bps(50)));
+        assert_ne!(ten, fifty);
+
+        // The stream decoder and the list and get decoders use the same projection.
+        let bytes = buffa::Message::encode_to_vec(&market(Some(
+            trigger_market_ioc::MaxSlippage::MaxSlippageBps(10),
+        )));
+        let streamed = crate::codecs::decode::trigger_from_bytes(&bytes).unwrap();
+        assert_eq!(streamed.max_slippage, Some(MaxSlippage::Bps(10)));
+        let listed = triggers_list_from_proto(&ListTriggersResponse {
+            triggers: vec![market(Some(
+                trigger_market_ioc::MaxSlippage::MaxSlippageBps(50),
+            ))],
+            ..Default::default()
+        });
+        assert_eq!(listed.triggers[0].max_slippage, Some(MaxSlippage::Bps(50)));
+        let got = get_trigger_from_proto(&GetTriggerResponse {
+            trigger: buffa::MessageField::some(market(Some(
+                trigger_market_ioc::MaxSlippage::MaxSlippageBps(10),
+            ))),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(got.max_slippage, Some(MaxSlippage::Bps(10)));
+    }
+
+    #[test]
+    fn trigger_from_proto_reads_buy_trailing_stop_maximum_and_trough() {
+        use crate::proto::triggers::v1::{
+            TrailingDetails, TrailingStopTrigger, trailing_stop_trigger,
+        };
+
+        let msg = ProtoTrigger {
+            trigger_id: 12,
+            symbol_id: 1,
+            status: TriggerStatus::StatusArmed.into(),
+            qty_scaled: 1_000_000,
+            configuration: Some(trigger::Configuration::TrailingStop(Box::new(
+                TrailingStopTrigger {
+                    side: Side::Buy.into(),
+                    activation_price_ticks: 80_000_000_000_000,
+                    // Maximum price 85000.25.
+                    limit_price_ticks: 85_000_250_000_000,
+                    trailing_distance: Some(
+                        trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(100),
+                    ),
+                    max_slippage: Some(trailing_stop_trigger::MaxSlippage::MaxSlippageBps(50)),
+                    ..Default::default()
+                },
+            ))),
+            runtime_details: Some(trigger::RuntimeDetails::Trailing(Box::new(
+                TrailingDetails {
+                    trailing_distance_bps: 100,
+                    activation_price_ticks: 80_000_000_000_000,
+                    // Lowest price seen 79500.5; the trigger is 1% above it.
+                    trough_price_ticks: 79_500_500_000_000,
+                    trigger_price_ticks: Some(80_295_505_000_000),
+                    ..Default::default()
+                },
+            ))),
+            ..Default::default()
+        };
+        let t = trigger_from_proto(&msg);
+        assert_eq!(t.trigger_type, "trailing_stop");
+        assert_eq!(t.side, "buy");
+        // A BUY trailing child is an IOC limit order at the maximum price.
+        assert_eq!(t.order_type, "limit");
+        assert_eq!(t.time_in_force, "ioc");
+        assert_eq!(t.limit_price.as_ref().unwrap().format(), "85000.25");
+        assert_eq!(t.max_slippage, Some(MaxSlippage::Bps(50)));
+        let Some(TriggerDetails::Trailing(trailing)) = t.details.as_ref() else {
+            panic!("expected trailing details, got {:?}", t.details);
+        };
+        assert_eq!(trailing.trough_price.as_ref().unwrap().format(), "79500.5");
+        assert!(trailing.peak_price.is_none());
+        assert_eq!(
+            trailing.activation_price.as_ref().unwrap().format(),
+            "80000"
+        );
+
+        // A SELL trailing stop has no maximum price.
+        let mut sell = msg.clone();
+        if let Some(trigger::Configuration::TrailingStop(config)) = sell.configuration.as_mut() {
+            config.side = Side::Sell.into();
+            config.limit_price_ticks = 0;
+        }
+        let t = trigger_from_proto(&sell);
+        assert_eq!(t.side, "sell");
+        // A SELL trailing child is a market IOC order; its cap stays in max_slippage.
+        assert_eq!(t.order_type, "market");
+        assert_eq!(t.time_in_force, "ioc");
+        assert!(t.limit_price.is_none());
+        assert_eq!(t.max_slippage, Some(MaxSlippage::Bps(50)));
     }
 
     #[test]

@@ -141,6 +141,23 @@ pub struct CancelAllOrdersResult {
     pub matched_orders: u32,
     pub submitted_cancels: u32,
     pub failed_cancels: u32,
+    /// Orders whose cancellation was requested, oldest first, at most 200.
+    /// Empty for a dry run. Each order's final state arrives on the order
+    /// stream and the order reads.
+    pub cancelled_orders: Vec<CancelledOrder>,
+    /// Number of orders whose cancellation was requested, including those not
+    /// listed in `cancelled_orders`. Zero for a dry run.
+    pub total_cancelled: u32,
+    /// True when more orders were canceled than `cancelled_orders` lists.
+    pub truncated: bool,
+}
+
+/// One order whose cancellation a cancel-all requested.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CancelledOrder {
+    pub order_id: String,
+    /// Empty when the order has no client order ID.
+    pub client_order_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

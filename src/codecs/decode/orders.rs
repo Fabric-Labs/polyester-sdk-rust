@@ -14,8 +14,8 @@ use crate::models::{
     AttachedRisk, AttachedRiskLegState, BatchCancelOrdersResult, BatchCancelResultItem,
     BatchCreateOrdersResult, BatchCreateResultItem, BatchReplaceAdmissionItem,
     BatchReplaceOrdersResult, BatchReplaceStatusItem, BatchReplaceStatusResult,
-    CancelAllAfterResult, CancelAllOrdersResult, CreateOrderType, GetOrderResult, MaxSlippage,
-    ModifyOrderResult, Order, OrderErrorDetail, OrderFieldViolation, OrderLineage,
+    CancelAllAfterResult, CancelAllOrdersResult, CancelledOrder, CreateOrderType, GetOrderResult,
+    MaxSlippage, ModifyOrderResult, Order, OrderErrorDetail, OrderFieldViolation, OrderLineage,
     OrderMutationResult, OrderTransfer, OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance,
     TrailingStop, UserTrade, UserTradesList,
 };
@@ -569,6 +569,16 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllO
         matched_orders: msg.matched_orders,
         submitted_cancels: msg.submitted_cancels,
         failed_cancels: msg.failed_cancels,
+        cancelled_orders: msg
+            .cancelled_orders
+            .iter()
+            .map(|order| CancelledOrder {
+                order_id: format_uint64_id(order.order_id),
+                client_order_id: order.client_order_id.clone(),
+            })
+            .collect(),
+        total_cancelled: msg.total_cancelled,
+        truncated: msg.truncated,
     })
 }
 
@@ -2221,6 +2231,47 @@ mod tests {
     }
 
     #[test]
+    fn cancel_all_lists_the_cancelled_orders_oldest_first() {
+        use crate::proto::orders::v1::CancelledOrder as ProtoCancelledOrder;
+
+        let msg = CancelAllOrdersResponse {
+            status: cancel_all_orders_response::Status::Submitted.into(),
+            matched_orders: 203,
+            submitted_cancels: 203,
+            cancelled_orders: (1..=200_u64)
+                .map(|id| ProtoCancelledOrder {
+                    order_id: id,
+                    client_order_id: if id == 1 {
+                        "first".into()
+                    } else {
+                        String::new()
+                    },
+                    ..Default::default()
+                })
+                .collect(),
+            total_cancelled: 203,
+            truncated: true,
+            ..Default::default()
+        };
+        let decoded = cancel_all_from_proto(&msg).unwrap();
+        assert_eq!(decoded.cancelled_orders.len(), 200);
+        assert_eq!(
+            decoded.cancelled_orders[0],
+            CancelledOrder {
+                order_id: format_uint64_id(1),
+                client_order_id: "first".into(),
+            }
+        );
+        assert_eq!(
+            decoded.cancelled_orders[199].order_id,
+            format_uint64_id(200)
+        );
+        assert!(decoded.cancelled_orders[199].client_order_id.is_empty());
+        assert_eq!(decoded.total_cancelled, 203);
+        assert!(decoded.truncated);
+    }
+
+    #[test]
     fn cancel_all_requires_known_status() {
         let valid = CancelAllOrdersResponse {
             status: cancel_all_orders_response::Status::Submitted.into(),
@@ -2232,6 +2283,9 @@ mod tests {
         let decoded = cancel_all_from_proto(&valid).expect("submitted is valid");
         assert_eq!(decoded.status, "submitted");
         assert_eq!(decoded.matched_orders, 2);
+        assert!(decoded.cancelled_orders.is_empty());
+        assert_eq!(decoded.total_cancelled, 0);
+        assert!(!decoded.truncated);
 
         let dry_run = CancelAllOrdersResponse {
             status: cancel_all_orders_response::Status::DryRun.into(),
