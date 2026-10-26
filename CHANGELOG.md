@@ -2,10 +2,32 @@
 
 ## Unreleased
 
+### Breaking
+- `OrdersService::subscribe` streams account orders over the private
+  WebSocket (`/v1/ws/private`) and returns a `PrivateOrdersSubscription`
+  of `PrivateOrdersEvent`s (`Connected`, `Snapshot`, `Unit`, `Ready`,
+  `Stale`, `Disconnected`, `Error`) instead of a `TypedSubscription<Order>`. The
+  realtime order channels it used are retired and no longer issue
+  subscribe tokens. Snapshot and unit orders use the same `Order` model as
+  the order reads; units also carry removed order IDs and order events.
+  The call returns at once: the handshake result arrives as `Connected` or
+  `Error`. The stream resumes from its last position after a gap or a
+  reconnect, and calls for the same account share one server subscription.
+  `Ready` arrives once per server subscription when the stream reaches the
+  account's read boundary; wait for it before relying on the stream. A
+  consumer that joins a ready stream gets it right after its catch-up
+  snapshot.
+- Removed `codecs::decode::order_from_bytes`, the decoder for the retired
+  order channel's publications.
+
 ### Fixed
 - Order reads no longer report an attached-risk leg whose state is
   `not_configured`; the server sends that state for a leg the order does
   not have.
+- An API error whose order, auth, withdraw or transfer code is newer than
+  this SDK version now reports `code = "UNKNOWN_ERROR_CODE(<n>)"` instead
+  of `ERROR_CODE_UNSPECIFIED` or `AUTH_UNSPECIFIED`, so the server's code is
+  never lost.
 
 ### Added
 - `OrderMutationResult` (order create), `ModifyOrderResult` and accepted
@@ -15,15 +37,11 @@
   have. These structs are not `#[non_exhaustive]`, so code that builds them
   with struct literals or destructures them exhaustively must add the new
   fields.
+- `realtime::Client::subscribe_private_orders(account_id)` and
+  `proto::privatews` (the private WebSocket contract).
 - Trigger events report `event_type = "activated"` when a standalone
   trailing trigger's activation condition is met and tracking begins.
   `trigger_event_type_from_label("activated")` filters for them.
-
-### Fixed
-- An API error whose order, auth, withdraw or transfer code is newer than
-  this SDK version now reports `code = "UNKNOWN_ERROR_CODE(<n>)"` instead
-  of `ERROR_CODE_UNSPECIFIED` or `AUTH_UNSPECIFIED`, so the server's code is
-  never lost.
 
 ### Changed
 - **Trading prices now use the published fixed scale of 9 decimals: one

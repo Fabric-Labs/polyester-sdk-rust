@@ -19,6 +19,7 @@ pub mod orderbook;
 pub mod orders;
 pub mod polychart;
 pub mod polyester;
+pub mod privatews;
 pub mod ratelimit;
 pub mod tradews;
 pub mod transfer;

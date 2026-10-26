@@ -1,9 +1,11 @@
-//! Centrifugo websocket realtime client.
+//! Realtime clients: Centrifugo channels and the private WebSocket order stream.
 
 mod auth;
+mod private_orders;
 mod protocol;
 mod snapshot_then_stream;
 
+pub use private_orders::{PRIVATE_WS_PATH, PRIVATE_WS_SUBPROTOCOL, PrivateOrdersSubscription};
 pub use snapshot_then_stream::{SnapshotErrorFn, SnapshotThenStream, SnapshotThenStreamConfig};
 
 use crate::auth::Credentials;
@@ -178,6 +180,8 @@ pub struct Client {
     /// Deadline for private-channel HTTP token exchange (request + body).
     timeout: Duration,
     allow_insecure_http: bool,
+    /// Account order streams, shared by every clone of this client.
+    private_orders: private_orders::PrivateOrderStreams,
 }
 
 impl Client {
@@ -203,17 +207,19 @@ impl Client {
         max_queue: Option<usize>,
         timeout: Duration,
     ) -> Self {
+        let max_queue = max_queue.unwrap_or(DEFAULT_QUEUE).max(1);
         Self {
             ws_url: ws_url.into(),
             api_url: api_url.into(),
             credentials,
-            max_queue: max_queue.unwrap_or(DEFAULT_QUEUE).max(1),
+            max_queue,
             timeout: if timeout.is_zero() {
                 auth::DEFAULT_TOKEN_REQUEST_TIMEOUT
             } else {
                 timeout
             },
             allow_insecure_http: false,
+            private_orders: private_orders::PrivateOrderStreams::new(max_queue),
         }
     }
 
@@ -250,6 +256,40 @@ impl Client {
             }
         }
         Ok(())
+    }
+
+    /// Streams one account's orders over the private WebSocket
+    /// ([`PRIVATE_WS_PATH`] on the API host).
+    ///
+    /// `account_id` is the account's public ID (base58). Returns at once;
+    /// [`crate::models::PrivateOrdersEvent::Connected`] follows when the
+    /// server confirms the subscription, then a snapshot of the live view and
+    /// its changes. Consumers of the same account share one server
+    /// subscription, and a consumer that joins a running one first receives
+    /// its current state. The stream reconnects and resumes from its last
+    /// applied position by itself; it ends only on a terminal error.
+    pub async fn subscribe_private_orders(
+        &self,
+        account_id: &str,
+    ) -> Result<PrivateOrdersSubscription> {
+        let credentials = self.credentials.clone().ok_or_else(|| {
+            Error::auth("Cannot subscribe to private orders without API-key credentials")
+        })?;
+        if self.api_url.is_empty() {
+            return Err(Error::realtime(
+                "Realtime private order streams require api_url".to_owned(),
+            ));
+        }
+        let account = crate::codecs::scalars::id_to_u64(account_id, "account_id")?;
+        let url = private_orders::private_ws_url(&self.api_url, self.allow_insecure_http)?;
+        let transport = private_orders::LiveTransport {
+            url,
+            api_url: self.api_url.clone(),
+            credentials,
+            timeout: self.timeout,
+            allow_insecure_http: self.allow_insecure_http,
+        };
+        Ok(self.private_orders.connect(account, || Arc::new(transport)))
     }
 
     /// Subscribe to a protobuf channel and receive raw publication payloads.
@@ -784,14 +824,14 @@ mod tests {
 
     #[test]
     fn is_private_channel_detects_prefix() {
-        assert!(is_private_channel("private:spot:orders:acct:proto"));
+        assert!(is_private_channel("private:spot:trades:acct:proto"));
         assert!(!is_private_channel("public:spot:market:trades:1:proto"));
     }
 
     #[tokio::test]
     async fn unauthenticated_private_subscribe_fails_before_network_io() {
         let client = Client::new("not a websocket URL", "", None, None);
-        let err = match client.subscribe_raw("private:spot:orders:acct:proto").await {
+        let err = match client.subscribe_raw("private:spot:trades:acct:proto").await {
             Err(err) => err,
             Ok(_) => panic!("private subscribe without credentials must fail"),
         };
