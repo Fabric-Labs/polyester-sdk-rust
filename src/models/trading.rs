@@ -75,6 +75,12 @@ pub struct OrderMutationResult {
     pub resolved_base_qty: Option<Quantity>,
     /// Hard all-in quote debit submitted with quote-budget sizing, when used.
     pub submitted_max_quote_debit_scaled: Option<i64>,
+    /// Public ID of the attached take-profit trigger, when the order has one.
+    pub take_profit_trigger_id: Option<String>,
+    /// Public ID of the attached stop-loss trigger, when the order has one.
+    pub stop_loss_trigger_id: Option<String>,
+    /// Public ID of the attached trailing-stop trigger, when the order has one.
+    pub trailing_stop_trigger_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,6 +127,12 @@ pub struct ModifyOrderResult {
     pub old_order_id: String,
     pub final_order_id: String,
     pub code: String,
+    /// Public ID of the attached take-profit trigger, when the final order has one.
+    pub take_profit_trigger_id: Option<String>,
+    /// Public ID of the attached stop-loss trigger, when the final order has one.
+    pub stop_loss_trigger_id: Option<String>,
+    /// Public ID of the attached trailing-stop trigger, when the final order has one.
+    pub trailing_stop_trigger_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,6 +150,12 @@ pub struct BatchCreateResultItem {
     pub client_order_id: String,
     pub code: String,
     pub rate_limit: Option<super::RateLimitDetail>,
+    /// Public ID of the attached take-profit trigger, when an accepted order has one.
+    pub take_profit_trigger_id: Option<String>,
+    /// Public ID of the attached stop-loss trigger, when an accepted order has one.
+    pub stop_loss_trigger_id: Option<String>,
+    /// Public ID of the attached trailing-stop trigger, when an accepted order has one.
+    pub trailing_stop_trigger_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
