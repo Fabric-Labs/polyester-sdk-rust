@@ -3377,31 +3377,6 @@ async fn l2_orders_subscribe_streams_over_the_private_websocket() {
         api_key_id: Some("orders-stream".into()),
         api_private_key: Some(TEST_KEY.into()),
         default_account_id: Some(format_id(ACCOUNT)),
-
-/// Gap-free backfill: an initial empty page with zero watermarks is a valid
-/// answer, and feeding its `next_after_trade_id` (0) back sends an explicit
-/// `after_trade_id = 0` rather than dropping the cursor.
-#[tokio::test]
-async fn l2_backfill_resumes_from_zero_watermarks() {
-    use polyester::models::GetTradesOpts;
-    use polyester::proto::marketdata::v1::{GetTradesRequest, GetTradesResponse};
-    use std::sync::Mutex;
-
-    let requests = Arc::new(Mutex::new(Vec::<GetTradesRequest>::new()));
-    let seen = requests.clone();
-    let server = MockHttpServer::spawn(move |request| {
-        if request.path == GET_TRADES_PATH {
-            seen.lock()
-                .unwrap()
-                .push(GetTradesRequest::decode_from_slice(&request.body).unwrap());
-            // Nothing traded yet: no trades and zero watermarks.
-            return connect_proto_ok(&GetTradesResponse::default());
-        }
-        hardening_support::HttpScript::NotFound
-    })
-    .await;
-    let client = Client::new(Config {
-        api_url: server.base_url(),
         hydrate_catalogs: false,
         ..Default::default()
     })
@@ -3452,7 +3427,36 @@ async fn l2_backfill_resumes_from_zero_watermarks() {
     }
     drop(orders);
     server.abort();
+}
 
+/// Gap-free backfill: an initial empty page with zero watermarks is a valid
+/// answer, and feeding its `next_after_trade_id` (0) back sends an explicit
+/// `after_trade_id = 0` rather than dropping the cursor.
+#[tokio::test]
+async fn l2_backfill_resumes_from_zero_watermarks() {
+    use polyester::models::GetTradesOpts;
+    use polyester::proto::marketdata::v1::{GetTradesRequest, GetTradesResponse};
+    use std::sync::Mutex;
+
+    let requests = Arc::new(Mutex::new(Vec::<GetTradesRequest>::new()));
+    let seen = requests.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path == GET_TRADES_PATH {
+            seen.lock()
+                .unwrap()
+                .push(GetTradesRequest::decode_from_slice(&request.body).unwrap());
+            // Nothing traded yet: no trades and zero watermarks.
+            return connect_proto_ok(&GetTradesResponse::default());
+        }
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
     client
         .catalogs
         .hydrate_spot_config_json(json!({
