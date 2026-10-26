@@ -26,7 +26,7 @@
 //!
 //! Order write APIs take [`types::Price`] / [`types::Quantity`] only:
 //! - Humans: `Price::from_decimal_str("1.5")` / `Quantity::from_decimal_str("0.01", scale, …)`
-//! - Bots: `Price::from_ticks(1_500_000)` / `Quantity::from_scaled(…)`
+//! - Bots: `Price::from_ticks(1_500_000_000)` (1.5 at 1e-9 per tick) / `Quantity::from_scaled(…)`
 //!
 //! Floats and bare integers are rejected.
 
