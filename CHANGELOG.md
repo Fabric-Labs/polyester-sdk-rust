@@ -2,7 +2,19 @@
 
 ## Unreleased
 
+### Fixed
+- Order reads no longer report an attached-risk leg whose state is
+  `not_configured`; the server sends that state for a leg the order does
+  not have.
+
 ### Added
+- `OrderMutationResult` (order create), `ModifyOrderResult` and accepted
+  `BatchCreateResultItem`s carry `take_profit_trigger_id`,
+  `stop_loss_trigger_id` and `trailing_stop_trigger_id`: the public ID of
+  each attached-risk leg's trigger, and `None` for a leg the order does not
+  have. These structs are not `#[non_exhaustive]`, so code that builds them
+  with struct literals or destructures them exhaustively must add the new
+  fields.
 - Trigger events report `event_type = "activated"` when a standalone
   trailing trigger's activation condition is met and tracking begins.
   `trigger_event_type_from_label("activated")` filters for them.
