@@ -7,6 +7,12 @@
   trailing trigger's activation condition is met and tracking begins.
   `trigger_event_type_from_label("activated")` filters for them.
 
+### Fixed
+- An API error whose order, auth, withdraw or transfer code is newer than
+  this SDK version now reports `code = "UNKNOWN_ERROR_CODE(<n>)"` instead
+  of `ERROR_CODE_UNSPECIFIED` or `AUTH_UNSPECIFIED`, so the server's code is
+  never lost.
+
 ### Changed
 - **Trading prices now use the published fixed scale of 9 decimals: one
   price tick is 0.000000001 quote units.** `PRICE_TICK_SCALE` is `9`, so
