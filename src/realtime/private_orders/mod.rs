@@ -387,6 +387,8 @@ struct Actor {
     /// Accounts whose last consumer left; torn down once the current batch of work is done.
     idle: HashSet<u64>,
     conn: Option<Connection>,
+    /// A socket whose writes can no longer be queued; closed after the current event.
+    unwritable: Option<u64>,
     /// A connect token fetch or socket open for the next connection is in flight.
     connecting: bool,
     /// Bumped on shutdown so an open that outlived it is discarded.
@@ -456,6 +458,7 @@ impl Actor {
             unsubscribing: HashSet::new(),
             idle: HashSet::new(),
             conn: None,
+            unwritable: None,
             connecting: false,
             generation: 0,
             next_conn: 0,
@@ -484,9 +487,17 @@ impl Actor {
                 Some(event) = self.internal_rx.recv() => self.on_internal(event),
                 _ = sleep_until(deadline), if deadline.is_some() => self.on_timers(),
             }
-            self.teardown_idle();
+            self.finish_event();
         }
         self.shutdown();
+    }
+
+    /// Work deferred until the current event is handled.
+    fn finish_event(&mut self) {
+        if let Some(conn) = self.unwritable.take() {
+            self.on_closed(conn, ABNORMAL_CLOSE_CODE, "write failed");
+        }
+        self.teardown_idle();
     }
 
     fn next_deadline(&self) -> Option<Instant> {
@@ -637,13 +648,24 @@ impl Actor {
         self.next_conn += 1;
         let id = self.next_conn;
         let (out, mut out_rx) = mpsc::unbounded_channel::<Message>();
+        let writer_internal = self.internal_tx.clone();
         tokio::spawn(async move {
             while let Some(message) = out_rx.recv().await {
                 let closing = matches!(message, Message::Close(_));
-                match tokio::time::timeout(WRITE_TIMEOUT, sink.send(message)).await {
-                    Ok(Ok(())) if !closing => {}
-                    _ => break,
-                }
+                let reason = match tokio::time::timeout(WRITE_TIMEOUT, sink.send(message)).await {
+                    Ok(Ok(())) if closing => break,
+                    Ok(Ok(())) => continue,
+                    Ok(Err(err)) => format!("write failed: {err}"),
+                    Err(_) => "write timed out".to_owned(),
+                };
+                // A socket that cannot be written is dead even while frames still
+                // arrive: report it so the stream reconnects.
+                let _ = writer_internal.send(Internal::Closed {
+                    conn: id,
+                    code: ABNORMAL_CLOSE_CODE,
+                    reason,
+                });
+                return;
             }
             let _ = tokio::time::timeout(WRITE_TIMEOUT, sink.close()).await;
         });
@@ -693,15 +715,21 @@ impl Actor {
         self.conn.as_ref().map(|conn| conn.id)
     }
 
-    fn send(&self, op: client_message::Op) {
+    /// Queues a frame on the current socket. A socket whose writer has ended
+    /// is closed once the current event is handled.
+    fn send(&mut self, op: client_message::Op) {
         if let Some(conn) = &self.conn {
             let message = ClientMessage {
                 op: Some(op),
                 ..Default::default()
             };
-            let _ = conn
+            if conn
                 .out
-                .send(Message::Binary(message.encode_to_vec().into()));
+                .send(Message::Binary(message.encode_to_vec().into()))
+                .is_err()
+            {
+                self.unwritable = Some(conn.id);
+            }
         }
     }
 

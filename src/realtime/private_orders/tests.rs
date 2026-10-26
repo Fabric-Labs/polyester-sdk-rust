@@ -27,6 +27,57 @@ struct FakeState {
     subscribe_tokens: AtomicUsize,
     subscribe_channels: Mutex<Vec<String>>,
     subscribe_error: Mutex<Option<Error>>,
+    /// How the client's outgoing writes on the current socket behave.
+    writes: Arc<Mutex<Writes>>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Writes {
+    Pass,
+    /// Every write waits forever, as on a peer that stopped reading.
+    Block,
+    /// Every write fails, as on a reset connection.
+    Fail,
+}
+
+/// The client's sink, with writes that can be made to block or fail.
+struct ControlledSink {
+    inner: WsSink,
+    writes: Arc<Mutex<Writes>>,
+}
+
+impl Sink<Message> for ControlledSink {
+    type Error = tungstenite::Error;
+
+    fn poll_ready(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
+        let writes = *self.writes.lock().unwrap();
+        match writes {
+            Writes::Pass => self.inner.as_mut().poll_ready(cx),
+            Writes::Block => std::task::Poll::Pending,
+            Writes::Fail => std::task::Poll::Ready(Err(tungstenite::Error::ConnectionClosed)),
+        }
+    }
+
+    fn start_send(mut self: Pin<&mut Self>, item: Message) -> std::result::Result<(), Self::Error> {
+        self.inner.as_mut().start_send(item)
+    }
+
+    fn poll_flush(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
+        self.inner.as_mut().poll_flush(cx)
+    }
+
+    fn poll_close(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
+        self.inner.as_mut().poll_close(cx)
+    }
 }
 
 #[derive(Clone)]
@@ -52,6 +103,8 @@ impl Transport for FakeTransport {
 
     fn open(&self) -> BoxFuture<Result<(WsSink, WsStream)>> {
         let servers = self.0.servers.clone();
+        let writes = self.0.writes.clone();
+        *writes.lock().unwrap() = Writes::Pass;
         Box::pin(async move {
             let (client_io, server_io) = tokio::io::duplex(1 << 20);
             tokio::spawn(async move {
@@ -64,6 +117,10 @@ impl Transport for FakeTransport {
                 .await
                 .map_err(|e| Error::realtime(e.to_string()))?;
             let (sink, stream) = ws.split();
+            let sink = ControlledSink {
+                inner: Box::pin(sink),
+                writes,
+            };
             Ok((Box::pin(sink) as WsSink, Box::pin(stream) as WsStream))
         })
     }
@@ -209,6 +266,7 @@ impl Harness {
             subscribe_tokens: AtomicUsize::new(0),
             subscribe_channels: Mutex::new(Vec::new()),
             subscribe_error: Mutex::new(None),
+            writes: Arc::new(Mutex::new(Writes::Pass)),
         }));
         Self {
             streams: PrivateOrderStreams::new(max_queue),
@@ -953,6 +1011,122 @@ async fn a_late_joiner_of_a_ready_stream_gets_snapshot_then_ready() {
     assert_eq!(expect_snapshot(&mut late).await, vec![order(1, 1)]);
     expect_ready(&mut late).await;
     expect_quiet(&mut first, Duration::from_millis(100)).await;
+}
+
+/// Makes the client's writes on the current socket block or fail, prompts a
+/// client write, and keeps the old socket's heartbeats coming. The stream must
+/// still drop the socket and resume from its cursor on a new one, within the
+/// write timeout plus the first reconnect backoff.
+async fn a_broken_write_path_reconnects(writes: Writes) {
+    let mut harness = Harness::new();
+    let mut consumer = harness.connect(ACCOUNT);
+    let (mut server, _) = harness.accept("s1").await;
+    expect_connected(&mut consumer).await;
+    server.snapshot("s1", 1, "c1", &[1]).await;
+    expect_snapshot(&mut consumer).await;
+
+    *harness.transport.0.writes.lock().unwrap() = writes;
+    let started = Instant::now();
+    // The client answers this with a write: a subscribeRefresh.
+    server.send("s1", 0, SubscribeExpiring::default()).await;
+
+    let heartbeat = crate::proto::privatews::v1::Heartbeat::default();
+    let mut replacement = None;
+    let mut disconnected = false;
+    while started.elapsed() < WRITE_TIMEOUT + Duration::from_secs(2) {
+        tokio::select! {
+            next = harness.servers.recv() => {
+                replacement = next;
+                break;
+            }
+            event = consumer.recv() => {
+                match event.expect("stream open") {
+                    PrivateOrdersEvent::Disconnected => disconnected = true,
+                    PrivateOrdersEvent::Error(error) => panic!("unexpected error: {error}"),
+                    other => panic!("unexpected event: {other:?}"),
+                }
+            }
+            _ = tokio::time::sleep(Duration::from_secs(1)) => {
+                // The old socket stays alive from the server's side.
+                server.send("", 0, heartbeat.clone()).await;
+            }
+        }
+    }
+    let mut replacement = replacement.expect("a reconnect within the write timeout plus backoff");
+    let waited = started.elapsed();
+    let limit = match writes {
+        Writes::Block => WRITE_TIMEOUT + Duration::from_millis(1_000),
+        _ => Duration::from_millis(1_000),
+    };
+    assert!(
+        waited <= limit,
+        "reconnected after {waited:?}, limit {limit:?}"
+    );
+    assert!(disconnected, "consumers were not told about the drop");
+    assert_eq!(replacement.auth().await, "connect-2");
+    let request = replacement.subscribe().await;
+    assert_eq!(request.cursor, "c1");
+    replacement.confirm(&request, "s2").await;
+    expect_connected(&mut consumer).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_blocked_write_reconnects_despite_heartbeats() {
+    a_broken_write_path_reconnects(Writes::Block).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_failed_write_reconnects_despite_heartbeats() {
+    a_broken_write_path_reconnects(Writes::Fail).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_frame_queued_on_a_closed_outgoing_channel_reconnects() {
+    let harness = Harness::new();
+    let (_commands_tx, commands_rx) = mpsc::unbounded_channel();
+    let mut actor = Actor::new(Arc::new(harness.transport.clone()), commands_rx);
+    let (tx, mut rx) = mpsc::channel(8);
+    actor.on_command(Command::Add {
+        account: ACCOUNT,
+        consumer: Consumer {
+            id: 1,
+            tx,
+            ended: Arc::default(),
+        },
+    });
+    // A connected subscription on a socket whose writer has already ended.
+    let (out, out_rx) = mpsc::unbounded_channel();
+    drop(out_rx);
+    actor.connecting = false;
+    actor.conn = Some(Connection {
+        id: 7,
+        out,
+        reader: tokio::spawn(std::future::pending()),
+        opened_at: Instant::now(),
+    });
+    let s = actor.subs.get_mut(&ACCOUNT).unwrap();
+    s.sub = "s1".into();
+    s.state = State::Connected;
+    s.cursor = "c1".into();
+
+    actor.send(client_message::Op::from(
+        crate::proto::privatews::v1::Ping {
+            id: "p1".into(),
+            ..Default::default()
+        },
+    ));
+    actor.finish_event();
+
+    assert!(actor.conn.is_none(), "the unwritable socket is dropped");
+    assert!(actor.reconnect_at.is_some(), "a reconnect is scheduled");
+    assert!(matches!(
+        rx.try_recv(),
+        Ok(PrivateOrdersEvent::Disconnected)
+    ));
+    assert_eq!(
+        actor.subs[&ACCOUNT].cursor, "c1",
+        "the cursor is kept to resume"
+    );
 }
 
 #[test]
