@@ -298,6 +298,13 @@ async fn expect_unit(consumer: &mut PrivateOrdersSubscription) -> OrdersUnit {
     }
 }
 
+async fn expect_ready(consumer: &mut PrivateOrdersSubscription) {
+    match next(consumer).await {
+        PrivateOrdersEvent::Ready => {}
+        other => panic!("expected Ready, got {other:?}"),
+    }
+}
+
 async fn expect_stale(consumer: &mut PrivateOrdersSubscription) -> bool {
     match next(consumer).await {
         PrivateOrdersEvent::Stale(stale) => stale,
@@ -584,7 +591,9 @@ async fn unavailable_and_available_toggle_the_stale_flag() {
 
     server.send("s1", seq, Unavailable::default()).await;
     assert!(expect_stale(&mut consumer).await);
+    // Ready may arrive while the view is stale: it describes the position delivered.
     server.send("s1", seq + 1, Ready::default()).await;
+    expect_ready(&mut consumer).await;
     server
         .send(
             "s1",
@@ -860,6 +869,90 @@ async fn a_consumer_that_falls_behind_leaves_with_a_queue_overflow() {
         consumer.recv_result().await,
         Err(Error::QueueOverflow(_))
     ));
+}
+
+#[tokio::test(start_paused = true)]
+async fn ready_follows_the_snapshot_once_per_server_subscription() {
+    let mut harness = Harness::new();
+    let mut consumer = harness.connect(ACCOUNT);
+    let (mut server, _) = harness.accept("s1").await;
+    expect_connected(&mut consumer).await;
+    let seq = server.snapshot("s1", 1, "c1", &[1]).await;
+    expect_snapshot(&mut consumer).await;
+    server.send("s1", seq, Ready::default()).await;
+    expect_ready(&mut consumer).await;
+
+    // A repeated ready on the same server subscription is not delivered again.
+    server.send("s1", seq + 1, Ready::default()).await;
+    server.send("s1", seq + 2, unit("c1", "c2", &[1])).await;
+    assert_eq!(expect_unit(&mut consumer).await.orders, vec![order(1, 2)]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn ready_is_delivered_again_after_a_reconnect() {
+    let mut harness = Harness::new();
+    let mut consumer = harness.connect(ACCOUNT);
+    let (mut server, _) = harness.accept("s1").await;
+    expect_connected(&mut consumer).await;
+    let seq = server.snapshot("s1", 1, "c1", &[1]).await;
+    expect_snapshot(&mut consumer).await;
+    server.send("s1", seq, Ready::default()).await;
+    expect_ready(&mut consumer).await;
+
+    server.close(1001).await;
+    expect_disconnected(&mut consumer).await;
+    let (mut server, request) = harness.accept("s2").await;
+    assert_eq!(request.cursor, "c1");
+    expect_connected(&mut consumer).await;
+    // A resumed subscription sends units from the cursor, then ready.
+    server.send("s2", 1, unit("c1", "c2", &[1])).await;
+    expect_unit(&mut consumer).await;
+    server.send("s2", 2, Ready::default()).await;
+    expect_ready(&mut consumer).await;
+
+    // A consumer joining a stream that is not ready yet after a resubscribe
+    // waits for the new subscription's ready.
+    server.send("s2", 4, unit("c2", "c3", &[1])).await;
+    expect_disconnected(&mut consumer).await;
+    match server.recv().await {
+        client_message::Op::Unsubscribe(unsubscribe) => assert_eq!(unsubscribe.sub, "s2"),
+        other => panic!("expected unsubscribe, got {other:?}"),
+    }
+    let retry = server.subscribe().await;
+    assert_eq!(retry.cursor, "c2");
+    let mut late = harness.connect(ACCOUNT);
+    expect_disconnected_free_catch_up(&mut late).await;
+    server.confirm(&retry, "s3").await;
+    expect_connected(&mut consumer).await;
+    expect_connected(&mut late).await;
+    server.send("s3", 1, Ready::default()).await;
+    expect_ready(&mut consumer).await;
+    expect_ready(&mut late).await;
+}
+
+/// A consumer that joins while the subscription is between server
+/// subscriptions catches up on the view only: no Connected and no Ready.
+async fn expect_disconnected_free_catch_up(consumer: &mut PrivateOrdersSubscription) {
+    assert_eq!(expect_snapshot(consumer).await, vec![order(1, 2)]);
+    expect_quiet(consumer, Duration::from_millis(1)).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_late_joiner_of_a_ready_stream_gets_snapshot_then_ready() {
+    let mut harness = Harness::new();
+    let mut first = harness.connect(ACCOUNT);
+    let (mut server, _) = harness.accept("s1").await;
+    expect_connected(&mut first).await;
+    let seq = server.snapshot("s1", 1, "c1", &[1]).await;
+    expect_snapshot(&mut first).await;
+    server.send("s1", seq, Ready::default()).await;
+    expect_ready(&mut first).await;
+
+    let mut late = harness.connect(ACCOUNT);
+    expect_connected(&mut late).await;
+    assert_eq!(expect_snapshot(&mut late).await, vec![order(1, 1)]);
+    expect_ready(&mut late).await;
+    expect_quiet(&mut first, Duration::from_millis(100)).await;
 }
 
 #[test]

@@ -226,17 +226,22 @@ async fn private_subscribe_connects_orders() {
     else {
         return;
     };
-    // The private WebSocket confirms the subscription, then sends the live view.
+    // The private WebSocket confirms the subscription, sends the live view,
+    // then reports ready once the stream reaches the account's read boundary.
     let wait = Duration::from_secs(10);
-    let mut connected = false;
+    let (mut connected, mut snapshot) = (false, false);
     loop {
         match tokio::time::timeout(wait, sub.recv()).await {
             Ok(Some(PrivateOrdersEvent::Connected)) => connected = true,
-            Ok(Some(PrivateOrdersEvent::Snapshot(_))) if connected => break,
+            Ok(Some(PrivateOrdersEvent::Snapshot(_))) if connected => snapshot = true,
+            Ok(Some(PrivateOrdersEvent::Ready)) if snapshot => break,
+            Ok(Some(PrivateOrdersEvent::Ready)) => {
+                panic!("orders.subscribe: ready before its snapshot")
+            }
             Ok(Some(PrivateOrdersEvent::Error(err))) => panic!("orders.subscribe: {err}"),
             Ok(Some(_)) => {}
-            Ok(None) => panic!("orders.subscribe ended before its snapshot"),
-            Err(_) => panic!("orders.subscribe: no snapshot within {wait:?}"),
+            Ok(None) => panic!("orders.subscribe ended before it was ready"),
+            Err(_) => panic!("orders.subscribe: not ready within {wait:?}"),
         }
     }
     sub.close();

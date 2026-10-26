@@ -3230,7 +3230,7 @@ async fn l2_orders_subscribe_streams_over_the_private_websocket() {
     use polyester::models::PrivateOrdersEvent;
     use polyester::proto::orders::v1::Order as ProtoOrder;
     use polyester::proto::privatews::v1::{
-        ClientMessage, ServerMessage, SnapshotBegin, SnapshotEnd, SnapshotPage, Subscribed,
+        ClientMessage, Ready, ServerMessage, SnapshotBegin, SnapshotEnd, SnapshotPage, Subscribed,
         client_message, server_message::Frame,
     };
     use std::sync::Mutex;
@@ -3349,6 +3349,7 @@ async fn l2_orders_subscribe_streams_over_the_private_websocket() {
                         }
                         .into(),
                     ),
+                    (4, Ready::default().into()),
                 ];
                 for (seq, frame) in frames {
                     let msg = ServerMessage {
@@ -3396,6 +3397,8 @@ async fn l2_orders_subscribe_streams_over_the_private_websocket() {
     assert_eq!(snapshot.len(), 1);
     assert_eq!(snapshot[0].order_id, format_id(9));
     assert_eq!(snapshot[0].price.as_ref().unwrap().format(), "2420");
+    let ready = next(&mut orders).await;
+    assert!(matches!(ready, PrivateOrdersEvent::Ready), "{ready:?}");
 
     let account = format_id(ACCOUNT);
     assert_eq!(

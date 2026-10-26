@@ -722,12 +722,15 @@ streams. Events arrive as `PrivateOrdersEvent`:
 | `Connected` | The server confirmed the subscription; again after each reconnect |
 | `Snapshot(orders)` | The account's full live view; replace local state with it |
 | `Unit(unit)` | One change: changed orders (complete), removed order IDs, and events (fills, cancels, rejections, command outcomes) |
+| `Ready` | The stream reached the account's read boundary: it reflects every acknowledgement and order read made before the subscription. Once per server subscription, so again after a reconnect |
 | `Stale(true)` / `Stale(false)` | The live view is temporarily behind / caught up again |
 | `Disconnected` | The stream dropped; it resumes by itself unless an error ended it |
 | `Error(error)` | A stream error; a terminal one is followed by `Disconnected` and the end of the stream |
 
 Orders use the same `Order` model as the order reads. Keep the copy with the
-higher `version`; equal versions are identical. The stream reconnects with
+higher `version`; equal versions are identical. Wait for `Ready` before
+relying on the stream: to combine it with an order read, read first, then
+subscribe, wait for `Ready`, and merge both by `version`. The stream reconnects with
 backoff, resumes from its last applied position, and takes a fresh snapshot
 when it cannot resume. Several `orders.subscribe` calls for one account share
 one server subscription.
@@ -740,6 +743,7 @@ let mut orders = client.orders.subscribe(None).await?;
 while let Some(event) = orders.recv_result().await? {
     match event {
         PrivateOrdersEvent::Snapshot(live) => println!("{} live orders", live.len()),
+        PrivateOrdersEvent::Ready => println!("order stream is current"),
         PrivateOrdersEvent::Unit(unit) => {
             for order in unit.orders {
                 println!("{} {} v{}", order.order_id, order.status, order.version);

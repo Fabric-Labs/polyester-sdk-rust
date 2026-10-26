@@ -5,14 +5,18 @@
 ### Breaking
 - `OrdersService::subscribe` streams account orders over the private
   WebSocket (`/v1/ws/private`) and returns a `PrivateOrdersSubscription`
-  of `PrivateOrdersEvent`s (`Connected`, `Snapshot`, `Unit`, `Stale`,
-  `Disconnected`, `Error`) instead of a `TypedSubscription<Order>`. The
+  of `PrivateOrdersEvent`s (`Connected`, `Snapshot`, `Unit`, `Ready`,
+  `Stale`, `Disconnected`, `Error`) instead of a `TypedSubscription<Order>`. The
   realtime order channels it used are retired and no longer issue
   subscribe tokens. Snapshot and unit orders use the same `Order` model as
   the order reads; units also carry removed order IDs and order events.
   The call returns at once: the handshake result arrives as `Connected` or
   `Error`. The stream resumes from its last position after a gap or a
   reconnect, and calls for the same account share one server subscription.
+  `Ready` arrives once per server subscription when the stream reaches the
+  account's read boundary; wait for it before relying on the stream. A
+  consumer that joins a ready stream gets it right after its catch-up
+  snapshot.
 - Removed `codecs::decode::order_from_bytes`, the decoder for the retired
   order channel's publications.
 

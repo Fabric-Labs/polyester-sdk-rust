@@ -28,6 +28,13 @@ pub enum PrivateOrdersEvent {
     Snapshot(Vec<crate::models::Order>),
     /// One change, applied whole.
     Unit(OrdersUnit),
+    /// The stream reached the account's read boundary, sampled when the
+    /// server received the subscription: from now on it reflects at least
+    /// every acknowledgement and order read made before the subscription.
+    /// Wait for it before relying on the stream. Sent once per server
+    /// subscription, so again after a reconnect or resubscribe; a consumer
+    /// that joins a ready stream gets it right after its catch-up snapshot.
+    Ready,
     /// The account's live view is temporarily behind (`true`) or caught up
     /// again (`false`). The stream recovers by itself.
     Stale(bool),

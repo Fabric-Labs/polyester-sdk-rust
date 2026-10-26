@@ -334,6 +334,8 @@ struct Subscription {
     state: State,
     /// Consumers were told the view is stale and not yet that it caught up.
     stale: bool,
+    /// The current server subscription reached its read boundary (`ready`).
+    ready: bool,
     /// Subscribe attempts since the subscription last delivered data; drives retry backoff.
     retries: u32,
     retry_at: Option<Instant>,
@@ -525,6 +527,9 @@ impl Actor {
                     orders.values().cloned().collect(),
                 ));
             }
+            if s.ready {
+                catch_up.push(PrivateOrdersEvent::Ready);
+            }
             if s.stale {
                 catch_up.push(PrivateOrdersEvent::Stale(true));
             }
@@ -551,6 +556,7 @@ impl Actor {
                 orders: None,
                 state: State::Pending,
                 stale: false,
+                ready: false,
                 retries: 0,
                 retry_at: None,
             },
@@ -832,6 +838,7 @@ impl Actor {
         };
         let sub = std::mem::take(&mut s.sub);
         s.seq = 0;
+        s.ready = false;
         s.staged = None;
         let retry = s.retries > 0;
         if !retry {
@@ -915,6 +922,7 @@ impl Actor {
                 };
                 s.sub = msg.sub.clone();
                 s.seq = 0;
+                s.ready = false;
                 let connected = s.state != State::Connected;
                 s.state = State::Connected;
                 // A new subscription reports Unavailable itself if its view is still behind.
@@ -1001,7 +1009,12 @@ impl Actor {
                 s.retries = 0;
             }
             // A resumed subscription on a quiet account delivers no data, only this.
-            (Some(Frame::Ready(_)), _) => s.retries = 0,
+            (Some(Frame::Ready(_)), _) => {
+                s.retries = 0;
+                if !std::mem::replace(&mut s.ready, true) {
+                    self.deliver(account, PrivateOrdersEvent::Ready);
+                }
+            }
             (Some(Frame::Unavailable(_)), _) => {
                 s.stale = true;
                 self.deliver(account, PrivateOrdersEvent::Stale(true));
@@ -1194,6 +1207,7 @@ impl Actor {
             s.retry_at = None;
             s.sub.clear();
             s.seq = 0;
+            s.ready = false;
             s.staged = None;
         }
     }
