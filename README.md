@@ -360,10 +360,20 @@ API host, so handle an unimplemented/not-found response and do not make Preview
 a prerequisite for order submission. Fee selection is `FeeAsset::Quote` or, for
 BUYs only, `FeeAsset::Base`; the former `received` fee mode no longer exists.
 
-Standalone trailing-stop triggers remain SELL market-IOC and now encode wire
-`side` explicitly. Attached trailing-stop risk may use either side (opposite
-the parent); trigger reads project `trigger_type`, `side`, and
-`parent_order_id` from the host response.
+Standalone trailing stops take either side. A SELL trailing stop tracks the
+highest price and fires a market-IOC child; it takes no `limit_price`. A BUY
+trailing stop tracks the lowest price and requires `limit_price`: its maximum
+price, the most its child pays per unit, fixed at create. Attached
+trailing-stop risk takes the side opposite the parent. Trigger reads project
+`trigger_type`, `side`, `parent_order_id`, a BUY trailing stop's maximum price
+as `limit_price`, and the trough (BUY) or peak (SELL) price in the trailing
+details.
+
+Stop-loss and take-profit triggers with a market child accept a slippage cap,
+`max_slippage_ticks` or `max_slippage_bps` (at most one; a SELL child takes
+fewer than 10000 bps). Without one, the pair's default market slippage
+applies. A limit child takes no cap; its `limit_price` bounds it. Trigger
+reads expose the cap as `Trigger.max_slippage`.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
 [Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)
@@ -466,7 +476,9 @@ For writes, `oco=true` requires take-profit plus exactly one stop leg
 (`stop_loss` or `trailing_stop`); one-leg OCO policies are rejected locally.
 
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
-`max_slippage_bps` to preserve the current values. Send an explicit zero
+`max_slippage_bps` to preserve the current values. A trigger's child limit
+price is fixed at create: cancel the trigger and create a new one to change
+it. Send an explicit zero
 (`Price::from_ticks(0)` or `Some(0)`) to clear an existing activation price
 or maximum-slippage cap. Create/modify `max_slippage_bps` must be 1–10000;
 modify still accepts `0` to clear.
@@ -660,6 +672,19 @@ let current: Option<_> = client
     .get_current_candle("BTC-USDT", "1m")
     .await?;
 let trades = client.market_data.get_trades("BTC-USDT", Some(20)).await?;
+// Gap-free backfill: walk trades by trade ID from a cursor (0 = the first
+// trade), then continue from `next_after_trade_id`. When it does not move,
+// nothing newer is available yet.
+let backfill = client
+    .market_data
+    .get_trades_with(polyester::models::GetTradesOpts {
+        symbol: Some("BTC-USDT".into()),
+        after_trade_id: Some(0),
+        limit: Some(500),
+        ..Default::default()
+    })
+    .await?;
+let _next_cursor = backfill.next_after_trade_id;
 let _ = (candles, current, trades);
 
 client.wait_for_catalogs().await?;

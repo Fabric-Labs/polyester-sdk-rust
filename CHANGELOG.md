@@ -19,8 +19,18 @@
   snapshot.
 - Removed `codecs::decode::order_from_bytes`, the decoder for the retired
   order channel's publications.
+- `ModifyTriggerParams.limit_price` is removed: a trigger's child limit
+  price is fixed at create, and the API rejects any modify that sets it.
+- `CancelAllOrdersResult`, `MarketTradesResult`, `GetTradesOpts` and
+  `Trigger` gain fields (below). These structs are not `#[non_exhaustive]`,
+  so code that builds them with struct literals must add them.
 
 ### Fixed
+- **Stop-loss and take-profit triggers with a market child now send their
+  slippage cap.** `max_slippage_ticks` / `max_slippage_bps` were dropped on
+  create, so the child used the pair's default market slippage instead of
+  the requested cap. At most one of them is accepted, a sell child takes
+  fewer than 10000 bps, and a limit child rejects them.
 - Order reads no longer report an attached-risk leg whose state is
   `not_configured`; the server sends that state for a leg the order does
   not have.
@@ -30,6 +40,18 @@
   never lost.
 
 ### Added
+- Standalone BUY trailing stops: `CreateTriggerParams.limit_price` is the
+  required maximum price of a BUY trailing stop (`limit_price_ticks`), and
+  must be `None` for a SELL one. Trigger reads expose it as
+  `Trigger.limit_price`; the trailing details carry the trough price.
+- `Trigger.max_slippage`: the slippage cap of a stop-loss or take-profit
+  market child, or of a trailing stop.
+- `CancelAllOrdersResult.cancelled_orders` (order ID and client order ID,
+  oldest first, at most 200), `total_cancelled` and `truncated`.
+- Gap-free trade backfill: `GetTradesOpts.after_trade_id` (not combinable
+  with `start`, `end` or `page_token`), and
+  `MarketTradesResult.complete_through_trade_id`, `next_after_trade_id` and
+  `epoch_ends`. Zero is a valid cursor and watermark.
 - `OrderMutationResult` (order create), `ModifyOrderResult` and accepted
   `BatchCreateResultItem`s carry `take_profit_trigger_id`,
   `stop_loss_trigger_id` and `trailing_stop_trigger_id`: the public ID of
