@@ -30,6 +30,16 @@ pub struct NextVIPTierThresholds {
     pub aop_threshold_usd: String,
 }
 
+/// Completeness of one rolling 30-day VIP qualification metric.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VIPMetricQuality {
+    /// `complete`, `price_unavailable` or `incomplete_history`; a value
+    /// newer than this SDK reads `unknown(<n>)`.
+    pub status: String,
+    /// Hours of the 30-day window the metric could not use.
+    pub incomplete_hours: u32,
+}
+
 /// Authenticated caller-root VIP assignment and qualification facts.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VIPStatus {
@@ -44,4 +54,10 @@ pub struct VIPStatus {
     pub evaluated_at: Option<Timestamp>,
     pub metrics_as_of: Option<Timestamp>,
     pub next_tier_thresholds: Option<NextVIPTierThresholds>,
+    /// Completeness of `settled_volume_30d_usd`. When its status is
+    /// `price_unavailable` the volume is a lower bound. `None` when the
+    /// assignment carries no automatic qualification evidence.
+    pub settled_volume_quality: Option<VIPMetricQuality>,
+    /// Completeness of `average_aop_30d_usd`; `None` as above.
+    pub average_aop_quality: Option<VIPMetricQuality>,
 }

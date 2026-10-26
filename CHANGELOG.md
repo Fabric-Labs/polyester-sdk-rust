@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Fixed
+- `Error::mutation_outcome_unknown()` is true for
+  `ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN` and
+  `ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN`: the cancel or modify may still
+  apply, so read the order back before retrying. `Error::is_retryable()` is
+  true for `ERROR_CODE_ACCOUNT_REPAIRING`, a short pause while the account's
+  balances are brought back in line. The codes are exported in
+  `errors::order_codes`.
+
+### Added
+- `VIPStatus.settled_volume_quality` and `average_aop_quality`
+  (`VIPMetricQuality`: `status` and `incomplete_hours`) report how complete
+  each rolling 30-day metric is. When the volume's status is
+  `price_unavailable`, `settled_volume_30d_usd` is a lower bound.
+- **Source break:** `VIPStatus` gains two public fields, so code that builds
+  it with a struct literal must set them.
+
 ### Breaking
 - `OrdersService::subscribe` streams account orders over the private
   WebSocket (`/v1/ws/private`) and returns a `PrivateOrdersSubscription`

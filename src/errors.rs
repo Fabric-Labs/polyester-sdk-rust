@@ -85,6 +85,17 @@ pub mod auth_codes {
     pub const INTERNAL_ERROR: &str = "AUTH_INTERNAL_ERROR";
 }
 
+/// Stable orders.v1 error codes that change how a caller should react.
+pub mod order_codes {
+    /// A cancel was sent but not confirmed in time; it may still apply.
+    pub const ORDER_CANCEL_OUTCOME_UNKNOWN: &str = "ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN";
+    /// A modify was sent but not confirmed in time; it may still apply.
+    pub const ORDER_MODIFY_OUTCOME_UNKNOWN: &str = "ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN";
+    /// The account's orders are briefly paused while its balances are
+    /// brought back in line. Nothing changed; try again shortly.
+    pub const ACCOUNT_REPAIRING: &str = "ERROR_CODE_ACCOUNT_REPAIRING";
+}
+
 impl Error {
     pub fn auth(msg: impl Into<String>) -> Self {
         Self::Auth(msg.into())
@@ -120,10 +131,11 @@ impl Error {
     /// key and reconcile server state before retrying when
     /// [`Self::mutation_outcome_unknown`] is true.
     pub fn is_retryable(&self) -> bool {
-        matches!(
-            self,
-            Self::Transport(_) | Self::RateLimit { .. } | Self::Server(_)
-        )
+        match self {
+            Self::Transport(_) | Self::RateLimit { .. } | Self::Server(_) => true,
+            Self::Api { code, .. } => code == order_codes::ACCOUNT_REPAIRING,
+            _ => false,
+        }
     }
 
     /// Whether this error can occur after the server accepted a mutation.
@@ -131,10 +143,14 @@ impl Error {
     /// Callers must treat these failures as ambiguous: reconcile first and
     /// reuse the original idempotency key if a retry is necessary.
     pub fn mutation_outcome_unknown(&self) -> bool {
-        matches!(
-            self,
-            Self::Transport(_) | Self::ResponseContract { .. } | Self::Server(_)
-        )
+        match self {
+            Self::Transport(_) | Self::ResponseContract { .. } | Self::Server(_) => true,
+            Self::Api { code, .. } => {
+                code == order_codes::ORDER_CANCEL_OUTCOME_UNKNOWN
+                    || code == order_codes::ORDER_MODIFY_OUTCOME_UNKNOWN
+            }
+            _ => false,
+        }
     }
 
     /// Server-requested retry delay in seconds, when supplied.
@@ -698,6 +714,33 @@ mod tests {
             Error::Api { code, .. } => assert_eq!(code, "UNKNOWN_ERROR_CODE(998)"),
             other => panic!("unexpected transfer error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn order_outcome_unknown_and_repairing_codes_drive_reconcile_and_retry() {
+        let map_order = |code: OrderErrorCode| {
+            let detail = OrderErrorDetail {
+                code: EnumValue::Known(code),
+                ..Default::default()
+            };
+            map_connect_error(
+                ConnectError::new(ErrorCode::Unavailable, "not confirmed")
+                    .with_detail(ErrorDetail::from_message("orders.v1.ErrorDetail", &detail)),
+            )
+        };
+        for code in [
+            OrderErrorCode::OrderCancelOutcomeUnknown,
+            OrderErrorCode::OrderModifyOutcomeUnknown,
+        ] {
+            let err = map_order(code);
+            assert!(err.mutation_outcome_unknown(), "{code:?}: {err:?}");
+        }
+        let repairing = map_order(OrderErrorCode::AccountRepairing);
+        assert!(repairing.is_retryable(), "{repairing:?}");
+        assert!(!repairing.mutation_outcome_unknown());
+        let expired = map_order(OrderErrorCode::CancelRequestExpired);
+        assert!(!expired.is_retryable());
+        assert!(!expired.mutation_outcome_unknown());
     }
 
     #[test]
