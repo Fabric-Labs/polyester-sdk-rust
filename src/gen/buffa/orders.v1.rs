@@ -903,8 +903,6 @@ pub enum ErrorCode {
     ERROR_CODE_TRAILING_DISTANCE_INVALID = 42i32,
     /// Trigger not found (for cancel/get operations).
     ERROR_CODE_TRIGGER_NOT_FOUND = 43i32,
-    /// Trigger cannot be canceled in current state.
-    ERROR_CODE_TRIGGER_CANCEL_REJECTED = 44i32,
     /// Trigger status does not allow requested lifecycle operation.
     ERROR_CODE_TRIGGER_STATUS_INVALID = 45i32,
     /// Trigger type/state does not support requested lifecycle operation.
@@ -943,6 +941,288 @@ pub enum ErrorCode {
     /// Order notional is above the pair maximum (quote units). A stricter
     /// sub-account policy cap returns POLICY_MAX_NOTIONAL instead.
     ERROR_CODE_MAX_NOTIONAL = 75i32,
+    /// The replacement total quantity is at or below the order's filled
+    /// quantity: the order ended at its filled quantity and no replacement order
+    /// was created.
+    ERROR_CODE_QTY_AT_OR_BELOW_FILLED = 76i32,
+    /// The trading gateway that took the request is misconfigured for the order
+    /// service behind it. An operator must correct it; retrying does not help.
+    ERROR_CODE_GATEWAY_MISCONFIGURED = 77i32,
+    /// The order identifier or the replacement order identifier is not valid.
+    ERROR_CODE_INVALID_ORDER_ID = 80i32,
+    /// The quantity of a trigger's child order, a TWAP slice or a ladder order
+    /// can't be raised above its planned quantity. Nothing changed.
+    ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED = 81i32,
+    /// Attached take-profit, stop-loss or trailing legs can't be applied here:
+    /// this market takes none, an attached trailing stop isn't offered yet, or
+    /// the modify changes them together with the order's price, quantity, client
+    /// order ID or a replace. Nothing changed.
+    ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED = 82i32,
+    /// The account has too many filled or ended orders whose settlement has not
+    /// completed yet. Nothing changed; the request is accepted again once settlement
+    /// catches up.
+    ERROR_CODE_SETTLEMENT_BACKLOGGED = 84i32,
+    /// The order would take the total quantity resting at its price past the
+    /// most a price level can hold, even if some quantity still fits. Nothing
+    /// changed: a new order was not placed, a modified order keeps resting as it
+    /// was, and the other orders at that price are unchanged. Another price or a
+    /// smaller quantity, or the same order once less quantity rests at that
+    /// price, is accepted.
+    ERROR_CODE_PRICE_LEVEL_QUANTITY_LIMIT = 127i32,
+    /// The market order carried no client reference price, and the pair's reference
+    /// quote (top of book) was older than its freshness bound when the order was
+    /// admitted.
+    ERROR_CODE_MARKET_QUOTE_STALE = 200i32,
+    /// The market order carried no client reference price, and the pair's reference
+    /// quote could not be used to price it, for example because it postdated the
+    /// order or carried an invalid price.
+    ERROR_CODE_MARKET_QUOTE_UNHEALTHY = 201i32,
+    /// The time in force, or its expiry time, is not accepted for this order or for
+    /// a trigger's child order type.
+    ERROR_CODE_INVALID_TIME_IN_FORCE = 202i32,
+    /// The request carried QuickSwap terms that the account or market does not
+    /// accept.
+    ERROR_CODE_QUICKSWAP_NOT_PERMITTED = 203i32,
+    /// The order identifier assigned to the request is already in use by another
+    /// order of the market. Nothing changed.
+    ERROR_CODE_DUPLICATE_ORDER_ID = 204i32,
+    /// The account has reached its maximum number of open orders across all markets.
+    /// A stricter sub-account policy cap returns POLICY_MAX_OPEN_ORDERS instead.
+    ERROR_CODE_MAX_OPEN_ORDERS_TOTAL = 205i32,
+    /// The self-trade prevention mode is not one the venue accepts for this order.
+    ERROR_CODE_STP_MODE_NOT_ALLOWED = 206i32,
+    /// The trading pair is busy with the account's earlier requests, so this one was
+    /// not admitted and nothing was reserved. Retry shortly.
+    ERROR_CODE_PAIR_BACKLOGGED = 207i32,
+    /// The order book of the market holds its maximum number of distinct price
+    /// levels, so an order at a new price cannot rest. Nothing changed.
+    ERROR_CODE_PRICE_LEVELS_EXHAUSTED = 208i32,
+    /// The account reserves its maximum number of client order IDs, including those
+    /// of recently ended orders. Retry once they expire, or send the request without
+    /// a client order ID.
+    ERROR_CODE_CLIENT_ORDER_IDS_EXHAUSTED = 209i32,
+    /// The order identifier is held by a different, earlier order, so the request
+    /// was not applied. Nothing changed.
+    ERROR_CODE_ORDER_ID_CONFLICT = 210i32,
+    /// The order side, or a trigger's child order side, is not a known side.
+    ERROR_CODE_INVALID_SIDE = 211i32,
+    /// The order type, or a trigger's child order type, is not a known order type.
+    ERROR_CODE_INVALID_ORDER_TYPE = 212i32,
+    /// The self-trade prevention mode is not a known mode.
+    ERROR_CODE_INVALID_STP_MODE = 213i32,
+    /// An order flag is unknown, or not accepted with this order type or time in
+    /// force, or on a trigger's child order.
+    ERROR_CODE_INVALID_ORDER_FLAGS = 214i32,
+    /// Another item of the same batch was invalid, so this item was not applied
+    /// either. Nothing in the batch changed.
+    ERROR_CODE_BATCH_OTHER_ITEM_INVALID = 215i32,
+    /// The replacement order identifier equals the identifier of the order it
+    /// replaces.
+    ERROR_CODE_REPLACE_ONTO_OWN_ID = 216i32,
+    /// The client order ID is longer than 36 bytes or otherwise not valid.
+    ERROR_CODE_INVALID_CLIENT_ORDER_ID = 217i32,
+    /// The account used every order identifier available to it in this market.
+    /// Retrying does not help; contact support.
+    ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED = 218i32,
+    /// The order handling mode is not a known or accepted mode.
+    ERROR_CODE_INVALID_HANDLING_MODE = 219i32,
+    /// The fees that apply to the order cannot be determined right now, so it was
+    /// not admitted. Retry later.
+    ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE = 220i32,
+    /// The account's trading policy cannot be evaluated right now, so the order was
+    /// not admitted. Retry later.
+    ERROR_CODE_POLICY_UNAVAILABLE = 221i32,
+    /// The cancel-all-after timeout is neither 0, which disarms it, nor between 10
+    /// and 120 seconds.
+    ERROR_CODE_CANCEL_ALL_AFTER_TIMEOUT_INVALID = 222i32,
+    /// The cancel-all request named more than 100 symbols.
+    ERROR_CODE_CANCEL_SCOPE_TOO_LARGE = 223i32,
+    /// No usable rate-limit policy applies to the account right now, so the request
+    /// was refused rather than admitted unlimited. Retry later.
+    ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE = 224i32,
+    /// The venue-wide admission rate that the account shares with other accounts is
+    /// exhausted. The account's own limit was not reached; retry shortly.
+    ERROR_CODE_SYSTEM_RATE_LIMITED = 225i32,
+    /// An earlier amend or replace of the order has not completed yet. Retry once it
+    /// completes.
+    ERROR_CODE_ORDER_MODIFY_IN_PROGRESS = 226i32,
+    /// The order, or the replace that created it, has not been placed on the book
+    /// yet, so it cannot be modified. Retry shortly.
+    ERROR_CODE_ORDER_PLACEMENT_PENDING = 227i32,
+    /// The modify behavior is not a known behavior.
+    ERROR_CODE_INVALID_MODIFY_BEHAVIOR = 228i32,
+    /// An item of the batch modify did not use the REPLACE_ONLY behavior, so the
+    /// batch was refused.
+    ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED = 229i32,
+    /// An item of the batch modify named no symbol, another symbol than the batch's
+    /// first item, or an order on another symbol, so the batch was refused.
+    ERROR_CODE_BATCH_SINGLE_SYMBOL_REQUIRED = 230i32,
+    /// The account keeps its maximum number of recent modify or batch requests for
+    /// duplicate detection. Retry once earlier ones expire.
+    ERROR_CODE_REQUEST_RECEIPTS_EXHAUSTED = 231i32,
+    /// The cancel-all or cancel-all-after request carried an intent identifier of
+    /// zero.
+    ERROR_CODE_INTENT_ID_INVALID = 232i32,
+    /// The cancel-all request's dry-run flag was neither 0 nor 1.
+    ERROR_CODE_DRY_RUN_INVALID = 233i32,
+    /// A cancel-all-after is already due to fire, and the re-arm's scope does not
+    /// cover every symbol of the pending one.
+    ERROR_CODE_CANCEL_ALL_AFTER_SCOPE_CONFLICT = 234i32,
+    /// The venue holds its maximum number of account access records, so an account
+    /// trading this market for the first time cannot be admitted. Retry later.
+    ERROR_CODE_NEW_ACCOUNT_CAPACITY_REACHED = 235i32,
+    /// The modify patched the trigger's child limit price or price mode, which the
+    /// trigger does not accept.
+    ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE = 236i32,
+    /// The trigger reached its last modification. Nothing changed; cancel it and
+    /// create a new trigger instead.
+    ERROR_CODE_TRIGGER_GENERATIONS_EXHAUSTED = 237i32,
+    /// The account has its maximum number of trigger changes whose outcome is still
+    /// pending. Retry shortly.
+    ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED = 238i32,
+    /// The venue's capacity for pending trigger changes is exhausted across
+    /// accounts. Retry shortly.
+    ERROR_CODE_TRIGGER_CONTROLS_BUSY = 239i32,
+    /// The trigger type is valid but not supported on this venue yet.
+    ERROR_CODE_TRIGGER_TYPE_NOT_SUPPORTED = 240i32,
+    /// The trigger type is not a known type.
+    ERROR_CODE_INVALID_TRIGGER_TYPE = 241i32,
+    /// The trigger direction is neither ABOVE nor BELOW.
+    ERROR_CODE_TRIGGER_DIRECTION_INVALID = 242i32,
+    /// The trigger's child order quantity is not positive.
+    ERROR_CODE_TRIGGER_QTY_INVALID = 243i32,
+    /// A buy trigger's child order is not a LIMIT order; its funds are reserved at
+    /// the limit price.
+    ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT = 244i32,
+    /// The account's trading route is not configured for triggers, so the trigger
+    /// was not admitted. Contact support if it persists.
+    ERROR_CODE_ACCOUNT_ROUTING_INVALID = 245i32,
+    /// The account has its maximum number of live and recently ended triggers.
+    ERROR_CODE_TRIGGER_LIMIT_EXCEEDED = 246i32,
+    /// An earlier change of the trigger has not completed yet. Retry once it
+    /// completes.
+    ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS = 247i32,
+    /// The trigger modify named no field to change.
+    ERROR_CODE_TRIGGER_PATCH_EMPTY = 248i32,
+    /// The client trigger ID is empty, longer than 36 bytes or otherwise not valid.
+    ERROR_CODE_CLIENT_TRIGGER_ID_INVALID = 249i32,
+    /// The trailing trigger's activation price is not positive or not on the pair's
+    /// tick.
+    ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID = 250i32,
+    /// The trigger's slippage bound in ticks is not valid for its child order.
+    ERROR_CODE_SLIPPAGE_TICKS_INVALID = 251i32,
+    /// The trigger's slippage bound in basis points is not valid for its child
+    /// order.
+    ERROR_CODE_SLIPPAGE_BPS_INVALID = 252i32,
+    /// The trigger change was not confirmed within its time bound. Its outcome is
+    /// unknown and it may still apply; read the trigger before retrying.
+    ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN = 253i32,
+    /// The venue holds its maximum number of triggers across accounts right now.
+    /// Retry later.
+    ERROR_CODE_TRIGGER_CAPACITY_REACHED = 254i32,
+    /// The venue's capacity for fund reservations is exhausted right now, so the
+    /// trigger's child order could not be reserved. Retry later.
+    ERROR_CODE_RESERVATION_CAPACITY_REACHED = 255i32,
+    /// The venue's capacity for reserved client order IDs is exhausted right now, so
+    /// the trigger's child order could not reserve one. Retry later.
+    ERROR_CODE_CLIENT_ORDER_ID_CAPACITY_REACHED = 256i32,
+    /// The account's open orders and triggers hold its maximum number of fund
+    /// reservations.
+    ERROR_CODE_ACCOUNT_RESERVATION_LIMIT_REACHED = 257i32,
+    /// The requested trigger operation is not a known operation.
+    ERROR_CODE_INVALID_TRIGGER_CONTROL = 258i32,
+    /// A trigger operation other than modify carried field changes.
+    ERROR_CODE_TRIGGER_PATCH_NOT_ALLOWED = 259i32,
+    /// The trigger modify named a field that is not known.
+    ERROR_CODE_TRIGGER_PATCH_FIELD_UNKNOWN = 260i32,
+    /// The trigger modify carried a value for a field its change mask does not name.
+    ERROR_CODE_TRIGGER_PATCH_VALUE_UNMASKED = 261i32,
+    /// The trigger modify's price mode is not a known mode.
+    ERROR_CODE_TRIGGER_PATCH_PRICE_MODE_INVALID = 262i32,
+    /// New orders, changes and trigger orders on this account are suspended until
+    /// a balance issue is resolved; cancels still work. Nothing changed.
+    ERROR_CODE_ACCOUNT_ORDERS_SUSPENDED = 263i32,
+    /// A standalone trailing stop must sell; a standalone buy trailing stop is not
+    /// supported. Attached trailing stops take the side opposite their parent.
+    ERROR_CODE_TRAILING_SIDE_NOT_SUPPORTED = 264i32,
+    /// A trailing stop's child order must be a MARKET order.
+    ERROR_CODE_TRAILING_CHILD_NOT_MARKET = 265i32,
+    /// The TWAP duration is shorter than 1 second or longer than about 292 years,
+    /// the longest the venue's clock represents.
+    ERROR_CODE_TWAP_DURATION_INVALID = 266i32,
+    /// The TWAP sets a slippage bound, but its slices are LIMIT orders, which take
+    /// none.
+    ERROR_CODE_LIMIT_CHILD_SLIPPAGE_SET = 267i32,
+    /// The slippage bound is given both in ticks and in basis points; give only one.
+    ERROR_CODE_SLIPPAGE_BOUNDS_CONFLICT = 268i32,
+    /// The TWAP slice interval is shorter than 100 milliseconds or longer than its
+    /// duration.
+    ERROR_CODE_TWAP_INTERVAL_INVALID = 269i32,
+    /// One of the ladder's orders can't be placed, so the ladder was not created.
+    /// Nothing changed.
+    ERROR_CODE_LADDER_LEVEL_REJECTED = 270i32,
+    /// The ladder's price range is too narrow to place its orders at least one
+    /// price tick apart.
+    ERROR_CODE_LADDER_RANGE_TOO_NARROW = 271i32,
+    /// A ladder places from 2 to 100 orders.
+    ERROR_CODE_LADDER_LEVELS_INVALID = 272i32,
+    /// This market's order limits aren't set yet, so it can't take new orders.
+    ERROR_CODE_ORDER_LIMITS_UNAVAILABLE = 273i32,
+    /// This market is in an auction call and takes only limit orders that rest
+    /// without crossing the book; market, immediate-or-cancel and fill-or-kill
+    /// orders are refused. Nothing changed.
+    ERROR_CODE_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION = 274i32,
+    /// This market is in an auction call; new post-only orders are refused.
+    /// Nothing changed.
+    ERROR_CODE_POST_ONLY_NOT_ALLOWED_IN_AUCTION = 275i32,
+    /// The request's QuickSwap fee details are incomplete: a fee schedule needs a
+    /// broker, and a broker or broker fee terms need a fee schedule.
+    ERROR_CODE_QUICKSWAP_FEE_DETAILS_INCOMPLETE = 276i32,
+    /// The requested QuickSwap fee schedule doesn't price this market.
+    ERROR_CODE_QUICKSWAP_MARKET_NOT_PRICED = 277i32,
+    /// The broker fee terms belong to another broker.
+    ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_MISMATCH = 278i32,
+    /// A QuickSwap fee would be paid into the account placing the order.
+    ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER = 279i32,
+    /// The broker fee terms aren't available yet; retry shortly.
+    ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE = 280i32,
+    /// The broker's fee account isn't available yet; retry shortly.
+    ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE = 281i32,
+    /// QuickSwap isn't enabled for this account's trading.
+    ERROR_CODE_QUICKSWAP_DISABLED = 282i32,
+    /// QuickSwap orders can't carry take-profit or stop-loss legs.
+    ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED = 283i32,
+    /// QuickSwap orders can't be amended or replaced.
+    ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE = 284i32,
+    /// The QuickSwap fees together would exceed the order's value.
+    ERROR_CODE_QUICKSWAP_FEE_TOTAL_TOO_HIGH = 285i32,
+    /// The broker fee terms are invalid and can't be used.
+    ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_INVALID = 286i32,
+    /// The broker's QuickSwap setup is invalid and can't be used.
+    ERROR_CODE_QUICKSWAP_BROKER_INVALID = 287i32,
+    /// The QuickSwap fee schedule is invalid and can't be used.
+    ERROR_CODE_QUICKSWAP_FEE_SCHEDULE_INVALID = 288i32,
+    /// The QuickSwap fee for this market is invalid and can't be used.
+    ERROR_CODE_QUICKSWAP_MARKET_FEE_INVALID = 289i32,
+    /// QuickSwap's setup is invalid, so QuickSwap orders can't be placed.
+    ERROR_CODE_QUICKSWAP_SETUP_INVALID = 290i32,
+    /// QuickSwap's capacity for fee settings is reached; this order can't be
+    /// placed.
+    ERROR_CODE_QUICKSWAP_CAPACITY_REACHED = 291i32,
+    /// An exit order placed by one of the order's attached take-profit or stop
+    /// legs is still working, so attached legs can't be added now. Nothing
+    /// changed; retry once the exit completes.
+    ERROR_CODE_ATTACHED_EXIT_WORKING = 292i32,
+    /// The account already has the most triggers one account may have on this
+    /// market, attached take-profit, stop-loss and trailing legs included.
+    /// Nothing changed; retry once one of them ends.
+    ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED = 293i32,
+    /// The account already has the most TWAP orders one account may have on
+    /// this market. Nothing changed; retry once one of them ends.
+    ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED = 294i32,
+    /// The account already has the most ladder orders one account may have on
+    /// this market. Nothing changed; retry once one of them ends.
+    ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED = 295i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1116,9 +1396,6 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_NOT_FOUND`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TriggerNotFound: Self = Self::ERROR_CODE_TRIGGER_NOT_FOUND;
-    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_CANCEL_REJECTED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const TriggerCancelRejected: Self = Self::ERROR_CODE_TRIGGER_CANCEL_REJECTED;
     ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_STATUS_INVALID`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TriggerStatusInvalid: Self = Self::ERROR_CODE_TRIGGER_STATUS_INVALID;
@@ -1164,6 +1441,315 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_MAX_NOTIONAL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MaxNotional: Self = Self::ERROR_CODE_MAX_NOTIONAL;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QTY_AT_OR_BELOW_FILLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QtyAtOrBelowFilled: Self = Self::ERROR_CODE_QTY_AT_OR_BELOW_FILLED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_GATEWAY_MISCONFIGURED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const GatewayMisconfigured: Self = Self::ERROR_CODE_GATEWAY_MISCONFIGURED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_ORDER_ID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidOrderId: Self = Self::ERROR_CODE_INVALID_ORDER_ID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ChildQtyRaiseNotAllowed: Self = Self::ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AttachedRiskNotSupported: Self = Self::ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SETTLEMENT_BACKLOGGED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SettlementBacklogged: Self = Self::ERROR_CODE_SETTLEMENT_BACKLOGGED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_PRICE_LEVEL_QUANTITY_LIMIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PriceLevelQuantityLimit: Self = Self::ERROR_CODE_PRICE_LEVEL_QUANTITY_LIMIT;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MARKET_QUOTE_STALE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketQuoteStale: Self = Self::ERROR_CODE_MARKET_QUOTE_STALE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MARKET_QUOTE_UNHEALTHY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketQuoteUnhealthy: Self = Self::ERROR_CODE_MARKET_QUOTE_UNHEALTHY;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_TIME_IN_FORCE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidTimeInForce: Self = Self::ERROR_CODE_INVALID_TIME_IN_FORCE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_NOT_PERMITTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapNotPermitted: Self = Self::ERROR_CODE_QUICKSWAP_NOT_PERMITTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DUPLICATE_ORDER_ID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DuplicateOrderId: Self = Self::ERROR_CODE_DUPLICATE_ORDER_ID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MAX_OPEN_ORDERS_TOTAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxOpenOrdersTotal: Self = Self::ERROR_CODE_MAX_OPEN_ORDERS_TOTAL;
+    ///Idiomatic alias for [`Self::ERROR_CODE_STP_MODE_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StpModeNotAllowed: Self = Self::ERROR_CODE_STP_MODE_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_PAIR_BACKLOGGED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PairBacklogged: Self = Self::ERROR_CODE_PAIR_BACKLOGGED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_PRICE_LEVELS_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PriceLevelsExhausted: Self = Self::ERROR_CODE_PRICE_LEVELS_EXHAUSTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CLIENT_ORDER_IDS_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClientOrderIdsExhausted: Self = Self::ERROR_CODE_CLIENT_ORDER_IDS_EXHAUSTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ORDER_ID_CONFLICT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderIdConflict: Self = Self::ERROR_CODE_ORDER_ID_CONFLICT;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_SIDE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidSide: Self = Self::ERROR_CODE_INVALID_SIDE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_ORDER_TYPE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidOrderType: Self = Self::ERROR_CODE_INVALID_ORDER_TYPE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_STP_MODE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidStpMode: Self = Self::ERROR_CODE_INVALID_STP_MODE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_ORDER_FLAGS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidOrderFlags: Self = Self::ERROR_CODE_INVALID_ORDER_FLAGS;
+    ///Idiomatic alias for [`Self::ERROR_CODE_BATCH_OTHER_ITEM_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BatchOtherItemInvalid: Self = Self::ERROR_CODE_BATCH_OTHER_ITEM_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_REPLACE_ONTO_OWN_ID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReplaceOntoOwnId: Self = Self::ERROR_CODE_REPLACE_ONTO_OWN_ID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_CLIENT_ORDER_ID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidClientOrderId: Self = Self::ERROR_CODE_INVALID_CLIENT_ORDER_ID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderSequenceExhausted: Self = Self::ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_HANDLING_MODE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidHandlingMode: Self = Self::ERROR_CODE_INVALID_HANDLING_MODE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FeeScheduleUnavailable: Self = Self::ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_POLICY_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicyUnavailable: Self = Self::ERROR_CODE_POLICY_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CANCEL_ALL_AFTER_TIMEOUT_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CancelAllAfterTimeoutInvalid: Self = Self::ERROR_CODE_CANCEL_ALL_AFTER_TIMEOUT_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CANCEL_SCOPE_TOO_LARGE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CancelScopeTooLarge: Self = Self::ERROR_CODE_CANCEL_SCOPE_TOO_LARGE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RateLimitPolicyUnavailable: Self = Self::ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SYSTEM_RATE_LIMITED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SystemRateLimited: Self = Self::ERROR_CODE_SYSTEM_RATE_LIMITED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ORDER_MODIFY_IN_PROGRESS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderModifyInProgress: Self = Self::ERROR_CODE_ORDER_MODIFY_IN_PROGRESS;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ORDER_PLACEMENT_PENDING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderPlacementPending: Self = Self::ERROR_CODE_ORDER_PLACEMENT_PENDING;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_MODIFY_BEHAVIOR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidModifyBehavior: Self = Self::ERROR_CODE_INVALID_MODIFY_BEHAVIOR;
+    ///Idiomatic alias for [`Self::ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BatchReplaceOnlyRequired: Self = Self::ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_BATCH_SINGLE_SYMBOL_REQUIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BatchSingleSymbolRequired: Self = Self::ERROR_CODE_BATCH_SINGLE_SYMBOL_REQUIRED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_REQUEST_RECEIPTS_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RequestReceiptsExhausted: Self = Self::ERROR_CODE_REQUEST_RECEIPTS_EXHAUSTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INTENT_ID_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const IntentIdInvalid: Self = Self::ERROR_CODE_INTENT_ID_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DRY_RUN_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DryRunInvalid: Self = Self::ERROR_CODE_DRY_RUN_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CANCEL_ALL_AFTER_SCOPE_CONFLICT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CancelAllAfterScopeConflict: Self = Self::ERROR_CODE_CANCEL_ALL_AFTER_SCOPE_CONFLICT;
+    ///Idiomatic alias for [`Self::ERROR_CODE_NEW_ACCOUNT_CAPACITY_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const NewAccountCapacityReached: Self = Self::ERROR_CODE_NEW_ACCOUNT_CAPACITY_REACHED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerChildPriceNotModifiable: Self = Self::ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_GENERATIONS_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerGenerationsExhausted: Self = Self::ERROR_CODE_TRIGGER_GENERATIONS_EXHAUSTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerControlShareExhausted: Self = Self::ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_CONTROLS_BUSY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerControlsBusy: Self = Self::ERROR_CODE_TRIGGER_CONTROLS_BUSY;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_TYPE_NOT_SUPPORTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerTypeNotSupported: Self = Self::ERROR_CODE_TRIGGER_TYPE_NOT_SUPPORTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_TRIGGER_TYPE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidTriggerType: Self = Self::ERROR_CODE_INVALID_TRIGGER_TYPE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_DIRECTION_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerDirectionInvalid: Self = Self::ERROR_CODE_TRIGGER_DIRECTION_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_QTY_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerQtyInvalid: Self = Self::ERROR_CODE_TRIGGER_QTY_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerBuyRequiresLimit: Self = Self::ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ACCOUNT_ROUTING_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AccountRoutingInvalid: Self = Self::ERROR_CODE_ACCOUNT_ROUTING_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_LIMIT_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerLimitExceeded: Self = Self::ERROR_CODE_TRIGGER_LIMIT_EXCEEDED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerControlInProgress: Self = Self::ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_PATCH_EMPTY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerPatchEmpty: Self = Self::ERROR_CODE_TRIGGER_PATCH_EMPTY;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CLIENT_TRIGGER_ID_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClientTriggerIdInvalid: Self = Self::ERROR_CODE_CLIENT_TRIGGER_ID_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerActivationPriceInvalid: Self = Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SLIPPAGE_TICKS_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SlippageTicksInvalid: Self = Self::ERROR_CODE_SLIPPAGE_TICKS_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SLIPPAGE_BPS_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SlippageBpsInvalid: Self = Self::ERROR_CODE_SLIPPAGE_BPS_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerControlOutcomeUnknown: Self = Self::ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_CAPACITY_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerCapacityReached: Self = Self::ERROR_CODE_TRIGGER_CAPACITY_REACHED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_RESERVATION_CAPACITY_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReservationCapacityReached: Self = Self::ERROR_CODE_RESERVATION_CAPACITY_REACHED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CLIENT_ORDER_ID_CAPACITY_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClientOrderIdCapacityReached: Self = Self::ERROR_CODE_CLIENT_ORDER_ID_CAPACITY_REACHED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ACCOUNT_RESERVATION_LIMIT_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AccountReservationLimitReached: Self = Self::ERROR_CODE_ACCOUNT_RESERVATION_LIMIT_REACHED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_TRIGGER_CONTROL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidTriggerControl: Self = Self::ERROR_CODE_INVALID_TRIGGER_CONTROL;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_PATCH_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerPatchNotAllowed: Self = Self::ERROR_CODE_TRIGGER_PATCH_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_PATCH_FIELD_UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerPatchFieldUnknown: Self = Self::ERROR_CODE_TRIGGER_PATCH_FIELD_UNKNOWN;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_PATCH_VALUE_UNMASKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerPatchValueUnmasked: Self = Self::ERROR_CODE_TRIGGER_PATCH_VALUE_UNMASKED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_PATCH_PRICE_MODE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerPatchPriceModeInvalid: Self = Self::ERROR_CODE_TRIGGER_PATCH_PRICE_MODE_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ACCOUNT_ORDERS_SUSPENDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AccountOrdersSuspended: Self = Self::ERROR_CODE_ACCOUNT_ORDERS_SUSPENDED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRAILING_SIDE_NOT_SUPPORTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TrailingSideNotSupported: Self = Self::ERROR_CODE_TRAILING_SIDE_NOT_SUPPORTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRAILING_CHILD_NOT_MARKET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TrailingChildNotMarket: Self = Self::ERROR_CODE_TRAILING_CHILD_NOT_MARKET;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TWAP_DURATION_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TwapDurationInvalid: Self = Self::ERROR_CODE_TWAP_DURATION_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_LIMIT_CHILD_SLIPPAGE_SET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LimitChildSlippageSet: Self = Self::ERROR_CODE_LIMIT_CHILD_SLIPPAGE_SET;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SLIPPAGE_BOUNDS_CONFLICT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SlippageBoundsConflict: Self = Self::ERROR_CODE_SLIPPAGE_BOUNDS_CONFLICT;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TWAP_INTERVAL_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TwapIntervalInvalid: Self = Self::ERROR_CODE_TWAP_INTERVAL_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_LADDER_LEVEL_REJECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LadderLevelRejected: Self = Self::ERROR_CODE_LADDER_LEVEL_REJECTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_LADDER_RANGE_TOO_NARROW`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LadderRangeTooNarrow: Self = Self::ERROR_CODE_LADDER_RANGE_TOO_NARROW;
+    ///Idiomatic alias for [`Self::ERROR_CODE_LADDER_LEVELS_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LadderLevelsInvalid: Self = Self::ERROR_CODE_LADDER_LEVELS_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ORDER_LIMITS_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderLimitsUnavailable: Self = Self::ERROR_CODE_ORDER_LIMITS_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderTypeNotAllowedInAuction: Self = Self::ERROR_CODE_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION;
+    ///Idiomatic alias for [`Self::ERROR_CODE_POST_ONLY_NOT_ALLOWED_IN_AUCTION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PostOnlyNotAllowedInAuction: Self = Self::ERROR_CODE_POST_ONLY_NOT_ALLOWED_IN_AUCTION;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_FEE_DETAILS_INCOMPLETE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapFeeDetailsIncomplete: Self = Self::ERROR_CODE_QUICKSWAP_FEE_DETAILS_INCOMPLETE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_MARKET_NOT_PRICED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapMarketNotPriced: Self = Self::ERROR_CODE_QUICKSWAP_MARKET_NOT_PRICED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_MISMATCH`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapBrokerFeeTermsMismatch: Self = Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_MISMATCH;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapFeeRecipientIsPayer: Self = Self::ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapBrokerFeeTermsUnavailable: Self = Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapBrokerAccountUnavailable: Self = Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_DISABLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapDisabled: Self = Self::ERROR_CODE_QUICKSWAP_DISABLED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapAttachedRiskNotAllowed: Self = Self::ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapOrderNotModifiable: Self = Self::ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_FEE_TOTAL_TOO_HIGH`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapFeeTotalTooHigh: Self = Self::ERROR_CODE_QUICKSWAP_FEE_TOTAL_TOO_HIGH;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapBrokerFeeTermsInvalid: Self = Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_BROKER_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapBrokerInvalid: Self = Self::ERROR_CODE_QUICKSWAP_BROKER_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_FEE_SCHEDULE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapFeeScheduleInvalid: Self = Self::ERROR_CODE_QUICKSWAP_FEE_SCHEDULE_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_MARKET_FEE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapMarketFeeInvalid: Self = Self::ERROR_CODE_QUICKSWAP_MARKET_FEE_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_SETUP_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapSetupInvalid: Self = Self::ERROR_CODE_QUICKSWAP_SETUP_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_CAPACITY_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapCapacityReached: Self = Self::ERROR_CODE_QUICKSWAP_CAPACITY_REACHED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ATTACHED_EXIT_WORKING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AttachedExitWorking: Self = Self::ERROR_CODE_ATTACHED_EXIT_WORKING;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketTriggerLimitExceeded: Self = Self::ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketTwapLimitExceeded: Self = Self::ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketLadderLimitExceeded: Self = Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -1354,9 +1940,6 @@ impl ::buffa::Enumeration for ErrorCode {
                 ::core::option::Option::Some(Self::ERROR_CODE_TRAILING_DISTANCE_INVALID)
             }
             43i32 => ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_NOT_FOUND),
-            44i32 => {
-                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_CANCEL_REJECTED)
-            }
             45i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_STATUS_INVALID)
             }
@@ -1388,6 +1971,345 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             74i32 => ::core::option::Option::Some(Self::ERROR_CODE_MAX_QTY),
             75i32 => ::core::option::Option::Some(Self::ERROR_CODE_MAX_NOTIONAL),
+            76i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QTY_AT_OR_BELOW_FILLED)
+            }
+            77i32 => ::core::option::Option::Some(Self::ERROR_CODE_GATEWAY_MISCONFIGURED),
+            80i32 => ::core::option::Option::Some(Self::ERROR_CODE_INVALID_ORDER_ID),
+            81i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED,
+                )
+            }
+            82i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED,
+                )
+            }
+            84i32 => ::core::option::Option::Some(Self::ERROR_CODE_SETTLEMENT_BACKLOGGED),
+            127i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_PRICE_LEVEL_QUANTITY_LIMIT)
+            }
+            200i32 => ::core::option::Option::Some(Self::ERROR_CODE_MARKET_QUOTE_STALE),
+            201i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MARKET_QUOTE_UNHEALTHY)
+            }
+            202i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_TIME_IN_FORCE)
+            }
+            203i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_NOT_PERMITTED)
+            }
+            204i32 => ::core::option::Option::Some(Self::ERROR_CODE_DUPLICATE_ORDER_ID),
+            205i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MAX_OPEN_ORDERS_TOTAL)
+            }
+            206i32 => ::core::option::Option::Some(Self::ERROR_CODE_STP_MODE_NOT_ALLOWED),
+            207i32 => ::core::option::Option::Some(Self::ERROR_CODE_PAIR_BACKLOGGED),
+            208i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_PRICE_LEVELS_EXHAUSTED)
+            }
+            209i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CLIENT_ORDER_IDS_EXHAUSTED)
+            }
+            210i32 => ::core::option::Option::Some(Self::ERROR_CODE_ORDER_ID_CONFLICT),
+            211i32 => ::core::option::Option::Some(Self::ERROR_CODE_INVALID_SIDE),
+            212i32 => ::core::option::Option::Some(Self::ERROR_CODE_INVALID_ORDER_TYPE),
+            213i32 => ::core::option::Option::Some(Self::ERROR_CODE_INVALID_STP_MODE),
+            214i32 => ::core::option::Option::Some(Self::ERROR_CODE_INVALID_ORDER_FLAGS),
+            215i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_BATCH_OTHER_ITEM_INVALID)
+            }
+            216i32 => ::core::option::Option::Some(Self::ERROR_CODE_REPLACE_ONTO_OWN_ID),
+            217i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_CLIENT_ORDER_ID)
+            }
+            218i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED)
+            }
+            219i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_HANDLING_MODE)
+            }
+            220i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE)
+            }
+            221i32 => ::core::option::Option::Some(Self::ERROR_CODE_POLICY_UNAVAILABLE),
+            222i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_CANCEL_ALL_AFTER_TIMEOUT_INVALID,
+                )
+            }
+            223i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CANCEL_SCOPE_TOO_LARGE)
+            }
+            224i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE,
+                )
+            }
+            225i32 => ::core::option::Option::Some(Self::ERROR_CODE_SYSTEM_RATE_LIMITED),
+            226i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ORDER_MODIFY_IN_PROGRESS)
+            }
+            227i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ORDER_PLACEMENT_PENDING)
+            }
+            228i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_MODIFY_BEHAVIOR)
+            }
+            229i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED,
+                )
+            }
+            230i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_BATCH_SINGLE_SYMBOL_REQUIRED,
+                )
+            }
+            231i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_REQUEST_RECEIPTS_EXHAUSTED)
+            }
+            232i32 => ::core::option::Option::Some(Self::ERROR_CODE_INTENT_ID_INVALID),
+            233i32 => ::core::option::Option::Some(Self::ERROR_CODE_DRY_RUN_INVALID),
+            234i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_CANCEL_ALL_AFTER_SCOPE_CONFLICT,
+                )
+            }
+            235i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_NEW_ACCOUNT_CAPACITY_REACHED,
+                )
+            }
+            236i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE,
+                )
+            }
+            237i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_GENERATIONS_EXHAUSTED,
+                )
+            }
+            238i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED,
+                )
+            }
+            239i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_CONTROLS_BUSY)
+            }
+            240i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_TYPE_NOT_SUPPORTED)
+            }
+            241i32 => ::core::option::Option::Some(Self::ERROR_CODE_INVALID_TRIGGER_TYPE),
+            242i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_DIRECTION_INVALID)
+            }
+            243i32 => ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_QTY_INVALID),
+            244i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT)
+            }
+            245i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ACCOUNT_ROUTING_INVALID)
+            }
+            246i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_LIMIT_EXCEEDED)
+            }
+            247i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS,
+                )
+            }
+            248i32 => ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_PATCH_EMPTY),
+            249i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CLIENT_TRIGGER_ID_INVALID)
+            }
+            250i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID,
+                )
+            }
+            251i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SLIPPAGE_TICKS_INVALID)
+            }
+            252i32 => ::core::option::Option::Some(Self::ERROR_CODE_SLIPPAGE_BPS_INVALID),
+            253i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN,
+                )
+            }
+            254i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_CAPACITY_REACHED)
+            }
+            255i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_RESERVATION_CAPACITY_REACHED,
+                )
+            }
+            256i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_CLIENT_ORDER_ID_CAPACITY_REACHED,
+                )
+            }
+            257i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ACCOUNT_RESERVATION_LIMIT_REACHED,
+                )
+            }
+            258i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_TRIGGER_CONTROL)
+            }
+            259i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_PATCH_NOT_ALLOWED)
+            }
+            260i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_PATCH_FIELD_UNKNOWN,
+                )
+            }
+            261i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_PATCH_VALUE_UNMASKED,
+                )
+            }
+            262i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_PATCH_PRICE_MODE_INVALID,
+                )
+            }
+            263i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ACCOUNT_ORDERS_SUSPENDED)
+            }
+            264i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRAILING_SIDE_NOT_SUPPORTED,
+                )
+            }
+            265i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRAILING_CHILD_NOT_MARKET)
+            }
+            266i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TWAP_DURATION_INVALID)
+            }
+            267i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_LIMIT_CHILD_SLIPPAGE_SET)
+            }
+            268i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SLIPPAGE_BOUNDS_CONFLICT)
+            }
+            269i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TWAP_INTERVAL_INVALID)
+            }
+            270i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_LADDER_LEVEL_REJECTED)
+            }
+            271i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_LADDER_RANGE_TOO_NARROW)
+            }
+            272i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_LADDER_LEVELS_INVALID)
+            }
+            273i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ORDER_LIMITS_UNAVAILABLE)
+            }
+            274i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION,
+                )
+            }
+            275i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_POST_ONLY_NOT_ALLOWED_IN_AUCTION,
+                )
+            }
+            276i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_FEE_DETAILS_INCOMPLETE,
+                )
+            }
+            277i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_MARKET_NOT_PRICED,
+                )
+            }
+            278i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_MISMATCH,
+                )
+            }
+            279i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER,
+                )
+            }
+            280i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE,
+                )
+            }
+            281i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE,
+                )
+            }
+            282i32 => ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_DISABLED),
+            283i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED,
+                )
+            }
+            284i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE,
+                )
+            }
+            285i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_FEE_TOTAL_TOO_HIGH,
+                )
+            }
+            286i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_INVALID,
+                )
+            }
+            287i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_BROKER_INVALID)
+            }
+            288i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_FEE_SCHEDULE_INVALID,
+                )
+            }
+            289i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_MARKET_FEE_INVALID,
+                )
+            }
+            290i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_SETUP_INVALID)
+            }
+            291i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_CAPACITY_REACHED)
+            }
+            292i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ATTACHED_EXIT_WORKING)
+            }
+            293i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED,
+                )
+            }
+            294i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED)
+            }
+            295i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -1481,9 +2403,6 @@ impl ::buffa::Enumeration for ErrorCode {
                 "ERROR_CODE_TRAILING_DISTANCE_INVALID"
             }
             Self::ERROR_CODE_TRIGGER_NOT_FOUND => "ERROR_CODE_TRIGGER_NOT_FOUND",
-            Self::ERROR_CODE_TRIGGER_CANCEL_REJECTED => {
-                "ERROR_CODE_TRIGGER_CANCEL_REJECTED"
-            }
             Self::ERROR_CODE_TRIGGER_STATUS_INVALID => {
                 "ERROR_CODE_TRIGGER_STATUS_INVALID"
             }
@@ -1513,6 +2432,253 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_MAX_QTY => "ERROR_CODE_MAX_QTY",
             Self::ERROR_CODE_MAX_NOTIONAL => "ERROR_CODE_MAX_NOTIONAL",
+            Self::ERROR_CODE_QTY_AT_OR_BELOW_FILLED => {
+                "ERROR_CODE_QTY_AT_OR_BELOW_FILLED"
+            }
+            Self::ERROR_CODE_GATEWAY_MISCONFIGURED => "ERROR_CODE_GATEWAY_MISCONFIGURED",
+            Self::ERROR_CODE_INVALID_ORDER_ID => "ERROR_CODE_INVALID_ORDER_ID",
+            Self::ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED => {
+                "ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED"
+            }
+            Self::ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED => {
+                "ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED"
+            }
+            Self::ERROR_CODE_SETTLEMENT_BACKLOGGED => "ERROR_CODE_SETTLEMENT_BACKLOGGED",
+            Self::ERROR_CODE_PRICE_LEVEL_QUANTITY_LIMIT => {
+                "ERROR_CODE_PRICE_LEVEL_QUANTITY_LIMIT"
+            }
+            Self::ERROR_CODE_MARKET_QUOTE_STALE => "ERROR_CODE_MARKET_QUOTE_STALE",
+            Self::ERROR_CODE_MARKET_QUOTE_UNHEALTHY => {
+                "ERROR_CODE_MARKET_QUOTE_UNHEALTHY"
+            }
+            Self::ERROR_CODE_INVALID_TIME_IN_FORCE => "ERROR_CODE_INVALID_TIME_IN_FORCE",
+            Self::ERROR_CODE_QUICKSWAP_NOT_PERMITTED => {
+                "ERROR_CODE_QUICKSWAP_NOT_PERMITTED"
+            }
+            Self::ERROR_CODE_DUPLICATE_ORDER_ID => "ERROR_CODE_DUPLICATE_ORDER_ID",
+            Self::ERROR_CODE_MAX_OPEN_ORDERS_TOTAL => "ERROR_CODE_MAX_OPEN_ORDERS_TOTAL",
+            Self::ERROR_CODE_STP_MODE_NOT_ALLOWED => "ERROR_CODE_STP_MODE_NOT_ALLOWED",
+            Self::ERROR_CODE_PAIR_BACKLOGGED => "ERROR_CODE_PAIR_BACKLOGGED",
+            Self::ERROR_CODE_PRICE_LEVELS_EXHAUSTED => {
+                "ERROR_CODE_PRICE_LEVELS_EXHAUSTED"
+            }
+            Self::ERROR_CODE_CLIENT_ORDER_IDS_EXHAUSTED => {
+                "ERROR_CODE_CLIENT_ORDER_IDS_EXHAUSTED"
+            }
+            Self::ERROR_CODE_ORDER_ID_CONFLICT => "ERROR_CODE_ORDER_ID_CONFLICT",
+            Self::ERROR_CODE_INVALID_SIDE => "ERROR_CODE_INVALID_SIDE",
+            Self::ERROR_CODE_INVALID_ORDER_TYPE => "ERROR_CODE_INVALID_ORDER_TYPE",
+            Self::ERROR_CODE_INVALID_STP_MODE => "ERROR_CODE_INVALID_STP_MODE",
+            Self::ERROR_CODE_INVALID_ORDER_FLAGS => "ERROR_CODE_INVALID_ORDER_FLAGS",
+            Self::ERROR_CODE_BATCH_OTHER_ITEM_INVALID => {
+                "ERROR_CODE_BATCH_OTHER_ITEM_INVALID"
+            }
+            Self::ERROR_CODE_REPLACE_ONTO_OWN_ID => "ERROR_CODE_REPLACE_ONTO_OWN_ID",
+            Self::ERROR_CODE_INVALID_CLIENT_ORDER_ID => {
+                "ERROR_CODE_INVALID_CLIENT_ORDER_ID"
+            }
+            Self::ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED => {
+                "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED"
+            }
+            Self::ERROR_CODE_INVALID_HANDLING_MODE => "ERROR_CODE_INVALID_HANDLING_MODE",
+            Self::ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE => {
+                "ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE"
+            }
+            Self::ERROR_CODE_POLICY_UNAVAILABLE => "ERROR_CODE_POLICY_UNAVAILABLE",
+            Self::ERROR_CODE_CANCEL_ALL_AFTER_TIMEOUT_INVALID => {
+                "ERROR_CODE_CANCEL_ALL_AFTER_TIMEOUT_INVALID"
+            }
+            Self::ERROR_CODE_CANCEL_SCOPE_TOO_LARGE => {
+                "ERROR_CODE_CANCEL_SCOPE_TOO_LARGE"
+            }
+            Self::ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE => {
+                "ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE"
+            }
+            Self::ERROR_CODE_SYSTEM_RATE_LIMITED => "ERROR_CODE_SYSTEM_RATE_LIMITED",
+            Self::ERROR_CODE_ORDER_MODIFY_IN_PROGRESS => {
+                "ERROR_CODE_ORDER_MODIFY_IN_PROGRESS"
+            }
+            Self::ERROR_CODE_ORDER_PLACEMENT_PENDING => {
+                "ERROR_CODE_ORDER_PLACEMENT_PENDING"
+            }
+            Self::ERROR_CODE_INVALID_MODIFY_BEHAVIOR => {
+                "ERROR_CODE_INVALID_MODIFY_BEHAVIOR"
+            }
+            Self::ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED => {
+                "ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED"
+            }
+            Self::ERROR_CODE_BATCH_SINGLE_SYMBOL_REQUIRED => {
+                "ERROR_CODE_BATCH_SINGLE_SYMBOL_REQUIRED"
+            }
+            Self::ERROR_CODE_REQUEST_RECEIPTS_EXHAUSTED => {
+                "ERROR_CODE_REQUEST_RECEIPTS_EXHAUSTED"
+            }
+            Self::ERROR_CODE_INTENT_ID_INVALID => "ERROR_CODE_INTENT_ID_INVALID",
+            Self::ERROR_CODE_DRY_RUN_INVALID => "ERROR_CODE_DRY_RUN_INVALID",
+            Self::ERROR_CODE_CANCEL_ALL_AFTER_SCOPE_CONFLICT => {
+                "ERROR_CODE_CANCEL_ALL_AFTER_SCOPE_CONFLICT"
+            }
+            Self::ERROR_CODE_NEW_ACCOUNT_CAPACITY_REACHED => {
+                "ERROR_CODE_NEW_ACCOUNT_CAPACITY_REACHED"
+            }
+            Self::ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE => {
+                "ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE"
+            }
+            Self::ERROR_CODE_TRIGGER_GENERATIONS_EXHAUSTED => {
+                "ERROR_CODE_TRIGGER_GENERATIONS_EXHAUSTED"
+            }
+            Self::ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED => {
+                "ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED"
+            }
+            Self::ERROR_CODE_TRIGGER_CONTROLS_BUSY => "ERROR_CODE_TRIGGER_CONTROLS_BUSY",
+            Self::ERROR_CODE_TRIGGER_TYPE_NOT_SUPPORTED => {
+                "ERROR_CODE_TRIGGER_TYPE_NOT_SUPPORTED"
+            }
+            Self::ERROR_CODE_INVALID_TRIGGER_TYPE => "ERROR_CODE_INVALID_TRIGGER_TYPE",
+            Self::ERROR_CODE_TRIGGER_DIRECTION_INVALID => {
+                "ERROR_CODE_TRIGGER_DIRECTION_INVALID"
+            }
+            Self::ERROR_CODE_TRIGGER_QTY_INVALID => "ERROR_CODE_TRIGGER_QTY_INVALID",
+            Self::ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT => {
+                "ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT"
+            }
+            Self::ERROR_CODE_ACCOUNT_ROUTING_INVALID => {
+                "ERROR_CODE_ACCOUNT_ROUTING_INVALID"
+            }
+            Self::ERROR_CODE_TRIGGER_LIMIT_EXCEEDED => {
+                "ERROR_CODE_TRIGGER_LIMIT_EXCEEDED"
+            }
+            Self::ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS => {
+                "ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS"
+            }
+            Self::ERROR_CODE_TRIGGER_PATCH_EMPTY => "ERROR_CODE_TRIGGER_PATCH_EMPTY",
+            Self::ERROR_CODE_CLIENT_TRIGGER_ID_INVALID => {
+                "ERROR_CODE_CLIENT_TRIGGER_ID_INVALID"
+            }
+            Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID => {
+                "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID"
+            }
+            Self::ERROR_CODE_SLIPPAGE_TICKS_INVALID => {
+                "ERROR_CODE_SLIPPAGE_TICKS_INVALID"
+            }
+            Self::ERROR_CODE_SLIPPAGE_BPS_INVALID => "ERROR_CODE_SLIPPAGE_BPS_INVALID",
+            Self::ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN => {
+                "ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN"
+            }
+            Self::ERROR_CODE_TRIGGER_CAPACITY_REACHED => {
+                "ERROR_CODE_TRIGGER_CAPACITY_REACHED"
+            }
+            Self::ERROR_CODE_RESERVATION_CAPACITY_REACHED => {
+                "ERROR_CODE_RESERVATION_CAPACITY_REACHED"
+            }
+            Self::ERROR_CODE_CLIENT_ORDER_ID_CAPACITY_REACHED => {
+                "ERROR_CODE_CLIENT_ORDER_ID_CAPACITY_REACHED"
+            }
+            Self::ERROR_CODE_ACCOUNT_RESERVATION_LIMIT_REACHED => {
+                "ERROR_CODE_ACCOUNT_RESERVATION_LIMIT_REACHED"
+            }
+            Self::ERROR_CODE_INVALID_TRIGGER_CONTROL => {
+                "ERROR_CODE_INVALID_TRIGGER_CONTROL"
+            }
+            Self::ERROR_CODE_TRIGGER_PATCH_NOT_ALLOWED => {
+                "ERROR_CODE_TRIGGER_PATCH_NOT_ALLOWED"
+            }
+            Self::ERROR_CODE_TRIGGER_PATCH_FIELD_UNKNOWN => {
+                "ERROR_CODE_TRIGGER_PATCH_FIELD_UNKNOWN"
+            }
+            Self::ERROR_CODE_TRIGGER_PATCH_VALUE_UNMASKED => {
+                "ERROR_CODE_TRIGGER_PATCH_VALUE_UNMASKED"
+            }
+            Self::ERROR_CODE_TRIGGER_PATCH_PRICE_MODE_INVALID => {
+                "ERROR_CODE_TRIGGER_PATCH_PRICE_MODE_INVALID"
+            }
+            Self::ERROR_CODE_ACCOUNT_ORDERS_SUSPENDED => {
+                "ERROR_CODE_ACCOUNT_ORDERS_SUSPENDED"
+            }
+            Self::ERROR_CODE_TRAILING_SIDE_NOT_SUPPORTED => {
+                "ERROR_CODE_TRAILING_SIDE_NOT_SUPPORTED"
+            }
+            Self::ERROR_CODE_TRAILING_CHILD_NOT_MARKET => {
+                "ERROR_CODE_TRAILING_CHILD_NOT_MARKET"
+            }
+            Self::ERROR_CODE_TWAP_DURATION_INVALID => "ERROR_CODE_TWAP_DURATION_INVALID",
+            Self::ERROR_CODE_LIMIT_CHILD_SLIPPAGE_SET => {
+                "ERROR_CODE_LIMIT_CHILD_SLIPPAGE_SET"
+            }
+            Self::ERROR_CODE_SLIPPAGE_BOUNDS_CONFLICT => {
+                "ERROR_CODE_SLIPPAGE_BOUNDS_CONFLICT"
+            }
+            Self::ERROR_CODE_TWAP_INTERVAL_INVALID => "ERROR_CODE_TWAP_INTERVAL_INVALID",
+            Self::ERROR_CODE_LADDER_LEVEL_REJECTED => "ERROR_CODE_LADDER_LEVEL_REJECTED",
+            Self::ERROR_CODE_LADDER_RANGE_TOO_NARROW => {
+                "ERROR_CODE_LADDER_RANGE_TOO_NARROW"
+            }
+            Self::ERROR_CODE_LADDER_LEVELS_INVALID => "ERROR_CODE_LADDER_LEVELS_INVALID",
+            Self::ERROR_CODE_ORDER_LIMITS_UNAVAILABLE => {
+                "ERROR_CODE_ORDER_LIMITS_UNAVAILABLE"
+            }
+            Self::ERROR_CODE_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION => {
+                "ERROR_CODE_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION"
+            }
+            Self::ERROR_CODE_POST_ONLY_NOT_ALLOWED_IN_AUCTION => {
+                "ERROR_CODE_POST_ONLY_NOT_ALLOWED_IN_AUCTION"
+            }
+            Self::ERROR_CODE_QUICKSWAP_FEE_DETAILS_INCOMPLETE => {
+                "ERROR_CODE_QUICKSWAP_FEE_DETAILS_INCOMPLETE"
+            }
+            Self::ERROR_CODE_QUICKSWAP_MARKET_NOT_PRICED => {
+                "ERROR_CODE_QUICKSWAP_MARKET_NOT_PRICED"
+            }
+            Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_MISMATCH => {
+                "ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_MISMATCH"
+            }
+            Self::ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER => {
+                "ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER"
+            }
+            Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE => {
+                "ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE"
+            }
+            Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE => {
+                "ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE"
+            }
+            Self::ERROR_CODE_QUICKSWAP_DISABLED => "ERROR_CODE_QUICKSWAP_DISABLED",
+            Self::ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED => {
+                "ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED"
+            }
+            Self::ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE => {
+                "ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE"
+            }
+            Self::ERROR_CODE_QUICKSWAP_FEE_TOTAL_TOO_HIGH => {
+                "ERROR_CODE_QUICKSWAP_FEE_TOTAL_TOO_HIGH"
+            }
+            Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_INVALID => {
+                "ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_INVALID"
+            }
+            Self::ERROR_CODE_QUICKSWAP_BROKER_INVALID => {
+                "ERROR_CODE_QUICKSWAP_BROKER_INVALID"
+            }
+            Self::ERROR_CODE_QUICKSWAP_FEE_SCHEDULE_INVALID => {
+                "ERROR_CODE_QUICKSWAP_FEE_SCHEDULE_INVALID"
+            }
+            Self::ERROR_CODE_QUICKSWAP_MARKET_FEE_INVALID => {
+                "ERROR_CODE_QUICKSWAP_MARKET_FEE_INVALID"
+            }
+            Self::ERROR_CODE_QUICKSWAP_SETUP_INVALID => {
+                "ERROR_CODE_QUICKSWAP_SETUP_INVALID"
+            }
+            Self::ERROR_CODE_QUICKSWAP_CAPACITY_REACHED => {
+                "ERROR_CODE_QUICKSWAP_CAPACITY_REACHED"
+            }
+            Self::ERROR_CODE_ATTACHED_EXIT_WORKING => "ERROR_CODE_ATTACHED_EXIT_WORKING",
+            Self::ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED => {
+                "ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED"
+            }
+            Self::ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED => {
+                "ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED"
+            }
+            Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED => {
+                "ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1698,9 +2864,6 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_TRIGGER_NOT_FOUND" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_NOT_FOUND)
             }
-            "ERROR_CODE_TRIGGER_CANCEL_REJECTED" => {
-                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_CANCEL_REJECTED)
-            }
             "ERROR_CODE_TRIGGER_STATUS_INVALID" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_STATUS_INVALID)
             }
@@ -1747,6 +2910,389 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             "ERROR_CODE_MAX_NOTIONAL" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_NOTIONAL)
+            }
+            "ERROR_CODE_QTY_AT_OR_BELOW_FILLED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QTY_AT_OR_BELOW_FILLED)
+            }
+            "ERROR_CODE_GATEWAY_MISCONFIGURED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_GATEWAY_MISCONFIGURED)
+            }
+            "ERROR_CODE_INVALID_ORDER_ID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_ORDER_ID)
+            }
+            "ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED,
+                )
+            }
+            "ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED,
+                )
+            }
+            "ERROR_CODE_SETTLEMENT_BACKLOGGED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SETTLEMENT_BACKLOGGED)
+            }
+            "ERROR_CODE_PRICE_LEVEL_QUANTITY_LIMIT" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_PRICE_LEVEL_QUANTITY_LIMIT)
+            }
+            "ERROR_CODE_MARKET_QUOTE_STALE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MARKET_QUOTE_STALE)
+            }
+            "ERROR_CODE_MARKET_QUOTE_UNHEALTHY" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MARKET_QUOTE_UNHEALTHY)
+            }
+            "ERROR_CODE_INVALID_TIME_IN_FORCE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_TIME_IN_FORCE)
+            }
+            "ERROR_CODE_QUICKSWAP_NOT_PERMITTED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_NOT_PERMITTED)
+            }
+            "ERROR_CODE_DUPLICATE_ORDER_ID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUPLICATE_ORDER_ID)
+            }
+            "ERROR_CODE_MAX_OPEN_ORDERS_TOTAL" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MAX_OPEN_ORDERS_TOTAL)
+            }
+            "ERROR_CODE_STP_MODE_NOT_ALLOWED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_STP_MODE_NOT_ALLOWED)
+            }
+            "ERROR_CODE_PAIR_BACKLOGGED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_PAIR_BACKLOGGED)
+            }
+            "ERROR_CODE_PRICE_LEVELS_EXHAUSTED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_PRICE_LEVELS_EXHAUSTED)
+            }
+            "ERROR_CODE_CLIENT_ORDER_IDS_EXHAUSTED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CLIENT_ORDER_IDS_EXHAUSTED)
+            }
+            "ERROR_CODE_ORDER_ID_CONFLICT" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ORDER_ID_CONFLICT)
+            }
+            "ERROR_CODE_INVALID_SIDE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_SIDE)
+            }
+            "ERROR_CODE_INVALID_ORDER_TYPE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_ORDER_TYPE)
+            }
+            "ERROR_CODE_INVALID_STP_MODE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_STP_MODE)
+            }
+            "ERROR_CODE_INVALID_ORDER_FLAGS" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_ORDER_FLAGS)
+            }
+            "ERROR_CODE_BATCH_OTHER_ITEM_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_BATCH_OTHER_ITEM_INVALID)
+            }
+            "ERROR_CODE_REPLACE_ONTO_OWN_ID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_REPLACE_ONTO_OWN_ID)
+            }
+            "ERROR_CODE_INVALID_CLIENT_ORDER_ID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_CLIENT_ORDER_ID)
+            }
+            "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED)
+            }
+            "ERROR_CODE_INVALID_HANDLING_MODE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_HANDLING_MODE)
+            }
+            "ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE)
+            }
+            "ERROR_CODE_POLICY_UNAVAILABLE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_POLICY_UNAVAILABLE)
+            }
+            "ERROR_CODE_CANCEL_ALL_AFTER_TIMEOUT_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_CANCEL_ALL_AFTER_TIMEOUT_INVALID,
+                )
+            }
+            "ERROR_CODE_CANCEL_SCOPE_TOO_LARGE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CANCEL_SCOPE_TOO_LARGE)
+            }
+            "ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE,
+                )
+            }
+            "ERROR_CODE_SYSTEM_RATE_LIMITED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SYSTEM_RATE_LIMITED)
+            }
+            "ERROR_CODE_ORDER_MODIFY_IN_PROGRESS" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ORDER_MODIFY_IN_PROGRESS)
+            }
+            "ERROR_CODE_ORDER_PLACEMENT_PENDING" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ORDER_PLACEMENT_PENDING)
+            }
+            "ERROR_CODE_INVALID_MODIFY_BEHAVIOR" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_MODIFY_BEHAVIOR)
+            }
+            "ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED,
+                )
+            }
+            "ERROR_CODE_BATCH_SINGLE_SYMBOL_REQUIRED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_BATCH_SINGLE_SYMBOL_REQUIRED,
+                )
+            }
+            "ERROR_CODE_REQUEST_RECEIPTS_EXHAUSTED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_REQUEST_RECEIPTS_EXHAUSTED)
+            }
+            "ERROR_CODE_INTENT_ID_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INTENT_ID_INVALID)
+            }
+            "ERROR_CODE_DRY_RUN_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DRY_RUN_INVALID)
+            }
+            "ERROR_CODE_CANCEL_ALL_AFTER_SCOPE_CONFLICT" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_CANCEL_ALL_AFTER_SCOPE_CONFLICT,
+                )
+            }
+            "ERROR_CODE_NEW_ACCOUNT_CAPACITY_REACHED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_NEW_ACCOUNT_CAPACITY_REACHED,
+                )
+            }
+            "ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE,
+                )
+            }
+            "ERROR_CODE_TRIGGER_GENERATIONS_EXHAUSTED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_GENERATIONS_EXHAUSTED,
+                )
+            }
+            "ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED,
+                )
+            }
+            "ERROR_CODE_TRIGGER_CONTROLS_BUSY" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_CONTROLS_BUSY)
+            }
+            "ERROR_CODE_TRIGGER_TYPE_NOT_SUPPORTED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_TYPE_NOT_SUPPORTED)
+            }
+            "ERROR_CODE_INVALID_TRIGGER_TYPE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_TRIGGER_TYPE)
+            }
+            "ERROR_CODE_TRIGGER_DIRECTION_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_DIRECTION_INVALID)
+            }
+            "ERROR_CODE_TRIGGER_QTY_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_QTY_INVALID)
+            }
+            "ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT)
+            }
+            "ERROR_CODE_ACCOUNT_ROUTING_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ACCOUNT_ROUTING_INVALID)
+            }
+            "ERROR_CODE_TRIGGER_LIMIT_EXCEEDED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_LIMIT_EXCEEDED)
+            }
+            "ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS,
+                )
+            }
+            "ERROR_CODE_TRIGGER_PATCH_EMPTY" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_PATCH_EMPTY)
+            }
+            "ERROR_CODE_CLIENT_TRIGGER_ID_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CLIENT_TRIGGER_ID_INVALID)
+            }
+            "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID,
+                )
+            }
+            "ERROR_CODE_SLIPPAGE_TICKS_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SLIPPAGE_TICKS_INVALID)
+            }
+            "ERROR_CODE_SLIPPAGE_BPS_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SLIPPAGE_BPS_INVALID)
+            }
+            "ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN,
+                )
+            }
+            "ERROR_CODE_TRIGGER_CAPACITY_REACHED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_CAPACITY_REACHED)
+            }
+            "ERROR_CODE_RESERVATION_CAPACITY_REACHED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_RESERVATION_CAPACITY_REACHED,
+                )
+            }
+            "ERROR_CODE_CLIENT_ORDER_ID_CAPACITY_REACHED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_CLIENT_ORDER_ID_CAPACITY_REACHED,
+                )
+            }
+            "ERROR_CODE_ACCOUNT_RESERVATION_LIMIT_REACHED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ACCOUNT_RESERVATION_LIMIT_REACHED,
+                )
+            }
+            "ERROR_CODE_INVALID_TRIGGER_CONTROL" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_TRIGGER_CONTROL)
+            }
+            "ERROR_CODE_TRIGGER_PATCH_NOT_ALLOWED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_PATCH_NOT_ALLOWED)
+            }
+            "ERROR_CODE_TRIGGER_PATCH_FIELD_UNKNOWN" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_PATCH_FIELD_UNKNOWN,
+                )
+            }
+            "ERROR_CODE_TRIGGER_PATCH_VALUE_UNMASKED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_PATCH_VALUE_UNMASKED,
+                )
+            }
+            "ERROR_CODE_TRIGGER_PATCH_PRICE_MODE_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_PATCH_PRICE_MODE_INVALID,
+                )
+            }
+            "ERROR_CODE_ACCOUNT_ORDERS_SUSPENDED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ACCOUNT_ORDERS_SUSPENDED)
+            }
+            "ERROR_CODE_TRAILING_SIDE_NOT_SUPPORTED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRAILING_SIDE_NOT_SUPPORTED,
+                )
+            }
+            "ERROR_CODE_TRAILING_CHILD_NOT_MARKET" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRAILING_CHILD_NOT_MARKET)
+            }
+            "ERROR_CODE_TWAP_DURATION_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TWAP_DURATION_INVALID)
+            }
+            "ERROR_CODE_LIMIT_CHILD_SLIPPAGE_SET" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_LIMIT_CHILD_SLIPPAGE_SET)
+            }
+            "ERROR_CODE_SLIPPAGE_BOUNDS_CONFLICT" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SLIPPAGE_BOUNDS_CONFLICT)
+            }
+            "ERROR_CODE_TWAP_INTERVAL_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TWAP_INTERVAL_INVALID)
+            }
+            "ERROR_CODE_LADDER_LEVEL_REJECTED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_LADDER_LEVEL_REJECTED)
+            }
+            "ERROR_CODE_LADDER_RANGE_TOO_NARROW" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_LADDER_RANGE_TOO_NARROW)
+            }
+            "ERROR_CODE_LADDER_LEVELS_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_LADDER_LEVELS_INVALID)
+            }
+            "ERROR_CODE_ORDER_LIMITS_UNAVAILABLE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ORDER_LIMITS_UNAVAILABLE)
+            }
+            "ERROR_CODE_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION,
+                )
+            }
+            "ERROR_CODE_POST_ONLY_NOT_ALLOWED_IN_AUCTION" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_POST_ONLY_NOT_ALLOWED_IN_AUCTION,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_FEE_DETAILS_INCOMPLETE" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_FEE_DETAILS_INCOMPLETE,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_MARKET_NOT_PRICED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_MARKET_NOT_PRICED,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_MISMATCH" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_MISMATCH,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_DISABLED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_DISABLED)
+            }
+            "ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_FEE_TOTAL_TOO_HIGH" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_FEE_TOTAL_TOO_HIGH,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_INVALID,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_BROKER_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_BROKER_INVALID)
+            }
+            "ERROR_CODE_QUICKSWAP_FEE_SCHEDULE_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_FEE_SCHEDULE_INVALID,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_MARKET_FEE_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_MARKET_FEE_INVALID,
+                )
+            }
+            "ERROR_CODE_QUICKSWAP_SETUP_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_SETUP_INVALID)
+            }
+            "ERROR_CODE_QUICKSWAP_CAPACITY_REACHED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_CAPACITY_REACHED)
+            }
+            "ERROR_CODE_ATTACHED_EXIT_WORKING" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ATTACHED_EXIT_WORKING)
+            }
+            "ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED,
+                )
+            }
+            "ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED)
+            }
+            "ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED,
+                )
             }
             _ => ::core::option::Option::None,
         }
@@ -1810,7 +3356,6 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED,
             Self::ERROR_CODE_TRAILING_DISTANCE_INVALID,
             Self::ERROR_CODE_TRIGGER_NOT_FOUND,
-            Self::ERROR_CODE_TRIGGER_CANCEL_REJECTED,
             Self::ERROR_CODE_TRIGGER_STATUS_INVALID,
             Self::ERROR_CODE_TRIGGER_NOT_MODIFIABLE,
             Self::ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID,
@@ -1826,6 +3371,109 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CANCEL_REQUEST_EXPIRED,
             Self::ERROR_CODE_MAX_QTY,
             Self::ERROR_CODE_MAX_NOTIONAL,
+            Self::ERROR_CODE_QTY_AT_OR_BELOW_FILLED,
+            Self::ERROR_CODE_GATEWAY_MISCONFIGURED,
+            Self::ERROR_CODE_INVALID_ORDER_ID,
+            Self::ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED,
+            Self::ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED,
+            Self::ERROR_CODE_SETTLEMENT_BACKLOGGED,
+            Self::ERROR_CODE_PRICE_LEVEL_QUANTITY_LIMIT,
+            Self::ERROR_CODE_MARKET_QUOTE_STALE,
+            Self::ERROR_CODE_MARKET_QUOTE_UNHEALTHY,
+            Self::ERROR_CODE_INVALID_TIME_IN_FORCE,
+            Self::ERROR_CODE_QUICKSWAP_NOT_PERMITTED,
+            Self::ERROR_CODE_DUPLICATE_ORDER_ID,
+            Self::ERROR_CODE_MAX_OPEN_ORDERS_TOTAL,
+            Self::ERROR_CODE_STP_MODE_NOT_ALLOWED,
+            Self::ERROR_CODE_PAIR_BACKLOGGED,
+            Self::ERROR_CODE_PRICE_LEVELS_EXHAUSTED,
+            Self::ERROR_CODE_CLIENT_ORDER_IDS_EXHAUSTED,
+            Self::ERROR_CODE_ORDER_ID_CONFLICT,
+            Self::ERROR_CODE_INVALID_SIDE,
+            Self::ERROR_CODE_INVALID_ORDER_TYPE,
+            Self::ERROR_CODE_INVALID_STP_MODE,
+            Self::ERROR_CODE_INVALID_ORDER_FLAGS,
+            Self::ERROR_CODE_BATCH_OTHER_ITEM_INVALID,
+            Self::ERROR_CODE_REPLACE_ONTO_OWN_ID,
+            Self::ERROR_CODE_INVALID_CLIENT_ORDER_ID,
+            Self::ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED,
+            Self::ERROR_CODE_INVALID_HANDLING_MODE,
+            Self::ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE,
+            Self::ERROR_CODE_POLICY_UNAVAILABLE,
+            Self::ERROR_CODE_CANCEL_ALL_AFTER_TIMEOUT_INVALID,
+            Self::ERROR_CODE_CANCEL_SCOPE_TOO_LARGE,
+            Self::ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE,
+            Self::ERROR_CODE_SYSTEM_RATE_LIMITED,
+            Self::ERROR_CODE_ORDER_MODIFY_IN_PROGRESS,
+            Self::ERROR_CODE_ORDER_PLACEMENT_PENDING,
+            Self::ERROR_CODE_INVALID_MODIFY_BEHAVIOR,
+            Self::ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED,
+            Self::ERROR_CODE_BATCH_SINGLE_SYMBOL_REQUIRED,
+            Self::ERROR_CODE_REQUEST_RECEIPTS_EXHAUSTED,
+            Self::ERROR_CODE_INTENT_ID_INVALID,
+            Self::ERROR_CODE_DRY_RUN_INVALID,
+            Self::ERROR_CODE_CANCEL_ALL_AFTER_SCOPE_CONFLICT,
+            Self::ERROR_CODE_NEW_ACCOUNT_CAPACITY_REACHED,
+            Self::ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE,
+            Self::ERROR_CODE_TRIGGER_GENERATIONS_EXHAUSTED,
+            Self::ERROR_CODE_TRIGGER_CONTROL_SHARE_EXHAUSTED,
+            Self::ERROR_CODE_TRIGGER_CONTROLS_BUSY,
+            Self::ERROR_CODE_TRIGGER_TYPE_NOT_SUPPORTED,
+            Self::ERROR_CODE_INVALID_TRIGGER_TYPE,
+            Self::ERROR_CODE_TRIGGER_DIRECTION_INVALID,
+            Self::ERROR_CODE_TRIGGER_QTY_INVALID,
+            Self::ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT,
+            Self::ERROR_CODE_ACCOUNT_ROUTING_INVALID,
+            Self::ERROR_CODE_TRIGGER_LIMIT_EXCEEDED,
+            Self::ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS,
+            Self::ERROR_CODE_TRIGGER_PATCH_EMPTY,
+            Self::ERROR_CODE_CLIENT_TRIGGER_ID_INVALID,
+            Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID,
+            Self::ERROR_CODE_SLIPPAGE_TICKS_INVALID,
+            Self::ERROR_CODE_SLIPPAGE_BPS_INVALID,
+            Self::ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN,
+            Self::ERROR_CODE_TRIGGER_CAPACITY_REACHED,
+            Self::ERROR_CODE_RESERVATION_CAPACITY_REACHED,
+            Self::ERROR_CODE_CLIENT_ORDER_ID_CAPACITY_REACHED,
+            Self::ERROR_CODE_ACCOUNT_RESERVATION_LIMIT_REACHED,
+            Self::ERROR_CODE_INVALID_TRIGGER_CONTROL,
+            Self::ERROR_CODE_TRIGGER_PATCH_NOT_ALLOWED,
+            Self::ERROR_CODE_TRIGGER_PATCH_FIELD_UNKNOWN,
+            Self::ERROR_CODE_TRIGGER_PATCH_VALUE_UNMASKED,
+            Self::ERROR_CODE_TRIGGER_PATCH_PRICE_MODE_INVALID,
+            Self::ERROR_CODE_ACCOUNT_ORDERS_SUSPENDED,
+            Self::ERROR_CODE_TRAILING_SIDE_NOT_SUPPORTED,
+            Self::ERROR_CODE_TRAILING_CHILD_NOT_MARKET,
+            Self::ERROR_CODE_TWAP_DURATION_INVALID,
+            Self::ERROR_CODE_LIMIT_CHILD_SLIPPAGE_SET,
+            Self::ERROR_CODE_SLIPPAGE_BOUNDS_CONFLICT,
+            Self::ERROR_CODE_TWAP_INTERVAL_INVALID,
+            Self::ERROR_CODE_LADDER_LEVEL_REJECTED,
+            Self::ERROR_CODE_LADDER_RANGE_TOO_NARROW,
+            Self::ERROR_CODE_LADDER_LEVELS_INVALID,
+            Self::ERROR_CODE_ORDER_LIMITS_UNAVAILABLE,
+            Self::ERROR_CODE_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION,
+            Self::ERROR_CODE_POST_ONLY_NOT_ALLOWED_IN_AUCTION,
+            Self::ERROR_CODE_QUICKSWAP_FEE_DETAILS_INCOMPLETE,
+            Self::ERROR_CODE_QUICKSWAP_MARKET_NOT_PRICED,
+            Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_MISMATCH,
+            Self::ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER,
+            Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE,
+            Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE,
+            Self::ERROR_CODE_QUICKSWAP_DISABLED,
+            Self::ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED,
+            Self::ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE,
+            Self::ERROR_CODE_QUICKSWAP_FEE_TOTAL_TOO_HIGH,
+            Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_INVALID,
+            Self::ERROR_CODE_QUICKSWAP_BROKER_INVALID,
+            Self::ERROR_CODE_QUICKSWAP_FEE_SCHEDULE_INVALID,
+            Self::ERROR_CODE_QUICKSWAP_MARKET_FEE_INVALID,
+            Self::ERROR_CODE_QUICKSWAP_SETUP_INVALID,
+            Self::ERROR_CODE_QUICKSWAP_CAPACITY_REACHED,
+            Self::ERROR_CODE_ATTACHED_EXIT_WORKING,
+            Self::ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED,
+            Self::ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED,
+            Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED,
         ]
     }
 }
@@ -16304,7 +17952,9 @@ pub struct AttachedRisk {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub trailing_stop: ::buffa::MessageField<AttachedRiskTrailingStop>,
-    /// True when the take-profit and stop leg are linked as one-cancels-the-other.
+    /// True while both the take-profit and a stop leg (stop-loss or trailing
+    /// stop) are present and linked as one-cancels-the-other. False once either
+    /// leg is removed; a leg canceled because the other fired stays present.
     ///
     /// Field 4: `oco`
     #[serde(
@@ -16871,7 +18521,10 @@ pub struct Order {
     )]
     pub terminal_reason: ::buffa::alloc::string::String,
     /// Attached risk controls + runtime state on the parent order.
-    /// Empty when no attached risk exists.
+    /// Empty when no attached risk exists. Order reads include it only when the
+    /// request asks for it (include_attached_risk, include_attached_risk_state):
+    /// an omission on request, never a removal. The private WebSocket always
+    /// carries it in full, as a read asking for both does.
     ///
     /// Field 21: `attached_risk`
     #[serde(
@@ -16920,8 +18573,11 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub market_max_slippage_bps: i32,
-    /// Per-order state version. Starts at 1 and increases for every published
-    /// state change. Use this field to reconcile API and realtime updates.
+    /// Per-order state version: 0 while the order is accepted but not yet on
+    /// the book (status PENDING), then 1 from its first book state and higher
+    /// for every later published state change. A higher version is always
+    /// newer, and two copies of an order with the same version are identical,
+    /// so use this field to reconcile API and realtime updates.
     ///
     /// Field 26: `version`
     #[serde(
@@ -41761,7 +43417,9 @@ pub mod __buffa {
             pub trailing_stop: ::buffa::MessageFieldView<
                 super::super::__buffa::view::AttachedRiskTrailingStopView<'a>,
             >,
-            /// True when the take-profit and stop leg are linked as one-cancels-the-other.
+            /// True while both the take-profit and a stop leg (stop-loss or trailing
+            /// stop) are present and linked as one-cancels-the-other. False once either
+            /// leg is removed; a leg canceled because the other fired stays present.
             ///
             /// Field 4: `oco`
             pub oco: bool,
@@ -42186,7 +43844,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().trailing_stop
             }
-            /// True when the take-profit and stop leg are linked as one-cancels-the-other.
+            /// True while both the take-profit and a stop leg (stop-loss or trailing
+            /// stop) are present and linked as one-cancels-the-other. False once either
+            /// leg is removed; a leg canceled because the other fired stays present.
             ///
             /// Field 4: `oco`
             #[must_use]
@@ -42628,7 +44288,10 @@ pub mod __buffa {
             /// Field 19: `terminal_reason`
             pub terminal_reason: &'a str,
             /// Attached risk controls + runtime state on the parent order.
-            /// Empty when no attached risk exists.
+            /// Empty when no attached risk exists. Order reads include it only when the
+            /// request asks for it (include_attached_risk, include_attached_risk_state):
+            /// an omission on request, never a removal. The private WebSocket always
+            /// carries it in full, as a read asking for both does.
             ///
             /// Field 21: `attached_risk`
             pub attached_risk: ::buffa::MessageFieldView<
@@ -42654,8 +44317,11 @@ pub mod __buffa {
             ///
             /// Field 25: `market_max_slippage_bps`
             pub market_max_slippage_bps: i32,
-            /// Per-order state version. Starts at 1 and increases for every published
-            /// state change. Use this field to reconcile API and realtime updates.
+            /// Per-order state version: 0 while the order is accepted but not yet on
+            /// the book (status PENDING), then 1 from its first book state and higher
+            /// for every later published state change. A higher version is always
+            /// newer, and two copies of an order with the same version are identical,
+            /// so use this field to reconcile API and realtime updates.
             ///
             /// Field 26: `version`
             pub version: u32,
@@ -43927,7 +45593,10 @@ pub mod __buffa {
                 self.0.reborrow().terminal_reason
             }
             /// Attached risk controls + runtime state on the parent order.
-            /// Empty when no attached risk exists.
+            /// Empty when no attached risk exists. Order reads include it only when the
+            /// request asks for it (include_attached_risk, include_attached_risk_state):
+            /// an omission on request, never a removal. The private WebSocket always
+            /// carries it in full, as a read asking for both does.
             ///
             /// Field 21: `attached_risk`
             #[must_use]
@@ -43972,8 +45641,11 @@ pub mod __buffa {
             pub fn market_max_slippage_bps(&self) -> i32 {
                 self.0.reborrow().market_max_slippage_bps
             }
-            /// Per-order state version. Starts at 1 and increases for every published
-            /// state change. Use this field to reconcile API and realtime updates.
+            /// Per-order state version: 0 while the order is accepted but not yet on
+            /// the book (status PENDING), then 1 from its first book state and higher
+            /// for every later published state change. A higher version is always
+            /// newer, and two copies of an order with the same version are identical,
+            /// so use this field to reconcile API and realtime updates.
             ///
             /// Field 26: `version`
             #[must_use]

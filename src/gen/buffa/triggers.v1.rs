@@ -850,6 +850,8 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL = 24i32,
     /// The applicable fee rate exceeded the maximum accepted by the trigger.
     TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED = 25i32,
+    /// The child order's time in force was not accepted.
+    TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE = 26i32,
     /// The configured trigger price was invalid.
     TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID = 40i32,
     /// The selected trigger price source was not supported.
@@ -876,6 +878,111 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED = 51i32,
     /// The maximum slippage could not produce a valid execution price bound.
     TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID = 53i32,
+    /// The child order's identifier was already in use by another order.
+    TRIGGER_FAILURE_REASON_DUPLICATE_ORDER_ID = 57i32,
+    /// The child order quantity was above the pair's maximum.
+    TRIGGER_FAILURE_REASON_MAX_QUANTITY = 60i32,
+    /// The child order notional was above the pair's maximum.
+    TRIGGER_FAILURE_REASON_MAX_NOTIONAL = 61i32,
+    /// The market took only post-only orders when the trigger fired.
+    TRIGGER_FAILURE_REASON_PAIR_POST_ONLY = 62i32,
+    /// The account had its maximum number of open orders.
+    TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL = 64i32,
+    /// The child order's self-trade prevention mode was not accepted.
+    TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED = 66i32,
+    /// The trading pair was busy with the account's earlier requests.
+    TRIGGER_FAILURE_REASON_PAIR_BACKLOGGED = 67i32,
+    /// The market does not support a trigger of this shape, including a
+    /// trailing stop whose child order is not a market order when it fires.
+    TRIGGER_FAILURE_REASON_MODE_NOT_SUPPORTED = 68i32,
+    /// The market's reference quote was too old to price the market child order.
+    TRIGGER_FAILURE_REASON_MARKET_QUOTE_STALE = 69i32,
+    /// The market's reference quote could not be used to price the market child
+    /// order.
+    TRIGGER_FAILURE_REASON_MARKET_QUOTE_UNHEALTHY = 70i32,
+    /// The trigger's quantity was not valid.
+    TRIGGER_FAILURE_REASON_QTY_INVALID = 103i32,
+    /// The trigger's limit price was not valid.
+    TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID = 104i32,
+    /// The TWAP interval was not valid.
+    TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID = 105i32,
+    /// The ladder's price range was too narrow for its number of levels.
+    TRIGGER_FAILURE_REASON_LADDER_RANGE_TOO_NARROW = 106i32,
+    /// The ladder's number of levels was not valid.
+    TRIGGER_FAILURE_REASON_LADDER_LEVELS_INVALID = 107i32,
+    /// The order carried more attached legs than allowed.
+    TRIGGER_FAILURE_REASON_ATTACHED_LEGS_EXCEEDED = 108i32,
+    /// The market held its maximum number of price levels.
+    TRIGGER_FAILURE_REASON_PRICE_LEVELS_EXHAUSTED = 109i32,
+    /// The account had too many filled orders whose settlement had not completed.
+    TRIGGER_FAILURE_REASON_SETTLEMENT_BACKLOGGED = 110i32,
+    /// The account reserved its maximum number of client order IDs.
+    TRIGGER_FAILURE_REASON_CLIENT_ORDER_IDS_EXHAUSTED = 111i32,
+    /// The child order's identifier was not valid.
+    TRIGGER_FAILURE_REASON_INVALID_ORDER_ID = 112i32,
+    /// The child order's identifier was held by a different order.
+    TRIGGER_FAILURE_REASON_ORDER_ID_CONFLICT = 113i32,
+    /// The child order's side was not valid.
+    TRIGGER_FAILURE_REASON_INVALID_SIDE = 114i32,
+    /// The child order's type was not valid.
+    TRIGGER_FAILURE_REASON_INVALID_ORDER_TYPE = 115i32,
+    /// The child order's self-trade prevention mode was not valid.
+    TRIGGER_FAILURE_REASON_INVALID_STP_MODE = 116i32,
+    /// The child order's flags were not valid.
+    TRIGGER_FAILURE_REASON_INVALID_ORDER_FLAGS = 117i32,
+    /// The child order would take the total quantity resting at its price past
+    /// the most a price level can hold, even if some quantity still fits; it was
+    /// not placed.
+    TRIGGER_FAILURE_REASON_PRICE_LEVEL_QUANTITY_LIMIT = 121i32,
+    /// One of the trigger's child orders went past its planned quantity, so the
+    /// trigger ended.
+    TRIGGER_FAILURE_REASON_CHILD_QTY_RAISE_NOT_ALLOWED = 122i32,
+    /// The market held its maximum number of triggers.
+    TRIGGER_FAILURE_REASON_TRIGGERS_EXHAUSTED = 140i32,
+    /// The account used every order identifier available to it in this market.
+    TRIGGER_FAILURE_REASON_ORDER_SEQUENCE_EXHAUSTED = 144i32,
+    /// The fees that apply to the child order could not be determined.
+    TRIGGER_FAILURE_REASON_FEE_SCHEDULE_UNAVAILABLE = 146i32,
+    /// The account's trading policy could not be evaluated.
+    TRIGGER_FAILURE_REASON_POLICY_UNAVAILABLE = 148i32,
+    /// The trigger could not be installed on its market's current route.
+    TRIGGER_FAILURE_REASON_ACCOUNT_ROUTING_INVALID = 164i32,
+    /// The client trigger ID was not valid.
+    TRIGGER_FAILURE_REASON_CLIENT_TRIGGER_ID_INVALID = 165i32,
+    /// The trigger direction was not valid.
+    TRIGGER_FAILURE_REASON_TRIGGER_DIRECTION_INVALID = 166i32,
+    /// The fee asset was not valid.
+    TRIGGER_FAILURE_REASON_FEE_ASSET_INVALID = 167i32,
+    /// The trigger's maximum fee rate was not valid.
+    TRIGGER_FAILURE_REASON_FEE_CEILING_INVALID = 168i32,
+    /// The trigger set a field that must be left unset.
+    TRIGGER_FAILURE_REASON_UNSUPPORTED_FIELD_SET = 169i32,
+    /// The trigger could not fire again.
+    TRIGGER_FAILURE_REASON_TRIGGER_FIRE_LIMIT_REACHED = 176i32,
+    /// The trigger's condition flags were not valid.
+    TRIGGER_FAILURE_REASON_CONDITION_FLAGS_INVALID = 202i32,
+    /// The trigger set a condition parameter its condition does not take.
+    TRIGGER_FAILURE_REASON_CONDITION_PARAMETER_SET = 203i32,
+    /// The trigger's slippage bound in ticks was not valid.
+    TRIGGER_FAILURE_REASON_SLIPPAGE_TICKS_INVALID = 204i32,
+    /// The trigger's slippage bound in basis points was not valid.
+    TRIGGER_FAILURE_REASON_SLIPPAGE_BPS_INVALID = 205i32,
+    /// The trigger set both slippage bounds where only one is accepted.
+    TRIGGER_FAILURE_REASON_SLIPPAGE_BOUNDS_CONFLICT = 206i32,
+    /// The trigger set a slippage bound on a LIMIT child order.
+    TRIGGER_FAILURE_REASON_LIMIT_CHILD_SLIPPAGE_SET = 207i32,
+    /// The venue could not admit the account to this market.
+    TRIGGER_FAILURE_REASON_NEW_ACCOUNT_CAPACITY_REACHED = 216i32,
+    /// The trigger's order type isn't taken while the market is in an auction
+    /// call.
+    TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION = 225i32,
+    /// The trigger's post-only order isn't taken while the market is in an auction
+    /// call.
+    TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION = 226i32,
+    /// The market had no room for another TWAP order.
+    TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED = 227i32,
+    /// The market's order limits weren't set yet when the trigger fired.
+    TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE = 238i32,
     /// The terminal state did not contain a failure reason.
     TRIGGER_FAILURE_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure caused the trigger to fail.
@@ -960,6 +1067,9 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const FeeCeilingExceeded: Self = Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidTimeInForce: Self = Self::TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TriggerPriceInvalid: Self = Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID;
@@ -999,6 +1109,153 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MaxSlippageInvalid: Self = Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_DUPLICATE_ORDER_ID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DuplicateOrderId: Self = Self::TRIGGER_FAILURE_REASON_DUPLICATE_ORDER_ID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MAX_QUANTITY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxQuantity: Self = Self::TRIGGER_FAILURE_REASON_MAX_QUANTITY;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MAX_NOTIONAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxNotional: Self = Self::TRIGGER_FAILURE_REASON_MAX_NOTIONAL;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_PAIR_POST_ONLY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PairPostOnly: Self = Self::TRIGGER_FAILURE_REASON_PAIR_POST_ONLY;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxOpenOrdersTotal: Self = Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StpModeNotAllowed: Self = Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_PAIR_BACKLOGGED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PairBacklogged: Self = Self::TRIGGER_FAILURE_REASON_PAIR_BACKLOGGED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MODE_NOT_SUPPORTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModeNotSupported: Self = Self::TRIGGER_FAILURE_REASON_MODE_NOT_SUPPORTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_STALE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketQuoteStale: Self = Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_STALE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_UNHEALTHY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketQuoteUnhealthy: Self = Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_UNHEALTHY;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_QTY_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QtyInvalid: Self = Self::TRIGGER_FAILURE_REASON_QTY_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LimitPriceInvalid: Self = Self::TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TwapIntervalInvalid: Self = Self::TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_LADDER_RANGE_TOO_NARROW`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LadderRangeTooNarrow: Self = Self::TRIGGER_FAILURE_REASON_LADDER_RANGE_TOO_NARROW;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_LADDER_LEVELS_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LadderLevelsInvalid: Self = Self::TRIGGER_FAILURE_REASON_LADDER_LEVELS_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ATTACHED_LEGS_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AttachedLegsExceeded: Self = Self::TRIGGER_FAILURE_REASON_ATTACHED_LEGS_EXCEEDED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_PRICE_LEVELS_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PriceLevelsExhausted: Self = Self::TRIGGER_FAILURE_REASON_PRICE_LEVELS_EXHAUSTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_SETTLEMENT_BACKLOGGED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SettlementBacklogged: Self = Self::TRIGGER_FAILURE_REASON_SETTLEMENT_BACKLOGGED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_CLIENT_ORDER_IDS_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClientOrderIdsExhausted: Self = Self::TRIGGER_FAILURE_REASON_CLIENT_ORDER_IDS_EXHAUSTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_ID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidOrderId: Self = Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_ID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ORDER_ID_CONFLICT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderIdConflict: Self = Self::TRIGGER_FAILURE_REASON_ORDER_ID_CONFLICT;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INVALID_SIDE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidSide: Self = Self::TRIGGER_FAILURE_REASON_INVALID_SIDE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_TYPE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidOrderType: Self = Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_TYPE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INVALID_STP_MODE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidStpMode: Self = Self::TRIGGER_FAILURE_REASON_INVALID_STP_MODE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_FLAGS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidOrderFlags: Self = Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_FLAGS;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_PRICE_LEVEL_QUANTITY_LIMIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PriceLevelQuantityLimit: Self = Self::TRIGGER_FAILURE_REASON_PRICE_LEVEL_QUANTITY_LIMIT;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_CHILD_QTY_RAISE_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ChildQtyRaiseNotAllowed: Self = Self::TRIGGER_FAILURE_REASON_CHILD_QTY_RAISE_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TRIGGERS_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggersExhausted: Self = Self::TRIGGER_FAILURE_REASON_TRIGGERS_EXHAUSTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ORDER_SEQUENCE_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderSequenceExhausted: Self = Self::TRIGGER_FAILURE_REASON_ORDER_SEQUENCE_EXHAUSTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_FEE_SCHEDULE_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FeeScheduleUnavailable: Self = Self::TRIGGER_FAILURE_REASON_FEE_SCHEDULE_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_POLICY_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PolicyUnavailable: Self = Self::TRIGGER_FAILURE_REASON_POLICY_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ACCOUNT_ROUTING_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AccountRoutingInvalid: Self = Self::TRIGGER_FAILURE_REASON_ACCOUNT_ROUTING_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_CLIENT_TRIGGER_ID_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClientTriggerIdInvalid: Self = Self::TRIGGER_FAILURE_REASON_CLIENT_TRIGGER_ID_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TRIGGER_DIRECTION_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerDirectionInvalid: Self = Self::TRIGGER_FAILURE_REASON_TRIGGER_DIRECTION_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_FEE_ASSET_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FeeAssetInvalid: Self = Self::TRIGGER_FAILURE_REASON_FEE_ASSET_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_FEE_CEILING_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FeeCeilingInvalid: Self = Self::TRIGGER_FAILURE_REASON_FEE_CEILING_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_UNSUPPORTED_FIELD_SET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UnsupportedFieldSet: Self = Self::TRIGGER_FAILURE_REASON_UNSUPPORTED_FIELD_SET;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TRIGGER_FIRE_LIMIT_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerFireLimitReached: Self = Self::TRIGGER_FAILURE_REASON_TRIGGER_FIRE_LIMIT_REACHED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_CONDITION_FLAGS_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ConditionFlagsInvalid: Self = Self::TRIGGER_FAILURE_REASON_CONDITION_FLAGS_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_CONDITION_PARAMETER_SET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ConditionParameterSet: Self = Self::TRIGGER_FAILURE_REASON_CONDITION_PARAMETER_SET;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_SLIPPAGE_TICKS_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SlippageTicksInvalid: Self = Self::TRIGGER_FAILURE_REASON_SLIPPAGE_TICKS_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BPS_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SlippageBpsInvalid: Self = Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BPS_INVALID;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BOUNDS_CONFLICT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SlippageBoundsConflict: Self = Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BOUNDS_CONFLICT;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_LIMIT_CHILD_SLIPPAGE_SET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LimitChildSlippageSet: Self = Self::TRIGGER_FAILURE_REASON_LIMIT_CHILD_SLIPPAGE_SET;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_NEW_ACCOUNT_CAPACITY_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const NewAccountCapacityReached: Self = Self::TRIGGER_FAILURE_REASON_NEW_ACCOUNT_CAPACITY_REACHED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderTypeNotAllowedInAuction: Self = Self::TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PostOnlyNotAllowedInAuction: Self = Self::TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TwapCapacityReached: Self = Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderLimitsUnavailable: Self = Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE;
@@ -1199,6 +1456,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED,
                 )
             }
+            26i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE,
+                )
+            }
             40i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID,
@@ -1260,6 +1522,241 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             53i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID,
+                )
+            }
+            57i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_DUPLICATE_ORDER_ID,
+                )
+            }
+            60i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_MAX_QUANTITY)
+            }
+            61i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_MAX_NOTIONAL)
+            }
+            62i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_PAIR_POST_ONLY)
+            }
+            64i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL,
+                )
+            }
+            66i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED,
+                )
+            }
+            67i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_PAIR_BACKLOGGED,
+                )
+            }
+            68i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MODE_NOT_SUPPORTED,
+                )
+            }
+            69i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_STALE,
+                )
+            }
+            70i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_UNHEALTHY,
+                )
+            }
+            103i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_QTY_INVALID)
+            }
+            104i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID,
+                )
+            }
+            105i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID,
+                )
+            }
+            106i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_LADDER_RANGE_TOO_NARROW,
+                )
+            }
+            107i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_LADDER_LEVELS_INVALID,
+                )
+            }
+            108i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ATTACHED_LEGS_EXCEEDED,
+                )
+            }
+            109i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_PRICE_LEVELS_EXHAUSTED,
+                )
+            }
+            110i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_SETTLEMENT_BACKLOGGED,
+                )
+            }
+            111i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CLIENT_ORDER_IDS_EXHAUSTED,
+                )
+            }
+            112i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_ID,
+                )
+            }
+            113i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ORDER_ID_CONFLICT,
+                )
+            }
+            114i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_INVALID_SIDE)
+            }
+            115i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_TYPE,
+                )
+            }
+            116i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INVALID_STP_MODE,
+                )
+            }
+            117i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_FLAGS,
+                )
+            }
+            121i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_PRICE_LEVEL_QUANTITY_LIMIT,
+                )
+            }
+            122i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CHILD_QTY_RAISE_NOT_ALLOWED,
+                )
+            }
+            140i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGERS_EXHAUSTED,
+                )
+            }
+            144i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ORDER_SEQUENCE_EXHAUSTED,
+                )
+            }
+            146i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FEE_SCHEDULE_UNAVAILABLE,
+                )
+            }
+            148i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_UNAVAILABLE,
+                )
+            }
+            164i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ACCOUNT_ROUTING_INVALID,
+                )
+            }
+            165i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CLIENT_TRIGGER_ID_INVALID,
+                )
+            }
+            166i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_DIRECTION_INVALID,
+                )
+            }
+            167i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FEE_ASSET_INVALID,
+                )
+            }
+            168i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FEE_CEILING_INVALID,
+                )
+            }
+            169i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_UNSUPPORTED_FIELD_SET,
+                )
+            }
+            176i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_FIRE_LIMIT_REACHED,
+                )
+            }
+            202i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CONDITION_FLAGS_INVALID,
+                )
+            }
+            203i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CONDITION_PARAMETER_SET,
+                )
+            }
+            204i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_SLIPPAGE_TICKS_INVALID,
+                )
+            }
+            205i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BPS_INVALID,
+                )
+            }
+            206i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BOUNDS_CONFLICT,
+                )
+            }
+            207i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_LIMIT_CHILD_SLIPPAGE_SET,
+                )
+            }
+            216i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_NEW_ACCOUNT_CAPACITY_REACHED,
+                )
+            }
+            225i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION,
+                )
+            }
+            226i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION,
+                )
+            }
+            227i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED,
+                )
+            }
+            238i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
                 )
             }
             998i32 => {
@@ -1352,6 +1849,9 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED => {
                 "TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED"
             }
+            Self::TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE => {
+                "TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE"
+            }
             Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID => {
                 "TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID"
             }
@@ -1390,6 +1890,153 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             }
             Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID => {
                 "TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_DUPLICATE_ORDER_ID => {
+                "TRIGGER_FAILURE_REASON_DUPLICATE_ORDER_ID"
+            }
+            Self::TRIGGER_FAILURE_REASON_MAX_QUANTITY => {
+                "TRIGGER_FAILURE_REASON_MAX_QUANTITY"
+            }
+            Self::TRIGGER_FAILURE_REASON_MAX_NOTIONAL => {
+                "TRIGGER_FAILURE_REASON_MAX_NOTIONAL"
+            }
+            Self::TRIGGER_FAILURE_REASON_PAIR_POST_ONLY => {
+                "TRIGGER_FAILURE_REASON_PAIR_POST_ONLY"
+            }
+            Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL => {
+                "TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL"
+            }
+            Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED => {
+                "TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED"
+            }
+            Self::TRIGGER_FAILURE_REASON_PAIR_BACKLOGGED => {
+                "TRIGGER_FAILURE_REASON_PAIR_BACKLOGGED"
+            }
+            Self::TRIGGER_FAILURE_REASON_MODE_NOT_SUPPORTED => {
+                "TRIGGER_FAILURE_REASON_MODE_NOT_SUPPORTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_STALE => {
+                "TRIGGER_FAILURE_REASON_MARKET_QUOTE_STALE"
+            }
+            Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_UNHEALTHY => {
+                "TRIGGER_FAILURE_REASON_MARKET_QUOTE_UNHEALTHY"
+            }
+            Self::TRIGGER_FAILURE_REASON_QTY_INVALID => {
+                "TRIGGER_FAILURE_REASON_QTY_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID => {
+                "TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID => {
+                "TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_LADDER_RANGE_TOO_NARROW => {
+                "TRIGGER_FAILURE_REASON_LADDER_RANGE_TOO_NARROW"
+            }
+            Self::TRIGGER_FAILURE_REASON_LADDER_LEVELS_INVALID => {
+                "TRIGGER_FAILURE_REASON_LADDER_LEVELS_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_ATTACHED_LEGS_EXCEEDED => {
+                "TRIGGER_FAILURE_REASON_ATTACHED_LEGS_EXCEEDED"
+            }
+            Self::TRIGGER_FAILURE_REASON_PRICE_LEVELS_EXHAUSTED => {
+                "TRIGGER_FAILURE_REASON_PRICE_LEVELS_EXHAUSTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_SETTLEMENT_BACKLOGGED => {
+                "TRIGGER_FAILURE_REASON_SETTLEMENT_BACKLOGGED"
+            }
+            Self::TRIGGER_FAILURE_REASON_CLIENT_ORDER_IDS_EXHAUSTED => {
+                "TRIGGER_FAILURE_REASON_CLIENT_ORDER_IDS_EXHAUSTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_ID => {
+                "TRIGGER_FAILURE_REASON_INVALID_ORDER_ID"
+            }
+            Self::TRIGGER_FAILURE_REASON_ORDER_ID_CONFLICT => {
+                "TRIGGER_FAILURE_REASON_ORDER_ID_CONFLICT"
+            }
+            Self::TRIGGER_FAILURE_REASON_INVALID_SIDE => {
+                "TRIGGER_FAILURE_REASON_INVALID_SIDE"
+            }
+            Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_TYPE => {
+                "TRIGGER_FAILURE_REASON_INVALID_ORDER_TYPE"
+            }
+            Self::TRIGGER_FAILURE_REASON_INVALID_STP_MODE => {
+                "TRIGGER_FAILURE_REASON_INVALID_STP_MODE"
+            }
+            Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_FLAGS => {
+                "TRIGGER_FAILURE_REASON_INVALID_ORDER_FLAGS"
+            }
+            Self::TRIGGER_FAILURE_REASON_PRICE_LEVEL_QUANTITY_LIMIT => {
+                "TRIGGER_FAILURE_REASON_PRICE_LEVEL_QUANTITY_LIMIT"
+            }
+            Self::TRIGGER_FAILURE_REASON_CHILD_QTY_RAISE_NOT_ALLOWED => {
+                "TRIGGER_FAILURE_REASON_CHILD_QTY_RAISE_NOT_ALLOWED"
+            }
+            Self::TRIGGER_FAILURE_REASON_TRIGGERS_EXHAUSTED => {
+                "TRIGGER_FAILURE_REASON_TRIGGERS_EXHAUSTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_ORDER_SEQUENCE_EXHAUSTED => {
+                "TRIGGER_FAILURE_REASON_ORDER_SEQUENCE_EXHAUSTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_FEE_SCHEDULE_UNAVAILABLE => {
+                "TRIGGER_FAILURE_REASON_FEE_SCHEDULE_UNAVAILABLE"
+            }
+            Self::TRIGGER_FAILURE_REASON_POLICY_UNAVAILABLE => {
+                "TRIGGER_FAILURE_REASON_POLICY_UNAVAILABLE"
+            }
+            Self::TRIGGER_FAILURE_REASON_ACCOUNT_ROUTING_INVALID => {
+                "TRIGGER_FAILURE_REASON_ACCOUNT_ROUTING_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_CLIENT_TRIGGER_ID_INVALID => {
+                "TRIGGER_FAILURE_REASON_CLIENT_TRIGGER_ID_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_DIRECTION_INVALID => {
+                "TRIGGER_FAILURE_REASON_TRIGGER_DIRECTION_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_FEE_ASSET_INVALID => {
+                "TRIGGER_FAILURE_REASON_FEE_ASSET_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_FEE_CEILING_INVALID => {
+                "TRIGGER_FAILURE_REASON_FEE_CEILING_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_UNSUPPORTED_FIELD_SET => {
+                "TRIGGER_FAILURE_REASON_UNSUPPORTED_FIELD_SET"
+            }
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_FIRE_LIMIT_REACHED => {
+                "TRIGGER_FAILURE_REASON_TRIGGER_FIRE_LIMIT_REACHED"
+            }
+            Self::TRIGGER_FAILURE_REASON_CONDITION_FLAGS_INVALID => {
+                "TRIGGER_FAILURE_REASON_CONDITION_FLAGS_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_CONDITION_PARAMETER_SET => {
+                "TRIGGER_FAILURE_REASON_CONDITION_PARAMETER_SET"
+            }
+            Self::TRIGGER_FAILURE_REASON_SLIPPAGE_TICKS_INVALID => {
+                "TRIGGER_FAILURE_REASON_SLIPPAGE_TICKS_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BPS_INVALID => {
+                "TRIGGER_FAILURE_REASON_SLIPPAGE_BPS_INVALID"
+            }
+            Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BOUNDS_CONFLICT => {
+                "TRIGGER_FAILURE_REASON_SLIPPAGE_BOUNDS_CONFLICT"
+            }
+            Self::TRIGGER_FAILURE_REASON_LIMIT_CHILD_SLIPPAGE_SET => {
+                "TRIGGER_FAILURE_REASON_LIMIT_CHILD_SLIPPAGE_SET"
+            }
+            Self::TRIGGER_FAILURE_REASON_NEW_ACCOUNT_CAPACITY_REACHED => {
+                "TRIGGER_FAILURE_REASON_NEW_ACCOUNT_CAPACITY_REACHED"
+            }
+            Self::TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION => {
+                "TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION"
+            }
+            Self::TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION => {
+                "TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION"
+            }
+            Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED => {
+                "TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED"
+            }
+            Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE => {
+                "TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE"
             }
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE"
@@ -1503,6 +2150,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED,
                 )
             }
+            "TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE,
+                )
+            }
             "TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID,
@@ -1566,6 +2218,241 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID,
                 )
             }
+            "TRIGGER_FAILURE_REASON_DUPLICATE_ORDER_ID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_DUPLICATE_ORDER_ID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_MAX_QUANTITY" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_MAX_QUANTITY)
+            }
+            "TRIGGER_FAILURE_REASON_MAX_NOTIONAL" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_MAX_NOTIONAL)
+            }
+            "TRIGGER_FAILURE_REASON_PAIR_POST_ONLY" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_PAIR_POST_ONLY)
+            }
+            "TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_PAIR_BACKLOGGED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_PAIR_BACKLOGGED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_MODE_NOT_SUPPORTED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MODE_NOT_SUPPORTED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_MARKET_QUOTE_STALE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_STALE,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_MARKET_QUOTE_UNHEALTHY" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_UNHEALTHY,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_QTY_INVALID" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_QTY_INVALID)
+            }
+            "TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_LADDER_RANGE_TOO_NARROW" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_LADDER_RANGE_TOO_NARROW,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_LADDER_LEVELS_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_LADDER_LEVELS_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_ATTACHED_LEGS_EXCEEDED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ATTACHED_LEGS_EXCEEDED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_PRICE_LEVELS_EXHAUSTED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_PRICE_LEVELS_EXHAUSTED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_SETTLEMENT_BACKLOGGED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_SETTLEMENT_BACKLOGGED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_CLIENT_ORDER_IDS_EXHAUSTED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CLIENT_ORDER_IDS_EXHAUSTED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_INVALID_ORDER_ID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_ID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_ORDER_ID_CONFLICT" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ORDER_ID_CONFLICT,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_INVALID_SIDE" => {
+                ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_INVALID_SIDE)
+            }
+            "TRIGGER_FAILURE_REASON_INVALID_ORDER_TYPE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_TYPE,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_INVALID_STP_MODE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INVALID_STP_MODE,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_INVALID_ORDER_FLAGS" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_FLAGS,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_PRICE_LEVEL_QUANTITY_LIMIT" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_PRICE_LEVEL_QUANTITY_LIMIT,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_CHILD_QTY_RAISE_NOT_ALLOWED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CHILD_QTY_RAISE_NOT_ALLOWED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_TRIGGERS_EXHAUSTED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGERS_EXHAUSTED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_ORDER_SEQUENCE_EXHAUSTED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ORDER_SEQUENCE_EXHAUSTED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_FEE_SCHEDULE_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FEE_SCHEDULE_UNAVAILABLE,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_POLICY_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POLICY_UNAVAILABLE,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_ACCOUNT_ROUTING_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ACCOUNT_ROUTING_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_CLIENT_TRIGGER_ID_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CLIENT_TRIGGER_ID_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_TRIGGER_DIRECTION_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_DIRECTION_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_FEE_ASSET_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FEE_ASSET_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_FEE_CEILING_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_FEE_CEILING_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_UNSUPPORTED_FIELD_SET" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_UNSUPPORTED_FIELD_SET,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_TRIGGER_FIRE_LIMIT_REACHED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_FIRE_LIMIT_REACHED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_CONDITION_FLAGS_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CONDITION_FLAGS_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_CONDITION_PARAMETER_SET" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CONDITION_PARAMETER_SET,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_SLIPPAGE_TICKS_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_SLIPPAGE_TICKS_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_SLIPPAGE_BPS_INVALID" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BPS_INVALID,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_SLIPPAGE_BOUNDS_CONFLICT" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BOUNDS_CONFLICT,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_LIMIT_CHILD_SLIPPAGE_SET" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_LIMIT_CHILD_SLIPPAGE_SET,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_NEW_ACCOUNT_CAPACITY_REACHED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_NEW_ACCOUNT_CAPACITY_REACHED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
+                )
+            }
             "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -1605,6 +2492,7 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_INVALID_SIZING,
             Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL,
             Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED,
+            Self::TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE,
             Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID,
             Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_SOURCE_UNSUPPORTED,
             Self::TRIGGER_FAILURE_REASON_TRAILING_DISTANCE_INVALID,
@@ -1618,6 +2506,55 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_POLICY_MAX_OPEN_ORDERS,
             Self::TRIGGER_FAILURE_REASON_POLICY_TRADING_HALTED,
             Self::TRIGGER_FAILURE_REASON_MAX_SLIPPAGE_INVALID,
+            Self::TRIGGER_FAILURE_REASON_DUPLICATE_ORDER_ID,
+            Self::TRIGGER_FAILURE_REASON_MAX_QUANTITY,
+            Self::TRIGGER_FAILURE_REASON_MAX_NOTIONAL,
+            Self::TRIGGER_FAILURE_REASON_PAIR_POST_ONLY,
+            Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL,
+            Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED,
+            Self::TRIGGER_FAILURE_REASON_PAIR_BACKLOGGED,
+            Self::TRIGGER_FAILURE_REASON_MODE_NOT_SUPPORTED,
+            Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_STALE,
+            Self::TRIGGER_FAILURE_REASON_MARKET_QUOTE_UNHEALTHY,
+            Self::TRIGGER_FAILURE_REASON_QTY_INVALID,
+            Self::TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID,
+            Self::TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID,
+            Self::TRIGGER_FAILURE_REASON_LADDER_RANGE_TOO_NARROW,
+            Self::TRIGGER_FAILURE_REASON_LADDER_LEVELS_INVALID,
+            Self::TRIGGER_FAILURE_REASON_ATTACHED_LEGS_EXCEEDED,
+            Self::TRIGGER_FAILURE_REASON_PRICE_LEVELS_EXHAUSTED,
+            Self::TRIGGER_FAILURE_REASON_SETTLEMENT_BACKLOGGED,
+            Self::TRIGGER_FAILURE_REASON_CLIENT_ORDER_IDS_EXHAUSTED,
+            Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_ID,
+            Self::TRIGGER_FAILURE_REASON_ORDER_ID_CONFLICT,
+            Self::TRIGGER_FAILURE_REASON_INVALID_SIDE,
+            Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_TYPE,
+            Self::TRIGGER_FAILURE_REASON_INVALID_STP_MODE,
+            Self::TRIGGER_FAILURE_REASON_INVALID_ORDER_FLAGS,
+            Self::TRIGGER_FAILURE_REASON_PRICE_LEVEL_QUANTITY_LIMIT,
+            Self::TRIGGER_FAILURE_REASON_CHILD_QTY_RAISE_NOT_ALLOWED,
+            Self::TRIGGER_FAILURE_REASON_TRIGGERS_EXHAUSTED,
+            Self::TRIGGER_FAILURE_REASON_ORDER_SEQUENCE_EXHAUSTED,
+            Self::TRIGGER_FAILURE_REASON_FEE_SCHEDULE_UNAVAILABLE,
+            Self::TRIGGER_FAILURE_REASON_POLICY_UNAVAILABLE,
+            Self::TRIGGER_FAILURE_REASON_ACCOUNT_ROUTING_INVALID,
+            Self::TRIGGER_FAILURE_REASON_CLIENT_TRIGGER_ID_INVALID,
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_DIRECTION_INVALID,
+            Self::TRIGGER_FAILURE_REASON_FEE_ASSET_INVALID,
+            Self::TRIGGER_FAILURE_REASON_FEE_CEILING_INVALID,
+            Self::TRIGGER_FAILURE_REASON_UNSUPPORTED_FIELD_SET,
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_FIRE_LIMIT_REACHED,
+            Self::TRIGGER_FAILURE_REASON_CONDITION_FLAGS_INVALID,
+            Self::TRIGGER_FAILURE_REASON_CONDITION_PARAMETER_SET,
+            Self::TRIGGER_FAILURE_REASON_SLIPPAGE_TICKS_INVALID,
+            Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BPS_INVALID,
+            Self::TRIGGER_FAILURE_REASON_SLIPPAGE_BOUNDS_CONFLICT,
+            Self::TRIGGER_FAILURE_REASON_LIMIT_CHILD_SLIPPAGE_SET,
+            Self::TRIGGER_FAILURE_REASON_NEW_ACCOUNT_CAPACITY_REACHED,
+            Self::TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION,
+            Self::TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION,
+            Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED,
+            Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR,
         ]
@@ -4477,6 +5414,8 @@ pub struct TriggerIntent {
     /// with the identical intent returns the same trigger. After a create fails
     /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
     /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
+    /// At most 36 bytes in UTF-8 (36 ASCII characters); longer IDs are rejected
+    /// with INVALID_ARGUMENT.
     ///
     /// Field 5: `client_trigger_id`
     #[serde(
@@ -16445,6 +17384,8 @@ pub mod __buffa {
             /// with the identical intent returns the same trigger. After a create fails
             /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
+            /// At most 36 bytes in UTF-8 (36 ASCII characters); longer IDs are rejected
+            /// with INVALID_ARGUMENT.
             ///
             /// Field 5: `client_trigger_id`
             pub client_trigger_id: &'a str,
@@ -17165,6 +18106,8 @@ pub mod __buffa {
             /// with the identical intent returns the same trigger. After a create fails
             /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
+            /// At most 36 bytes in UTF-8 (36 ASCII characters); longer IDs are rejected
+            /// with INVALID_ARGUMENT.
             ///
             /// Field 5: `client_trigger_id`
             #[must_use]
