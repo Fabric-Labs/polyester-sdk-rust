@@ -54,6 +54,19 @@ pub mod __buffa {
             to_json: ::buffa::extension_registry::helpers::bool_to_json,
             from_json: ::buffa::extension_registry::helpers::bool_from_json,
         };
+        ///Extension `display_label` on `.buf.validate.StringRules` (field 50003).
+        pub const DISPLAY_LABEL: ::buffa::Extension<::buffa::extension::codecs::Bool> = ::buffa::Extension::new(
+            50003u32,
+            "buf.validate.StringRules",
+        );
+        #[doc(hidden)]
+        pub const __DISPLAY_LABEL_JSON_EXT: ::buffa::type_registry::JsonExtEntry = ::buffa::type_registry::JsonExtEntry {
+            number: 50003u32,
+            full_name: "polyester.api.validation.v1.display_label",
+            extendee: "buf.validate.StringRules",
+            to_json: ::buffa::extension_registry::helpers::bool_to_json,
+            from_json: ::buffa::extension_registry::helpers::bool_from_json,
+        };
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -62,6 +75,7 @@ pub mod __buffa {
         );
         reg.register_json_ext(super::__buffa::ext::__EVM_ADDRESS_JSON_EXT);
         reg.register_json_ext(super::__buffa::ext::__CHAIN_TX_IDENTIFIER_JSON_EXT);
+        reg.register_json_ext(super::__buffa::ext::__DISPLAY_LABEL_JSON_EXT);
     }
 }
 #[doc(inline)]
@@ -70,5 +84,7 @@ pub use self::__buffa::ext::EXTERNAL_CHAIN_ADDRESS_TEXT;
 pub use self::__buffa::ext::EVM_ADDRESS;
 #[doc(inline)]
 pub use self::__buffa::ext::CHAIN_TX_IDENTIFIER;
+#[doc(inline)]
+pub use self::__buffa::ext::DISPLAY_LABEL;
 #[doc(inline)]
 pub use self::__buffa::register_types;

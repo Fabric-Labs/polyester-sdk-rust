@@ -331,13 +331,18 @@ fn parse_timeframe(interval: &str) -> Result<Timeframe> {
     let tf = match key.as_str() {
         "1s" | "sec1" => Timeframe::Sec1,
         "1m" | "min1" => Timeframe::Min1,
+        "3m" | "min3" => Timeframe::Min3,
         "5m" | "min5" => Timeframe::Min5,
         "15m" | "min15" => Timeframe::Min15,
         "30m" | "min30" => Timeframe::Min30,
         "1h" | "hour1" => Timeframe::Hour1,
+        "2h" | "hour2" => Timeframe::Hour2,
         "4h" | "hour4" => Timeframe::Hour4,
+        "6h" | "hour6" => Timeframe::Hour6,
+        "8h" | "hour8" => Timeframe::Hour8,
         "12h" | "hour12" => Timeframe::Hour12,
         "1d" | "day1" => Timeframe::Day1,
+        "3d" | "day3" => Timeframe::Day3,
         "1w" | "week1" => Timeframe::Week1,
         "1mo" | "month1" => Timeframe::Month1,
         _ => {
@@ -1016,6 +1021,24 @@ mod tests {
     use std::sync::atomic::AtomicBool;
     use std::sync::{Arc, Mutex};
     use tokio::sync::mpsc;
+
+    #[test]
+    fn candle_channel_accepts_every_published_timeframe() {
+        for (alias, label) in [
+            ("3m", "3m"),
+            ("MIN_3", "3m"),
+            ("2h", "2h"),
+            ("HOUR_6", "6h"),
+            ("8h", "8h"),
+            ("DAY_3", "3d"),
+        ] {
+            assert_eq!(
+                MarketDataService::candle_channel_timeframe(alias).unwrap(),
+                label,
+                "alias {alias}"
+            );
+        }
+    }
 
     #[test]
     fn candle_channel_normalizes_aliases_to_human_label() {

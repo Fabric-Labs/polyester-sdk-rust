@@ -3197,8 +3197,12 @@ impl ::buffa::Enumeration for SideFilter {
 }
 /// Timeframe represents an OHLCV candle bucket.
 ///
-/// Most values are fixed-duration buckets. `MONTH_1` is calendar-based (UTC
-/// month boundaries).
+/// All buckets are in UTC; daylight saving time never shifts a boundary.
+/// Fixed-duration buckets start at whole multiples of their duration since
+/// 1970-01-01T00:00:00Z, so every bucket up to 1 day starts on a UTC midnight
+/// boundary and `DAY_3` buckets start every third day counted from
+/// 1970-01-01. `WEEK_1` buckets start on Monday 00:00 UTC. `MONTH_1` is
+/// calendar-based (UTC month boundaries). Values are listed shortest first.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum Timeframe {
@@ -3207,6 +3211,8 @@ pub enum Timeframe {
     SEC_1 = 1i32,
     /// 1 minute
     MIN_1 = 2i32,
+    /// 3 minutes
+    MIN_3 = 12i32,
     /// 5 minutes
     MIN_5 = 3i32,
     /// 15 minutes
@@ -3215,13 +3221,21 @@ pub enum Timeframe {
     MIN_30 = 5i32,
     /// 1 hour
     HOUR_1 = 6i32,
+    /// 2 hours
+    HOUR_2 = 13i32,
     /// 4 hours
     HOUR_4 = 7i32,
-    /// 1 day
-    DAY_1 = 8i32,
+    /// 6 hours
+    HOUR_6 = 14i32,
+    /// 8 hours
+    HOUR_8 = 15i32,
     /// 12 hours
     HOUR_12 = 9i32,
-    /// 1 week
+    /// 1 day
+    DAY_1 = 8i32,
+    /// 3 days, counted from 1970-01-01 UTC
+    DAY_3 = 16i32,
+    /// 1 week, starting Monday 00:00 UTC
     WEEK_1 = 10i32,
     /// 1 month (calendar month, UTC)
     MONTH_1 = 11i32,
@@ -3236,6 +3250,9 @@ impl Timeframe {
     ///Idiomatic alias for [`Self::MIN_1`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Min1: Self = Self::MIN_1;
+    ///Idiomatic alias for [`Self::MIN_3`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Min3: Self = Self::MIN_3;
     ///Idiomatic alias for [`Self::MIN_5`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Min5: Self = Self::MIN_5;
@@ -3248,15 +3265,27 @@ impl Timeframe {
     ///Idiomatic alias for [`Self::HOUR_1`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Hour1: Self = Self::HOUR_1;
+    ///Idiomatic alias for [`Self::HOUR_2`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Hour2: Self = Self::HOUR_2;
     ///Idiomatic alias for [`Self::HOUR_4`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Hour4: Self = Self::HOUR_4;
-    ///Idiomatic alias for [`Self::DAY_1`]; `Debug` prints the variant name.
+    ///Idiomatic alias for [`Self::HOUR_6`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const Day1: Self = Self::DAY_1;
+    pub const Hour6: Self = Self::HOUR_6;
+    ///Idiomatic alias for [`Self::HOUR_8`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Hour8: Self = Self::HOUR_8;
     ///Idiomatic alias for [`Self::HOUR_12`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Hour12: Self = Self::HOUR_12;
+    ///Idiomatic alias for [`Self::DAY_1`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Day1: Self = Self::DAY_1;
+    ///Idiomatic alias for [`Self::DAY_3`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Day3: Self = Self::DAY_3;
     ///Idiomatic alias for [`Self::WEEK_1`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Week1: Self = Self::WEEK_1;
@@ -3361,13 +3390,18 @@ impl ::buffa::Enumeration for Timeframe {
             0i32 => ::core::option::Option::Some(Self::TIMEFRAME_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::SEC_1),
             2i32 => ::core::option::Option::Some(Self::MIN_1),
+            12i32 => ::core::option::Option::Some(Self::MIN_3),
             3i32 => ::core::option::Option::Some(Self::MIN_5),
             4i32 => ::core::option::Option::Some(Self::MIN_15),
             5i32 => ::core::option::Option::Some(Self::MIN_30),
             6i32 => ::core::option::Option::Some(Self::HOUR_1),
+            13i32 => ::core::option::Option::Some(Self::HOUR_2),
             7i32 => ::core::option::Option::Some(Self::HOUR_4),
-            8i32 => ::core::option::Option::Some(Self::DAY_1),
+            14i32 => ::core::option::Option::Some(Self::HOUR_6),
+            15i32 => ::core::option::Option::Some(Self::HOUR_8),
             9i32 => ::core::option::Option::Some(Self::HOUR_12),
+            8i32 => ::core::option::Option::Some(Self::DAY_1),
+            16i32 => ::core::option::Option::Some(Self::DAY_3),
             10i32 => ::core::option::Option::Some(Self::WEEK_1),
             11i32 => ::core::option::Option::Some(Self::MONTH_1),
             _ => ::core::option::Option::None,
@@ -3381,13 +3415,18 @@ impl ::buffa::Enumeration for Timeframe {
             Self::TIMEFRAME_UNSPECIFIED => "TIMEFRAME_UNSPECIFIED",
             Self::SEC_1 => "SEC_1",
             Self::MIN_1 => "MIN_1",
+            Self::MIN_3 => "MIN_3",
             Self::MIN_5 => "MIN_5",
             Self::MIN_15 => "MIN_15",
             Self::MIN_30 => "MIN_30",
             Self::HOUR_1 => "HOUR_1",
+            Self::HOUR_2 => "HOUR_2",
             Self::HOUR_4 => "HOUR_4",
-            Self::DAY_1 => "DAY_1",
+            Self::HOUR_6 => "HOUR_6",
+            Self::HOUR_8 => "HOUR_8",
             Self::HOUR_12 => "HOUR_12",
+            Self::DAY_1 => "DAY_1",
+            Self::DAY_3 => "DAY_3",
             Self::WEEK_1 => "WEEK_1",
             Self::MONTH_1 => "MONTH_1",
         }
@@ -3399,13 +3438,18 @@ impl ::buffa::Enumeration for Timeframe {
             }
             "SEC_1" => ::core::option::Option::Some(Self::SEC_1),
             "MIN_1" => ::core::option::Option::Some(Self::MIN_1),
+            "MIN_3" => ::core::option::Option::Some(Self::MIN_3),
             "MIN_5" => ::core::option::Option::Some(Self::MIN_5),
             "MIN_15" => ::core::option::Option::Some(Self::MIN_15),
             "MIN_30" => ::core::option::Option::Some(Self::MIN_30),
             "HOUR_1" => ::core::option::Option::Some(Self::HOUR_1),
+            "HOUR_2" => ::core::option::Option::Some(Self::HOUR_2),
             "HOUR_4" => ::core::option::Option::Some(Self::HOUR_4),
-            "DAY_1" => ::core::option::Option::Some(Self::DAY_1),
+            "HOUR_6" => ::core::option::Option::Some(Self::HOUR_6),
+            "HOUR_8" => ::core::option::Option::Some(Self::HOUR_8),
             "HOUR_12" => ::core::option::Option::Some(Self::HOUR_12),
+            "DAY_1" => ::core::option::Option::Some(Self::DAY_1),
+            "DAY_3" => ::core::option::Option::Some(Self::DAY_3),
             "WEEK_1" => ::core::option::Option::Some(Self::WEEK_1),
             "MONTH_1" => ::core::option::Option::Some(Self::MONTH_1),
             _ => ::core::option::Option::None,
@@ -3416,13 +3460,18 @@ impl ::buffa::Enumeration for Timeframe {
             Self::TIMEFRAME_UNSPECIFIED,
             Self::SEC_1,
             Self::MIN_1,
+            Self::MIN_3,
             Self::MIN_5,
             Self::MIN_15,
             Self::MIN_30,
             Self::HOUR_1,
+            Self::HOUR_2,
             Self::HOUR_4,
-            Self::DAY_1,
+            Self::HOUR_6,
+            Self::HOUR_8,
             Self::HOUR_12,
+            Self::DAY_1,
+            Self::DAY_3,
             Self::WEEK_1,
             Self::MONTH_1,
         ]
@@ -3625,6 +3674,10 @@ impl ::buffa::Enumeration for PairStatus {
 /// Results are ordered newest-first by execution timestamp, with match_id as a
 /// tie-breaker. When both start_time and end_time are set, both bounds are
 /// inclusive.
+///
+/// With after_trade_id set, the request instead walks the symbol's trades by
+/// trade identifier (match_id), oldest first and gap-free, to backfill trades
+/// missed on a live stream: see after_trade_id.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -3689,6 +3742,23 @@ pub struct GetTradesRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub page_token: ::buffa::alloc::string::String,
+    /// Exclusive trade-identifier cursor for gap-free backfill. When set, the
+    /// results are the symbol's trades with match_id greater than
+    /// after_trade_id, ascending by match_id, up to limit, and only trades at or
+    /// below the response's complete_through_trade_id: every page is gap-free.
+    /// Trade identifiers order trades across epochs too, so a walk crosses
+    /// epoch ends without a gap. Pass 0 to start from the symbol's first trade,
+    /// then the response's next_after_trade_id. Cannot be combined with
+    /// start_time, end_time, side or page_token.
+    ///
+    /// Field 7: `after_trade_id`
+    #[serde(
+        rename = "afterTradeId",
+        alias = "after_trade_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub after_trade_id: ::core::option::Option<u64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3702,6 +3772,7 @@ impl ::core::fmt::Debug for GetTradesRequest {
             .field("end_time", &self.end_time)
             .field("side", &self.side)
             .field("page_token", &self.page_token)
+            .field("after_trade_id", &self.after_trade_id)
             .finish()
     }
 }
@@ -3711,6 +3782,15 @@ impl GetTradesRequest {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetTradesRequest";
+}
+impl GetTradesRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::after_trade_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_after_trade_id(mut self, value: u64) -> Self {
+        self.after_trade_id = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(GetTradesRequest);
 impl ::buffa::MessageName for GetTradesRequest {
@@ -3761,6 +3841,9 @@ impl ::buffa::Message for GetTradesRequest {
         if !self.page_token.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.page_token) as u32;
         }
+        if let Some(v) = self.after_trade_id {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3793,6 +3876,9 @@ impl ::buffa::Message for GetTradesRequest {
         }
         if !self.page_token.is_empty() {
             ::buffa::types::put_string_field(6u32, &self.page_token, buf);
+        }
+        if let Some(v) = self.after_trade_id {
+            ::buffa::types::put_uint64_field(7u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3857,6 +3943,15 @@ impl ::buffa::Message for GetTradesRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.page_token, buf)?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.after_trade_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3871,6 +3966,7 @@ impl ::buffa::Message for GetTradesRequest {
         self.end_time = ::buffa::MessageField::none();
         self.side = ::buffa::EnumValue::from(0);
         self.page_token.clear();
+        self.after_trade_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4300,13 +4396,169 @@ pub const __MARKET_TRADE_BATCH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     from_json: ::buffa::type_registry::any_from_json::<MarketTradeBatch>,
     is_wkt: false,
 };
+/// TradeEpochEnd reports where one epoch of a symbol's trade identifiers
+/// ended. Trade identifiers of epoch e are greater than (e-1) * 2^40 and less
+/// than e * 2^40; a later epoch's identifiers are greater than every earlier
+/// epoch's.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TradeEpochEnd {
+    /// The epoch.
+    ///
+    /// Field 1: `epoch`
+    #[serde(
+        rename = "epoch",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub epoch: u64,
+    /// match_id of the epoch's last trade; (epoch-1) * 2^40 when the epoch
+    /// ended without trades.
+    ///
+    /// Field 2: `last_trade_id`
+    #[serde(
+        rename = "lastTradeId",
+        alias = "last_trade_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub last_trade_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TradeEpochEnd {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TradeEpochEnd")
+            .field("epoch", &self.epoch)
+            .field("last_trade_id", &self.last_trade_id)
+            .finish()
+    }
+}
+impl TradeEpochEnd {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.TradeEpochEnd";
+}
+::buffa::impl_default_instance!(TradeEpochEnd);
+impl ::buffa::MessageName for TradeEpochEnd {
+    const PACKAGE: &'static str = "marketdata.v1";
+    const NAME: &'static str = "TradeEpochEnd";
+    const FULL_NAME: &'static str = "marketdata.v1.TradeEpochEnd";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.TradeEpochEnd";
+}
+impl ::buffa::Message for TradeEpochEnd {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.epoch != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.epoch) as u32;
+        }
+        if self.last_trade_id != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.last_trade_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.epoch != 0u64 {
+            ::buffa::types::put_uint64_field(1u32, self.epoch, buf);
+        }
+        if self.last_trade_id != 0u64 {
+            ::buffa::types::put_uint64_field(2u32, self.last_trade_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.epoch = ::buffa::types::decode_uint64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.last_trade_id = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.epoch = 0u64;
+        self.last_trade_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TradeEpochEnd {
+    const PROTO_FQN: &'static str = "marketdata.v1.TradeEpochEnd";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TradeEpochEnd {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRADE_EPOCH_END_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketdata.v1.TradeEpochEnd",
+    to_json: ::buffa::type_registry::any_to_json::<TradeEpochEnd>,
+    from_json: ::buffa::type_registry::any_from_json::<TradeEpochEnd>,
+    is_wkt: false,
+};
 /// GetTradesResponse contains public trades for one spot market.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetTradesResponse {
     /// Trades ordered newest-first by execution timestamp, with match_id as a
-    /// tie-breaker.
+    /// tie-breaker; with after_trade_id, ascending by match_id.
     ///
     /// Field 1: `trades`
     #[serde(
@@ -4315,7 +4567,8 @@ pub struct GetTradesResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub trades: ::buffa::alloc::vec::Vec<MarketTrade>,
-    /// Opaque cursor for the next page. Empty when no more results exist.
+    /// Opaque cursor for the next page. Empty when no more results exist, and
+    /// always empty with after_trade_id.
     ///
     /// Field 2: `next_page_token`
     #[serde(
@@ -4325,6 +4578,51 @@ pub struct GetTradesResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub next_page_token: ::buffa::alloc::string::String,
+    /// Set only with after_trade_id; 0 otherwise. Every trade of the symbol
+    /// with match_id at or below this value exists and is returned by this
+    /// method. Identifiers in that range that no trade has, the rest of an
+    /// ended epoch and every identifier below a later epoch's first, are
+    /// covered too. Newer trades may exist that are not available here yet; it
+    /// only grows.
+    ///
+    /// Field 3: `complete_through_trade_id`
+    #[serde(
+        rename = "completeThroughTradeId",
+        alias = "complete_through_trade_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub complete_through_trade_id: u64,
+    /// Set only with after_trade_id; 0 otherwise. The after_trade_id of the
+    /// next call; it never moves backwards. On a full page (limit trades) it is
+    /// the last trade's match_id. Otherwise it is the greater of after_trade_id
+    /// and complete_through_trade_id, so a walk progresses across epoch ends
+    /// and empty epochs without trades to carry it. When it equals the
+    /// request's after_trade_id, nothing newer is available yet: retry later
+    /// with backoff.
+    ///
+    /// Field 4: `next_after_trade_id`
+    #[serde(
+        rename = "nextAfterTradeId",
+        alias = "next_after_trade_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub next_after_trade_id: u64,
+    /// Set only with after_trade_id. Every epoch whose last trade (or, for an
+    /// epoch without trades, its start) lies between after_trade_id and
+    /// next_after_trade_id, both inclusive, ascending by epoch. A page that
+    /// ends exactly on an epoch's last trade is followed by a page that still
+    /// reports that epoch's end.
+    ///
+    /// Field 5: `epoch_ends`
+    #[serde(
+        rename = "epochEnds",
+        alias = "epoch_ends",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub epoch_ends: ::buffa::alloc::vec::Vec<TradeEpochEnd>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -4334,6 +4632,9 @@ impl ::core::fmt::Debug for GetTradesResponse {
         f.debug_struct("GetTradesResponse")
             .field("trades", &self.trades)
             .field("next_page_token", &self.next_page_token)
+            .field("complete_through_trade_id", &self.complete_through_trade_id)
+            .field("next_after_trade_id", &self.next_after_trade_id)
+            .field("epoch_ends", &self.epoch_ends)
             .finish()
     }
 }
@@ -4375,6 +4676,26 @@ impl ::buffa::Message for GetTradesResponse {
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
         }
+        if self.complete_through_trade_id != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.complete_through_trade_id)
+                        as u32;
+        }
+        if self.next_after_trade_id != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.next_after_trade_id)
+                        as u32;
+        }
+        for v in &self.epoch_ends {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -4391,6 +4712,16 @@ impl ::buffa::Message for GetTradesResponse {
         }
         if !self.next_page_token.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+        }
+        if self.complete_through_trade_id != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.complete_through_trade_id, buf);
+        }
+        if self.next_after_trade_id != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.next_after_trade_id, buf);
+        }
+        for v in &self.epoch_ends {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4421,6 +4752,29 @@ impl ::buffa::Message for GetTradesResponse {
                 )?;
                 ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.complete_through_trade_id = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.next_after_trade_id = ::buffa::types::decode_uint64(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.epoch_ends.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4431,6 +4785,9 @@ impl ::buffa::Message for GetTradesResponse {
     fn clear(&mut self) {
         self.trades.clear();
         self.next_page_token.clear();
+        self.complete_through_trade_id = 0u64;
+        self.next_after_trade_id = 0u64;
+        self.epoch_ends.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5217,8 +5574,8 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub volume: i64,
-    /// True only for WebSocket terminal updates of a closed bucket.
-    /// Historical API rows and current open-candle rows set this to false.
+    /// True for a closed candle bucket, including historical API rows and
+    /// WebSocket terminal updates. False only while the bucket is still open.
     ///
     /// Field 7: `is_closed`
     #[serde(
@@ -12987,6 +13344,10 @@ pub mod __buffa {
         /// Results are ordered newest-first by execution timestamp, with match_id as a
         /// tie-breaker. When both start_time and end_time are set, both bounds are
         /// inclusive.
+        ///
+        /// With after_trade_id set, the request instead walks the symbol's trades by
+        /// trade identifier (match_id), oldest first and gap-free, to backfill trades
+        /// missed on a live stream: see after_trade_id.
         #[derive(Clone, Debug, Default)]
         pub struct GetTradesRequestView<'a> {
             /// Stable numeric pair id from GetSpotConfig.
@@ -13021,6 +13382,17 @@ pub mod __buffa {
             ///
             /// Field 6: `page_token`
             pub page_token: &'a str,
+            /// Exclusive trade-identifier cursor for gap-free backfill. When set, the
+            /// results are the symbol's trades with match_id greater than
+            /// after_trade_id, ascending by match_id, up to limit, and only trades at or
+            /// below the response's complete_through_trade_id: every page is gap-free.
+            /// Trade identifiers order trades across epochs too, so a walk crosses
+            /// epoch ends without a gap. Pass 0 to start from the symbol's first trade,
+            /// then the response's next_after_trade_id. Cannot be combined with
+            /// start_time, end_time, side or page_token.
+            ///
+            /// Field 7: `after_trade_id`
+            pub after_trade_id: ::core::option::Option<u64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetTradesRequestView<'a> {
@@ -13134,6 +13506,15 @@ pub mod __buffa {
                         )?;
                         view.page_token = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.after_trade_id = Some(
+                            ::buffa::types::decode_uint64(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -13183,6 +13564,7 @@ pub mod __buffa {
                     },
                     side: self.side,
                     page_token: self.page_token.to_string(),
+                    after_trade_id: self.after_trade_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -13233,6 +13615,9 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.page_token)
                                 as u32;
                 }
+                if let Some(v) = self.after_trade_id {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -13274,6 +13659,9 @@ pub mod __buffa {
                 }
                 if !self.page_token.is_empty() {
                     ::buffa::types::put_string_field(6u32, &self.page_token, buf);
+                }
+                if let Some(v) = self.after_trade_id {
+                    ::buffa::types::put_uint64_field(7u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -13329,6 +13717,13 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.page_token) {
                     __map.serialize_entry("pageToken", self.page_token)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.after_trade_id {
+                    __map
+                        .serialize_entry(
+                            "afterTradeId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -13479,6 +13874,20 @@ pub mod __buffa {
             #[must_use]
             pub fn page_token(&self) -> &'_ str {
                 self.0.reborrow().page_token
+            }
+            /// Exclusive trade-identifier cursor for gap-free backfill. When set, the
+            /// results are the symbol's trades with match_id greater than
+            /// after_trade_id, ascending by match_id, up to limit, and only trades at or
+            /// below the response's complete_through_trade_id: every page is gap-free.
+            /// Trade identifiers order trades across epochs too, so a walk crosses
+            /// epoch ends without a gap. Pass 0 to start from the symbol's first trade,
+            /// then the response's next_after_trade_id. Cannot be combined with
+            /// start_time, end_time, side or page_token.
+            ///
+            /// Field 7: `after_trade_id`
+            #[must_use]
+            pub fn after_trade_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().after_trade_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetTradesRequestView<'static>>>
@@ -14252,21 +14661,362 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// TradeEpochEnd reports where one epoch of a symbol's trade identifiers
+        /// ended. Trade identifiers of epoch e are greater than (e-1) * 2^40 and less
+        /// than e * 2^40; a later epoch's identifiers are greater than every earlier
+        /// epoch's.
+        #[derive(Clone, Debug, Default)]
+        pub struct TradeEpochEndView<'a> {
+            /// The epoch.
+            ///
+            /// Field 1: `epoch`
+            pub epoch: u64,
+            /// match_id of the epoch's last trade; (epoch-1) * 2^40 when the epoch
+            /// ended without trades.
+            ///
+            /// Field 2: `last_trade_id`
+            pub last_trade_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TradeEpochEndView<'a> {
+            type Owned = super::super::TradeEpochEnd;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.epoch = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.last_trade_id = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TradeEpochEnd,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TradeEpochEnd,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TradeEpochEnd {
+                    epoch: self.epoch,
+                    last_trade_id: self.last_trade_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TradeEpochEndView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.epoch != 0u64 {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(self.epoch) as u32;
+                }
+                if self.last_trade_id != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.last_trade_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.epoch != 0u64 {
+                    ::buffa::types::put_uint64_field(1u32, self.epoch, buf);
+                }
+                if self.last_trade_id != 0u64 {
+                    ::buffa::types::put_uint64_field(2u32, self.last_trade_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TradeEpochEndView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.epoch) {
+                    __map
+                        .serialize_entry(
+                            "epoch",
+                            &::buffa::json_helpers::ProtoJson(&self.epoch),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.last_trade_id) {
+                    __map
+                        .serialize_entry(
+                            "lastTradeId",
+                            &::buffa::json_helpers::ProtoJson(&self.last_trade_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TradeEpochEndView<'a> {
+            const PACKAGE: &'static str = "marketdata.v1";
+            const NAME: &'static str = "TradeEpochEnd";
+            const FULL_NAME: &'static str = "marketdata.v1.TradeEpochEnd";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.TradeEpochEnd";
+        }
+        ::buffa::impl_default_view_instance!(TradeEpochEndView);
+        ::buffa::impl_view_reborrow!(TradeEpochEndView);
+        /** Self-contained, `'static` owned view of a `TradeEpochEnd` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TradeEpochEndView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TradeEpochEndView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TradeEpochEndOwnedView(
+            ::buffa::OwnedView<TradeEpochEndView<'static>>,
+        );
+        impl TradeEpochEndOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TradeEpochEndOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TradeEpochEndOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TradeEpochEnd,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TradeEpochEndOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TradeEpochEndView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TradeEpochEndView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TradeEpochEnd,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The epoch.
+            ///
+            /// Field 1: `epoch`
+            #[must_use]
+            pub fn epoch(&self) -> u64 {
+                self.0.reborrow().epoch
+            }
+            /// match_id of the epoch's last trade; (epoch-1) * 2^40 when the epoch
+            /// ended without trades.
+            ///
+            /// Field 2: `last_trade_id`
+            #[must_use]
+            pub fn last_trade_id(&self) -> u64 {
+                self.0.reborrow().last_trade_id
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TradeEpochEndView<'static>>>
+        for TradeEpochEndOwnedView {
+            fn from(inner: ::buffa::OwnedView<TradeEpochEndView<'static>>) -> Self {
+                TradeEpochEndOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TradeEpochEndOwnedView>
+        for ::buffa::OwnedView<TradeEpochEndView<'static>> {
+            fn from(wrapper: TradeEpochEndOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TradeEpochEndView<'static>>>
+        for TradeEpochEndOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TradeEpochEndView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TradeEpochEnd {
+            type View<'a> = TradeEpochEndView<'a>;
+            type ViewHandle = TradeEpochEndOwnedView;
+        }
+        impl ::serde::Serialize for TradeEpochEndOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// GetTradesResponse contains public trades for one spot market.
         #[derive(Clone, Debug, Default)]
         pub struct GetTradesResponseView<'a> {
             /// Trades ordered newest-first by execution timestamp, with match_id as a
-            /// tie-breaker.
+            /// tie-breaker; with after_trade_id, ascending by match_id.
             ///
             /// Field 1: `trades`
             pub trades: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::MarketTradeView<'a>,
             >,
-            /// Opaque cursor for the next page. Empty when no more results exist.
+            /// Opaque cursor for the next page. Empty when no more results exist, and
+            /// always empty with after_trade_id.
             ///
             /// Field 2: `next_page_token`
             pub next_page_token: &'a str,
+            /// Set only with after_trade_id; 0 otherwise. Every trade of the symbol
+            /// with match_id at or below this value exists and is returned by this
+            /// method. Identifiers in that range that no trade has, the rest of an
+            /// ended epoch and every identifier below a later epoch's first, are
+            /// covered too. Newer trades may exist that are not available here yet; it
+            /// only grows.
+            ///
+            /// Field 3: `complete_through_trade_id`
+            pub complete_through_trade_id: u64,
+            /// Set only with after_trade_id; 0 otherwise. The after_trade_id of the
+            /// next call; it never moves backwards. On a full page (limit trades) it is
+            /// the last trade's match_id. Otherwise it is the greater of after_trade_id
+            /// and complete_through_trade_id, so a walk progresses across epoch ends
+            /// and empty epochs without trades to carry it. When it equals the
+            /// request's after_trade_id, nothing newer is available yet: retry later
+            /// with backoff.
+            ///
+            /// Field 4: `next_after_trade_id`
+            pub next_after_trade_id: u64,
+            /// Set only with after_trade_id. Every epoch whose last trade (or, for an
+            /// epoch without trades, its start) lies between after_trade_id and
+            /// next_after_trade_id, both inclusive, ascending by epoch. A page that
+            /// ends exactly on an epoch's last trade is followed by a page that still
+            /// reports that epoch's end.
+            ///
+            /// Field 5: `epoch_ends`
+            pub epoch_ends: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::TradeEpochEndView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetTradesResponseView<'a> {
@@ -14307,6 +15057,24 @@ pub mod __buffa {
                         )?;
                         view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.complete_through_trade_id = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.next_after_trade_id = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -14317,6 +15085,21 @@ pub mod __buffa {
                         view.trades
                             .push(
                                 <super::super::__buffa::view::MarketTradeView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.epoch_ends
+                            .push(
+                                <super::super::__buffa::view::TradeEpochEndView as ::buffa::MessageView>::decode_view_ctx(
                                     sub,
                                     __sub_ctx,
                                 )?,
@@ -14357,6 +15140,13 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     next_page_token: self.next_page_token.to_string(),
+                    complete_through_trade_id: self.complete_through_trade_id,
+                    next_after_trade_id: self.next_after_trade_id,
+                    epoch_ends: self
+                        .epoch_ends
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -14385,6 +15175,28 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.next_page_token)
                                 as u32;
                 }
+                if self.complete_through_trade_id != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.complete_through_trade_id,
+                            ) as u32;
+                }
+                if self.next_after_trade_id != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.next_after_trade_id,
+                            ) as u32;
+                }
+                for v in &self.epoch_ends {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -14406,6 +15218,28 @@ pub mod __buffa {
                 }
                 if !self.next_page_token.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+                }
+                if self.complete_through_trade_id != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        3u32,
+                        self.complete_through_trade_id,
+                        buf,
+                    );
+                }
+                if self.next_after_trade_id != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        4u32,
+                        self.next_after_trade_id,
+                        buf,
+                    );
+                }
+                for v in &self.epoch_ends {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -14433,6 +15267,29 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
                     __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.complete_through_trade_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "completeThroughTradeId",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.complete_through_trade_id,
+                            ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.next_after_trade_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "nextAfterTradeId",
+                            &::buffa::json_helpers::ProtoJson(&self.next_after_trade_id),
+                        )?;
+                }
+                if !self.epoch_ends.is_empty() {
+                    __map.serialize_entry("epochEnds", &*self.epoch_ends)?;
                 }
                 __map.end()
             }
@@ -14531,7 +15388,7 @@ pub mod __buffa {
                 self.0.into_bytes()
             }
             /// Trades ordered newest-first by execution timestamp, with match_id as a
-            /// tie-breaker.
+            /// tie-breaker; with after_trade_id, ascending by match_id.
             ///
             /// Field 1: `trades`
             #[must_use]
@@ -14543,12 +15400,54 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().trades
             }
-            /// Opaque cursor for the next page. Empty when no more results exist.
+            /// Opaque cursor for the next page. Empty when no more results exist, and
+            /// always empty with after_trade_id.
             ///
             /// Field 2: `next_page_token`
             #[must_use]
             pub fn next_page_token(&self) -> &'_ str {
                 self.0.reborrow().next_page_token
+            }
+            /// Set only with after_trade_id; 0 otherwise. Every trade of the symbol
+            /// with match_id at or below this value exists and is returned by this
+            /// method. Identifiers in that range that no trade has, the rest of an
+            /// ended epoch and every identifier below a later epoch's first, are
+            /// covered too. Newer trades may exist that are not available here yet; it
+            /// only grows.
+            ///
+            /// Field 3: `complete_through_trade_id`
+            #[must_use]
+            pub fn complete_through_trade_id(&self) -> u64 {
+                self.0.reborrow().complete_through_trade_id
+            }
+            /// Set only with after_trade_id; 0 otherwise. The after_trade_id of the
+            /// next call; it never moves backwards. On a full page (limit trades) it is
+            /// the last trade's match_id. Otherwise it is the greater of after_trade_id
+            /// and complete_through_trade_id, so a walk progresses across epoch ends
+            /// and empty epochs without trades to carry it. When it equals the
+            /// request's after_trade_id, nothing newer is available yet: retry later
+            /// with backoff.
+            ///
+            /// Field 4: `next_after_trade_id`
+            #[must_use]
+            pub fn next_after_trade_id(&self) -> u64 {
+                self.0.reborrow().next_after_trade_id
+            }
+            /// Set only with after_trade_id. Every epoch whose last trade (or, for an
+            /// epoch without trades, its start) lies between after_trade_id and
+            /// next_after_trade_id, both inclusive, ascending by epoch. A page that
+            /// ends exactly on an epoch's last trade is followed by a page that still
+            /// reports that epoch's end.
+            ///
+            /// Field 5: `epoch_ends`
+            #[must_use]
+            pub fn epoch_ends(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::TradeEpochEndView<'_>,
+            > {
+                &self.0.reborrow().epoch_ends
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetTradesResponseView<'static>>>
@@ -15832,8 +16731,8 @@ pub mod __buffa {
             ///
             /// Field 6: `volume`
             pub volume: i64,
-            /// True only for WebSocket terminal updates of a closed bucket.
-            /// Historical API rows and current open-candle rows set this to false.
+            /// True for a closed candle bucket, including historical API rows and
+            /// WebSocket terminal updates. False only while the bucket is still open.
             ///
             /// Field 7: `is_closed`
             pub is_closed: bool,
@@ -16252,8 +17151,8 @@ pub mod __buffa {
             pub fn volume(&self) -> i64 {
                 self.0.reborrow().volume
             }
-            /// True only for WebSocket terminal updates of a closed bucket.
-            /// Historical API rows and current open-candle rows set this to false.
+            /// True for a closed candle bucket, including historical API rows and
+            /// WebSocket terminal updates. False only while the bucket is still open.
             ///
             /// Field 7: `is_closed`
             #[must_use]
@@ -20941,6 +21840,7 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_TRADES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__MARKET_TRADE_JSON_ANY);
         reg.register_json_any(super::__MARKET_TRADE_BATCH_JSON_ANY);
+        reg.register_json_any(super::__TRADE_EPOCH_END_JSON_ANY);
         reg.register_json_any(super::__GET_TRADES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_CANDLES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_CANDLES_COLUMNS_REQUEST_JSON_ANY);
@@ -21003,6 +21903,10 @@ pub use self::__buffa::view::MarketTradeOwnedView;
 pub use self::__buffa::view::MarketTradeBatchView;
 #[doc(inline)]
 pub use self::__buffa::view::MarketTradeBatchOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TradeEpochEndView;
+#[doc(inline)]
+pub use self::__buffa::view::TradeEpochEndOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetTradesResponseView;
 #[doc(inline)]

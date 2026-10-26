@@ -461,7 +461,9 @@ pub trait OrdersService: Send + Sync + 'static {
         >,
     > + Send;
     /// Cancels all matching open orders for an account (kill switch).
-    /// Evaluates matching orders from a consistent snapshot at request start.
+    /// Evaluates matching orders from a consistent snapshot at request start and
+    /// requests cancellation of every one, however many match. The response
+    /// lists up to 200 of them, oldest first, with the total count.
     /// Final state is confirmed via the order update stream or read path.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).

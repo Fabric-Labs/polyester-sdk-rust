@@ -742,6 +742,23 @@ pub enum QuickSwapReason {
     /// for it. Its withdrawal is NOT_SENT with the amount in unsent_amount.
     /// Other withdrawals are unaffected.
     REFUND_BELOW_MINIMUM = 21i32,
+    /// The QuickSwap could not be issued a deposit address and never gets one:
+    /// it is EXPIRED without deposit_instructions, and nothing can be deposited
+    /// to it. Create a new QuickSwap with a new idempotency key, and report the
+    /// swap_id to Polyester broker support.
+    DEPOSIT_ADDRESS_CONFLICT = 22i32,
+    /// The address already accepted its one eligible deposit; this deposit is
+    /// returned to return_address and never executes.
+    DEPOSIT_ADDRESS_ALREADY_USED = 23i32,
+    /// The address was retired; this observed deposit is returned and never executes.
+    DEPOSIT_ADDRESS_RETIRED = 24i32,
+    /// The address had not been issued when this deposit was observed; it never executes.
+    DEPOSIT_ADDRESS_NOT_ISSUED = 25i32,
+    /// On a two-leg route, intermediate funds were below the smallest order the
+    /// second leg's market accepts, so they could not be converted to the
+    /// destination asset; they are refunded to refund_address. Shown on the
+    /// payout statuses that follow.
+    INTERMEDIATE_BELOW_MINIMUM = 26i32,
 }
 impl QuickSwapReason {
     ///Idiomatic alias for [`Self::REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -786,6 +803,21 @@ impl QuickSwapReason {
     ///Idiomatic alias for [`Self::REFUND_BELOW_MINIMUM`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const RefundBelowMinimum: Self = Self::REFUND_BELOW_MINIMUM;
+    ///Idiomatic alias for [`Self::DEPOSIT_ADDRESS_CONFLICT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DepositAddressConflict: Self = Self::DEPOSIT_ADDRESS_CONFLICT;
+    ///Idiomatic alias for [`Self::DEPOSIT_ADDRESS_ALREADY_USED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DepositAddressAlreadyUsed: Self = Self::DEPOSIT_ADDRESS_ALREADY_USED;
+    ///Idiomatic alias for [`Self::DEPOSIT_ADDRESS_RETIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DepositAddressRetired: Self = Self::DEPOSIT_ADDRESS_RETIRED;
+    ///Idiomatic alias for [`Self::DEPOSIT_ADDRESS_NOT_ISSUED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DepositAddressNotIssued: Self = Self::DEPOSIT_ADDRESS_NOT_ISSUED;
+    ///Idiomatic alias for [`Self::INTERMEDIATE_BELOW_MINIMUM`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const IntermediateBelowMinimum: Self = Self::INTERMEDIATE_BELOW_MINIMUM;
 }
 impl ::core::default::Default for QuickSwapReason {
     fn default() -> Self {
@@ -897,6 +929,11 @@ impl ::buffa::Enumeration for QuickSwapReason {
             17i32 => ::core::option::Option::Some(Self::OUTCOME_RECONCILING),
             20i32 => ::core::option::Option::Some(Self::SOURCE_SCREENING_BLOCKED),
             21i32 => ::core::option::Option::Some(Self::REFUND_BELOW_MINIMUM),
+            22i32 => ::core::option::Option::Some(Self::DEPOSIT_ADDRESS_CONFLICT),
+            23i32 => ::core::option::Option::Some(Self::DEPOSIT_ADDRESS_ALREADY_USED),
+            24i32 => ::core::option::Option::Some(Self::DEPOSIT_ADDRESS_RETIRED),
+            25i32 => ::core::option::Option::Some(Self::DEPOSIT_ADDRESS_NOT_ISSUED),
+            26i32 => ::core::option::Option::Some(Self::INTERMEDIATE_BELOW_MINIMUM),
             _ => ::core::option::Option::None,
         }
     }
@@ -919,6 +956,11 @@ impl ::buffa::Enumeration for QuickSwapReason {
             Self::OUTCOME_RECONCILING => "OUTCOME_RECONCILING",
             Self::SOURCE_SCREENING_BLOCKED => "SOURCE_SCREENING_BLOCKED",
             Self::REFUND_BELOW_MINIMUM => "REFUND_BELOW_MINIMUM",
+            Self::DEPOSIT_ADDRESS_CONFLICT => "DEPOSIT_ADDRESS_CONFLICT",
+            Self::DEPOSIT_ADDRESS_ALREADY_USED => "DEPOSIT_ADDRESS_ALREADY_USED",
+            Self::DEPOSIT_ADDRESS_RETIRED => "DEPOSIT_ADDRESS_RETIRED",
+            Self::DEPOSIT_ADDRESS_NOT_ISSUED => "DEPOSIT_ADDRESS_NOT_ISSUED",
+            Self::INTERMEDIATE_BELOW_MINIMUM => "INTERMEDIATE_BELOW_MINIMUM",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -959,6 +1001,21 @@ impl ::buffa::Enumeration for QuickSwapReason {
             "REFUND_BELOW_MINIMUM" => {
                 ::core::option::Option::Some(Self::REFUND_BELOW_MINIMUM)
             }
+            "DEPOSIT_ADDRESS_CONFLICT" => {
+                ::core::option::Option::Some(Self::DEPOSIT_ADDRESS_CONFLICT)
+            }
+            "DEPOSIT_ADDRESS_ALREADY_USED" => {
+                ::core::option::Option::Some(Self::DEPOSIT_ADDRESS_ALREADY_USED)
+            }
+            "DEPOSIT_ADDRESS_RETIRED" => {
+                ::core::option::Option::Some(Self::DEPOSIT_ADDRESS_RETIRED)
+            }
+            "DEPOSIT_ADDRESS_NOT_ISSUED" => {
+                ::core::option::Option::Some(Self::DEPOSIT_ADDRESS_NOT_ISSUED)
+            }
+            "INTERMEDIATE_BELOW_MINIMUM" => {
+                ::core::option::Option::Some(Self::INTERMEDIATE_BELOW_MINIMUM)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -978,6 +1035,11 @@ impl ::buffa::Enumeration for QuickSwapReason {
             Self::OUTCOME_RECONCILING,
             Self::SOURCE_SCREENING_BLOCKED,
             Self::REFUND_BELOW_MINIMUM,
+            Self::DEPOSIT_ADDRESS_CONFLICT,
+            Self::DEPOSIT_ADDRESS_ALREADY_USED,
+            Self::DEPOSIT_ADDRESS_RETIRED,
+            Self::DEPOSIT_ADDRESS_NOT_ISSUED,
+            Self::INTERMEDIATE_BELOW_MINIMUM,
         ]
     }
 }
@@ -1330,11 +1392,12 @@ impl ::buffa::Enumeration for WithdrawalState {
 ///
 /// Flow: ALLOCATING → AWAITING_DEPOSIT → (WAITING_FOR_CAPACITY |
 /// PREPARING_DEPOSIT | CONFIRMING) → CREDITED → EXECUTING (skipped for a
-/// bridge) → PAYING_OUT | REFUNDING | RETURNING → a terminal status. HELD can
-/// be entered from any non-terminal status and is not terminal. The terminal
-/// statuses are COMPLETED, REFUNDED, RETURNED and EXPIRED; a terminal status
-/// never changes. Accept status values added later; is_terminal is
-/// authoritative.
+/// bridge) → PAYING_OUT | REFUNDING | RETURNING → a terminal status. A
+/// QuickSwap that cannot be issued a deposit address goes from ALLOCATING
+/// straight to EXPIRED (DEPOSIT_ADDRESS_CONFLICT). HELD can be entered from
+/// any non-terminal status and is not terminal. The terminal statuses are
+/// COMPLETED, REFUNDED, RETURNED and EXPIRED; a terminal status never
+/// changes. Accept status values added later; is_terminal is authoritative.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum QuickSwapStatus {
@@ -1383,7 +1446,9 @@ pub enum QuickSwapStatus {
     /// Terminal: every withdrawal is final and all are RETURN (FINALIZED or
     /// NOT_SENT).
     RETURNED = 15i32,
-    /// Terminal: the funding window ended without an eligible deposit.
+    /// Terminal: the funding window ended without an eligible deposit
+    /// (FUNDING_WINDOW_ENDED), or the QuickSwap never got a deposit address
+    /// (DEPOSIT_ADDRESS_CONFLICT).
     EXPIRED = 16i32,
 }
 impl QuickSwapStatus {
@@ -1713,9 +1778,9 @@ pub enum ErrorCode {
     /// broker support with the swap_id.
     STATS_INCOMPLETE = 33i32,
     /// The QuickSwap (swap_id in the error) cannot be issued a deposit address
-    /// and never gets one, so nothing can be deposited to it. Create a new
-    /// QuickSwap with a new idempotency key, and report the swap_id to Polyester
-    /// broker support.
+    /// and never gets one, so nothing can be deposited to it; it is EXPIRED with
+    /// reason DEPOSIT_ADDRESS_CONFLICT. Create a new QuickSwap with a new
+    /// idempotency key, and report the swap_id to Polyester broker support.
     ADDRESS_CONFLICT = 34i32,
 }
 impl ErrorCode {
@@ -2594,7 +2659,20 @@ pub const __MARKET_EXECUTION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     from_json: ::buffa::type_registry::any_from_json::<MarketExecution>,
     is_wkt: false,
 };
-/// TwapExecution spreads execution evenly over a duration.
+/// TwapExecution spreads execution evenly over a duration, one slice per
+/// slot. Slot k starts k slice intervals after execution starts. Each slice
+/// trades what is left of the credited deposit over the slots left, and is
+/// protected by the quote's min_rate on what it trades. A slice is sent only
+/// within its slot: a slot missed is skipped, never sent late. On a two-leg
+/// route, each slice's second leg converts that slice's intermediate funds
+/// before the next slice. Intermediate funds below the smallest order the
+/// second leg's market accepts do not end the TWAP: they are added to the
+/// next slice's conversion, and what is still unconverted when execution
+/// ends is refunded to refund_address (INTERMEDIATE_BELOW_MINIMUM). Only the
+/// second leg's market closing ends a TWAP early. A TWAP needs a larger
+/// deposit than a market execution, since every slice must be a valid order
+/// (see QuickSwapQuote.min_deposit_amount). A bridge takes market execution
+/// only.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -3664,7 +3742,8 @@ pub struct QuickSwapQuote {
     /// network's minimum
     /// (AssetChainVariant.deposit_min_amount in the config), and differs from
     /// ErrorDetail.min_deposit_amount, the smallest deposit that currently
-    /// quotes.
+    /// quotes. For a TWAP it is the slice count times the smallest deposit one
+    /// slice takes, and at least a market execution's minimum.
     ///
     /// Field 5: `min_deposit_amount`
     #[serde(
@@ -4280,10 +4359,13 @@ pub struct DepositInstructions {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub address_state: ::buffa::EnumValue<DepositAddressState>,
-    /// A native-coin deposit (for example ETH) needs at least this gas limit, in
-    /// gas units; a plain 21000-gas transfer is not enough and fails without
-    /// depositing. Unused gas is refunded, so a higher limit is safe. Zero for
-    /// token deposits and non-EVM networks.
+    /// Recommended gas limit, in gas units, for native-coin deposits on EVM
+    /// networks: 250000. Polyester does not enforce this limit. On some networks,
+    /// depositing to an address that has never received funds requires far more
+    /// than 21000 gas. If the limit is too low, the transaction fails on chain
+    /// without depositing funds, and the network fee is still charged. Use at
+    /// least the recommended limit. Unused gas is not charged. Zero for token
+    /// deposits and non-EVM networks.
     ///
     /// Field 8: `min_native_gas_limit`
     #[serde(
@@ -5061,7 +5143,9 @@ pub struct ExecutionProgress {
     )]
     pub intermediate_remainder: ::buffa::MessageField<TokenAmount>,
     /// Completed slices: a market execution's one slice completes when
-    /// execution finishes. Zero for a bridge.
+    /// execution finishes; a TWAP slice completes once it has traded and is
+    /// over, so a slot that traded nothing or was skipped never completes.
+    /// Zero for a bridge.
     ///
     /// Field 5: `completed_slices`
     #[serde(
@@ -5071,7 +5155,8 @@ pub struct ExecutionProgress {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub completed_slices: u32,
-    /// Planned slices: a market execution has one once it is planned. Zero
+    /// Planned slices: a market execution has one once it is planned; a TWAP
+    /// has its slice count, duration_ms over slice_interval_ms rounded up. Zero
     /// until then, and for a bridge, which trades nothing.
     ///
     /// Field 6: `total_slices`
@@ -5997,7 +6082,9 @@ pub struct QuickSwap {
     /// added later. Polling can stop at a terminal status. A terminal status
     /// never changes. Shortly after it, address_retires_at can still move later,
     /// and withdrawal details can be corrected as documented on Withdrawal;
-    /// another deposit reaching the address also shows. Read it again if the end
+    /// another deposit reaching the address also shows as RETURN_ONLY. Returns
+    /// made directly for such deposits are not yet reported in
+    /// withdrawals; RETURN_ONLY does not confirm a completed return. Read again if the end
     /// user reports such a deposit or needs the final retirement time.
     ///
     /// Field 5: `is_terminal`
@@ -6098,7 +6185,9 @@ pub struct QuickSwap {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub quote: ::buffa::MessageField<QuickSwapQuote>,
-    /// Where and until when to deposit; absent while ALLOCATING.
+    /// Where and until when to deposit; absent while ALLOCATING and on a
+    /// QuickSwap that never got an address (EXPIRED with
+    /// DEPOSIT_ADDRESS_CONFLICT).
     ///
     /// Field 15: `deposit_instructions`
     #[serde(
@@ -6190,8 +6279,9 @@ pub struct QuickSwap {
     )]
     pub terminal_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     /// Monotonic state version: a snapshot with a lower version is older. Zero
-    /// while ALLOCATING; 1 once the deposit address is issued
-    /// (AWAITING_DEPOSIT); every later change increments it.
+    /// while ALLOCATING; 1 once the deposit address is issued (AWAITING_DEPOSIT)
+    /// or allocation ends without one (EXPIRED with DEPOSIT_ADDRESS_CONFLICT);
+    /// every later change increments it.
     ///
     /// Field 26: `version`
     #[serde(
@@ -16740,6 +16830,305 @@ pub const __QUICK_SWAP_SUMMARY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     from_json: ::buffa::type_registry::any_from_json::<QuickSwapSummary>,
     is_wkt: false,
 };
+/// QuickSwapBrokerServiceGetQuickSwapRequest reads one QuickSwap belonging to this broker.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct QuickSwapBrokerServiceGetQuickSwapRequest {
+    /// Broker name. A broker API key may name only its own broker.
+    ///
+    /// Field 1: `broker`
+    #[serde(
+        rename = "broker",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub broker: ::buffa::alloc::string::String,
+    /// Public QuickSwap ID. Another broker's swap is indistinguishable from an
+    /// unknown ID.
+    ///
+    /// Field 2: `swap_id`
+    #[serde(
+        rename = "swapId",
+        alias = "swap_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub swap_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for QuickSwapBrokerServiceGetQuickSwapRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("QuickSwapBrokerServiceGetQuickSwapRequest")
+            .field("broker", &self.broker)
+            .field("swap_id", &self.swap_id)
+            .finish()
+    }
+}
+impl QuickSwapBrokerServiceGetQuickSwapRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapRequest";
+}
+::buffa::impl_default_instance!(QuickSwapBrokerServiceGetQuickSwapRequest);
+impl ::buffa::MessageName for QuickSwapBrokerServiceGetQuickSwapRequest {
+    const PACKAGE: &'static str = "swap.quickswap.v1";
+    const NAME: &'static str = "QuickSwapBrokerServiceGetQuickSwapRequest";
+    const FULL_NAME: &'static str = "swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapRequest";
+}
+impl ::buffa::Message for QuickSwapBrokerServiceGetQuickSwapRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.broker.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.broker) as u32;
+        }
+        if self.swap_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.broker.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.broker, buf);
+        }
+        if self.swap_id != 0u64 {
+            ::buffa::types::put_fixed64_field(2u32, self.swap_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.broker, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.swap_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.broker.clear();
+        self.swap_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for QuickSwapBrokerServiceGetQuickSwapRequest {
+    const PROTO_FQN: &'static str = "swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for QuickSwapBrokerServiceGetQuickSwapRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __QUICK_SWAP_BROKER_SERVICE_GET_QUICK_SWAP_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapRequest",
+    to_json: ::buffa::type_registry::any_to_json::<
+        QuickSwapBrokerServiceGetQuickSwapRequest,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        QuickSwapBrokerServiceGetQuickSwapRequest,
+    >,
+    is_wkt: false,
+};
+/// QuickSwapBrokerServiceGetQuickSwapResponse carries the broker's full swap detail.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct QuickSwapBrokerServiceGetQuickSwapResponse {
+    /// The broker-owned QuickSwap, including its quote, addresses, progress and fees.
+    ///
+    /// Field 1: `quick_swap`
+    #[serde(
+        rename = "quickSwap",
+        alias = "quick_swap",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub quick_swap: ::buffa::MessageField<QuickSwap>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for QuickSwapBrokerServiceGetQuickSwapResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("QuickSwapBrokerServiceGetQuickSwapResponse")
+            .field("quick_swap", &self.quick_swap)
+            .finish()
+    }
+}
+impl QuickSwapBrokerServiceGetQuickSwapResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapResponse";
+}
+::buffa::impl_default_instance!(QuickSwapBrokerServiceGetQuickSwapResponse);
+impl ::buffa::MessageName for QuickSwapBrokerServiceGetQuickSwapResponse {
+    const PACKAGE: &'static str = "swap.quickswap.v1";
+    const NAME: &'static str = "QuickSwapBrokerServiceGetQuickSwapResponse";
+    const FULL_NAME: &'static str = "swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapResponse";
+}
+impl ::buffa::Message for QuickSwapBrokerServiceGetQuickSwapResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.quick_swap.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.quick_swap.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.quick_swap.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.quick_swap.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.quick_swap.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.quick_swap = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for QuickSwapBrokerServiceGetQuickSwapResponse {
+    const PROTO_FQN: &'static str = "swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson
+for QuickSwapBrokerServiceGetQuickSwapResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __QUICK_SWAP_BROKER_SERVICE_GET_QUICK_SWAP_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapResponse",
+    to_json: ::buffa::type_registry::any_to_json::<
+        QuickSwapBrokerServiceGetQuickSwapResponse,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        QuickSwapBrokerServiceGetQuickSwapResponse,
+    >,
+    is_wkt: false,
+};
 /// ListQuickSwapsRequest lists the broker's QuickSwaps, newest first, with
 /// optional filters. Every filter narrows the list.
 #[derive(Clone, PartialEq, Default)]
@@ -20044,7 +20433,20 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// TwapExecution spreads execution evenly over a duration.
+        /// TwapExecution spreads execution evenly over a duration, one slice per
+        /// slot. Slot k starts k slice intervals after execution starts. Each slice
+        /// trades what is left of the credited deposit over the slots left, and is
+        /// protected by the quote's min_rate on what it trades. A slice is sent only
+        /// within its slot: a slot missed is skipped, never sent late. On a two-leg
+        /// route, each slice's second leg converts that slice's intermediate funds
+        /// before the next slice. Intermediate funds below the smallest order the
+        /// second leg's market accepts do not end the TWAP: they are added to the
+        /// next slice's conversion, and what is still unconverted when execution
+        /// ends is refunded to refund_address (INTERMEDIATE_BELOW_MINIMUM). Only the
+        /// second leg's market closing ends a TWAP early. A TWAP needs a larger
+        /// deposit than a market execution, since every slice must be a valid order
+        /// (see QuickSwapQuote.min_deposit_amount). A bridge takes market execution
+        /// only.
         #[derive(Clone, Debug, Default)]
         pub struct TwapExecutionView<'a> {
             /// Total execution duration in milliseconds, from 60000 (1 minute) to
@@ -21866,7 +22268,8 @@ pub mod __buffa {
             /// network's minimum
             /// (AssetChainVariant.deposit_min_amount in the config), and differs from
             /// ErrorDetail.min_deposit_amount, the smallest deposit that currently
-            /// quotes.
+            /// quotes. For a TWAP it is the slice count times the smallest deposit one
+            /// slice takes, and at least a market execution's minimum.
             ///
             /// Field 5: `min_deposit_amount`
             pub min_deposit_amount: ::buffa::MessageFieldView<
@@ -22675,7 +23078,8 @@ pub mod __buffa {
             /// network's minimum
             /// (AssetChainVariant.deposit_min_amount in the config), and differs from
             /// ErrorDetail.min_deposit_amount, the smallest deposit that currently
-            /// quotes.
+            /// quotes. For a TWAP it is the slice count times the smallest deposit one
+            /// slice takes, and at least a market execution's minimum.
             ///
             /// Field 5: `min_deposit_amount`
             #[must_use]
@@ -23096,10 +23500,13 @@ pub mod __buffa {
             ///
             /// Field 7: `address_state`
             pub address_state: ::buffa::EnumValue<super::super::DepositAddressState>,
-            /// A native-coin deposit (for example ETH) needs at least this gas limit, in
-            /// gas units; a plain 21000-gas transfer is not enough and fails without
-            /// depositing. Unused gas is refunded, so a higher limit is safe. Zero for
-            /// token deposits and non-EVM networks.
+            /// Recommended gas limit, in gas units, for native-coin deposits on EVM
+            /// networks: 250000. Polyester does not enforce this limit. On some networks,
+            /// depositing to an address that has never received funds requires far more
+            /// than 21000 gas. If the limit is too low, the transaction fails on chain
+            /// without depositing funds, and the network fee is still charged. Use at
+            /// least the recommended limit. Unused gas is not charged. Zero for token
+            /// deposits and non-EVM networks.
             ///
             /// Field 8: `min_native_gas_limit`
             pub min_native_gas_limit: u64,
@@ -23672,10 +24079,13 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::DepositAddressState> {
                 self.0.reborrow().address_state
             }
-            /// A native-coin deposit (for example ETH) needs at least this gas limit, in
-            /// gas units; a plain 21000-gas transfer is not enough and fails without
-            /// depositing. Unused gas is refunded, so a higher limit is safe. Zero for
-            /// token deposits and non-EVM networks.
+            /// Recommended gas limit, in gas units, for native-coin deposits on EVM
+            /// networks: 250000. Polyester does not enforce this limit. On some networks,
+            /// depositing to an address that has never received funds requires far more
+            /// than 21000 gas. If the limit is too low, the transaction fails on chain
+            /// without depositing funds, and the network fee is still charged. Use at
+            /// least the recommended limit. Unused gas is not charged. Zero for token
+            /// deposits and non-EVM networks.
             ///
             /// Field 8: `min_native_gas_limit`
             #[must_use]
@@ -24545,11 +24955,14 @@ pub mod __buffa {
                 super::super::__buffa::view::TokenAmountView<'a>,
             >,
             /// Completed slices: a market execution's one slice completes when
-            /// execution finishes. Zero for a bridge.
+            /// execution finishes; a TWAP slice completes once it has traded and is
+            /// over, so a slot that traded nothing or was skipped never completes.
+            /// Zero for a bridge.
             ///
             /// Field 5: `completed_slices`
             pub completed_slices: u32,
-            /// Planned slices: a market execution has one once it is planned. Zero
+            /// Planned slices: a market execution has one once it is planned; a TWAP
+            /// has its slice count, duration_ms over slice_interval_ms rounded up. Zero
             /// until then, and for a bridge, which trades nothing.
             ///
             /// Field 6: `total_slices`
@@ -25274,14 +25687,17 @@ pub mod __buffa {
                 &self.0.reborrow().intermediate_remainder
             }
             /// Completed slices: a market execution's one slice completes when
-            /// execution finishes. Zero for a bridge.
+            /// execution finishes; a TWAP slice completes once it has traded and is
+            /// over, so a slot that traded nothing or was skipped never completes.
+            /// Zero for a bridge.
             ///
             /// Field 5: `completed_slices`
             #[must_use]
             pub fn completed_slices(&self) -> u32 {
                 self.0.reborrow().completed_slices
             }
-            /// Planned slices: a market execution has one once it is planned. Zero
+            /// Planned slices: a market execution has one once it is planned; a TWAP
+            /// has its slice count, duration_ms over slice_interval_ms rounded up. Zero
             /// until then, and for a bridge, which trades nothing.
             ///
             /// Field 6: `total_slices`
@@ -26309,7 +26725,9 @@ pub mod __buffa {
             /// added later. Polling can stop at a terminal status. A terminal status
             /// never changes. Shortly after it, address_retires_at can still move later,
             /// and withdrawal details can be corrected as documented on Withdrawal;
-            /// another deposit reaching the address also shows. Read it again if the end
+            /// another deposit reaching the address also shows as RETURN_ONLY. Returns
+            /// made directly for such deposits are not yet reported in
+            /// withdrawals; RETURN_ONLY does not confirm a completed return. Read again if the end
             /// user reports such a deposit or needs the final retirement time.
             ///
             /// Field 5: `is_terminal`
@@ -26358,7 +26776,9 @@ pub mod __buffa {
             pub quote: ::buffa::MessageFieldView<
                 super::super::__buffa::view::QuickSwapQuoteView<'a>,
             >,
-            /// Where and until when to deposit; absent while ALLOCATING.
+            /// Where and until when to deposit; absent while ALLOCATING and on a
+            /// QuickSwap that never got an address (EXPIRED with
+            /// DEPOSIT_ADDRESS_CONFLICT).
             ///
             /// Field 15: `deposit_instructions`
             pub deposit_instructions: ::buffa::MessageFieldView<
@@ -26418,8 +26838,9 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
             /// Monotonic state version: a snapshot with a lower version is older. Zero
-            /// while ALLOCATING; 1 once the deposit address is issued
-            /// (AWAITING_DEPOSIT); every later change increments it.
+            /// while ALLOCATING; 1 once the deposit address is issued (AWAITING_DEPOSIT)
+            /// or allocation ends without one (EXPIRED with DEPOSIT_ADDRESS_CONFLICT);
+            /// every later change increments it.
             ///
             /// Field 26: `version`
             pub version: u64,
@@ -27666,7 +28087,9 @@ pub mod __buffa {
             /// added later. Polling can stop at a terminal status. A terminal status
             /// never changes. Shortly after it, address_retires_at can still move later,
             /// and withdrawal details can be corrected as documented on Withdrawal;
-            /// another deposit reaching the address also shows. Read it again if the end
+            /// another deposit reaching the address also shows as RETURN_ONLY. Returns
+            /// made directly for such deposits are not yet reported in
+            /// withdrawals; RETURN_ONLY does not confirm a completed return. Read again if the end
             /// user reports such a deposit or needs the final retirement time.
             ///
             /// Field 5: `is_terminal`
@@ -27749,7 +28172,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().quote
             }
-            /// Where and until when to deposit; absent while ALLOCATING.
+            /// Where and until when to deposit; absent while ALLOCATING and on a
+            /// QuickSwap that never got an address (EXPIRED with
+            /// DEPOSIT_ADDRESS_CONFLICT).
             ///
             /// Field 15: `deposit_instructions`
             #[must_use]
@@ -27855,8 +28280,9 @@ pub mod __buffa {
                 &self.0.reborrow().terminal_at
             }
             /// Monotonic state version: a snapshot with a lower version is older. Zero
-            /// while ALLOCATING; 1 once the deposit address is issued
-            /// (AWAITING_DEPOSIT); every later change increments it.
+            /// while ALLOCATING; 1 once the deposit address is issued (AWAITING_DEPOSIT)
+            /// or allocation ends without one (EXPIRED with DEPOSIT_ADDRESS_CONFLICT);
+            /// every later change increments it.
             ///
             /// Field 26: `version`
             #[must_use]
@@ -46100,6 +46526,666 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// QuickSwapBrokerServiceGetQuickSwapRequest reads one QuickSwap belonging to this broker.
+        #[derive(Clone, Debug, Default)]
+        pub struct QuickSwapBrokerServiceGetQuickSwapRequestView<'a> {
+            /// Broker name. A broker API key may name only its own broker.
+            ///
+            /// Field 1: `broker`
+            pub broker: &'a str,
+            /// Public QuickSwap ID. Another broker's swap is indistinguishable from an
+            /// unknown ID.
+            ///
+            /// Field 2: `swap_id`
+            pub swap_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for QuickSwapBrokerServiceGetQuickSwapRequestView<'a> {
+            type Owned = super::super::QuickSwapBrokerServiceGetQuickSwapRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.broker = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.swap_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::QuickSwapBrokerServiceGetQuickSwapRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::QuickSwapBrokerServiceGetQuickSwapRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::QuickSwapBrokerServiceGetQuickSwapRequest {
+                    broker: self.broker.to_string(),
+                    swap_id: self.swap_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for QuickSwapBrokerServiceGetQuickSwapRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.broker.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.broker) as u32;
+                }
+                if self.swap_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.broker.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.broker, buf);
+                }
+                if self.swap_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(2u32, self.swap_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for QuickSwapBrokerServiceGetQuickSwapRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.broker) {
+                    __map.serialize_entry("broker", self.broker)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.swap_id) {
+                    __map
+                        .serialize_entry(
+                            "swapId",
+                            &::buffa::json_helpers::ProtoJson(&self.swap_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for QuickSwapBrokerServiceGetQuickSwapRequestView<'a> {
+            const PACKAGE: &'static str = "swap.quickswap.v1";
+            const NAME: &'static str = "QuickSwapBrokerServiceGetQuickSwapRequest";
+            const FULL_NAME: &'static str = "swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapRequest";
+        }
+        ::buffa::impl_default_view_instance!(
+            QuickSwapBrokerServiceGetQuickSwapRequestView
+        );
+        ::buffa::impl_view_reborrow!(QuickSwapBrokerServiceGetQuickSwapRequestView);
+        /** Self-contained, `'static` owned view of a `QuickSwapBrokerServiceGetQuickSwapRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`QuickSwapBrokerServiceGetQuickSwapRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`QuickSwapBrokerServiceGetQuickSwapRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct QuickSwapBrokerServiceGetQuickSwapRequestOwnedView(
+            ::buffa::OwnedView<QuickSwapBrokerServiceGetQuickSwapRequestView<'static>>,
+        );
+        impl QuickSwapBrokerServiceGetQuickSwapRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuickSwapBrokerServiceGetQuickSwapRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuickSwapBrokerServiceGetQuickSwapRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::QuickSwapBrokerServiceGetQuickSwapRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuickSwapBrokerServiceGetQuickSwapRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`QuickSwapBrokerServiceGetQuickSwapRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &QuickSwapBrokerServiceGetQuickSwapRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::QuickSwapBrokerServiceGetQuickSwapRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Broker name. A broker API key may name only its own broker.
+            ///
+            /// Field 1: `broker`
+            #[must_use]
+            pub fn broker(&self) -> &'_ str {
+                self.0.reborrow().broker
+            }
+            /// Public QuickSwap ID. Another broker's swap is indistinguishable from an
+            /// unknown ID.
+            ///
+            /// Field 2: `swap_id`
+            #[must_use]
+            pub fn swap_id(&self) -> u64 {
+                self.0.reborrow().swap_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<QuickSwapBrokerServiceGetQuickSwapRequestView<'static>>,
+        > for QuickSwapBrokerServiceGetQuickSwapRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    QuickSwapBrokerServiceGetQuickSwapRequestView<'static>,
+                >,
+            ) -> Self {
+                QuickSwapBrokerServiceGetQuickSwapRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<QuickSwapBrokerServiceGetQuickSwapRequestOwnedView>
+        for ::buffa::OwnedView<QuickSwapBrokerServiceGetQuickSwapRequestView<'static>> {
+            fn from(
+                wrapper: QuickSwapBrokerServiceGetQuickSwapRequestOwnedView,
+            ) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<QuickSwapBrokerServiceGetQuickSwapRequestView<'static>>,
+        > for QuickSwapBrokerServiceGetQuickSwapRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                QuickSwapBrokerServiceGetQuickSwapRequestView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::QuickSwapBrokerServiceGetQuickSwapRequest {
+            type View<'a> = QuickSwapBrokerServiceGetQuickSwapRequestView<'a>;
+            type ViewHandle = QuickSwapBrokerServiceGetQuickSwapRequestOwnedView;
+        }
+        impl ::serde::Serialize for QuickSwapBrokerServiceGetQuickSwapRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// QuickSwapBrokerServiceGetQuickSwapResponse carries the broker's full swap detail.
+        #[derive(Clone, Debug, Default)]
+        pub struct QuickSwapBrokerServiceGetQuickSwapResponseView<'a> {
+            /// The broker-owned QuickSwap, including its quote, addresses, progress and fees.
+            ///
+            /// Field 1: `quick_swap`
+            pub quick_swap: ::buffa::MessageFieldView<
+                super::super::__buffa::view::QuickSwapView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for QuickSwapBrokerServiceGetQuickSwapResponseView<'a> {
+            type Owned = super::super::QuickSwapBrokerServiceGetQuickSwapResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.quick_swap.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.quick_swap = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::QuickSwapView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::QuickSwapBrokerServiceGetQuickSwapResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::QuickSwapBrokerServiceGetQuickSwapResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::QuickSwapBrokerServiceGetQuickSwapResponse {
+                    quick_swap: match self.quick_swap.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::QuickSwap,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for QuickSwapBrokerServiceGetQuickSwapResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.quick_swap.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.quick_swap.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.quick_swap.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.quick_swap.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for QuickSwapBrokerServiceGetQuickSwapResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .quick_swap
+                        .as_option()
+                    {
+                        __map.serialize_entry("quickSwap", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for QuickSwapBrokerServiceGetQuickSwapResponseView<'a> {
+            const PACKAGE: &'static str = "swap.quickswap.v1";
+            const NAME: &'static str = "QuickSwapBrokerServiceGetQuickSwapResponse";
+            const FULL_NAME: &'static str = "swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/swap.quickswap.v1.QuickSwapBrokerServiceGetQuickSwapResponse";
+        }
+        ::buffa::impl_default_view_instance!(
+            QuickSwapBrokerServiceGetQuickSwapResponseView
+        );
+        ::buffa::impl_view_reborrow!(QuickSwapBrokerServiceGetQuickSwapResponseView);
+        /** Self-contained, `'static` owned view of a `QuickSwapBrokerServiceGetQuickSwapResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`QuickSwapBrokerServiceGetQuickSwapResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`QuickSwapBrokerServiceGetQuickSwapResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct QuickSwapBrokerServiceGetQuickSwapResponseOwnedView(
+            ::buffa::OwnedView<QuickSwapBrokerServiceGetQuickSwapResponseView<'static>>,
+        );
+        impl QuickSwapBrokerServiceGetQuickSwapResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuickSwapBrokerServiceGetQuickSwapResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuickSwapBrokerServiceGetQuickSwapResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::QuickSwapBrokerServiceGetQuickSwapResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuickSwapBrokerServiceGetQuickSwapResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`QuickSwapBrokerServiceGetQuickSwapResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &QuickSwapBrokerServiceGetQuickSwapResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::QuickSwapBrokerServiceGetQuickSwapResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The broker-owned QuickSwap, including its quote, addresses, progress and fees.
+            ///
+            /// Field 1: `quick_swap`
+            #[must_use]
+            pub fn quick_swap(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::QuickSwapView<'_>,
+            > {
+                &self.0.reborrow().quick_swap
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<QuickSwapBrokerServiceGetQuickSwapResponseView<'static>>,
+        > for QuickSwapBrokerServiceGetQuickSwapResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    QuickSwapBrokerServiceGetQuickSwapResponseView<'static>,
+                >,
+            ) -> Self {
+                QuickSwapBrokerServiceGetQuickSwapResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<QuickSwapBrokerServiceGetQuickSwapResponseOwnedView>
+        for ::buffa::OwnedView<QuickSwapBrokerServiceGetQuickSwapResponseView<'static>> {
+            fn from(
+                wrapper: QuickSwapBrokerServiceGetQuickSwapResponseOwnedView,
+            ) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<QuickSwapBrokerServiceGetQuickSwapResponseView<'static>>,
+        > for QuickSwapBrokerServiceGetQuickSwapResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                QuickSwapBrokerServiceGetQuickSwapResponseView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::QuickSwapBrokerServiceGetQuickSwapResponse {
+            type View<'a> = QuickSwapBrokerServiceGetQuickSwapResponseView<'a>;
+            type ViewHandle = QuickSwapBrokerServiceGetQuickSwapResponseOwnedView;
+        }
+        impl ::serde::Serialize for QuickSwapBrokerServiceGetQuickSwapResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// ListQuickSwapsRequest lists the broker's QuickSwaps, newest first, with
         /// optional filters. Every filter narrows the list.
         #[derive(Clone, Debug, Default)]
@@ -51061,6 +52147,12 @@ pub mod __buffa {
         reg.register_json_any(super::__SET_VAULT_STATUS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_VAULT_STATUS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__QUICK_SWAP_SUMMARY_JSON_ANY);
+        reg.register_json_any(
+            super::__QUICK_SWAP_BROKER_SERVICE_GET_QUICK_SWAP_REQUEST_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::__QUICK_SWAP_BROKER_SERVICE_GET_QUICK_SWAP_RESPONSE_JSON_ANY,
+        );
         reg.register_json_any(super::__LIST_QUICK_SWAPS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_QUICK_SWAPS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_FEE_TOTALS_REQUEST_JSON_ANY);
@@ -51330,6 +52422,14 @@ pub use self::__buffa::view::SetVaultStatusResponseOwnedView;
 pub use self::__buffa::view::QuickSwapSummaryView;
 #[doc(inline)]
 pub use self::__buffa::view::QuickSwapSummaryOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::QuickSwapBrokerServiceGetQuickSwapRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::QuickSwapBrokerServiceGetQuickSwapRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::QuickSwapBrokerServiceGetQuickSwapResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::QuickSwapBrokerServiceGetQuickSwapResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListQuickSwapsRequestView;
 #[doc(inline)]
