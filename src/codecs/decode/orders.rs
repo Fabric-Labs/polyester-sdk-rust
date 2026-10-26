@@ -217,7 +217,13 @@ fn decode_trailing_stop(
     }))
 }
 
+/// NOT_CONFIGURED is the server's state for a leg the parent order does not have.
 fn attached_risk_state_is_meaningful(msg: &ProtoAttachedRiskLegState) -> bool {
+    use crate::proto::orders::v1::attached_risk_leg_state::Status;
+
+    if msg.status.as_known() == Some(Status::NotConfigured) {
+        return false;
+    }
     msg.status.to_i32() != 0
         || msg.armed_ts_ns != 0
         || msg.terminal_ts_ns != 0
@@ -1473,6 +1479,88 @@ mod tests {
             63,
             73,
         );
+    }
+
+    #[test]
+    fn not_configured_attached_risk_legs_are_omitted() {
+        use crate::proto::orders::v1::attached_risk_leg_state::Status;
+        use crate::proto::orders::v1::{
+            AttachedRisk as ProtoRisk, AttachedRiskLegState as ProtoState, AttachedRiskStopLoss,
+            AttachedRiskTakeProfit, AttachedRiskTrailingStop, RiskExecution, TakeProfitPolicy,
+        };
+
+        let not_configured = || ProtoState {
+            status: Status::NotConfigured.into(),
+            ..Default::default()
+        };
+        let order = order_from_proto(&ProtoOrder {
+            order_id: 1,
+            attached_risk: ProtoRisk {
+                take_profit: AttachedRiskTakeProfit {
+                    policy: TakeProfitPolicy {
+                        trigger_price_ticks: 2_000_000_000_000,
+                        child: RiskExecution {
+                            execution: Some(
+                                crate::proto::orders::v1::risk_execution::Execution::MarketIoc(
+                                    Box::default(),
+                                ),
+                            ),
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    state: ProtoState {
+                        status: Status::Created.into(),
+                        trigger_id: Some(5_584_097_434_927_106),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                stop_loss: AttachedRiskStopLoss {
+                    state: not_configured().into(),
+                    ..Default::default()
+                }
+                .into(),
+                trailing_stop: AttachedRiskTrailingStop {
+                    state: not_configured().into(),
+                    ..Default::default()
+                }
+                .into(),
+                oco: true,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        let risk = order.attached_risk.expect("configured take-profit");
+        assert!(risk.take_profit.is_some());
+        assert!(risk.stop_loss.is_none(), "stop_loss: {:?}", risk.stop_loss);
+        assert!(
+            risk.trailing_stop.is_none(),
+            "trailing_stop: {:?}",
+            risk.trailing_stop
+        );
+
+        let only_unconfigured = order_from_proto(&ProtoOrder {
+            order_id: 2,
+            attached_risk: ProtoRisk {
+                trailing_stop: AttachedRiskTrailingStop {
+                    state: not_configured().into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(only_unconfigured.attached_risk.is_none());
     }
 
     #[test]

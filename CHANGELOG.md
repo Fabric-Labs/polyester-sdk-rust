@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+- Order reads no longer report an attached-risk leg whose state is
+  `not_configured`; the server sends that state for a leg the order does
+  not have.
+
 ### Added
 - Trigger events report `event_type = "activated"` when a standalone
   trailing trigger's activation condition is met and tracking begins.
