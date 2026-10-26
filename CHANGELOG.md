@@ -42,8 +42,10 @@
 ### Added
 - Standalone BUY trailing stops: `CreateTriggerParams.limit_price` is the
   required maximum price of a BUY trailing stop (`limit_price_ticks`), and
-  must be `None` for a SELL one. Trigger reads expose it as
-  `Trigger.limit_price`; the trailing details carry the trough price.
+  must be `None` for a SELL one. Trigger reads show a BUY trailing stop
+  as an IOC limit child (`order_type` `limit`, `time_in_force` `ioc`) with
+  the maximum price as `Trigger.limit_price`; the trailing details carry the
+  trough price.
 - `Trigger.max_slippage`: the slippage cap of a stop-loss or take-profit
   market child, or of a trailing stop.
 - `CancelAllOrdersResult.cancelled_orders` (order ID and client order ID,

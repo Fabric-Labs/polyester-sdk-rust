@@ -10,7 +10,7 @@ use crate::models::{
     TriggersList,
 };
 use crate::proto::orders::v1::{
-    FeeAsset, SelfTradePreventionMode, TriggerDirection, TriggerPriceSource,
+    FeeAsset, SelfTradePreventionMode, Side as TrailingSide, TriggerDirection, TriggerPriceSource,
 };
 use crate::proto::triggers::v1::{
     CancelTriggerResponse, ConditionalTrigger, CreateTriggerResponse, GetTriggerResponse,
@@ -367,16 +367,24 @@ fn trigger_config_projection(
             }
         }
         Some(trigger::Configuration::TrailingStop(trailing)) => {
-            // Trailing stop is market-IOC; side is carried on the wire. A BUY
-            // trailing stop's maximum price is its limit price.
+            // A SELL trailing stop fires a market IOC child. A standalone BUY
+            // one fires an IOC limit child at its maximum price (or at its
+            // slippage cap above the fire price when that is lower). An
+            // attached BUY trailing leg has no maximum price; its child is
+            // market IOC like a SELL one.
             proj.trigger_type = "trailing_stop".to_owned();
             proj.side = enum_value_side(trailing.side).to_owned();
             if proj.side.is_empty() {
                 proj.side = "sell".to_owned();
             }
-            proj.order_type = "market".to_owned();
             proj.time_in_force = "ioc".to_owned();
-            proj.limit_price = decode_price_ticks(trailing.limit_price_ticks, symbol);
+            let max_price = decode_price_ticks(trailing.limit_price_ticks, symbol);
+            if trailing.side.as_known() == Some(TrailingSide::Buy) && max_price.is_some() {
+                proj.order_type = "limit".to_owned();
+                proj.limit_price = max_price;
+            } else {
+                proj.order_type = "market".to_owned();
+            }
             proj.max_slippage = trailing.max_slippage.as_ref().map(|cap| match cap {
                 trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(ticks) => {
                     MaxSlippage::Ticks(*ticks)
@@ -807,7 +815,9 @@ mod tests {
         let t = trigger_from_proto(&msg);
         assert_eq!(t.trigger_type, "trailing_stop");
         assert_eq!(t.side, "buy");
-        assert_eq!(t.order_type, "market");
+        // A BUY trailing child is an IOC limit order at the maximum price.
+        assert_eq!(t.order_type, "limit");
+        assert_eq!(t.time_in_force, "ioc");
         assert_eq!(t.limit_price.as_ref().unwrap().format(), "85000.25");
         assert_eq!(t.max_slippage, Some(MaxSlippage::Bps(50)));
         let Some(TriggerDetails::Trailing(trailing)) = t.details.as_ref() else {
@@ -828,7 +838,11 @@ mod tests {
         }
         let t = trigger_from_proto(&sell);
         assert_eq!(t.side, "sell");
+        // A SELL trailing child is a market IOC order; its cap stays in max_slippage.
+        assert_eq!(t.order_type, "market");
+        assert_eq!(t.time_in_force, "ioc");
         assert!(t.limit_price.is_none());
+        assert_eq!(t.max_slippage, Some(MaxSlippage::Bps(50)));
     }
 
     #[test]

@@ -365,9 +365,11 @@ highest price and fires a market-IOC child; it takes no `limit_price`. A BUY
 trailing stop tracks the lowest price and requires `limit_price`: its maximum
 price, the most its child pays per unit, fixed at create. Attached
 trailing-stop risk takes the side opposite the parent. Trigger reads project
-`trigger_type`, `side`, `parent_order_id`, a BUY trailing stop's maximum price
-as `limit_price`, and the trough (BUY) or peak (SELL) price in the trailing
-details.
+`trigger_type`, `side` and `parent_order_id`. A standalone BUY trailing stop
+reads as an IOC limit child (`order_type` `limit`, `time_in_force` `ioc`) with
+its maximum price as `limit_price`; a SELL one (and an attached BUY leg) reads
+as a market IOC child with any cap in `max_slippage`. The trailing details
+carry the trough (BUY) or peak (SELL) price.
 
 Stop-loss and take-profit triggers with a market child accept a slippage cap,
 `max_slippage_ticks` or `max_slippage_bps` (at most one; a SELL child takes
