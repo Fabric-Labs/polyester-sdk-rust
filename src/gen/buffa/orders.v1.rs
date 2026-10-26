@@ -798,7 +798,7 @@ pub enum ErrorCode {
     ERROR_CODE_QTY_STEP_SIZE = 8i32,
     /// Client order ID is already in use on this account, by an open order or by
     /// an order that ended recently; an ended order keeps its client order ID
-    /// reserved for at least 15 minutes. Reuse returns this code even with the
+    /// reserved for at least 60 seconds. Reuse returns this code even with the
     /// same payload. Use GetOrder to reconcile, then retry with a new client
     /// order ID.
     ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID = 9i32,
@@ -950,8 +950,8 @@ pub enum ErrorCode {
     ERROR_CODE_GATEWAY_MISCONFIGURED = 77i32,
     /// The order identifier or the replacement order identifier is not valid.
     ERROR_CODE_INVALID_ORDER_ID = 80i32,
-    /// The quantity of a trigger's child order, a TWAP slice or a ladder order
-    /// can't be raised above its planned quantity. Nothing changed.
+    /// The quantity of a trigger's child order or a ladder order can't be raised
+    /// above its planned quantity. Nothing changed.
     ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED = 81i32,
     /// Attached take-profit, stop-loss or trailing legs can't be applied here:
     /// this market takes none, an attached trailing stop isn't offered yet, or
@@ -1091,8 +1091,8 @@ pub enum ErrorCode {
     ERROR_CODE_TRIGGER_DIRECTION_INVALID = 242i32,
     /// The trigger's child order quantity is not positive.
     ERROR_CODE_TRIGGER_QTY_INVALID = 243i32,
-    /// A buy trigger's child order is not a LIMIT order; its funds are reserved at
-    /// the limit price.
+    /// A buy trailing stop's child order is not a LIMIT order with a maximum
+    /// price; its funds are reserved at that price.
     ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT = 244i32,
     /// The account's trading route is not configured for triggers, so the trigger
     /// was not admitted. Contact support if it persists.
@@ -1142,10 +1142,10 @@ pub enum ErrorCode {
     /// New orders, changes and trigger orders on this account are suspended until
     /// a balance issue is resolved; cancels still work. Nothing changed.
     ERROR_CODE_ACCOUNT_ORDERS_SUSPENDED = 263i32,
-    /// A standalone trailing stop must sell; a standalone buy trailing stop is not
-    /// supported. Attached trailing stops take the side opposite their parent.
+    /// A trailing stop's side is not supported. Trailing stops accept either
+    /// side, so this code is not currently returned.
     ERROR_CODE_TRAILING_SIDE_NOT_SUPPORTED = 264i32,
-    /// A trailing stop's child order must be a MARKET order.
+    /// A trailing stop that sells must have a MARKET child order.
     ERROR_CODE_TRAILING_CHILD_NOT_MARKET = 265i32,
     /// The TWAP duration is shorter than 1 second or longer than about 292 years,
     /// the longest the venue's clock represents.
@@ -1188,6 +1188,8 @@ pub enum ErrorCode {
     ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE = 280i32,
     /// The broker's fee account isn't available yet; retry shortly.
     ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE = 281i32,
+    /// The QuickSwap account is not ready yet; no order was placed. Retry shortly.
+    ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN = 301i32,
     /// QuickSwap isn't enabled for this account's trading.
     ERROR_CODE_QUICKSWAP_DISABLED = 282i32,
     /// QuickSwap orders can't carry take-profit or stop-loss legs.
@@ -1223,6 +1225,29 @@ pub enum ErrorCode {
     /// The account already has the most ladder orders one account may have on
     /// this market. Nothing changed; retry once one of them ends.
     ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED = 295i32,
+    /// The new quantity of a TWAP order's slice would leave more than the TWAP's
+    /// remaining quantity. Nothing changed; a slice can be raised up to what the
+    /// TWAP still has to execute.
+    ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING = 296i32,
+    /// The order cancellation was sent but not confirmed in time. Its outcome is
+    /// unknown and it may still apply; read the order before retrying. For a batch
+    /// cancellation, every item's outcome is unknown; read them back. For a cancel
+    /// all, some or all of the matching orders may be canceled; read open orders.
+    /// For a cancel all after heartbeat, the switch may or may not have been armed,
+    /// refreshed or disabled; send the heartbeat again.
+    ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN = 297i32,
+    /// The order modification was sent but not confirmed in time. Its outcome is
+    /// unknown and it may still apply; read the order before retrying. For a batch
+    /// replacement, every item's outcome is unknown; read them back.
+    ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN = 298i32,
+    /// This order is being canceled while the account's balances are brought back
+    /// in line, so it can't be changed. Nothing changed; cancels still work, and
+    /// the account's other orders can still be changed.
+    ERROR_CODE_ORDER_REPAIRING = 299i32,
+    /// This account's orders are being canceled while its balances are brought
+    /// back in line, so new orders, changes and trigger orders are paused for a
+    /// short time. Nothing changed; cancels still work. Try again shortly.
+    ERROR_CODE_ACCOUNT_REPAIRING = 300i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1708,6 +1733,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const QuickswapBrokerAccountUnavailable: Self = Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapAccountOwnerUnknown: Self = Self::ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN;
     ///Idiomatic alias for [`Self::ERROR_CODE_QUICKSWAP_DISABLED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const QuickswapDisabled: Self = Self::ERROR_CODE_QUICKSWAP_DISABLED;
@@ -1750,6 +1778,21 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MarketLadderLimitExceeded: Self = Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ChildQtyExceedsRemaining: Self = Self::ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderCancelOutcomeUnknown: Self = Self::ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderModifyOutcomeUnknown: Self = Self::ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ORDER_REPAIRING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderRepairing: Self = Self::ERROR_CODE_ORDER_REPAIRING;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ACCOUNT_REPAIRING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AccountRepairing: Self = Self::ERROR_CODE_ACCOUNT_REPAIRING;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -2254,6 +2297,11 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE,
                 )
             }
+            301i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN,
+                )
+            }
             282i32 => ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_DISABLED),
             283i32 => {
                 ::core::option::Option::Some(
@@ -2310,6 +2358,23 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED,
                 )
             }
+            296i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING,
+                )
+            }
+            297i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN,
+                )
+            }
+            298i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN,
+                )
+            }
+            299i32 => ::core::option::Option::Some(Self::ERROR_CODE_ORDER_REPAIRING),
+            300i32 => ::core::option::Option::Some(Self::ERROR_CODE_ACCOUNT_REPAIRING),
             _ => ::core::option::Option::None,
         }
     }
@@ -2641,6 +2706,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE => {
                 "ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE"
             }
+            Self::ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN => {
+                "ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN"
+            }
             Self::ERROR_CODE_QUICKSWAP_DISABLED => "ERROR_CODE_QUICKSWAP_DISABLED",
             Self::ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED => {
                 "ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED"
@@ -2679,6 +2747,17 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED => {
                 "ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED"
             }
+            Self::ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING => {
+                "ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING"
+            }
+            Self::ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN => {
+                "ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN"
+            }
+            Self::ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN => {
+                "ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN"
+            }
+            Self::ERROR_CODE_ORDER_REPAIRING => "ERROR_CODE_ORDER_REPAIRING",
+            Self::ERROR_CODE_ACCOUNT_REPAIRING => "ERROR_CODE_ACCOUNT_REPAIRING",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -3236,6 +3315,11 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE,
                 )
             }
+            "ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN,
+                )
+            }
             "ERROR_CODE_QUICKSWAP_DISABLED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_QUICKSWAP_DISABLED)
             }
@@ -3293,6 +3377,27 @@ impl ::buffa::Enumeration for ErrorCode {
                 ::core::option::Option::Some(
                     Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED,
                 )
+            }
+            "ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING,
+                )
+            }
+            "ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN,
+                )
+            }
+            "ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN,
+                )
+            }
+            "ERROR_CODE_ORDER_REPAIRING" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ORDER_REPAIRING)
+            }
+            "ERROR_CODE_ACCOUNT_REPAIRING" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ACCOUNT_REPAIRING)
             }
             _ => ::core::option::Option::None,
         }
@@ -3460,6 +3565,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_QUICKSWAP_FEE_RECIPIENT_IS_PAYER,
             Self::ERROR_CODE_QUICKSWAP_BROKER_FEE_TERMS_UNAVAILABLE,
             Self::ERROR_CODE_QUICKSWAP_BROKER_ACCOUNT_UNAVAILABLE,
+            Self::ERROR_CODE_QUICKSWAP_ACCOUNT_OWNER_UNKNOWN,
             Self::ERROR_CODE_QUICKSWAP_DISABLED,
             Self::ERROR_CODE_QUICKSWAP_ATTACHED_RISK_NOT_ALLOWED,
             Self::ERROR_CODE_QUICKSWAP_ORDER_NOT_MODIFIABLE,
@@ -3474,6 +3580,11 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_MARKET_TRIGGER_LIMIT_EXCEEDED,
             Self::ERROR_CODE_MARKET_TWAP_LIMIT_EXCEEDED,
             Self::ERROR_CODE_MARKET_LADDER_LIMIT_EXCEEDED,
+            Self::ERROR_CODE_CHILD_QTY_EXCEEDS_REMAINING,
+            Self::ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN,
+            Self::ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN,
+            Self::ERROR_CODE_ORDER_REPAIRING,
+            Self::ERROR_CODE_ACCOUNT_REPAIRING,
         ]
     }
 }
@@ -9631,10 +9742,25 @@ pub mod trailing_stop_policy {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage as MaxSlippageView;
 }
-/// RiskPolicy defines optional risk controls (TP/SL/TrailingStop) attached to an
-/// order. These arm after the parent order fills and fire when conditions are
-/// met. If the parent order is canceled before any fill, attached risk controls
-/// are discarded.
+/// RiskPolicy defines optional risk controls (take-profit, stop-loss or
+/// trailing stop) attached to an order. The legs protect the parent order's
+/// filled position: they arm as the parent fills and follow its later fills.
+///
+/// The legs of one parent share that position, whether or not oco is set, and
+/// only one exit works at a time. The first leg whose condition is met submits
+/// an exit for the whole remaining position, rounded down to the pair's step
+/// size; a remainder below one step stays in the balance. If another leg's
+/// condition is met while that exit works, the working exit is canceled; once
+/// it ends, that leg is checked again against the latest trade and, if its
+/// condition still holds, exits what remains. After an exit ends, the legs keep
+/// protecting whatever position remains.
+///
+/// The legs end once the parent order is terminal and no position they can
+/// exit remains: the leg whose exit ended last completes, and the others are
+/// canceled with TRIGGER_CANCEL_REASON_OCO. If the parent order ends without a
+/// fill, the legs are canceled with
+/// TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL. If no exit ran and the
+/// parent's whole fill is below one step, the legs fail.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -9648,9 +9774,11 @@ pub struct RiskPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub take_profit: ::buffa::MessageField<TakeProfitPolicy>,
-    /// If true, take-profit and the configured stop leg (stop-loss or trailing-stop)
-    /// form an OCO pair: when one fires, the other is canceled.
-    /// Default is false (no mutual cancellation).
+    /// If true, the take-profit and the configured stop leg (stop-loss or
+    /// trailing stop) are linked and shown as one-cancels-the-other. Requires a
+    /// take-profit and exactly one stop leg. The legs of every parent share one
+    /// position and end together as described on RiskPolicy, so this setting
+    /// does not change when exits are submitted or canceled. Default is false.
     ///
     /// Field 4: `oco`
     #[serde(
@@ -10289,7 +10417,166 @@ pub const __CANCEL_ALL_ORDERS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyE
     from_json: ::buffa::type_registry::any_from_json::<CancelAllOrdersRequest>,
     is_wkt: false,
 };
+/// CancelledOrder identifies one order whose cancellation a cancel-all
+/// requested.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CancelledOrder {
+    /// Order ID.
+    ///
+    /// Field 1: `order_id`
+    #[serde(
+        rename = "orderId",
+        alias = "order_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub order_id: u64,
+    /// The order's client order ID; empty when the order has none.
+    ///
+    /// Field 2: `client_order_id`
+    #[serde(
+        rename = "clientOrderId",
+        alias = "client_order_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub client_order_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CancelledOrder {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CancelledOrder")
+            .field("order_id", &self.order_id)
+            .field("client_order_id", &self.client_order_id)
+            .finish()
+    }
+}
+impl CancelledOrder {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.CancelledOrder";
+}
+::buffa::impl_default_instance!(CancelledOrder);
+impl ::buffa::MessageName for CancelledOrder {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "CancelledOrder";
+    const FULL_NAME: &'static str = "orders.v1.CancelledOrder";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.CancelledOrder";
+}
+impl ::buffa::Message for CancelledOrder {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.order_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.client_order_id.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.client_order_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.order_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.order_id, buf);
+        }
+        if !self.client_order_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.client_order_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.order_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.client_order_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.order_id = 0u64;
+        self.client_order_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CancelledOrder {
+    const PROTO_FQN: &'static str = "orders.v1.CancelledOrder";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CancelledOrder {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CANCELLED_ORDER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.CancelledOrder",
+    to_json: ::buffa::type_registry::any_to_json::<CancelledOrder>,
+    from_json: ::buffa::type_registry::any_from_json::<CancelledOrder>,
+    is_wkt: false,
+};
 /// CancelAllOrdersResponse returns the result of a cancel-all operation.
+/// The response confirms that cancellation was requested for every matching
+/// order; each order's final state is reported on the order update stream and
+/// read paths.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -10359,6 +10646,42 @@ pub struct CancelAllOrdersResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_ns: u64,
+    /// Orders whose cancellation was requested, oldest first (the order in
+    /// which they were created), at most 200. When more orders were canceled,
+    /// these are the 200 oldest and `truncated` is true; the order update stream
+    /// and read paths report every one. Empty when `dry_run` is set. Retrying
+    /// with the same `request_id` and criteria within the replay window returns
+    /// the same list.
+    ///
+    /// Field 7: `cancelled_orders`
+    #[serde(
+        rename = "cancelledOrders",
+        alias = "cancelled_orders",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub cancelled_orders: ::buffa::alloc::vec::Vec<CancelledOrder>,
+    /// Number of orders whose cancellation was requested, including those not
+    /// listed in `cancelled_orders`. Equals `submitted_cancels`. Zero when
+    /// `dry_run` is set.
+    ///
+    /// Field 8: `total_cancelled`
+    #[serde(
+        rename = "totalCancelled",
+        alias = "total_cancelled",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub total_cancelled: u32,
+    /// True when more orders were canceled than `cancelled_orders` lists.
+    ///
+    /// Field 9: `truncated`
+    #[serde(
+        rename = "truncated",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub truncated: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -10372,6 +10695,9 @@ impl ::core::fmt::Debug for CancelAllOrdersResponse {
             .field("failed_cancels", &self.failed_cancels)
             .field("ts", &self.ts)
             .field("ts_ns", &self.ts_ns)
+            .field("cancelled_orders", &self.cancelled_orders)
+            .field("total_cancelled", &self.total_cancelled)
+            .field("truncated", &self.truncated)
             .finish()
     }
 }
@@ -10430,6 +10756,22 @@ impl ::buffa::Message for CancelAllOrdersResponse {
         if self.ts_ns != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
         }
+        for v in &self.cancelled_orders {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.total_cancelled != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.total_cancelled) as u32;
+        }
+        if self.truncated {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -10461,6 +10803,16 @@ impl ::buffa::Message for CancelAllOrdersResponse {
         }
         if self.ts_ns != 0u64 {
             ::buffa::types::put_uint64_field(6u32, self.ts_ns, buf);
+        }
+        for v in &self.cancelled_orders {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.total_cancelled != 0u32 {
+            ::buffa::types::put_uint32_field(8u32, self.total_cancelled, buf);
+        }
+        if self.truncated {
+            ::buffa::types::put_bool_field(9u32, self.truncated, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -10523,6 +10875,29 @@ impl ::buffa::Message for CancelAllOrdersResponse {
                 )?;
                 self.ts_ns = ::buffa::types::decode_uint64(buf)?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.cancelled_orders.push(elem);
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.total_cancelled = ::buffa::types::decode_uint32(buf)?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.truncated = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -10537,6 +10912,9 @@ impl ::buffa::Message for CancelAllOrdersResponse {
         self.failed_cancels = 0u32;
         self.ts = ::buffa::MessageField::none();
         self.ts_ns = 0u64;
+        self.cancelled_orders.clear();
+        self.total_cancelled = 0u32;
+        self.truncated = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -12603,7 +12981,8 @@ pub struct ModifyOrderRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Idempotency key (required).
+    /// Idempotency key (required). Outstanding modifications retain this key;
+    /// identical retries replay the final result for 60 seconds after the answer.
     ///
     /// Field 4: `request_id`
     #[serde(
@@ -14420,6 +14799,8 @@ pub const __BATCH_REPLACE_ADMISSION_ITEM_JSON_ANY: ::buffa::type_registry::JsonA
     is_wkt: false,
 };
 /// BatchReplaceOrdersRequest replaces same-symbol orders as one quote refresh.
+/// Identical retries replay the admission result for 60 seconds from acceptance;
+/// a different payload under the same key conflicts. Use a fresh key for a new batch.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -17952,9 +18333,10 @@ pub struct AttachedRisk {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub trailing_stop: ::buffa::MessageField<AttachedRiskTrailingStop>,
-    /// True while both the take-profit and a stop leg (stop-loss or trailing
-    /// stop) are present and linked as one-cancels-the-other. False once either
-    /// leg is removed; a leg canceled because the other fired stays present.
+    /// True while the parent's legs were placed with oco and both the
+    /// take-profit and a stop leg (stop-loss or trailing stop) are present.
+    /// False once either leg is removed. A leg that ended, including one
+    /// canceled with TRIGGER_CANCEL_REASON_OCO, stays present.
     ///
     /// Field 4: `oco`
     #[serde(
@@ -23249,6 +23631,8 @@ pub const __GET_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     is_wkt: false,
 };
 /// GetBatchReplaceStatusRequest retrieves one admitted batch by server identity.
+/// Batch admission replay lasts 60 seconds from acceptance. If status is
+/// unavailable, reconcile the individual orders; absence does not prove rejection.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -32045,10 +32429,25 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// RiskPolicy defines optional risk controls (TP/SL/TrailingStop) attached to an
-        /// order. These arm after the parent order fills and fire when conditions are
-        /// met. If the parent order is canceled before any fill, attached risk controls
-        /// are discarded.
+        /// RiskPolicy defines optional risk controls (take-profit, stop-loss or
+        /// trailing stop) attached to an order. The legs protect the parent order's
+        /// filled position: they arm as the parent fills and follow its later fills.
+        ///
+        /// The legs of one parent share that position, whether or not oco is set, and
+        /// only one exit works at a time. The first leg whose condition is met submits
+        /// an exit for the whole remaining position, rounded down to the pair's step
+        /// size; a remainder below one step stays in the balance. If another leg's
+        /// condition is met while that exit works, the working exit is canceled; once
+        /// it ends, that leg is checked again against the latest trade and, if its
+        /// condition still holds, exits what remains. After an exit ends, the legs keep
+        /// protecting whatever position remains.
+        ///
+        /// The legs end once the parent order is terminal and no position they can
+        /// exit remains: the leg whose exit ended last completes, and the others are
+        /// canceled with TRIGGER_CANCEL_REASON_OCO. If the parent order ends without a
+        /// fill, the legs are canceled with
+        /// TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL. If no exit ran and the
+        /// parent's whole fill is below one step, the legs fail.
         #[derive(Clone, Debug, Default)]
         pub struct RiskPolicyView<'a> {
             /// Optional take-profit configuration.
@@ -32057,9 +32456,11 @@ pub mod __buffa {
             pub take_profit: ::buffa::MessageFieldView<
                 super::super::__buffa::view::TakeProfitPolicyView<'a>,
             >,
-            /// If true, take-profit and the configured stop leg (stop-loss or trailing-stop)
-            /// form an OCO pair: when one fires, the other is canceled.
-            /// Default is false (no mutual cancellation).
+            /// If true, the take-profit and the configured stop leg (stop-loss or
+            /// trailing stop) are linked and shown as one-cancels-the-other. Requires a
+            /// take-profit and exactly one stop leg. The legs of every parent share one
+            /// position and end together as described on RiskPolicy, so this setting
+            /// does not change when exits are submitted or canceled. Default is false.
             ///
             /// Field 4: `oco`
             pub oco: bool,
@@ -32495,9 +32896,11 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().take_profit
             }
-            /// If true, take-profit and the configured stop leg (stop-loss or trailing-stop)
-            /// form an OCO pair: when one fires, the other is canceled.
-            /// Default is false (no mutual cancellation).
+            /// If true, the take-profit and the configured stop leg (stop-loss or
+            /// trailing stop) are linked and shown as one-cancels-the-other. Requires a
+            /// take-profit and exactly one stop leg. The legs of every parent share one
+            /// position and end together as described on RiskPolicy, so this setting
+            /// does not change when exits are submitted or canceled. Default is false.
             ///
             /// Field 4: `oco`
             #[must_use]
@@ -32992,7 +33395,312 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// CancelledOrder identifies one order whose cancellation a cancel-all
+        /// requested.
+        #[derive(Clone, Debug, Default)]
+        pub struct CancelledOrderView<'a> {
+            /// Order ID.
+            ///
+            /// Field 1: `order_id`
+            pub order_id: u64,
+            /// The order's client order ID; empty when the order has none.
+            ///
+            /// Field 2: `client_order_id`
+            pub client_order_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CancelledOrderView<'a> {
+            type Owned = super::super::CancelledOrder;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.order_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_order_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelledOrder,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CancelledOrder,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CancelledOrder {
+                    order_id: self.order_id,
+                    client_order_id: self.client_order_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CancelledOrderView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.order_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.client_order_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.client_order_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.order_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.order_id, buf);
+                }
+                if !self.client_order_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.client_order_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CancelledOrderView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.order_id) {
+                    __map
+                        .serialize_entry(
+                            "orderId",
+                            &::buffa::json_helpers::ProtoJson(&self.order_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_order_id) {
+                    __map.serialize_entry("clientOrderId", self.client_order_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CancelledOrderView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "CancelledOrder";
+            const FULL_NAME: &'static str = "orders.v1.CancelledOrder";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.CancelledOrder";
+        }
+        ::buffa::impl_default_view_instance!(CancelledOrderView);
+        ::buffa::impl_view_reborrow!(CancelledOrderView);
+        /** Self-contained, `'static` owned view of a `CancelledOrder` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CancelledOrderView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CancelledOrderView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CancelledOrderOwnedView(
+            ::buffa::OwnedView<CancelledOrderView<'static>>,
+        );
+        impl CancelledOrderOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelledOrderOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelledOrderOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CancelledOrder,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelledOrderOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CancelledOrderView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CancelledOrderView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelledOrder,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Order ID.
+            ///
+            /// Field 1: `order_id`
+            #[must_use]
+            pub fn order_id(&self) -> u64 {
+                self.0.reborrow().order_id
+            }
+            /// The order's client order ID; empty when the order has none.
+            ///
+            /// Field 2: `client_order_id`
+            #[must_use]
+            pub fn client_order_id(&self) -> &'_ str {
+                self.0.reborrow().client_order_id
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<CancelledOrderView<'static>>>
+        for CancelledOrderOwnedView {
+            fn from(inner: ::buffa::OwnedView<CancelledOrderView<'static>>) -> Self {
+                CancelledOrderOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CancelledOrderOwnedView>
+        for ::buffa::OwnedView<CancelledOrderView<'static>> {
+            fn from(wrapper: CancelledOrderOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<CancelledOrderView<'static>>>
+        for CancelledOrderOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CancelledOrderView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CancelledOrder {
+            type View<'a> = CancelledOrderView<'a>;
+            type ViewHandle = CancelledOrderOwnedView;
+        }
+        impl ::serde::Serialize for CancelledOrderOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// CancelAllOrdersResponse returns the result of a cancel-all operation.
+        /// The response confirms that cancellation was requested for every matching
+        /// order; each order's final state is reported on the order update stream and
+        /// read paths.
         #[derive(Clone, Debug, Default)]
         pub struct CancelAllOrdersResponseView<'a> {
             /// Cancel-all submission outcome.
@@ -33031,6 +33739,28 @@ pub mod __buffa {
             ///
             /// Field 6: `ts_ns`
             pub ts_ns: u64,
+            /// Orders whose cancellation was requested, oldest first (the order in
+            /// which they were created), at most 200. When more orders were canceled,
+            /// these are the 200 oldest and `truncated` is true; the order update stream
+            /// and read paths report every one. Empty when `dry_run` is set. Retrying
+            /// with the same `request_id` and criteria within the replay window returns
+            /// the same list.
+            ///
+            /// Field 7: `cancelled_orders`
+            pub cancelled_orders: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::CancelledOrderView<'a>,
+            >,
+            /// Number of orders whose cancellation was requested, including those not
+            /// listed in `cancelled_orders`. Equals `submitted_cancels`. Zero when
+            /// `dry_run` is set.
+            ///
+            /// Field 8: `total_cancelled`
+            pub total_cancelled: u32,
+            /// True when more orders were canceled than `cancelled_orders` lists.
+            ///
+            /// Field 9: `truncated`
+            pub truncated: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CancelAllOrdersResponseView<'a> {
@@ -33128,6 +33858,35 @@ pub mod __buffa {
                         )?;
                         view.ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.total_cancelled = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.truncated = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.cancelled_orders
+                            .push(
+                                <super::super::__buffa::view::CancelledOrderView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -33170,6 +33929,13 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     ts_ns: self.ts_ns,
+                    cancelled_orders: self
+                        .cancelled_orders
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    total_cancelled: self.total_cancelled,
+                    truncated: self.truncated,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -33219,6 +33985,23 @@ pub mod __buffa {
                 if self.ts_ns != 0u64 {
                     size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
                 }
+                for v in &self.cancelled_orders {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.total_cancelled != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.total_cancelled)
+                                as u32;
+                }
+                if self.truncated {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -33255,6 +34038,20 @@ pub mod __buffa {
                 }
                 if self.ts_ns != 0u64 {
                     ::buffa::types::put_uint64_field(6u32, self.ts_ns, buf);
+                }
+                for v in &self.cancelled_orders {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.total_cancelled != 0u32 {
+                    ::buffa::types::put_uint32_field(8u32, self.total_cancelled, buf);
+                }
+                if self.truncated {
+                    ::buffa::types::put_bool_field(9u32, self.truncated, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -33314,6 +34111,19 @@ pub mod __buffa {
                             "tsNs",
                             &::buffa::json_helpers::ProtoJson(&self.ts_ns),
                         )?;
+                }
+                if !self.cancelled_orders.is_empty() {
+                    __map.serialize_entry("cancelledOrders", &*self.cancelled_orders)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.total_cancelled) {
+                    __map
+                        .serialize_entry(
+                            "totalCancelled",
+                            &::buffa::json_helpers::ProtoJson(&self.total_cancelled),
+                        )?;
+                }
+                if self.truncated {
+                    __map.serialize_entry("truncated", &self.truncated)?;
                 }
                 __map.end()
             }
@@ -33468,6 +34278,39 @@ pub mod __buffa {
             #[must_use]
             pub fn ts_ns(&self) -> u64 {
                 self.0.reborrow().ts_ns
+            }
+            /// Orders whose cancellation was requested, oldest first (the order in
+            /// which they were created), at most 200. When more orders were canceled,
+            /// these are the 200 oldest and `truncated` is true; the order update stream
+            /// and read paths report every one. Empty when `dry_run` is set. Retrying
+            /// with the same `request_id` and criteria within the replay window returns
+            /// the same list.
+            ///
+            /// Field 7: `cancelled_orders`
+            #[must_use]
+            pub fn cancelled_orders(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::CancelledOrderView<'_>,
+            > {
+                &self.0.reborrow().cancelled_orders
+            }
+            /// Number of orders whose cancellation was requested, including those not
+            /// listed in `cancelled_orders`. Equals `submitted_cancels`. Zero when
+            /// `dry_run` is set.
+            ///
+            /// Field 8: `total_cancelled`
+            #[must_use]
+            pub fn total_cancelled(&self) -> u32 {
+                self.0.reborrow().total_cancelled
+            }
+            /// True when more orders were canceled than `cancelled_orders` lists.
+            ///
+            /// Field 9: `truncated`
+            #[must_use]
+            pub fn truncated(&self) -> bool {
+                self.0.reborrow().truncated
             }
         }
         impl ::core::convert::From<
@@ -36482,7 +37325,8 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Idempotency key (required).
+            /// Idempotency key (required). Outstanding modifications retain this key;
+            /// identical retries replay the final result for 60 seconds after the answer.
             ///
             /// Field 4: `request_id`
             pub request_id: &'a str,
@@ -37040,7 +37884,8 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Idempotency key (required).
+            /// Idempotency key (required). Outstanding modifications retain this key;
+            /// identical retries replay the final result for 60 seconds after the answer.
             ///
             /// Field 4: `request_id`
             #[must_use]
@@ -38811,6 +39656,8 @@ pub mod __buffa {
             }
         }
         /// BatchReplaceOrdersRequest replaces same-symbol orders as one quote refresh.
+        /// Identical retries replay the admission result for 60 seconds from acceptance;
+        /// a different payload under the same key conflicts. Use a fresh key for a new batch.
         #[derive(Clone, Debug, Default)]
         pub struct BatchReplaceOrdersRequestView<'a> {
             /// Target sub-account numeric ID. When omitted, uses caller's root account.
@@ -43417,9 +44264,10 @@ pub mod __buffa {
             pub trailing_stop: ::buffa::MessageFieldView<
                 super::super::__buffa::view::AttachedRiskTrailingStopView<'a>,
             >,
-            /// True while both the take-profit and a stop leg (stop-loss or trailing
-            /// stop) are present and linked as one-cancels-the-other. False once either
-            /// leg is removed; a leg canceled because the other fired stays present.
+            /// True while the parent's legs were placed with oco and both the
+            /// take-profit and a stop leg (stop-loss or trailing stop) are present.
+            /// False once either leg is removed. A leg that ended, including one
+            /// canceled with TRIGGER_CANCEL_REASON_OCO, stays present.
             ///
             /// Field 4: `oco`
             pub oco: bool,
@@ -43844,9 +44692,10 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().trailing_stop
             }
-            /// True while both the take-profit and a stop leg (stop-loss or trailing
-            /// stop) are present and linked as one-cancels-the-other. False once either
-            /// leg is removed; a leg canceled because the other fired stays present.
+            /// True while the parent's legs were placed with oco and both the
+            /// take-profit and a stop leg (stop-loss or trailing stop) are present.
+            /// False once either leg is removed. A leg that ended, including one
+            /// canceled with TRIGGER_CANCEL_REASON_OCO, stays present.
             ///
             /// Field 4: `oco`
             #[must_use]
@@ -51340,6 +52189,8 @@ pub mod __buffa {
             }
         }
         /// GetBatchReplaceStatusRequest retrieves one admitted batch by server identity.
+        /// Batch admission replay lasts 60 seconds from acceptance. If status is
+        /// unavailable, reconcile the individual orders; absence does not prove rejection.
         #[derive(Clone, Debug, Default)]
         pub struct GetBatchReplaceStatusRequestView<'a> {
             /// Target sub-account numeric ID. When omitted, uses caller's root account.
@@ -53464,6 +54315,7 @@ pub mod __buffa {
         reg.register_json_any(super::__TRAILING_STOP_POLICY_JSON_ANY);
         reg.register_json_any(super::__RISK_POLICY_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ALL_ORDERS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CANCELLED_ORDER_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ALL_ORDERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ALL_AFTER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ALL_AFTER_RESPONSE_JSON_ANY);
@@ -53594,6 +54446,10 @@ pub use self::__buffa::view::RiskPolicyOwnedView;
 pub use self::__buffa::view::CancelAllOrdersRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::CancelAllOrdersRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelledOrderView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelledOrderOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CancelAllOrdersResponseView;
 #[doc(inline)]

@@ -625,7 +625,9 @@ pub const MARKET_DATA_SERVICE_GET_SPOT_CONFIG_SPEC: ::connectrpc::Spec = ::conne
 pub trait MarketDataService: Send + Sync + 'static {
     /// Retrieve recent public trades for a spot market.
     /// Results are ordered newest-first and support optional aggressor side,
-    /// inclusive time-range, and opaque keyset pagination filters.
+    /// inclusive time-range, and opaque keyset pagination filters. With
+    /// after_trade_id, it walks the symbol's trades by trade identifier,
+    /// oldest first and gap-free, to backfill trades missed on a live stream.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

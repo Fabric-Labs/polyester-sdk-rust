@@ -35,6 +35,8 @@ pub enum ErrorCode {
     ERROR_CODE_SUBACCOUNT_NOT_FOUND = 13i32,
     /// The selected subaccount is owned by the authenticated root account but is not active.
     ERROR_CODE_SUBACCOUNT_INACTIVE = 14i32,
+    /// Reward payouts for this campaign are paused. Today's claim is kept and paid automatically once payouts resume.
+    ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE = 15i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -82,6 +84,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_SUBACCOUNT_INACTIVE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const SubaccountInactive: Self = Self::ERROR_CODE_SUBACCOUNT_INACTIVE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClaimPayoutUnavailable: Self = Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -200,6 +205,9 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             13i32 => ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_NOT_FOUND),
             14i32 => ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_INACTIVE),
+            15i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -227,6 +235,9 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_SUBACCOUNT_NOT_FOUND => "ERROR_CODE_SUBACCOUNT_NOT_FOUND",
             Self::ERROR_CODE_SUBACCOUNT_INACTIVE => "ERROR_CODE_SUBACCOUNT_INACTIVE",
+            Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE => {
+                "ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -280,6 +291,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_SUBACCOUNT_INACTIVE" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_INACTIVE)
             }
+            "ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -300,6 +314,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_SOCIAL_VERIFICATION_REQUIRED,
             Self::ERROR_CODE_SUBACCOUNT_NOT_FOUND,
             Self::ERROR_CODE_SUBACCOUNT_INACTIVE,
+            Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE,
         ]
     }
 }
@@ -455,6 +470,9 @@ pub enum DailyClaimState {
     CLAIM_CLAIMED = 3i32,
     /// No reward is active for the current UTC day.
     CLAIM_UNAVAILABLE = 4i32,
+    /// Today's claim is recorded but its payout is delayed. It is retried and paid automatically;
+    /// the payout delay reason gives the cause.
+    CLAIM_PAYOUT_DELAYED = 5i32,
 }
 impl DailyClaimState {
     ///Idiomatic alias for [`Self::CLAIM_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -472,6 +490,9 @@ impl DailyClaimState {
     ///Idiomatic alias for [`Self::CLAIM_UNAVAILABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ClaimUnavailable: Self = Self::CLAIM_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::CLAIM_PAYOUT_DELAYED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClaimPayoutDelayed: Self = Self::CLAIM_PAYOUT_DELAYED;
 }
 impl ::core::default::Default for DailyClaimState {
     fn default() -> Self {
@@ -574,6 +595,7 @@ impl ::buffa::Enumeration for DailyClaimState {
             2i32 => ::core::option::Option::Some(Self::CLAIM_PROCESSING),
             3i32 => ::core::option::Option::Some(Self::CLAIM_CLAIMED),
             4i32 => ::core::option::Option::Some(Self::CLAIM_UNAVAILABLE),
+            5i32 => ::core::option::Option::Some(Self::CLAIM_PAYOUT_DELAYED),
             _ => ::core::option::Option::None,
         }
     }
@@ -587,6 +609,7 @@ impl ::buffa::Enumeration for DailyClaimState {
             Self::CLAIM_PROCESSING => "CLAIM_PROCESSING",
             Self::CLAIM_CLAIMED => "CLAIM_CLAIMED",
             Self::CLAIM_UNAVAILABLE => "CLAIM_UNAVAILABLE",
+            Self::CLAIM_PAYOUT_DELAYED => "CLAIM_PAYOUT_DELAYED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -596,6 +619,9 @@ impl ::buffa::Enumeration for DailyClaimState {
             "CLAIM_PROCESSING" => ::core::option::Option::Some(Self::CLAIM_PROCESSING),
             "CLAIM_CLAIMED" => ::core::option::Option::Some(Self::CLAIM_CLAIMED),
             "CLAIM_UNAVAILABLE" => ::core::option::Option::Some(Self::CLAIM_UNAVAILABLE),
+            "CLAIM_PAYOUT_DELAYED" => {
+                ::core::option::Option::Some(Self::CLAIM_PAYOUT_DELAYED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -606,6 +632,7 @@ impl ::buffa::Enumeration for DailyClaimState {
             Self::CLAIM_PROCESSING,
             Self::CLAIM_CLAIMED,
             Self::CLAIM_UNAVAILABLE,
+            Self::CLAIM_PAYOUT_DELAYED,
         ]
     }
 }
@@ -1303,6 +1330,18 @@ pub struct GetDailyClaimStatusResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub subaccount_id: u64,
+    /// Why the payout of today's claim is delayed: the claim reward is temporarily unavailable, or
+    /// reward payouts for this campaign are paused. Set only while the state is payout delayed;
+    /// unspecified or omitted otherwise.
+    ///
+    /// Field 7: `payout_delay_reason`
+    #[serde(
+        rename = "payoutDelayReason",
+        alias = "payout_delay_reason",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub payout_delay_reason: ::buffa::EnumValue<ErrorCode>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1316,6 +1355,7 @@ impl ::core::fmt::Debug for GetDailyClaimStatusResponse {
             .field("claim_id", &self.claim_id)
             .field("campaign", &self.campaign)
             .field("subaccount_id", &self.subaccount_id)
+            .field("payout_delay_reason", &self.payout_delay_reason)
             .finish()
     }
 }
@@ -1380,6 +1420,12 @@ impl ::buffa::Message for GetDailyClaimStatusResponse {
         if self.subaccount_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        {
+            let val = self.payout_delay_reason.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1413,6 +1459,12 @@ impl ::buffa::Message for GetDailyClaimStatusResponse {
         }
         if self.subaccount_id != 0u64 {
             ::buffa::types::put_fixed64_field(6u32, self.subaccount_id, buf);
+        }
+        {
+            let val = self.payout_delay_reason.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1481,6 +1533,15 @@ impl ::buffa::Message for GetDailyClaimStatusResponse {
                 )?;
                 self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.payout_delay_reason = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1495,6 +1556,7 @@ impl ::buffa::Message for GetDailyClaimStatusResponse {
         self.claim_id.clear();
         self.campaign = ::buffa::MessageField::none();
         self.subaccount_id = 0u64;
+        self.payout_delay_reason = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3485,6 +3547,12 @@ pub mod __buffa {
             ///
             /// Field 6: `subaccount_id`
             pub subaccount_id: u64,
+            /// Why the payout of today's claim is delayed: the claim reward is temporarily unavailable, or
+            /// reward payouts for this campaign are paused. Set only while the state is payout delayed;
+            /// unspecified or omitted otherwise.
+            ///
+            /// Field 7: `payout_delay_reason`
+            pub payout_delay_reason: ::buffa::EnumValue<super::super::ErrorCode>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetDailyClaimStatusResponseView<'a> {
@@ -3591,6 +3659,15 @@ pub mod __buffa {
                         )?;
                         view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
                     }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.payout_delay_reason = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -3659,6 +3736,7 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     subaccount_id: self.subaccount_id,
+                    payout_delay_reason: self.payout_delay_reason,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -3711,6 +3789,12 @@ pub mod __buffa {
                 if self.subaccount_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
+                {
+                    let val = self.payout_delay_reason.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -3757,6 +3841,12 @@ pub mod __buffa {
                 }
                 if self.subaccount_id != 0u64 {
                     ::buffa::types::put_fixed64_field(6u32, self.subaccount_id, buf);
+                }
+                {
+                    let val = self.payout_delay_reason.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(7u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -3805,6 +3895,15 @@ pub mod __buffa {
                         .serialize_entry(
                             "subaccountId",
                             &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.payout_delay_reason,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "payoutDelayReason",
+                            &self.payout_delay_reason,
                         )?;
                 }
                 __map.end()
@@ -3962,6 +4061,17 @@ pub mod __buffa {
             #[must_use]
             pub fn subaccount_id(&self) -> u64 {
                 self.0.reborrow().subaccount_id
+            }
+            /// Why the payout of today's claim is delayed: the claim reward is temporarily unavailable, or
+            /// reward payouts for this campaign are paused. Set only while the state is payout delayed;
+            /// unspecified or omitted otherwise.
+            ///
+            /// Field 7: `payout_delay_reason`
+            #[must_use]
+            pub fn payout_delay_reason(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::ErrorCode> {
+                self.0.reborrow().payout_delay_reason
             }
         }
         impl ::core::convert::From<
