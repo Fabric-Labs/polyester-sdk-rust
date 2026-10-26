@@ -298,11 +298,10 @@ pub fn map_connect_error(err: ConnectError) -> Error {
     let header_retry = retry_after_seconds(&err);
     for detail in &err.details {
         if let Some(auth_detail) = decode_auth_error_detail(detail) {
-            let code = auth_detail
-                .code
-                .as_known()
-                .map(|c| c.proto_name().to_owned())
-                .unwrap_or_else(|| "AUTH_UNSPECIFIED".to_owned());
+            let code = known_or_unknown_code(
+                auth_detail.code.as_known().map(|c| c.proto_name()),
+                auth_detail.code.to_i32(),
+            );
             let message = if auth_detail.message.is_empty() {
                 fallback_message.clone()
             } else {
@@ -334,11 +333,10 @@ pub fn map_connect_error(err: ConnectError) -> Error {
                     .map(rate_limit_detail_from_proto_local);
                 return rate_limit_error(fallback_message.clone(), detail, header_retry);
             }
-            let code = order_detail
-                .code
-                .as_known()
-                .map(|c| c.proto_name().to_owned())
-                .unwrap_or_else(|| "ERROR_CODE_UNSPECIFIED".to_owned());
+            let code = known_or_unknown_code(
+                order_detail.code.as_known().map(|c| c.proto_name()),
+                order_detail.code.to_i32(),
+            );
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
             }
@@ -349,11 +347,10 @@ pub fn map_connect_error(err: ConnectError) -> Error {
             };
         }
         if let Some(withdraw_detail) = decode_withdraw_error_detail(detail) {
-            let code = withdraw_detail
-                .code
-                .as_known()
-                .map(|c| c.proto_name().to_owned())
-                .unwrap_or_else(|| "ERROR_CODE_UNSPECIFIED".to_owned());
+            let code = known_or_unknown_code(
+                withdraw_detail.code.as_known().map(|c| c.proto_name()),
+                withdraw_detail.code.to_i32(),
+            );
             if matches!(
                 withdraw_detail.code.as_known(),
                 Some(WithdrawErrorCode::RateLimitExceeded)
@@ -370,11 +367,10 @@ pub fn map_connect_error(err: ConnectError) -> Error {
             };
         }
         if let Some(transfer_detail) = decode_transfer_error_detail(detail) {
-            let code = transfer_detail
-                .code
-                .as_known()
-                .map(|c| c.proto_name().to_owned())
-                .unwrap_or_else(|| "ERROR_CODE_UNSPECIFIED".to_owned());
+            let code = known_or_unknown_code(
+                transfer_detail.code.as_known().map(|c| c.proto_name()),
+                transfer_detail.code.to_i32(),
+            );
             if matches!(
                 transfer_detail.code.as_known(),
                 Some(TransferErrorCode::RateLimitExceeded)
@@ -423,6 +419,12 @@ pub fn map_connect_error(err: ConnectError) -> Error {
             metadata: Vec::new(),
         },
     }
+}
+
+/// Proto name of a known error code, or `UNKNOWN_ERROR_CODE(<n>)` for a code
+/// this SDK version does not know yet, so the server's code is never lost.
+fn known_or_unknown_code(known: Option<&str>, raw: i32) -> String {
+    known.map_or_else(|| format!("UNKNOWN_ERROR_CODE({raw})"), str::to_owned)
 }
 
 #[cfg(test)]
@@ -664,6 +666,37 @@ mod tests {
         ) {
             Error::Api { code, .. } => assert_eq!(code, "ERROR_CODE_CANCEL_REQUEST_EXPIRED"),
             other => panic!("unexpected expired error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn map_connect_error_keeps_unknown_error_codes() {
+        let order = OrderErrorDetail {
+            code: EnumValue::Unknown(999),
+            ..Default::default()
+        };
+        match map_connect_error(
+            ConnectError::new(ErrorCode::FailedPrecondition, "new rule")
+                .with_detail(ErrorDetail::from_message("orders.v1.ErrorDetail", &order)),
+        ) {
+            Error::Api { code, message, .. } => {
+                assert_eq!(code, "UNKNOWN_ERROR_CODE(999)");
+                assert!(message.ends_with("new rule"), "{message}");
+            }
+            other => panic!("unexpected order error: {other:?}"),
+        }
+
+        let transfer = TransferErrorDetail {
+            code: EnumValue::Unknown(998),
+            ..Default::default()
+        };
+        match map_connect_error(
+            ConnectError::new(ErrorCode::FailedPrecondition, "new rule").with_detail(
+                ErrorDetail::from_message("transfer.v1.ErrorDetail", &transfer),
+            ),
+        ) {
+            Error::Api { code, .. } => assert_eq!(code, "UNKNOWN_ERROR_CODE(998)"),
+            other => panic!("unexpected transfer error: {other:?}"),
         }
     }
 
