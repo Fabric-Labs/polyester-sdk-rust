@@ -312,8 +312,8 @@ fn must_env(params: CreatePolyesterEnvironmentParams) -> PolyesterEnvironment {
 pub static POLYESTER_DEVNET_ENVIRONMENT: LazyLock<PolyesterEnvironment> = LazyLock::new(|| {
     must_env(CreatePolyesterEnvironmentParams {
         name: "polyester-devnet".into(),
-        api_url: "https://api-devnet.polyester.ai".into(),
-        websocket_url: "wss://api-devnet.polyester.ai".into(),
+        api_url: "https://api.devnet.polyester.com".into(),
+        websocket_url: "wss://api.devnet.polyester.com".into(),
         rpc_url: "https://rpc.polyester.tech".into(),
         chain_id: 888168,
         chain_name: "Polyester Chain Devnet".into(),
@@ -351,8 +351,8 @@ pub static POLYESTER_DEVNET_ENVIRONMENT: LazyLock<PolyesterEnvironment> = LazyLo
 pub static POLYESTER_TESTNET_ENVIRONMENT: LazyLock<PolyesterEnvironment> = LazyLock::new(|| {
     must_env(CreatePolyesterEnvironmentParams {
         name: "polyester-testnet".into(),
-        api_url: "https://api-testnet.polyester.com".into(),
-        websocket_url: "wss://api-testnet.polyester.com".into(),
+        api_url: "https://api.testnet.polyester.com".into(),
+        websocket_url: "wss://api.testnet.polyester.com".into(),
         rpc_url: "https://rpc.polyester.live".into(),
         chain_id: 888169,
         chain_name: "Polyester Chain Testnet".into(),
