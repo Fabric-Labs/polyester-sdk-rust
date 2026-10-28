@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+- `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
+  use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
+  Earlier versions pointed at `api-testnet.polyester.com`, which does not
+  exist, so every testnet call failed with a DNS error. The devnet preset and
+  `DEFAULT_API_URL` / `DEFAULT_WS_URL` now use the documented
+  `api.devnet.polyester.com` host.
+
 ### Breaking
 - `OrdersService::subscribe` streams account orders over the private
   WebSocket (`/v1/ws/private`) and returns a `PrivateOrdersSubscription`
