@@ -36,6 +36,10 @@ path = "tests/hardening.rs"
 name = "a7_strict_live"
 path = "tests/a7_strict_live.rs"
 
+[[test]]
+name = "price_fixtures"
+path = "tests/price_fixtures.rs"
+
 [features]
 # Always-on stubs so existing `features = ["realtime"]` / `["chain"]` keep working.
 realtime = []

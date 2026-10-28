@@ -28,7 +28,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-const PRIVATE_CHANNEL: &str = "private:spot:orders:acct:proto";
+const PRIVATE_CHANNEL: &str = "private:spot:trades:acct:proto";
 const PUBLIC_CHANNEL: &str = "public:spot:market:trades:1:proto";
 type PublicationDecoder =
     Arc<dyn Fn(&[u8]) -> polyester::Result<()> + Send + Sync + std::panic::RefUnwindSafe>;
@@ -39,9 +39,9 @@ fn publication_decoders() -> Vec<(&'static str, PublicationDecoder)> {
         api_policy_from_bytes, asset_balance_from_bytes, candle_point_from_bytes,
         flow_detail_from_bytes, flow_summary_from_bytes, heatmap_live_bucket_from_bytes,
         ledger_transfer_from_bytes, market_overview_batch_from_bytes, market_trade_from_bytes,
-        order_from_bytes, orderbook_delta_from_bytes, subaccount_from_bytes,
-        subaccount_policy_from_bytes, trigger_event_from_bytes, trigger_from_bytes,
-        user_trade_from_bytes, zipped_asset_supply_batch_from_bytes,
+        orderbook_delta_from_bytes, subaccount_from_bytes, subaccount_policy_from_bytes,
+        trigger_event_from_bytes, trigger_from_bytes, user_trade_from_bytes,
+        zipped_asset_supply_batch_from_bytes,
     };
 
     macro_rules! decoder {
@@ -54,7 +54,6 @@ fn publication_decoders() -> Vec<(&'static str, PublicationDecoder)> {
     }
 
     vec![
-        decoder!("order", order_from_bytes),
         decoder!("user_trade", user_trade_from_bytes),
         decoder!("asset_balance", asset_balance_from_bytes),
         decoder!("ledger_transfer", ledger_transfer_from_bytes),
@@ -3219,4 +3218,283 @@ fn _creds_type_check() -> Credentials {
 #[allow(dead_code)]
 fn _reply_helper() -> Vec<u8> {
     centrifugo_ok_reply(1)
+}
+
+/// `orders.subscribe` end to end over real TCP: signed token requests for the
+/// base order channel, then the private WebSocket on the API host with the
+/// binary protobuf subprotocol, auth first, and orders decoded like the reads.
+#[tokio::test]
+async fn l2_orders_subscribe_streams_over_the_private_websocket() {
+    use futures_util::{SinkExt, StreamExt};
+    use polyester::codecs::scalars::format_id;
+    use polyester::models::PrivateOrdersEvent;
+    use polyester::proto::orders::v1::Order as ProtoOrder;
+    use polyester::proto::privatews::v1::{
+        ClientMessage, Ready, ServerMessage, SnapshotBegin, SnapshotEnd, SnapshotPage, Subscribed,
+        client_message, server_message::Frame,
+    };
+    use std::sync::Mutex;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio_tungstenite::tungstenite::Message as WsMessage;
+    use tokio_tungstenite::tungstenite::http::{Request as WsRequest, Response as WsResponse};
+
+    const ACCOUNT: u64 = 8_215_573_541_720_371;
+    let token_requests = Arc::new(Mutex::new(Vec::<String>::new()));
+    let upgrade = Arc::new(Mutex::new(None::<(String, String)>));
+    let client_ops = Arc::new(Mutex::new(Vec::<client_message::Op>::new()));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (requests, upgraded, ops) = (token_requests.clone(), upgrade.clone(), client_ops.clone());
+    let server = tokio::spawn(async move {
+        loop {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let (requests, upgraded, ops) = (requests.clone(), upgraded.clone(), ops.clone());
+            // Token requests arrive while the socket is open, so serve each connection on its own task.
+            tokio::spawn(async move {
+                let mut head = [0u8; 32];
+                let n = stream.peek(&mut head).await.unwrap();
+                if !head[..n].starts_with(b"GET /v1/ws/private") {
+                    // A realtime token request.
+                    let mut request = Vec::new();
+                    let mut buf = [0u8; 4096];
+                    while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                        let n = stream.read(&mut buf).await.unwrap();
+                        request.extend_from_slice(&buf[..n]);
+                    }
+                    let line = String::from_utf8_lossy(&request)
+                        .lines()
+                        .next()
+                        .unwrap()
+                        .to_owned();
+                    let token = if line.contains("/v1/rt/subscribe") {
+                        "sub-token"
+                    } else {
+                        "connect-token"
+                    };
+                    requests.lock().unwrap().push(line);
+                    let body = format!(r#"{{"token":"{token}"}}"#);
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    stream.write_all(response.as_bytes()).await.unwrap();
+                    return;
+                }
+                let mut ws = tokio_tungstenite::accept_hdr_async(
+                    stream,
+                    #[allow(clippy::result_large_err)]
+                    move |req: &WsRequest<()>, mut response: WsResponse<()>| {
+                        let protocol = req
+                            .headers()
+                            .get("Sec-WebSocket-Protocol")
+                            .and_then(|v| v.to_str().ok())
+                            .unwrap_or("")
+                            .to_owned();
+                        *upgraded.lock().unwrap() = Some((req.uri().path().to_owned(), protocol));
+                        response.headers_mut().insert(
+                            "Sec-WebSocket-Protocol",
+                            "polyester.v1.proto".parse().unwrap(),
+                        );
+                        Ok(response)
+                    },
+                )
+                .await
+                .unwrap();
+                let mut recv = async || loop {
+                    if let WsMessage::Binary(bytes) = ws.next().await.unwrap().unwrap() {
+                        break ClientMessage::decode_from_slice(&bytes)
+                            .unwrap()
+                            .op
+                            .unwrap();
+                    }
+                };
+                let auth = recv().await;
+                let subscribe = recv().await;
+                let id = match &subscribe {
+                    client_message::Op::Subscribe(subscribe) => subscribe.id.clone(),
+                    other => panic!("expected subscribe, got {other:?}"),
+                };
+                ops.lock().unwrap().extend([auth, subscribe]);
+                let frames: Vec<(u64, Frame)> = vec![
+                    (
+                        0,
+                        Subscribed {
+                            id,
+                            account: ACCOUNT,
+                            ..Default::default()
+                        }
+                        .into(),
+                    ),
+                    (1, SnapshotBegin::default().into()),
+                    (
+                        2,
+                        SnapshotPage {
+                            orders: vec![ProtoOrder {
+                                order_id: 9,
+                                symbol_id: 2,
+                                price_ticks: 2_420_000_000_000,
+                                version: 1,
+                                ..Default::default()
+                            }],
+                            ..Default::default()
+                        }
+                        .into(),
+                    ),
+                    (
+                        3,
+                        SnapshotEnd {
+                            cursor: "c1".into(),
+                            count: 1,
+                            ..Default::default()
+                        }
+                        .into(),
+                    ),
+                    (4, Ready::default().into()),
+                ];
+                for (seq, frame) in frames {
+                    let msg = ServerMessage {
+                        sub: "s1".into(),
+                        seq,
+                        frame: Some(frame),
+                        ..Default::default()
+                    };
+                    ws.send(WsMessage::Binary(msg.encode_to_vec().into()))
+                        .await
+                        .unwrap();
+                }
+                // Keep the socket open until the client leaves.
+                while let Some(Ok(frame)) = ws.next().await {
+                    if frame.is_close() {
+                        break;
+                    }
+                }
+            });
+        }
+    });
+
+    let client = Client::new(Config {
+        api_url: format!("http://{addr}"),
+        api_key_id: Some("orders-stream".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        default_account_id: Some(format_id(ACCOUNT)),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    let mut orders = client.orders.subscribe(None).await.unwrap();
+    let next = async |orders: &mut polyester::realtime::PrivateOrdersSubscription| {
+        tokio::time::timeout(Duration::from_secs(10), orders.recv())
+            .await
+            .expect("event in time")
+            .expect("stream open")
+    };
+    let first = next(&mut orders).await;
+    assert!(matches!(first, PrivateOrdersEvent::Connected), "{first:?}");
+    let snapshot = match next(&mut orders).await {
+        PrivateOrdersEvent::Snapshot(snapshot) => snapshot,
+        other => panic!("expected a snapshot, got {other:?}"),
+    };
+    assert_eq!(snapshot.len(), 1);
+    assert_eq!(snapshot[0].order_id, format_id(9));
+    assert_eq!(snapshot[0].price.as_ref().unwrap().format(), "2420");
+    let ready = next(&mut orders).await;
+    assert!(matches!(ready, PrivateOrdersEvent::Ready), "{ready:?}");
+
+    let account = format_id(ACCOUNT);
+    assert_eq!(
+        *token_requests.lock().unwrap(),
+        vec![
+            "GET /v1/rt/token HTTP/1.1".to_owned(),
+            format!("GET /v1/rt/subscribe?channel=private%3Aspot%3Aorders%3A{account} HTTP/1.1"),
+        ]
+    );
+    assert_eq!(
+        upgrade.lock().unwrap().clone(),
+        Some(("/v1/ws/private".to_owned(), "polyester.v1.proto".to_owned()))
+    );
+    let ops = client_ops.lock().unwrap().clone();
+    match &ops[0] {
+        client_message::Op::Auth(auth) => assert_eq!(auth.token, "connect-token"),
+        other => panic!("the first frame must be auth, got {other:?}"),
+    }
+    match &ops[1] {
+        client_message::Op::Subscribe(subscribe) => {
+            assert_eq!(subscribe.account, ACCOUNT);
+            assert_eq!(subscribe.token, "sub-token");
+            assert_eq!(subscribe.cursor, "");
+        }
+        other => panic!("expected subscribe, got {other:?}"),
+    }
+    drop(orders);
+    server.abort();
+}
+
+/// Gap-free backfill: an initial empty page with zero watermarks is a valid
+/// answer, and feeding its `next_after_trade_id` (0) back sends an explicit
+/// `after_trade_id = 0` rather than dropping the cursor.
+#[tokio::test]
+async fn l2_backfill_resumes_from_zero_watermarks() {
+    use polyester::models::GetTradesOpts;
+    use polyester::proto::marketdata::v1::{GetTradesRequest, GetTradesResponse};
+    use std::sync::Mutex;
+
+    let requests = Arc::new(Mutex::new(Vec::<GetTradesRequest>::new()));
+    let seen = requests.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path == GET_TRADES_PATH {
+            seen.lock()
+                .unwrap()
+                .push(GetTradesRequest::decode_from_slice(&request.body).unwrap());
+            // Nothing traded yet: no trades and zero watermarks.
+            return connect_proto_ok(&GetTradesResponse::default());
+        }
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8}]
+        }))
+        .unwrap();
+
+    let first = client
+        .market_data
+        .get_trades_with(GetTradesOpts {
+            symbol: Some("BTC-USDT".into()),
+            after_trade_id: Some(0),
+            limit: Some(100),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(first.trades.is_empty());
+    assert_eq!(first.complete_through_trade_id, 0);
+    assert_eq!(first.next_after_trade_id, 0);
+
+    client
+        .market_data
+        .get_trades_with(GetTradesOpts {
+            symbol: Some("BTC-USDT".into()),
+            after_trade_id: Some(first.next_after_trade_id),
+            limit: Some(100),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let requests = requests.lock().unwrap();
+    assert_eq!(requests.len(), 2);
+    for request in requests.iter() {
+        assert_eq!(request.symbol_id, 1);
+        assert_eq!(request.after_trade_id, Some(0), "the cursor 0 must be sent");
+        assert!(request.page_token.is_empty());
+        assert!(request.start_time.as_option().is_none());
+    }
 }

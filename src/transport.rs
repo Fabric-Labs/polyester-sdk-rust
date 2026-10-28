@@ -12,8 +12,8 @@ use serde::Serialize;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub const DEFAULT_API_URL: &str = "https://api-devnet.polyester.ai";
-pub const DEFAULT_WS_URL: &str = "wss://api-devnet.polyester.ai";
+pub const DEFAULT_API_URL: &str = "https://api.devnet.polyester.com";
+pub const DEFAULT_WS_URL: &str = "wss://api.devnet.polyester.com";
 /// Maximum decompressed ConnectRPC response message accepted by the SDK.
 ///
 /// This is set explicitly instead of relying on the transport dependency's

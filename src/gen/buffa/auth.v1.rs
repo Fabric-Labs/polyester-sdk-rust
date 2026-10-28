@@ -247,8 +247,9 @@ pub struct ApiKey {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub created_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Last time in UTC when this key authenticated a request. Omitted when the
-    /// key has not been used.
+    /// Approximate last time in UTC when this key authenticated a request,
+    /// recorded at most about once a minute; it may lag recent use by a few
+    /// minutes. Omitted when no use has been recorded.
     ///
     /// Field 21: `last_used_at`
     #[serde(
@@ -711,7 +712,8 @@ pub const __API_KEY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::ty
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateApiKeyRequest {
-    /// Human-readable label for the key. Required; 1 to 64 characters.
+    /// Human-readable label for the key. Required; 1 to 64 characters, and must
+    /// not contain '\<' or '\>'.
     ///
     /// Field 1: `label`
     #[serde(
@@ -1879,6 +1881,7 @@ pub const __GET_API_KEY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
 #[serde(default)]
 pub struct ApiKeyUpdateSpec {
     /// Human-friendly label for the key. Empty clears the label when selected.
+    /// Must not contain '\<' or '\>'.
     ///
     /// Field 1: `label`
     #[serde(
@@ -44240,8 +44243,9 @@ pub mod __buffa {
             pub created_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Last time in UTC when this key authenticated a request. Omitted when the
-            /// key has not been used.
+            /// Approximate last time in UTC when this key authenticated a request,
+            /// recorded at most about once a minute; it may lag recent use by a few
+            /// minutes. Omitted when no use has been recorded.
             ///
             /// Field 21: `last_used_at`
             pub last_used_at: ::buffa::MessageFieldView<
@@ -45005,8 +45009,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().created_at
             }
-            /// Last time in UTC when this key authenticated a request. Omitted when the
-            /// key has not been used.
+            /// Approximate last time in UTC when this key authenticated a request,
+            /// recorded at most about once a minute; it may lag recent use by a few
+            /// minutes. Omitted when no use has been recorded.
             ///
             /// Field 21: `last_used_at`
             #[must_use]
@@ -45101,7 +45106,8 @@ pub mod __buffa {
         /// pair locally and submit only the public key.
         #[derive(Clone, Debug, Default)]
         pub struct CreateApiKeyRequestView<'a> {
-            /// Human-readable label for the key. Required; 1 to 64 characters.
+            /// Human-readable label for the key. Required; 1 to 64 characters, and must
+            /// not contain '\<' or '\>'.
             ///
             /// Field 1: `label`
             pub label: &'a str,
@@ -45457,7 +45463,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Human-readable label for the key. Required; 1 to 64 characters.
+            /// Human-readable label for the key. Required; 1 to 64 characters, and must
+            /// not contain '\<' or '\>'.
             ///
             /// Field 1: `label`
             #[must_use]
@@ -47517,6 +47524,7 @@ pub mod __buffa {
         #[derive(Clone, Debug, Default)]
         pub struct ApiKeyUpdateSpecView<'a> {
             /// Human-friendly label for the key. Empty clears the label when selected.
+            /// Must not contain '\<' or '\>'.
             ///
             /// Field 1: `label`
             pub label: &'a str,
@@ -47903,6 +47911,7 @@ pub mod __buffa {
                 self.0.into_bytes()
             }
             /// Human-friendly label for the key. Empty clears the label when selected.
+            /// Must not contain '\<' or '\>'.
             ///
             /// Field 1: `label`
             #[must_use]

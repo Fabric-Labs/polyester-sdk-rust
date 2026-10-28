@@ -20,9 +20,9 @@ use crate::proto::triggers::v1::{
     CancelTriggerRequest, ConditionalChildExecution, ConditionalTrigger, CreateTriggerRequest,
     GetTriggerRequest, LadderTrigger, ListTriggerEventsRequest, ListTriggersRequest,
     ModifyTriggerRequest, PauseTriggerRequest, ResumeTriggerRequest, TrailingStopTrigger,
-    TriggerIntent, TriggerLimitFok, TriggerLimitGtc, TriggerLimitIoc, TwapLimitGtc, TwapMarketIoc,
-    TwapTrigger, conditional_child_execution, modify_trigger_request, trailing_stop_trigger,
-    trigger_intent, twap_market_ioc, twap_trigger,
+    TriggerIntent, TriggerLimitFok, TriggerLimitGtc, TriggerLimitIoc, TriggerMarketIoc,
+    TwapLimitGtc, TwapMarketIoc, TwapTrigger, conditional_child_execution, modify_trigger_request,
+    trailing_stop_trigger, trigger_intent, trigger_market_ioc, twap_market_ioc, twap_trigger,
 };
 use crate::types::{resolve_price_ticks, resolve_qty_scaled};
 
@@ -198,16 +198,34 @@ impl TriggersService {
                 }
             }
             CreateTriggerType::TrailingStop => {
-                // Standalone trailing stops remain SELL market-IOC. Attached
-                // trailing risk may use either side (opposite the parent) and is
-                // encoded via order AttachedRisk, not this create path.
-                if !matches!(params.side, CreateSide::Sell) {
-                    return Err(Error::validation("trailing_stop only supports side=sell"));
-                }
+                // The child is market-IOC. A BUY trailing stop carries its maximum
+                // price as `limit_price_ticks`; a SELL one has none.
                 let mut trailing = TrailingStopTrigger {
                     side: side.into(),
                     ..Default::default()
                 };
+                match (params.side, params.limit_price.as_ref()) {
+                    (CreateSide::Buy, Some(max_price)) => {
+                        let ticks = self.resolve_catalog_price(max_price, &params.symbol)?;
+                        if ticks <= 0 {
+                            return Err(Error::validation(
+                                "a buy trailing_stop limit_price (its maximum price) must be positive",
+                            ));
+                        }
+                        trailing.limit_price_ticks = ticks;
+                    }
+                    (CreateSide::Buy, None) => {
+                        return Err(Error::validation(
+                            "a buy trailing_stop requires limit_price: the maximum price its child pays",
+                        ));
+                    }
+                    (CreateSide::Sell, Some(_)) => {
+                        return Err(Error::validation(
+                            "limit_price is only valid for a buy trailing_stop (its maximum price)",
+                        ));
+                    }
+                    (CreateSide::Sell, None) => {}
+                }
                 if params.trailing_distance_ticks.is_some()
                     == params.trailing_distance_bps.is_some()
                 {
@@ -372,9 +390,41 @@ impl TriggersService {
                         "post_only is only valid for limit GTC executions",
                     ));
                 }
-                conditional_child_execution::Execution::MarketIoc(Box::default())
+                let max_slippage = match (params.max_slippage_ticks, params.max_slippage_bps) {
+                    (Some(_), Some(_)) => {
+                        return Err(Error::validation(
+                            "a market child allows at most one of max_slippage_ticks or max_slippage_bps",
+                        ));
+                    }
+                    (Some(ticks), None) => {
+                        if ticks <= 0 {
+                            return Err(Error::validation("max_slippage_ticks must be positive"));
+                        }
+                        Some(trigger_market_ioc::MaxSlippage::MaxSlippageTicks(ticks))
+                    }
+                    (None, Some(bps)) => {
+                        validate_bps("max_slippage_bps", bps, false)?;
+                        // A 100% cap would leave a sell no positive price to sell at.
+                        if bps == MAX_BPS && matches!(params.side, CreateSide::Sell) {
+                            return Err(Error::validation(
+                                "max_slippage_bps of a sell market child must be below 10000",
+                            ));
+                        }
+                        Some(trigger_market_ioc::MaxSlippage::MaxSlippageBps(bps))
+                    }
+                    (None, None) => None,
+                };
+                conditional_child_execution::Execution::MarketIoc(Box::new(TriggerMarketIoc {
+                    max_slippage,
+                    ..Default::default()
+                }))
             }
             CreateOrderType::Limit => {
+                if params.max_slippage_ticks.is_some() || params.max_slippage_bps.is_some() {
+                    return Err(Error::validation(
+                        "max_slippage_ticks and max_slippage_bps are only valid for a market child; a limit child is bounded by its limit_price",
+                    ));
+                }
                 let price = params
                     .limit_price
                     .as_ref()
@@ -431,7 +481,6 @@ impl TriggersService {
 
     fn encode_modify_params(&self, params: &ModifyTriggerParams) -> Result<ModifyTriggerRequest> {
         if params.trigger_price.is_none()
-            && params.limit_price.is_none()
             && params.activation_price.is_none()
             && params.trailing_distance_ticks.is_none()
             && params.trailing_distance_bps.is_none()
@@ -439,7 +488,7 @@ impl TriggersService {
             && params.max_slippage_bps.is_none()
         {
             return Err(Error::validation(
-                "modify requires at least one of trigger_price, limit_price, trailing_distance_ticks, trailing_distance_bps, activation_price, max_slippage_ticks, or max_slippage_bps",
+                "modify requires at least one of trigger_price, trailing_distance_ticks, trailing_distance_bps, activation_price, max_slippage_ticks, or max_slippage_bps",
             ));
         }
         let mut req = ModifyTriggerRequest {
@@ -454,9 +503,6 @@ impl TriggersService {
         };
         if let Some(price) = params.trigger_price.as_ref() {
             req.trigger_price_ticks = Some(resolve_price_ticks(price, None)?);
-        }
-        if let Some(price) = params.limit_price.as_ref() {
-            req.limit_price_ticks = Some(resolve_price_ticks(price, None)?);
         }
         if let Some(price) = params.activation_price.as_ref() {
             req.activation_price_ticks = Some(resolve_price_ticks(price, None)?);
@@ -812,19 +858,165 @@ mod tests {
         }
     }
 
-    #[test]
-    fn trailing_stop_rejects_buy() {
-        let client = client();
+    fn market_stop(side: CreateSide) -> CreateTriggerParams {
         let mut params = create_params(
             crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
             crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
             crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
         );
-        params.trigger_type = CreateTriggerType::TrailingStop;
+        params.side = side;
+        params.order_type = CreateOrderType::Market;
+        params.time_in_force = None;
+        params.limit_price = None;
+        params
+    }
+
+    fn market_child_slippage(
+        wire: &CreateTriggerRequest,
+    ) -> Option<crate::proto::triggers::v1::trigger_market_ioc::MaxSlippage> {
+        use crate::proto::triggers::v1::trigger_intent::Strategy;
+        let intent = wire.trigger.as_option().expect("trigger intent");
+        let (Some(Strategy::StopLoss(cond)) | Some(Strategy::TakeProfit(cond))) =
+            intent.strategy.as_ref()
+        else {
+            panic!("expected a conditional strategy, got {:?}", intent.strategy);
+        };
+        match cond
+            .child
+            .as_option()
+            .and_then(|child| child.execution.as_ref())
+        {
+            Some(conditional_child_execution::Execution::MarketIoc(market)) => {
+                market.max_slippage.clone()
+            }
+            other => panic!("expected a market child, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn market_stop_and_take_profit_send_their_slippage_cap() {
+        use crate::proto::triggers::v1::trigger_market_ioc::MaxSlippage;
+
+        let client = client();
+        let mut stop = market_stop(CreateSide::Sell);
+        stop.max_slippage_bps = Some(150);
+        let wire = client.triggers.encode_create_params(&stop).unwrap();
+        assert_eq!(
+            market_child_slippage(&wire),
+            Some(MaxSlippage::MaxSlippageBps(150))
+        );
+
+        // A BUY stop with a market child is accepted; its cap is absolute ticks here.
+        let mut buy_take_profit = market_stop(CreateSide::Buy);
+        buy_take_profit.trigger_type = CreateTriggerType::TakeProfit;
+        buy_take_profit.max_slippage_ticks = Some(25_000_000_000);
+        let wire = client
+            .triggers
+            .encode_create_params(&buy_take_profit)
+            .unwrap();
+        assert_eq!(
+            market_child_slippage(&wire),
+            Some(MaxSlippage::MaxSlippageTicks(25_000_000_000))
+        );
+
+        // Without a cap the pair default applies: nothing on the wire.
+        let wire = client
+            .triggers
+            .encode_create_params(&market_stop(CreateSide::Sell))
+            .unwrap();
+        assert_eq!(market_child_slippage(&wire), None);
+    }
+
+    #[test]
+    fn conditional_slippage_cap_is_validated_and_limit_children_reject_it() {
+        let client = client();
+        let mut both = market_stop(CreateSide::Sell);
+        both.max_slippage_ticks = Some(1);
+        both.max_slippage_bps = Some(1);
+        let err = client.triggers.encode_create_params(&both).unwrap_err();
+        assert!(err.to_string().contains("at most one"), "{err}");
+
+        let mut zero_ticks = market_stop(CreateSide::Sell);
+        zero_ticks.max_slippage_ticks = Some(0);
+        assert!(client.triggers.encode_create_params(&zero_ticks).is_err());
+
+        let mut too_many_bps = market_stop(CreateSide::Buy);
+        too_many_bps.max_slippage_bps = Some(10_001);
+        assert!(client.triggers.encode_create_params(&too_many_bps).is_err());
+        // A buy accepts a 100% cap; a sell does not.
+        too_many_bps.max_slippage_bps = Some(10_000);
+        assert!(client.triggers.encode_create_params(&too_many_bps).is_ok());
+        let mut sell_full = market_stop(CreateSide::Sell);
+        sell_full.max_slippage_bps = Some(10_000);
+        let err = client
+            .triggers
+            .encode_create_params(&sell_full)
+            .unwrap_err();
+        assert!(err.to_string().contains("below 10000"), "{err}");
+
+        let mut limit = create_params(
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+        limit.max_slippage_bps = Some(50);
+        let err = client.triggers.encode_create_params(&limit).unwrap_err();
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
+        assert!(err.to_string().contains("market child"), "{err}");
+    }
+
+    #[test]
+    fn buy_trailing_stop_sends_its_maximum_price() {
+        use crate::proto::triggers::v1::trigger_intent::Strategy;
+
+        let client = client();
+        let mut params = trailing_create(None);
         params.side = CreateSide::Buy;
-        params.trailing_distance_bps = Some(100);
+        params.activation_price =
+            Some(crate::Price::from_decimal_str("80000", Some("BTC-USDT".into())).unwrap());
+        params.limit_price =
+            Some(crate::Price::from_decimal_str("85000.25", Some("BTC-USDT".into())).unwrap());
+        let wire = client.triggers.encode_create_params(&params).unwrap();
+        let intent = wire.trigger.expect("trigger intent");
+        let Some(Strategy::TrailingStop(trailing)) = intent.strategy.as_ref() else {
+            panic!("expected TrailingStop strategy, got {:?}", intent.strategy);
+        };
+        assert_eq!(
+            trailing.side.as_known(),
+            Some(crate::proto::orders::v1::Side::Buy)
+        );
+        assert_eq!(trailing.limit_price_ticks, 85_000_250_000_000);
+        assert_eq!(trailing.activation_price_ticks, 80_000_000_000_000);
+        assert_eq!(intent.qty_scaled, 10_000_000);
+    }
+
+    #[test]
+    fn buy_trailing_stop_requires_a_maximum_price() {
+        let client = client();
+        let mut params = trailing_create(None);
+        params.side = CreateSide::Buy;
         let err = client.triggers.encode_create_params(&params).unwrap_err();
-        assert!(err.to_string().contains("only supports side=sell"), "{err}");
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
+        assert!(err.to_string().contains("requires limit_price"), "{err}");
+
+        params.limit_price = Some(crate::Price::from_ticks(0, None).unwrap());
+        let err = client.triggers.encode_create_params(&params).unwrap_err();
+        assert!(err.to_string().contains("must be positive"), "{err}");
+    }
+
+    #[test]
+    fn sell_trailing_stop_rejects_a_maximum_price() {
+        let client = client();
+        let mut params = trailing_create(None);
+        params.limit_price =
+            Some(crate::Price::from_decimal_str("85000.25", Some("BTC-USDT".into())).unwrap());
+        let err = client.triggers.encode_create_params(&params).unwrap_err();
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
+        assert!(
+            err.to_string()
+                .contains("only valid for a buy trailing_stop"),
+            "{err}"
+        );
     }
 
     #[test]
@@ -852,6 +1044,7 @@ mod tests {
             trailing.side.as_known(),
             Some(crate::proto::orders::v1::Side::Sell)
         );
+        assert_eq!(trailing.limit_price_ticks, 0);
         assert!(matches!(
             trailing.trailing_distance,
             Some(
@@ -918,7 +1111,7 @@ mod tests {
             trigger_id: encoded,
             symbol: Some("BTC-USDT".into()),
             trailing_distance_bps: Some(50),
-            ..modify_params(None, None, None)
+            ..modify_params(None, None)
         };
         let wire = client.triggers.encode_modify_params(&params).unwrap();
         assert_eq!(wire.trigger_id, 42);
@@ -933,7 +1126,6 @@ mod tests {
             symbol: Some("BTC-USDT".into()),
             symbol_id: None,
             trigger_price: None,
-            limit_price: None,
             activation_price: None,
             trailing_distance_ticks: None,
             trailing_distance_bps: None,
@@ -1003,7 +1195,7 @@ mod tests {
             trigger_id: "1".into(),
             symbol: Some("BTC-USDT".into()),
             max_slippage_bps: Some(10_001),
-            ..modify_params(None, None, None)
+            ..modify_params(None, None)
         };
         assert!(
             client
@@ -1086,7 +1278,7 @@ mod tests {
         let base = ModifyTriggerParams {
             trigger_id: "1".into(),
             symbol: Some("BTC-USDT".into()),
-            ..modify_params(None, None, None)
+            ..modify_params(None, None)
         };
         for bps in [1, 10_000] {
             client
@@ -1135,7 +1327,7 @@ mod tests {
         let base = ModifyTriggerParams {
             trigger_id: "1".into(),
             symbol: Some("BTC-USDT".into()),
-            ..modify_params(None, None, None)
+            ..modify_params(None, None)
         };
         for bps in [1, 10_000] {
             client
@@ -1169,7 +1361,6 @@ mod tests {
 
     fn modify_params(
         trigger_price: Option<crate::Price>,
-        limit_price: Option<crate::Price>,
         activation_price: Option<crate::Price>,
     ) -> ModifyTriggerParams {
         ModifyTriggerParams {
@@ -1178,7 +1369,6 @@ mod tests {
             symbol: Some("BTC-USDT".into()),
             symbol_id: None,
             trigger_price,
-            limit_price,
             activation_price,
             trailing_distance_ticks: None,
             trailing_distance_bps: None,
@@ -1192,12 +1382,10 @@ mod tests {
         let client = client();
         let decimal = modify_params(
             Some(crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap()),
-            Some(crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap()),
             Some(crate::Price::from_decimal_str("49500", Some("BTC-USDT".into())).unwrap()),
         );
         let scaled = modify_params(
             Some(crate::Price::from_ticks(49_000_000_000_000, Some("BTC-USDT".into())).unwrap()),
-            Some(crate::Price::from_ticks(48_950_000_000_000, Some("BTC-USDT".into())).unwrap()),
             Some(crate::Price::from_ticks(49_500_000_000_000, Some("BTC-USDT".into())).unwrap()),
         );
         let decimal_wire = client.triggers.encode_modify_params(&decimal).unwrap();

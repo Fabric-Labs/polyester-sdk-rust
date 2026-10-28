@@ -33,6 +33,12 @@ pub struct GetTradesOpts {
     /// Inclusive upper bound (unix seconds UTC).
     pub end: Option<i64>,
     pub page_token: Option<String>,
+    /// Gap-free backfill cursor: return the symbol's trades with `match_id`
+    /// greater than this, ascending by `match_id`, up to `limit`. Pass 0 to
+    /// start from the first trade, then the response's
+    /// [`MarketTradesResult::next_after_trade_id`]. Cannot be combined with
+    /// `start`, `end` or `page_token`.
+    pub after_trade_id: Option<u64>,
 }
 
 /// Spot pair catalog payload (Go `SpotConfig` raw-map escape hatch).
@@ -76,7 +82,29 @@ pub struct MarketTrade {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarketTradesResult {
     pub trades: Vec<MarketTrade>,
+    /// Opaque cursor for the next page; always empty with `after_trade_id`.
     pub next_page_token: String,
+    /// With `after_trade_id` only (0 otherwise): every trade with `match_id`
+    /// at or below this exists and is returned by this method. It only grows.
+    pub complete_through_trade_id: u64,
+    /// With `after_trade_id` only (0 otherwise): the `after_trade_id` of the
+    /// next call. It never moves backwards; when it equals the request's
+    /// `after_trade_id`, nothing newer is available yet, so retry later with
+    /// backoff.
+    pub next_after_trade_id: u64,
+    /// With `after_trade_id` only: every trade-ID epoch that ended between
+    /// `after_trade_id` and `next_after_trade_id`, ascending by epoch.
+    pub epoch_ends: Vec<TradeEpochEnd>,
+}
+
+/// Where one epoch of a symbol's trade IDs ended. Trade IDs of epoch `e` are
+/// greater than `(e-1) * 2^40` and less than `e * 2^40`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TradeEpochEnd {
+    pub epoch: u64,
+    /// `match_id` of the epoch's last trade; `(epoch-1) * 2^40` when the epoch
+    /// ended without trades.
+    pub last_trade_id: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

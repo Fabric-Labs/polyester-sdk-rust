@@ -75,6 +75,12 @@ pub struct OrderMutationResult {
     pub resolved_base_qty: Option<Quantity>,
     /// Hard all-in quote debit submitted with quote-budget sizing, when used.
     pub submitted_max_quote_debit_scaled: Option<i64>,
+    /// Public ID of the attached take-profit trigger, when the order has one.
+    pub take_profit_trigger_id: Option<String>,
+    /// Public ID of the attached stop-loss trigger, when the order has one.
+    pub stop_loss_trigger_id: Option<String>,
+    /// Public ID of the attached trailing-stop trigger, when the order has one.
+    pub trailing_stop_trigger_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,6 +127,12 @@ pub struct ModifyOrderResult {
     pub old_order_id: String,
     pub final_order_id: String,
     pub code: String,
+    /// Public ID of the attached take-profit trigger, when the final order has one.
+    pub take_profit_trigger_id: Option<String>,
+    /// Public ID of the attached stop-loss trigger, when the final order has one.
+    pub stop_loss_trigger_id: Option<String>,
+    /// Public ID of the attached trailing-stop trigger, when the final order has one.
+    pub trailing_stop_trigger_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,6 +141,23 @@ pub struct CancelAllOrdersResult {
     pub matched_orders: u32,
     pub submitted_cancels: u32,
     pub failed_cancels: u32,
+    /// Orders whose cancellation was requested, oldest first, at most 200.
+    /// Empty for a dry run. Each order's final state arrives on the order
+    /// stream and the order reads.
+    pub cancelled_orders: Vec<CancelledOrder>,
+    /// Number of orders whose cancellation was requested, including those not
+    /// listed in `cancelled_orders`. Zero for a dry run.
+    pub total_cancelled: u32,
+    /// True when more orders were canceled than `cancelled_orders` lists.
+    pub truncated: bool,
+}
+
+/// One order whose cancellation a cancel-all requested.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CancelledOrder {
+    pub order_id: String,
+    /// Empty when the order has no client order ID.
+    pub client_order_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,6 +167,12 @@ pub struct BatchCreateResultItem {
     pub client_order_id: String,
     pub code: String,
     pub rate_limit: Option<super::RateLimitDetail>,
+    /// Public ID of the attached take-profit trigger, when an accepted order has one.
+    pub take_profit_trigger_id: Option<String>,
+    /// Public ID of the attached stop-loss trigger, when an accepted order has one.
+    pub stop_loss_trigger_id: Option<String>,
+    /// Public ID of the attached trailing-stop trigger, when an accepted order has one.
+    pub trailing_stop_trigger_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

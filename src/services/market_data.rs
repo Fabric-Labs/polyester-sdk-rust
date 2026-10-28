@@ -127,12 +127,21 @@ impl MarketDataService {
         let symbol_id =
             self.resolve_symbol_id(opts.symbol.as_deref(), opts.symbol_id, "get_trades")?;
         let quantity_scale = self.require_quantity_scale(symbol_id, "get_trades")?;
+        let page_token = opts.page_token.unwrap_or_default();
+        if opts.after_trade_id.is_some()
+            && (opts.start.is_some() || opts.end.is_some() || !page_token.is_empty())
+        {
+            return Err(Error::validation(
+                "get_trades after_trade_id cannot be combined with start, end or page_token",
+            ));
+        }
         let req = GetTradesRequest {
             symbol_id,
             limit: opts.limit.unwrap_or(0),
             start_time: Self::timestamp_field(opts.start),
             end_time: Self::timestamp_field(opts.end),
-            page_token: opts.page_token.unwrap_or_default(),
+            page_token,
+            after_trade_id: opts.after_trade_id,
             ..Default::default()
         };
         let resp = unary::await_public(self.client().get_trades(req))
@@ -331,13 +340,18 @@ fn parse_timeframe(interval: &str) -> Result<Timeframe> {
     let tf = match key.as_str() {
         "1s" | "sec1" => Timeframe::Sec1,
         "1m" | "min1" => Timeframe::Min1,
+        "3m" | "min3" => Timeframe::Min3,
         "5m" | "min5" => Timeframe::Min5,
         "15m" | "min15" => Timeframe::Min15,
         "30m" | "min30" => Timeframe::Min30,
         "1h" | "hour1" => Timeframe::Hour1,
+        "2h" | "hour2" => Timeframe::Hour2,
         "4h" | "hour4" => Timeframe::Hour4,
+        "6h" | "hour6" => Timeframe::Hour6,
+        "8h" | "hour8" => Timeframe::Hour8,
         "12h" | "hour12" => Timeframe::Hour12,
         "1d" | "day1" => Timeframe::Day1,
+        "3d" | "day3" => Timeframe::Day3,
         "1w" | "week1" => Timeframe::Week1,
         "1mo" | "month1" => Timeframe::Month1,
         _ => {
@@ -1016,6 +1030,63 @@ mod tests {
     use std::sync::atomic::AtomicBool;
     use std::sync::{Arc, Mutex};
     use tokio::sync::mpsc;
+
+    #[tokio::test]
+    async fn after_trade_id_cannot_be_combined_with_time_or_page_filters() {
+        let client = crate::Client::new(crate::Config {
+            api_url: "http://127.0.0.1:1".into(),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .unwrap();
+        client
+            .catalogs
+            .hydrate_spot_config_json(serde_json::json!({
+                "pairs": [{"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8}]
+            }))
+            .unwrap();
+        let base = GetTradesOpts {
+            symbol: Some("BTC-USDT".into()),
+            after_trade_id: Some(0),
+            ..Default::default()
+        };
+        for opts in [
+            GetTradesOpts {
+                start: Some(1_700_000_000),
+                ..base.clone()
+            },
+            GetTradesOpts {
+                end: Some(1_700_000_000),
+                ..base.clone()
+            },
+            GetTradesOpts {
+                page_token: Some("next".into()),
+                ..base.clone()
+            },
+        ] {
+            let err = client.market_data.get_trades_with(opts).await.unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{err:?}");
+            assert!(err.to_string().contains("after_trade_id"), "{err}");
+        }
+    }
+
+    #[test]
+    fn candle_channel_accepts_every_published_timeframe() {
+        for (alias, label) in [
+            ("3m", "3m"),
+            ("MIN_3", "3m"),
+            ("2h", "2h"),
+            ("HOUR_6", "6h"),
+            ("8h", "8h"),
+            ("DAY_3", "3d"),
+        ] {
+            assert_eq!(
+                MarketDataService::candle_channel_timeframe(alias).unwrap(),
+                label,
+                "alias {alias}"
+            );
+        }
+    }
 
     #[test]
     fn candle_channel_normalizes_aliases_to_human_label() {

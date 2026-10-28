@@ -22,6 +22,11 @@ pub struct CreateTriggerParams {
     pub order_type: CreateOrderType,
     pub qty: Quantity,
     pub trigger_price: Option<Price>,
+    /// Limit price of a limit child. For a [`CreateTriggerType::TrailingStop`]
+    /// with side BUY it is required and is the maximum price: the most the
+    /// child pays per unit, at least the activation price (or the last trade
+    /// price when no activation price is set). Must be `None` for a SELL
+    /// trailing stop. Fixed at create.
     pub limit_price: Option<Price>,
     pub trigger_price_source: Option<String>,
     pub time_in_force: Option<CreateTimeInForce>,
@@ -32,6 +37,10 @@ pub struct CreateTriggerParams {
     pub activation_price: Option<Price>,
     pub trailing_distance_ticks: Option<i64>,
     pub trailing_distance_bps: Option<i32>,
+    /// Slippage cap (at most one of ticks or bps) for a trailing stop, a
+    /// TWAP market slice, or a stop-loss / take-profit market child. Without
+    /// one, a market child uses the pair's default market slippage. Rejected
+    /// for a stop-loss / take-profit limit child.
     pub max_slippage_ticks: Option<i64>,
     pub max_slippage_bps: Option<i32>,
     pub twap_duration_ms: Option<i64>,
@@ -59,10 +68,12 @@ pub struct ModifyTriggerParams {
     /// Connect `symbol_id`. Mutually exclusive with [`Self::symbol`].
     pub symbol_id: Option<u32>,
     pub trigger_price: Option<Price>,
-    pub limit_price: Option<Price>,
     pub activation_price: Option<Price>,
     pub trailing_distance_ticks: Option<i64>,
     pub trailing_distance_bps: Option<i32>,
+    /// Slippage cap of a trailing stop, or of a stop-loss or take-profit with
+    /// a market child. Zero clears the cap; a cleared cap on a market child
+    /// falls back to the pair's default market slippage.
     pub max_slippage_ticks: Option<i64>,
     pub max_slippage_bps: Option<i32>,
 }
@@ -114,7 +125,9 @@ pub struct TriggerTrailingDetails {
     pub trailing_distance: Option<Price>,
     pub trailing_distance_bps: i32,
     pub activation_price: Option<Price>,
+    /// Highest price seen, for a SELL trailing stop.
     pub peak_price: Option<Price>,
+    /// Lowest price seen, for a BUY trailing stop.
     pub trough_price: Option<Price>,
     pub max_slippage: Option<Price>,
     pub max_slippage_bps: i32,
@@ -162,12 +175,17 @@ pub struct Trigger {
     pub order_type: String,
     pub time_in_force: String,
     pub qty: Option<Quantity>,
+    /// Child limit price; for a BUY trailing stop, its maximum price.
     pub limit_price: Option<Price>,
     pub fee_asset: String,
     pub self_trade_prevention_mode: String,
     pub post_only: bool,
     /// Convenience: stop-trigger price when details are `Stop`.
     pub trigger_price: Option<Price>,
+    /// Slippage cap configured on a stop-loss or take-profit market child or
+    /// on a trailing stop; `None` when none is set (a market child then uses
+    /// the pair's default market slippage).
+    pub max_slippage: Option<super::MaxSlippage>,
     pub client_trigger_id: String,
     pub created_at: Option<Timestamp>,
     pub updated_at: Option<Timestamp>,

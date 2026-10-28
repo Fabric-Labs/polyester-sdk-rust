@@ -20,7 +20,7 @@ use crate::models::{
     CancelAllOpts, CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType,
     CreateSide, CreateTimeInForce, FeeAsset, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts,
     ListOrderHistoryOpts, ListUserTradesOpts, MaxSlippage, ModifyOrderParams, ModifyOrderResult,
-    Order, OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, PreviewOrderParams,
+    OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, PreviewOrderParams,
     PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
@@ -1348,17 +1348,20 @@ impl OrdersService {
         })
     }
 
-    /// Subscribe to private order updates for an account.
+    /// Streams the account's live orders over the private WebSocket.
+    ///
+    /// `account_id` defaults to the configured account. Events arrive as
+    /// [`crate::models::PrivateOrdersEvent`]: `Connected`, a `Snapshot` of
+    /// the live view, then one `Unit` per change, with `Stale`,
+    /// `Disconnected` and `Error` along the way. Orders use the same
+    /// [`crate::models::Order`] model as the order reads. The stream reconnects and resumes
+    /// by itself and ends only on a terminal error.
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
-    ) -> Result<crate::realtime::TypedSubscription<Order>> {
+    ) -> Result<crate::realtime::PrivateOrdersSubscription> {
         let account = scope::resolve_account_id(&self.ctx, account_id)?;
-        let channel = format!("private:spot:orders:{account}:proto");
-        self.ctx
-            .realtime
-            .subscribe_proto(&channel, crate::codecs::decode::order_from_bytes)
-            .await
+        self.ctx.realtime.subscribe_private_orders(&account).await
     }
 }
 
@@ -1501,6 +1504,7 @@ fn order_trades_projection_complete(result: &GetOrderResult) -> bool {
 mod tests {
     use super::*;
     use crate::codecs::scalars::format_id;
+    use crate::models::Order;
     use buffa::Message;
     use serde_json::json;
 

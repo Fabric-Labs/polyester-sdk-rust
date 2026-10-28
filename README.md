@@ -72,9 +72,11 @@ Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
 still applies. In particular, whiteboard/social-verification and some
 layout/polychart routes may require a JWT session or may not be mounted.
 Private streams require an Account ID and the corresponding API-key permission.
-A successful subscribe call means the token exchange and realtime handshake
-completed. Treat a structured permission denial as non-transient and update the
-API-key policy before retrying.
+A successful Centrifugo subscribe call means the token exchange and realtime
+handshake completed. The order stream (`orders.subscribe`) returns at once and
+reports its handshake through `Connected` and `Error` events. Treat a
+structured permission denial as non-transient and update the API-key policy
+before retrying.
 
 ## Install
 
@@ -173,7 +175,7 @@ async fn main() -> Result<()> {
 Pass `Config.environment` so API, websocket, RPC, and contract pins stay
 together. `POLYESTER_DEVNET_ENVIRONMENT` is the `Client::new` default.
 `POLYESTER_TESTNET_ENVIRONMENT` targets public testnet
-(`api-testnet.polyester.com`, chain `888169`). Custom / VPC endpoints use
+(`api.testnet.polyester.com`, chain `888169`). Custom / VPC endpoints use
 `create_polyester_environment` or `environment.with_urls(...)`. `api_url` /
 `ws_url` remain as transport overrides.
 
@@ -358,10 +360,22 @@ API host, so handle an unimplemented/not-found response and do not make Preview
 a prerequisite for order submission. Fee selection is `FeeAsset::Quote` or, for
 BUYs only, `FeeAsset::Base`; the former `received` fee mode no longer exists.
 
-Standalone trailing-stop triggers remain SELL market-IOC and now encode wire
-`side` explicitly. Attached trailing-stop risk may use either side (opposite
-the parent); trigger reads project `trigger_type`, `side`, and
-`parent_order_id` from the host response.
+Standalone trailing stops take either side. A SELL trailing stop tracks the
+highest price and fires a market-IOC child; it takes no `limit_price`. A BUY
+trailing stop tracks the lowest price and requires `limit_price`: its maximum
+price, the most its child pays per unit, fixed at create. Attached
+trailing-stop risk takes the side opposite the parent. Trigger reads project
+`trigger_type`, `side` and `parent_order_id`. A standalone BUY trailing stop
+reads as an IOC limit child (`order_type` `limit`, `time_in_force` `ioc`) with
+its maximum price as `limit_price`; a SELL one (and an attached BUY leg) reads
+as a market IOC child with any cap in `max_slippage`. The trailing details
+carry the trough (BUY) or peak (SELL) price.
+
+Stop-loss and take-profit triggers with a market child accept a slippage cap,
+`max_slippage_ticks` or `max_slippage_bps` (at most one; a SELL child takes
+fewer than 10000 bps). Without one, the pair's default market slippage
+applies. A limit child takes no cap; its `limit_price` bounds it. Trigger
+reads expose the cap as `Trigger.max_slippage`.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
 [Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)
@@ -464,7 +478,9 @@ For writes, `oco=true` requires take-profit plus exactly one stop leg
 (`stop_loss` or `trailing_stop`); one-leg OCO policies are rejected locally.
 
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
-`max_slippage_bps` to preserve the current values. Send an explicit zero
+`max_slippage_bps` to preserve the current values. A trigger's child limit
+price is fixed at create: cancel the trigger and create a new one to change
+it. Send an explicit zero
 (`Price::from_ticks(0)` or `Some(0)`) to clear an existing activation price
 or maximum-slippage cap. Create/modify `max_slippage_bps` must be 1–10000;
 modify still accepts `0` to clear.
@@ -658,6 +674,19 @@ let current: Option<_> = client
     .get_current_candle("BTC-USDT", "1m")
     .await?;
 let trades = client.market_data.get_trades("BTC-USDT", Some(20)).await?;
+// Gap-free backfill: walk trades by trade ID from a cursor (0 = the first
+// trade), then continue from `next_after_trade_id`. When it does not move,
+// nothing newer is available yet.
+let backfill = client
+    .market_data
+    .get_trades_with(polyester::models::GetTradesOpts {
+        symbol: Some("BTC-USDT".into()),
+        after_trade_id: Some(0),
+        limit: Some(500),
+        ..Default::default()
+    })
+    .await?;
+let _next_cursor = backfill.next_after_trade_id;
 let _ = (candles, current, trades);
 
 client.wait_for_catalogs().await?;
@@ -695,22 +724,61 @@ if let Some(markets) = sub.updates().recv().await {
 
 ## Realtime
 
-Realtime is binary-only. The client negotiates the `centrifuge-protobuf`
-WebSocket subprotocol, sends binary length-delimited Centrifugo commands, and
-decodes protobuf publication payloads from `:proto` channels. ConnectRPC's
-optional JSON wire mode does not apply to realtime. Incoming WebSocket messages,
-frames, and protobuf record lengths are capped at 8 MiB.
+Realtime is binary-only. Account orders stream over the private WebSocket;
+every other stream uses Centrifugo channels.
+
+Centrifugo streams negotiate the `centrifuge-protobuf` WebSocket subprotocol,
+send binary length-delimited Centrifugo commands, and decode protobuf
+publication payloads from `:proto` channels. ConnectRPC's optional JSON wire
+mode does not apply to realtime. Incoming WebSocket messages, frames, and
+protobuf record lengths are capped at 8 MiB.
 
 Realtime subscription handles stop their background tasks when explicitly
 closed or dropped. Call `close()` when prompt shutdown matters; `Drop` provides
 the cleanup safety net.
 
+### Order stream
+
+`orders.subscribe` streams an account's live orders over the private WebSocket
+(`/v1/ws/private` on the API host, subprotocol `polyester.v1.proto`). It
+authenticates with the same signed realtime tokens as the other private
+streams. Events arrive as `PrivateOrdersEvent`:
+
+| Event | Meaning |
+| --- | --- |
+| `Connected` | The server confirmed the subscription; again after each reconnect |
+| `Snapshot(orders)` | The account's full live view; replace local state with it |
+| `Unit(unit)` | One change: changed orders (complete), removed order IDs, and events (fills, cancels, rejections, command outcomes) |
+| `Ready` | The stream reached the account's read boundary: it reflects every acknowledgement and order read made before the subscription. Once per server subscription, so again after a reconnect |
+| `Stale(true)` / `Stale(false)` | The live view is temporarily behind / caught up again |
+| `Disconnected` | The stream dropped; it resumes by itself unless an error ended it |
+| `Error(error)` | A stream error; a terminal one is followed by `Disconnected` and the end of the stream |
+
+Orders use the same `Order` model as the order reads. Keep the copy with the
+higher `version`; equal versions are identical. Wait for `Ready` before
+relying on the stream: to combine it with an order read, read first, then
+subscribe, wait for `Ready`, and merge both by `version`. The stream reconnects with
+backoff, resumes from its last applied position, and takes a fresh snapshot
+when it cannot resume. Several `orders.subscribe` calls for one account share
+one server subscription.
+
 ```rust,no_run
+use polyester::models::PrivateOrdersEvent;
 use polyester::services::CreateSubscriptionOptions;
 
 let mut orders = client.orders.subscribe(None).await?;
-if let Some(order) = orders.recv_result().await? {
-    println!("{} {}", order.order_id, order.status);
+while let Some(event) = orders.recv_result().await? {
+    match event {
+        PrivateOrdersEvent::Snapshot(live) => println!("{} live orders", live.len()),
+        PrivateOrdersEvent::Ready => println!("order stream is current"),
+        PrivateOrdersEvent::Unit(unit) => {
+            for order in unit.orders {
+                println!("{} {} v{}", order.order_id, order.status, order.version);
+            }
+        }
+        PrivateOrdersEvent::Error(error) => eprintln!("order stream: {error}"),
+        _ => {}
+    }
 }
 
 let mut api_policies = client.policies.subscribe_api_policies(None).await?;
@@ -733,7 +801,7 @@ if let Some(snapshot) = book.updates().recv().await {
 }
 ```
 
-Private order protobufs carry scaled quantity integers but may not carry the
+Streamed orders carry scaled quantity integers but may not carry the
 base quantity scale, so `Quantity::scale()` can return `None`. A bot must
 resolve the scale from the hydrated catalog using `Quantity::symbol_id()` (or
 `Quantity::symbol()`), then pass that catalog scale to `Quantity::format`.

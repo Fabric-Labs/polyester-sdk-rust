@@ -198,8 +198,9 @@ pub enum TriggerStatus {
     /// canceled or failed instead.
     STATUS_COMPLETED = 4i32,
     /// Trigger was canceled. The cancel reason states why, for example a user
-    /// request, a linked one-cancels-the-other trigger, self-trade prevention, or,
-    /// for a ladder, the cancellation of its child orders.
+    /// request, another attached leg's exit closing its parent's position,
+    /// self-trade prevention, or, for a ladder, the cancellation of its child
+    /// orders.
     STATUS_CANCELED = 5i32,
     /// Trigger failed (for example, reservation failure, child order rejection).
     STATUS_FAILED = 6i32,
@@ -565,7 +566,8 @@ pub enum TriggerCancelReason {
     TRIGGER_CANCEL_REASON_UNSPECIFIED = 0i32,
     /// The user explicitly canceled the trigger.
     TRIGGER_CANCEL_REASON_USER_REQUEST = 1i32,
-    /// A linked one-cancels-the-other trigger fired.
+    /// An attached leg ended because its parent order is terminal and another of
+    /// the parent's legs made the last exit, leaving no position to protect.
     TRIGGER_CANCEL_REASON_OCO = 2i32,
     /// The parent order ended without a fill, so its attached trigger was canceled.
     TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL = 3i32,
@@ -902,7 +904,9 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_MARKET_QUOTE_UNHEALTHY = 70i32,
     /// The trigger's quantity was not valid.
     TRIGGER_FAILURE_REASON_QTY_INVALID = 103i32,
-    /// The trigger's limit price was not valid.
+    /// The trigger's limit price was not valid, including a buy trailing stop's
+    /// maximum price below the last trade price when it was placed without an
+    /// activation price.
     TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID = 104i32,
     /// The TWAP interval was not valid.
     TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID = 105i32,
@@ -981,6 +985,9 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION = 226i32,
     /// The market had no room for another TWAP order.
     TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED = 227i32,
+    /// The trigger's child order did not match the order the trigger requested,
+    /// so the trigger failed and the child order was canceled.
+    TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT = 235i32,
     /// The market's order limits weren't set yet when the trigger fired.
     TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE = 238i32,
     /// The terminal state did not contain a failure reason.
@@ -1253,6 +1260,9 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TwapCapacityReached: Self = Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ChildOrderInconsistent: Self = Self::TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const OrderLimitsUnavailable: Self = Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE;
@@ -1754,6 +1764,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED,
                 )
             }
+            235i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT,
+                )
+            }
             238i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
@@ -2034,6 +2049,9 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             }
             Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED => {
                 "TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED"
+            }
+            Self::TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT => {
+                "TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT"
             }
             Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE => {
                 "TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE"
@@ -2448,6 +2466,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED,
                 )
             }
+            "TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT,
+                )
+            }
             "TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
@@ -2554,6 +2577,7 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_ORDER_TYPE_NOT_ALLOWED_IN_AUCTION,
             Self::TRIGGER_FAILURE_REASON_POST_ONLY_NOT_ALLOWED_IN_AUCTION,
             Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED,
+            Self::TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT,
             Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR,
@@ -2727,18 +2751,29 @@ impl ::buffa::Enumeration for LadderDistribution {
 /// Create Trigger Request/Response
 /// =============================================================================
 ///
-/// TriggerMarketIoc configures an immediate market child.
+/// TriggerMarketIoc configures an immediate market child. When the trigger
+/// fires, the child is protected like a market order: it fills only within its
+/// slippage cap of the price that fired it. A market child with a cap never
+/// fills worse than the cap; on a gap past it, it may fill partly or not at all.
+/// A buy reserves its funds when it is created, at the trigger price raised by
+/// the cap, and its child never buys above that price.
 #[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct TriggerMarketIoc {
+    #[serde(flatten)]
+    pub max_slippage: ::core::option::Option<
+        __buffa::oneof::trigger_market_ioc::MaxSlippage,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for TriggerMarketIoc {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("TriggerMarketIoc").finish()
+        f.debug_struct("TriggerMarketIoc")
+            .field("max_slippage", &self.max_slippage)
+            .finish()
     }
 }
 impl TriggerMarketIoc {
@@ -2766,6 +2801,16 @@ impl ::buffa::Message for TriggerMarketIoc {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
+        if let ::core::option::Option::Some(ref v) = self.max_slippage {
+            match v {
+                __buffa::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageTicks(v) => {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                }
+                __buffa::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageBps(v) => {
+                    size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                }
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -2776,6 +2821,16 @@ impl ::buffa::Message for TriggerMarketIoc {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.max_slippage {
+            match v {
+                __buffa::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageTicks(x) => {
+                    ::buffa::types::put_int64_field(1u32, *x, buf);
+                }
+                __buffa::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageBps(x) => {
+                    ::buffa::types::put_int32_field(2u32, *x, buf);
+                }
+            }
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -2789,6 +2844,28 @@ impl ::buffa::Message for TriggerMarketIoc {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_slippage = ::core::option::Option::Some(
+                    __buffa::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageTicks(
+                        ::buffa::types::decode_int64(buf)?,
+                    ),
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_slippage = ::core::option::Option::Some(
+                    __buffa::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageBps(
+                        ::buffa::types::decode_int32(buf)?,
+                    ),
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2797,6 +2874,7 @@ impl ::buffa::Message for TriggerMarketIoc {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
+        self.max_slippage = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2807,6 +2885,99 @@ impl ::buffa::ExtensionSet for TriggerMarketIoc {
     }
     fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
         &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for TriggerMarketIoc {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = TriggerMarketIoc;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct TriggerMarketIoc")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<TriggerMarketIoc, A::Error> {
+                let mut __oneof_max_slippage: ::core::option::Option<
+                    __buffa::oneof::trigger_market_ioc::MaxSlippage,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "maxSlippageTicks" | "max_slippage_ticks" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_max_slippage.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'max_slippage'",
+                                        ),
+                                    );
+                                }
+                                __oneof_max_slippage = Some(
+                                    __buffa::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageTicks(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "maxSlippageBps" | "max_slippage_bps" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i32;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i32, D::Error> {
+                                    ::buffa::json_helpers::int32::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i32> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_max_slippage.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'max_slippage'",
+                                        ),
+                                    );
+                                }
+                                __oneof_max_slippage = Some(
+                                    __buffa::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageBps(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <TriggerMarketIoc as ::core::default::Default>::default();
+                __r.max_slippage = __oneof_max_slippage;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for TriggerMarketIoc {
@@ -2829,6 +3000,14 @@ pub const __TRIGGER_MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     from_json: ::buffa::type_registry::any_from_json::<TriggerMarketIoc>,
     is_wkt: false,
 };
+pub mod trigger_market_ioc {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::trigger_market_ioc::MaxSlippage;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage as MaxSlippageView;
+}
 /// TriggerLimitGtc configures a resting limit child.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -3239,7 +3418,7 @@ pub const __TRIGGER_LIMIT_FOK_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     is_wkt: false,
 };
 /// ConditionalChildExecution selects the child submitted by a stop-loss or
-/// take-profit trigger. BUY market children are not supported in spot.
+/// take-profit trigger. Either side may use any child.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -3838,8 +4017,14 @@ pub const __CONDITIONAL_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     from_json: ::buffa::type_registry::any_from_json::<ConditionalTrigger>,
     is_wkt: false,
 };
-/// TrailingStopTrigger configures a spot trailing-stop strategy.
-/// Standalone triggers currently support SELL market-IOC children. Attached
+/// TrailingStopTrigger configures a spot trailing-stop strategy. A trailing
+/// stop that sells tracks the highest price since it activated and fires a
+/// market IOC child when the price falls the trailing distance from it. A
+/// trailing stop that buys tracks the lowest price since it activated and
+/// fires when the price rises the trailing distance from it; its child is an
+/// IOC limit order at its maximum price, or at its slippage cap above the fire
+/// price when that is lower, so it never buys above the maximum price. Without
+/// an activation price, tracking starts when the trigger is placed. Attached
 /// trailing stops may use either side, opposite their parent order.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
@@ -3864,6 +4049,21 @@ pub struct TrailingStopTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
+    /// Maximum price of a trailing stop that buys, in quote units scaled by 1e9:
+    /// the most its child pays per unit. Required when `side` is BUY and set
+    /// aside for it with the child's fee; at least the activation price, or at
+    /// least the last trade price when no activation price is set. A rise that
+    /// fires above it still fires, and the child fills only at or below it. Must
+    /// be unset when `side` is SELL. Fixed at create.
+    ///
+    /// Field 7: `limit_price_ticks`
+    #[serde(
+        rename = "limitPriceTicks",
+        alias = "limit_price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub limit_price_ticks: i64,
     #[serde(flatten)]
     pub trailing_distance: ::core::option::Option<
         __buffa::oneof::trailing_stop_trigger::TrailingDistance,
@@ -3881,6 +4081,7 @@ impl ::core::fmt::Debug for TrailingStopTrigger {
         f.debug_struct("TrailingStopTrigger")
             .field("activation_price_ticks", &self.activation_price_ticks)
             .field("side", &self.side)
+            .field("limit_price_ticks", &self.limit_price_ticks)
             .field("trailing_distance", &self.trailing_distance)
             .field("max_slippage", &self.max_slippage)
             .finish()
@@ -3951,6 +4152,11 @@ impl ::buffa::Message for TrailingStopTrigger {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if self.limit_price_ticks != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.limit_price_ticks) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3997,6 +4203,9 @@ impl ::buffa::Message for TrailingStopTrigger {
             if val != 0 {
                 ::buffa::types::put_int32_field(6u32, val, buf);
             }
+        }
+        if self.limit_price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(7u32, self.limit_price_ticks, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4069,6 +4278,13 @@ impl ::buffa::Message for TrailingStopTrigger {
                 )?;
                 self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit_price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4081,6 +4297,7 @@ impl ::buffa::Message for TrailingStopTrigger {
         self.activation_price_ticks = 0i64;
         self.max_slippage = ::core::option::Option::None;
         self.side = ::buffa::EnumValue::from(0);
+        self.limit_price_ticks = 0i64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4112,6 +4329,7 @@ impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
                 let mut __f_side: ::core::option::Option<
                     ::buffa::EnumValue<super::super::orders::v1::Side>,
                 > = None;
+                let mut __f_limit_price_ticks: ::core::option::Option<i64> = None;
                 let mut __oneof_trailing_distance: ::core::option::Option<
                     __buffa::oneof::trailing_stop_trigger::TrailingDistance,
                 > = None;
@@ -4150,6 +4368,21 @@ impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "limitPriceTicks" | "limit_price_ticks" => {
+                            __f_limit_price_ticks = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = i64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<i64, D::Error> {
+                                        ::buffa::json_helpers::int64::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -4286,6 +4519,9 @@ impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
                 }
                 if let ::core::option::Option::Some(v) = __f_side {
                     __r.side = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_limit_price_ticks {
+                    __r.limit_price_ticks = v;
                 }
                 __r.trailing_distance = __oneof_trailing_distance;
                 __r.max_slippage = __oneof_max_slippage;
@@ -8981,7 +9217,11 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub trigger_price_ticks: ::core::option::Option<i64>,
-    /// Updated limit price in quote units scaled by 1e9 for LIMIT child orders.
+    /// Not modifiable: a trigger's child limit price is fixed at create. Setting
+    /// this field rejects the whole request with
+    /// ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE (InvalidArgument, HTTP 400)
+    /// and leaves the trigger unchanged; cancel the trigger and create a new one
+    /// to change the child limit price.
     ///
     /// Field 11: `limit_price_ticks`
     #[serde(
@@ -11899,7 +12139,9 @@ pub struct Trigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub armed_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Timestamp when the trigger reached a terminal successful state.
+    /// Instant the trigger became terminal, matching its terminal event timestamp.
+    /// Set for completed, canceled (for any reason), or failed triggers,
+    /// including terminal expiry or rejection. Absent while the trigger is live.
     ///
     /// Field 64: `completed_at`
     #[serde(
@@ -13284,9 +13526,17 @@ pub mod __buffa {
         /// Create Trigger Request/Response
         /// =============================================================================
         ///
-        /// TriggerMarketIoc configures an immediate market child.
+        /// TriggerMarketIoc configures an immediate market child. When the trigger
+        /// fires, the child is protected like a market order: it fills only within its
+        /// slippage cap of the price that fired it. A market child with a cap never
+        /// fills worse than the cap; on a gap past it, it may fill partly or not at all.
+        /// A buy reserves its funds when it is created, at the trigger price raised by
+        /// the cap, and its child never buys above that price.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerMarketIocView<'a> {
+            pub max_slippage: ::core::option::Option<
+                super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for TriggerMarketIocView<'a> {
@@ -13320,6 +13570,28 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_slippage = Some(
+                            super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageTicks(
+                                ::buffa::types::decode_int64(&mut cur)?,
+                            ),
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_slippage = Some(
+                            super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageBps(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -13349,6 +13621,25 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::TriggerMarketIoc {
+                    max_slippage: self
+                        .max_slippage
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageTicks(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageTicks(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageBps(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageBps(
+                                    *v,
+                                )
+                            }
+                        }),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -13363,6 +13654,20 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
+                if let ::core::option::Option::Some(ref v) = self.max_slippage {
+                    match v {
+                        super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageTicks(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                        }
+                        super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageBps(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int32_encoded_len(*v) as u32;
+                        }
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -13374,6 +13679,20 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
+                if let ::core::option::Option::Some(ref v) = self.max_slippage {
+                    match v {
+                        super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageTicks(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int64_field(1u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageBps(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int32_field(2u32, *x, buf);
+                        }
+                    }
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -13395,6 +13714,28 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(ref __ov) = self.max_slippage {
+                    match __ov {
+                        super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageTicks(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "maxSlippageTicks",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage::MaxSlippageBps(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "maxSlippageBps",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                    }
+                }
                 __map.end()
             }
         }
@@ -13490,6 +13831,15 @@ pub mod __buffa {
             #[must_use]
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
+            }
+            /// Oneof `max_slippage`.
+            #[must_use]
+            pub fn max_slippage(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::trigger_market_ioc::MaxSlippage,
+            > {
+                self.0.reborrow().max_slippage.as_ref()
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<TriggerMarketIocView<'static>>>
@@ -14367,7 +14717,7 @@ pub mod __buffa {
             }
         }
         /// ConditionalChildExecution selects the child submitted by a stop-loss or
-        /// take-profit trigger. BUY market children are not supported in spot.
+        /// take-profit trigger. Either side may use any child.
         #[derive(Clone, Debug, Default)]
         pub struct ConditionalChildExecutionView<'a> {
             pub execution: ::core::option::Option<
@@ -15298,8 +15648,14 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// TrailingStopTrigger configures a spot trailing-stop strategy.
-        /// Standalone triggers currently support SELL market-IOC children. Attached
+        /// TrailingStopTrigger configures a spot trailing-stop strategy. A trailing
+        /// stop that sells tracks the highest price since it activated and fires a
+        /// market IOC child when the price falls the trailing distance from it. A
+        /// trailing stop that buys tracks the lowest price since it activated and
+        /// fires when the price rises the trailing distance from it; its child is an
+        /// IOC limit order at its maximum price, or at its slippage cap above the fire
+        /// price when that is lower, so it never buys above the maximum price. Without
+        /// an activation price, tracking starts when the trigger is placed. Attached
         /// trailing stops may use either side, opposite their parent order.
         #[derive(Clone, Debug, Default)]
         pub struct TrailingStopTriggerView<'a> {
@@ -15311,6 +15667,15 @@ pub mod __buffa {
             ///
             /// Field 6: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
+            /// Maximum price of a trailing stop that buys, in quote units scaled by 1e9:
+            /// the most its child pays per unit. Required when `side` is BUY and set
+            /// aside for it with the child's fee; at least the activation price, or at
+            /// least the last trade price when no activation price is set. A rise that
+            /// fires above it still fires, and the child fills only at or below it. Must
+            /// be unset when `side` is SELL. Fixed at create.
+            ///
+            /// Field 7: `limit_price_ticks`
+            pub limit_price_ticks: i64,
             pub trailing_distance: ::core::option::Option<
                 super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance,
             >,
@@ -15367,6 +15732,13 @@ pub mod __buffa {
                         view.side = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -15443,6 +15815,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::TrailingStopTrigger {
                     activation_price_ticks: self.activation_price_ticks,
                     side: self.side,
+                    limit_price_ticks: self.limit_price_ticks,
                     trailing_distance: self
                         .trailing_distance
                         .as_ref()
@@ -15536,6 +15909,12 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if self.limit_price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.limit_price_ticks)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -15588,6 +15967,9 @@ pub mod __buffa {
                         ::buffa::types::put_int32_field(6u32, val, buf);
                     }
                 }
+                if self.limit_price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(7u32, self.limit_price_ticks, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -15622,6 +16004,15 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
                     __map.serialize_entry("side", &self.side)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.limit_price_ticks,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "limitPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.limit_price_ticks),
+                        )?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.trailing_distance {
                     match __ov {
@@ -15778,6 +16169,18 @@ pub mod __buffa {
                 &self,
             ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
                 self.0.reborrow().side
+            }
+            /// Maximum price of a trailing stop that buys, in quote units scaled by 1e9:
+            /// the most its child pays per unit. Required when `side` is BUY and set
+            /// aside for it with the child's fee; at least the activation price, or at
+            /// least the last trade price when no activation price is set. A rise that
+            /// fires above it still fires, and the child fills only at or below it. Must
+            /// be unset when `side` is SELL. Fixed at create.
+            ///
+            /// Field 7: `limit_price_ticks`
+            #[must_use]
+            pub fn limit_price_ticks(&self) -> i64 {
+                self.0.reborrow().limit_price_ticks
             }
             /// Oneof `trailing_distance`.
             #[must_use]
@@ -22877,7 +23280,11 @@ pub mod __buffa {
             ///
             /// Field 10: `trigger_price_ticks`
             pub trigger_price_ticks: ::core::option::Option<i64>,
-            /// Updated limit price in quote units scaled by 1e9 for LIMIT child orders.
+            /// Not modifiable: a trigger's child limit price is fixed at create. Setting
+            /// this field rejects the whole request with
+            /// ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE (InvalidArgument, HTTP 400)
+            /// and leaves the trigger unchanged; cancel the trigger and create a new one
+            /// to change the child limit price.
             ///
             /// Field 11: `limit_price_ticks`
             pub limit_price_ticks: ::core::option::Option<i64>,
@@ -23445,7 +23852,11 @@ pub mod __buffa {
             pub fn trigger_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().trigger_price_ticks
             }
-            /// Updated limit price in quote units scaled by 1e9 for LIMIT child orders.
+            /// Not modifiable: a trigger's child limit price is fixed at create. Setting
+            /// this field rejects the whole request with
+            /// ERROR_CODE_TRIGGER_CHILD_PRICE_NOT_MODIFIABLE (InvalidArgument, HTTP 400)
+            /// and leaves the trigger unchanged; cancel the trigger and create a new one
+            /// to change the child limit price.
             ///
             /// Field 11: `limit_price_ticks`
             #[must_use]
@@ -27417,7 +27828,9 @@ pub mod __buffa {
             pub armed_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Timestamp when the trigger reached a terminal successful state.
+            /// Instant the trigger became terminal, matching its terminal event timestamp.
+            /// Set for completed, canceled (for any reason), or failed triggers,
+            /// including terminal expiry or rejection. Absent while the trigger is live.
             ///
             /// Field 64: `completed_at`
             pub completed_at: ::buffa::MessageFieldView<
@@ -28891,7 +29304,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().armed_at
             }
-            /// Timestamp when the trigger reached a terminal successful state.
+            /// Instant the trigger became terminal, matching its terminal event timestamp.
+            /// Set for completed, canceled (for any reason), or failed triggers,
+            /// including terminal expiry or rejection. Absent while the trigger is live.
             ///
             /// Field 64: `completed_at`
             #[must_use]
@@ -28963,6 +29378,15 @@ pub mod __buffa {
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
+            pub mod trigger_market_ioc {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum MaxSlippage {
+                    MaxSlippageTicks(i64),
+                    MaxSlippageBps(i32),
+                }
+            }
             pub mod conditional_child_execution {
                 #[allow(unused_imports)]
                 use super::*;
@@ -29206,6 +29630,43 @@ pub mod __buffa {
     pub mod oneof {
         #[allow(unused_imports)]
         use super::*;
+        pub mod trigger_market_ioc {
+            #[allow(unused_imports)]
+            use super::*;
+            /// Optional slippage cap. If omitted, the pair's default market slippage for
+            /// the child's side applies, as for a market order. It can be changed with
+            /// ModifyTrigger while the trigger is live.
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum MaxSlippage {
+                MaxSlippageTicks(i64),
+                MaxSlippageBps(i32),
+            }
+            impl ::buffa::Oneof for MaxSlippage {}
+            impl serde::Serialize for MaxSlippage {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::MaxSlippageTicks(v) => {
+                            map.serialize_entry(
+                                "maxSlippageTicks",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                        Self::MaxSlippageBps(v) => {
+                            map.serialize_entry(
+                                "maxSlippageBps",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
         pub mod conditional_child_execution {
             #[allow(unused_imports)]
             use super::*;
@@ -29328,7 +29789,9 @@ pub mod __buffa {
                     map.end()
                 }
             }
-            /// Optional protection applied when the market child fires.
+            /// Optional protection applied when the child fires: the child becomes an
+            /// IOC limit order this far below the fire price for a sell, or above it
+            /// for a buy, never above a buy's maximum price.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
                 MaxSlippageTicks(i64),
@@ -29598,8 +30061,13 @@ pub mod __buffa {
                     map.end()
                 }
             }
+            /// For a trailing stop, or a stop-loss or take-profit with a market child:
             /// Optional price protection. Select either field with a zero value to clear
-            /// an existing max-slippage cap; omit the oneof to leave it unchanged.
+            /// an existing max-slippage cap; omit the oneof to leave it unchanged. A
+            /// cleared cap on a market child falls back to the pair's default market
+            /// slippage. Changing the trigger price or the cap of a buy with a market
+            /// child re-sizes its reserved funds; a change that needs more funds than
+            /// are available is rejected and leaves the trigger unchanged.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
                 MaxSlippageTicks(i64),

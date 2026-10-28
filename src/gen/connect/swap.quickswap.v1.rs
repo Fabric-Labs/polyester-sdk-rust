@@ -235,8 +235,9 @@ pub trait QuickSwapService: Send + Sync + 'static {
     /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original QuickSwap stands.
     /// - UNAVAILABLE: ADDRESS_UNAVAILABLE; the QuickSwap is kept and gets its
     /// address automatically; follow it with GetQuickSwap or the same request.
-    /// - ABORTED: ADDRESS_CONFLICT; the QuickSwap never gets an address; create
-    /// a new one with a new idempotency key.
+    /// - ABORTED: ADDRESS_CONFLICT; the QuickSwap never gets an address and is
+    /// EXPIRED (DEPOSIT_ADDRESS_CONFLICT); every repeat returns this error;
+    /// create a new one with a new idempotency key.
     /// - UNAVAILABLE, DEADLINE_EXCEEDED: unknown outcome or QUOTE_UNAVAILABLE;
     /// retry the same request.
     /// - PERMISSION_DENIED: BROKER_DISABLED; nothing is bound to the key.
@@ -947,6 +948,18 @@ pub type OwnedListQuickSwapsRequestView = ::buffa::view::OwnedView<
 pub type OwnedListQuickSwapsResponseView = ::buffa::view::OwnedView<
     crate::proto::swap::quickswap::v1::__buffa::view::ListQuickSwapsResponseView<'static>,
 >;
+///Shorthand for `OwnedView<QuickSwapBrokerServiceGetQuickSwapRequestView<'static>>`.
+pub type OwnedQuickSwapBrokerServiceGetQuickSwapRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::QuickSwapBrokerServiceGetQuickSwapRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<QuickSwapBrokerServiceGetQuickSwapResponseView<'static>>`.
+pub type OwnedQuickSwapBrokerServiceGetQuickSwapResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::QuickSwapBrokerServiceGetQuickSwapResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<GetFeeTotalsRequestView<'static>>`.
 pub type OwnedGetFeeTotalsRequestView = ::buffa::view::OwnedView<
     crate::proto::swap::quickswap::v1::__buffa::view::GetFeeTotalsRequestView<'static>,
@@ -1319,6 +1332,34 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapResponse,
+>
+for crate::proto::swap::quickswap::v1::__buffa::view::QuickSwapBrokerServiceGetQuickSwapResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::QuickSwapBrokerServiceGetQuickSwapResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetFeeTotalsResponse>
 for crate::proto::swap::quickswap::v1::__buffa::view::GetFeeTotalsResponseView<'_> {
     fn encode(
@@ -1514,6 +1555,15 @@ pub const QUICK_SWAP_BROKER_SERVICE_LIST_QUICK_SWAPS_SPEC: ::connectrpc::Spec = 
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetQuickSwap` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_GET_QUICK_SWAP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/GetQuickSwap",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetFeeTotals` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -1539,7 +1589,7 @@ pub const QUICK_SWAP_BROKER_SERVICE_GET_BROKER_STATS_SPEC: ::connectrpc::Spec = 
 /// BROKER_NOT_FOUND. Each RPC maps to one broker action:
 /// | Action | Owner | Admin | Finance | Affiliate manager | Viewer | API key |
 /// | --- | --- | --- | --- | --- | --- | --- |
-/// | Read (GetBroker, ListKeys, ListVaults, GetVault, ListMembers, ListQuickSwaps, GetFeeTotals, GetBrokerStats) | yes | yes | yes | yes | yes | yes, except ListMembers |
+/// | Read (GetBroker, ListKeys, ListVaults, GetVault, ListMembers, ListQuickSwaps, GetQuickSwap, GetFeeTotals, GetBrokerStats) | yes | yes | yes | yes | yes | yes, except ListMembers |
 /// | Create vaults (CreateAffiliateVault, SetVaultStatus) | yes | yes | no | yes | no | yes |
 /// | Manage keys (CreateKey, RotateKey, RevokeKey) | yes | yes | no | no | no | RotateKey of itself only |
 /// | Manage members (InviteMember, SetMemberRole, RemoveMember) | yes | yes, never the Owner | no | no | no | no |
@@ -2070,6 +2120,33 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::swap::quickswap::v1::ListQuickSwapsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetQuickSwap returns the full detail of one of the broker's QuickSwaps,
+    /// including its addresses, quote, progress, requested and charged fees.
+    /// Every broker member role can read it with a session token.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or SWAP_NOT_FOUND, including another broker's swap.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_quick_swap<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -2656,6 +2733,35 @@ impl<S: QuickSwapBrokerService> QuickSwapBrokerServiceExt for S {
             .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_QUICK_SWAPS_SPEC)
             .route_view(
                 QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "GetQuickSwap",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::QuickSwapBrokerServiceGetQuickSwapRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_quick_swap(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_GET_QUICK_SWAP_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
                 "GetFeeTotals",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -2869,6 +2975,12 @@ for QuickSwapBrokerServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_QUICK_SWAPS_SPEC),
+                )
+            }
+            "GetQuickSwap" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_GET_QUICK_SWAP_SPEC),
                 )
             }
             "GetFeeTotals" => {
@@ -3253,6 +3365,27 @@ for QuickSwapBrokerServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::swap::quickswap::v1::ListQuickSwapsResponse,
+                        >(format)
+                })
+            }
+            "GetQuickSwap" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::QuickSwapBrokerServiceGetQuickSwapRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_quick_swap(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapResponse,
                         >(format)
                 })
             }
@@ -4163,6 +4296,51 @@ where
                 &self.config,
                 QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
                 "ListQuickSwaps",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetQuickSwap RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/GetQuickSwap.
+    pub async fn get_quick_swap(
+        &self,
+        request: crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::QuickSwapBrokerServiceGetQuickSwapResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_quick_swap_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetQuickSwap RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_quick_swap_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::QuickSwapBrokerServiceGetQuickSwapRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::QuickSwapBrokerServiceGetQuickSwapResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "GetQuickSwap",
                 request,
                 options,
             )

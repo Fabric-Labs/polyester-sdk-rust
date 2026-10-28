@@ -14,8 +14,8 @@ use crate::models::{
     AttachedRisk, AttachedRiskLegState, BatchCancelOrdersResult, BatchCancelResultItem,
     BatchCreateOrdersResult, BatchCreateResultItem, BatchReplaceAdmissionItem,
     BatchReplaceOrdersResult, BatchReplaceStatusItem, BatchReplaceStatusResult,
-    CancelAllAfterResult, CancelAllOrdersResult, CreateOrderType, GetOrderResult, MaxSlippage,
-    ModifyOrderResult, Order, OrderErrorDetail, OrderFieldViolation, OrderLineage,
+    CancelAllAfterResult, CancelAllOrdersResult, CancelledOrder, CreateOrderType, GetOrderResult,
+    MaxSlippage, ModifyOrderResult, Order, OrderErrorDetail, OrderFieldViolation, OrderLineage,
     OrderMutationResult, OrderTransfer, OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance,
     TrailingStop, UserTrade, UserTradesList,
 };
@@ -217,7 +217,13 @@ fn decode_trailing_stop(
     }))
 }
 
+/// NOT_CONFIGURED is the server's state for a leg the parent order does not have.
 fn attached_risk_state_is_meaningful(msg: &ProtoAttachedRiskLegState) -> bool {
+    use crate::proto::orders::v1::attached_risk_leg_state::Status;
+
+    if msg.status.as_known() == Some(Status::NotConfigured) {
+        return false;
+    }
     msg.status.to_i32() != 0
         || msg.armed_ts_ns != 0
         || msg.terminal_ts_ns != 0
@@ -389,6 +395,9 @@ pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> Result<OrderMuta
     let mut result = order_mutation("accepted", msg.order_id, &msg.client_order_id);
     result.resolved_base_qty = decode_qty_scaled(msg.resolved_base_qty_scaled, None, None, None);
     result.submitted_max_quote_debit_scaled = msg.submitted_max_quote_debit_scaled;
+    result.take_profit_trigger_id = leg_trigger_id(msg.take_profit_trigger_id);
+    result.stop_loss_trigger_id = leg_trigger_id(msg.stop_loss_trigger_id);
+    result.trailing_stop_trigger_id = leg_trigger_id(msg.trailing_stop_trigger_id);
     Ok(result)
 }
 
@@ -420,7 +429,16 @@ fn order_mutation(status: &str, order_id: u64, client_order_id: &str) -> OrderMu
         client_order_id: client_order_id.to_owned(),
         resolved_base_qty: None,
         submitted_max_quote_debit_scaled: None,
+        take_profit_trigger_id: None,
+        stop_loss_trigger_id: None,
+        trailing_stop_trigger_id: None,
     }
+}
+
+/// Public ID of an attached-risk leg's trigger; `None` for a leg the order
+/// does not have (absent or zero on the wire).
+fn leg_trigger_id(id: Option<u64>) -> Option<String> {
+    id.filter(|id| *id != 0).map(format_uint64_id)
 }
 
 fn timestamp_ms(ts: &buffa_types::google::protobuf::Timestamp) -> i64 {
@@ -497,6 +515,9 @@ pub fn modify_order_from_proto(msg: &ModifyOrderResponse) -> Result<ModifyOrderR
         old_order_id: format_uint64_id(msg.old_order_id),
         final_order_id: format_uint64_id(msg.final_order_id),
         code: msg.code.clone(),
+        take_profit_trigger_id: leg_trigger_id(msg.take_profit_trigger_id),
+        stop_loss_trigger_id: leg_trigger_id(msg.stop_loss_trigger_id),
+        trailing_stop_trigger_id: leg_trigger_id(msg.trailing_stop_trigger_id),
     })
 }
 
@@ -548,6 +569,16 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllO
         matched_orders: msg.matched_orders,
         submitted_cancels: msg.submitted_cancels,
         failed_cancels: msg.failed_cancels,
+        cancelled_orders: msg
+            .cancelled_orders
+            .iter()
+            .map(|order| CancelledOrder {
+                order_id: format_uint64_id(order.order_id),
+                client_order_id: order.client_order_id.clone(),
+            })
+            .collect(),
+        total_cancelled: msg.total_cancelled,
+        truncated: msg.truncated,
     })
 }
 
@@ -576,12 +607,18 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                 client_order_id: item.client_order_id.clone(),
                 code: String::new(),
                 rate_limit: None,
+                take_profit_trigger_id: None,
+                stop_loss_trigger_id: None,
+                trailing_stop_trigger_id: None,
             };
             match item.outcome.as_ref() {
                 Some(batch_create_result_item::Outcome::Accepted(value)) => {
                     accepted += 1;
                     out.status = "accepted".to_owned();
                     out.order_id = format_uint64_id(value.order_id);
+                    out.take_profit_trigger_id = leg_trigger_id(value.take_profit_trigger_id);
+                    out.stop_loss_trigger_id = leg_trigger_id(value.stop_loss_trigger_id);
+                    out.trailing_stop_trigger_id = leg_trigger_id(value.trailing_stop_trigger_id);
                 }
                 Some(batch_create_result_item::Outcome::Rejected(value)) => {
                     rejected += 1;
@@ -1476,6 +1513,88 @@ mod tests {
     }
 
     #[test]
+    fn not_configured_attached_risk_legs_are_omitted() {
+        use crate::proto::orders::v1::attached_risk_leg_state::Status;
+        use crate::proto::orders::v1::{
+            AttachedRisk as ProtoRisk, AttachedRiskLegState as ProtoState, AttachedRiskStopLoss,
+            AttachedRiskTakeProfit, AttachedRiskTrailingStop, RiskExecution, TakeProfitPolicy,
+        };
+
+        let not_configured = || ProtoState {
+            status: Status::NotConfigured.into(),
+            ..Default::default()
+        };
+        let order = order_from_proto(&ProtoOrder {
+            order_id: 1,
+            attached_risk: ProtoRisk {
+                take_profit: AttachedRiskTakeProfit {
+                    policy: TakeProfitPolicy {
+                        trigger_price_ticks: 2_000_000_000_000,
+                        child: RiskExecution {
+                            execution: Some(
+                                crate::proto::orders::v1::risk_execution::Execution::MarketIoc(
+                                    Box::default(),
+                                ),
+                            ),
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    state: ProtoState {
+                        status: Status::Created.into(),
+                        trigger_id: Some(5_584_097_434_927_106),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                stop_loss: AttachedRiskStopLoss {
+                    state: not_configured().into(),
+                    ..Default::default()
+                }
+                .into(),
+                trailing_stop: AttachedRiskTrailingStop {
+                    state: not_configured().into(),
+                    ..Default::default()
+                }
+                .into(),
+                oco: true,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        let risk = order.attached_risk.expect("configured take-profit");
+        assert!(risk.take_profit.is_some());
+        assert!(risk.stop_loss.is_none(), "stop_loss: {:?}", risk.stop_loss);
+        assert!(
+            risk.trailing_stop.is_none(),
+            "trailing_stop: {:?}",
+            risk.trailing_stop
+        );
+
+        let only_unconfigured = order_from_proto(&ProtoOrder {
+            order_id: 2,
+            attached_risk: ProtoRisk {
+                trailing_stop: AttachedRiskTrailingStop {
+                    state: not_configured().into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(only_unconfigured.attached_risk.is_none());
+    }
+
+    #[test]
     fn filled_order_preserves_zero_leaves_and_cum_qty() {
         let msg = ProtoOrder {
             order_id: 1,
@@ -1650,6 +1769,95 @@ mod tests {
         assert_eq!(cancelled.status, "accepted");
         assert_eq!(cancelled.order_id, format_uint64_id(42));
         assert!(cancelled.client_order_id.is_empty());
+    }
+
+    #[test]
+    fn mutation_results_carry_configured_leg_trigger_ids_only() {
+        use crate::proto::orders::v1::{
+            BatchCreateAccepted, BatchCreateResultItem as ProtoItem, CreateOrderResponse,
+            ModifyActionTaken, ModifyOrderResponse, batch_create_result_item,
+        };
+
+        // Take-profit and stop-loss configured; no trailing stop (absent), and a
+        // zero ID is treated as no leg.
+        let created = order_mutation_from_create(&CreateOrderResponse {
+            order_id: 42,
+            take_profit_trigger_id: Some(501),
+            stop_loss_trigger_id: Some(502),
+            trailing_stop_trigger_id: None,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(created.take_profit_trigger_id, Some(format_uint64_id(501)));
+        assert_eq!(created.stop_loss_trigger_id, Some(format_uint64_id(502)));
+        assert_eq!(created.trailing_stop_trigger_id, None);
+
+        let plain = order_mutation_from_create(&CreateOrderResponse {
+            order_id: 43,
+            take_profit_trigger_id: Some(0),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(plain.take_profit_trigger_id, None);
+        assert_eq!(plain.stop_loss_trigger_id, None);
+        assert_eq!(plain.trailing_stop_trigger_id, None);
+
+        let modified = modify_order_from_proto(&ModifyOrderResponse {
+            action_taken: ModifyActionTaken::Replaced.into(),
+            old_order_id: 10,
+            final_order_id: 11,
+            trailing_stop_trigger_id: Some(777),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(modified.take_profit_trigger_id, None);
+        assert_eq!(modified.stop_loss_trigger_id, None);
+        assert_eq!(
+            modified.trailing_stop_trigger_id,
+            Some(format_uint64_id(777))
+        );
+
+        let batch = batch_create_from_proto(&BatchCreateOrdersResponse {
+            results: vec![
+                ProtoItem {
+                    client_order_id: "risk".into(),
+                    outcome: Some(batch_create_result_item::Outcome::Accepted(Box::new(
+                        BatchCreateAccepted {
+                            order_id: 9,
+                            take_profit_trigger_id: Some(601),
+                            stop_loss_trigger_id: Some(602),
+                            ..Default::default()
+                        },
+                    ))),
+                    ..Default::default()
+                },
+                ProtoItem {
+                    client_order_id: "plain".into(),
+                    outcome: Some(batch_create_result_item::Outcome::Accepted(Box::new(
+                        BatchCreateAccepted {
+                            order_id: 10,
+                            ..Default::default()
+                        },
+                    ))),
+                    ..Default::default()
+                },
+            ],
+            accepted_count: 2,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            batch.results[0].take_profit_trigger_id,
+            Some(format_uint64_id(601))
+        );
+        assert_eq!(
+            batch.results[0].stop_loss_trigger_id,
+            Some(format_uint64_id(602))
+        );
+        assert_eq!(batch.results[0].trailing_stop_trigger_id, None);
+        assert_eq!(batch.results[1].take_profit_trigger_id, None);
+        assert_eq!(batch.results[1].stop_loss_trigger_id, None);
+        assert_eq!(batch.results[1].trailing_stop_trigger_id, None);
     }
 
     #[test]
@@ -2023,6 +2231,47 @@ mod tests {
     }
 
     #[test]
+    fn cancel_all_lists_the_cancelled_orders_oldest_first() {
+        use crate::proto::orders::v1::CancelledOrder as ProtoCancelledOrder;
+
+        let msg = CancelAllOrdersResponse {
+            status: cancel_all_orders_response::Status::Submitted.into(),
+            matched_orders: 203,
+            submitted_cancels: 203,
+            cancelled_orders: (1..=200_u64)
+                .map(|id| ProtoCancelledOrder {
+                    order_id: id,
+                    client_order_id: if id == 1 {
+                        "first".into()
+                    } else {
+                        String::new()
+                    },
+                    ..Default::default()
+                })
+                .collect(),
+            total_cancelled: 203,
+            truncated: true,
+            ..Default::default()
+        };
+        let decoded = cancel_all_from_proto(&msg).unwrap();
+        assert_eq!(decoded.cancelled_orders.len(), 200);
+        assert_eq!(
+            decoded.cancelled_orders[0],
+            CancelledOrder {
+                order_id: format_uint64_id(1),
+                client_order_id: "first".into(),
+            }
+        );
+        assert_eq!(
+            decoded.cancelled_orders[199].order_id,
+            format_uint64_id(200)
+        );
+        assert!(decoded.cancelled_orders[199].client_order_id.is_empty());
+        assert_eq!(decoded.total_cancelled, 203);
+        assert!(decoded.truncated);
+    }
+
+    #[test]
     fn cancel_all_requires_known_status() {
         let valid = CancelAllOrdersResponse {
             status: cancel_all_orders_response::Status::Submitted.into(),
@@ -2034,6 +2283,9 @@ mod tests {
         let decoded = cancel_all_from_proto(&valid).expect("submitted is valid");
         assert_eq!(decoded.status, "submitted");
         assert_eq!(decoded.matched_orders, 2);
+        assert!(decoded.cancelled_orders.is_empty());
+        assert_eq!(decoded.total_cancelled, 0);
+        assert!(!decoded.truncated);
 
         let dry_run = CancelAllOrdersResponse {
             status: cancel_all_orders_response::Status::DryRun.into(),

@@ -6,7 +6,73 @@
 
 Package version: `0.1.0-alpha.50`. Git tag: `v0.1.0a50`.
 
+### Breaking
+- `OrdersService::subscribe` streams account orders over the private
+  WebSocket (`/v1/ws/private`) and returns a `PrivateOrdersSubscription`
+  of `PrivateOrdersEvent`s (`Connected`, `Snapshot`, `Unit`, `Ready`,
+  `Stale`, `Disconnected`, `Error`) instead of a `TypedSubscription<Order>`. The
+  realtime order channels it used are retired and no longer issue
+  subscribe tokens. Snapshot and unit orders use the same `Order` model as
+  the order reads; units also carry removed order IDs and order events.
+  The call returns at once: the handshake result arrives as `Connected` or
+  `Error`. The stream resumes from its last position after a gap or a
+  reconnect, and calls for the same account share one server subscription.
+  `Ready` arrives once per server subscription when the stream reaches the
+  account's read boundary; wait for it before relying on the stream. A
+  consumer that joins a ready stream gets it right after its catch-up
+  snapshot.
+- Removed `codecs::decode::order_from_bytes`, the decoder for the retired
+  order channel's publications.
+- `ModifyTriggerParams.limit_price` is removed: a trigger's child limit
+  price is fixed at create, and the API rejects any modify that sets it.
+- `CancelAllOrdersResult`, `MarketTradesResult`, `GetTradesOpts` and
+  `Trigger` gain fields (below). These structs are not `#[non_exhaustive]`,
+  so code that builds them with struct literals must add them.
+
+### Fixed
+- `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
+  use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
+  Earlier versions pointed at `api-testnet.polyester.com`, which does not
+  exist, so every testnet call failed with a DNS error. The devnet preset and
+  `DEFAULT_API_URL` / `DEFAULT_WS_URL` now use the documented
+  `api.devnet.polyester.com` host.
+- **Stop-loss and take-profit triggers with a market child now send their
+  slippage cap.** `max_slippage_ticks` / `max_slippage_bps` were dropped on
+  create, so the child used the pair's default market slippage instead of
+  the requested cap. At most one of them is accepted, a sell child takes
+  fewer than 10000 bps, and a limit child rejects them.
+- Order reads no longer report an attached-risk leg whose state is
+  `not_configured`; the server sends that state for a leg the order does
+  not have.
+- An API error whose order, auth, withdraw or transfer code is newer than
+  this SDK version now reports `code = "UNKNOWN_ERROR_CODE(<n>)"` instead
+  of `ERROR_CODE_UNSPECIFIED` or `AUTH_UNSPECIFIED`, so the server's code is
+  never lost.
+
 ### Added
+- Standalone BUY trailing stops: `CreateTriggerParams.limit_price` is the
+  required maximum price of a BUY trailing stop (`limit_price_ticks`), and
+  must be `None` for a SELL one. Trigger reads show a BUY trailing stop
+  as an IOC limit child (`order_type` `limit`, `time_in_force` `ioc`) with
+  the maximum price as `Trigger.limit_price`; the trailing details carry the
+  trough price.
+- `Trigger.max_slippage`: the slippage cap of a stop-loss or take-profit
+  market child, or of a trailing stop.
+- `CancelAllOrdersResult.cancelled_orders` (order ID and client order ID,
+  oldest first, at most 200), `total_cancelled` and `truncated`.
+- Gap-free trade backfill: `GetTradesOpts.after_trade_id` (not combinable
+  with `start`, `end` or `page_token`), and
+  `MarketTradesResult.complete_through_trade_id`, `next_after_trade_id` and
+  `epoch_ends`. Zero is a valid cursor and watermark.
+- `OrderMutationResult` (order create), `ModifyOrderResult` and accepted
+  `BatchCreateResultItem`s carry `take_profit_trigger_id`,
+  `stop_loss_trigger_id` and `trailing_stop_trigger_id`: the public ID of
+  each attached-risk leg's trigger, and `None` for a leg the order does not
+  have. These structs are not `#[non_exhaustive]`, so code that builds them
+  with struct literals or destructures them exhaustively must add the new
+  fields.
+- `realtime::Client::subscribe_private_orders(account_id)` and
+  `proto::privatews` (the private WebSocket contract).
 - Trigger events report `event_type = "activated"` when a standalone
   trailing trigger's activation condition is met and tracking begins.
   `trigger_event_type_from_label("activated")` filters for them.
