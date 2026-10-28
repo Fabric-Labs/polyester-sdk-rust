@@ -394,7 +394,8 @@ mod tests {
     fn devnet_preset_matches_typescript() {
         let env = &*POLYESTER_DEVNET_ENVIRONMENT;
         assert_eq!(env.name, "polyester-devnet");
-        assert_eq!(env.api_url, "https://api-devnet.polyester.ai");
+        assert_eq!(env.api_url, "https://api.devnet.polyester.com");
+        assert_eq!(env.websocket_url, "wss://api.devnet.polyester.com");
         assert_eq!(env.chain_id, 888168);
         assert_eq!(
             env.contracts.trading_gateway_address,
@@ -406,7 +407,8 @@ mod tests {
     fn testnet_preset_matches_typescript() {
         let env = &*POLYESTER_TESTNET_ENVIRONMENT;
         assert_eq!(env.name, "polyester-testnet");
-        assert_eq!(env.api_url, "https://api-testnet.polyester.com");
+        assert_eq!(env.api_url, "https://api.testnet.polyester.com");
+        assert_eq!(env.websocket_url, "wss://api.testnet.polyester.com");
         assert_eq!(env.chain_id, 888169);
         assert_eq!(
             env.contracts.trading_gateway_address,
