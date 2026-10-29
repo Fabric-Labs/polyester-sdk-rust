@@ -21,7 +21,8 @@ use crate::models::{
     CreateSide, CreateTimeInForce, FeeAsset, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts,
     ListOrderHistoryOpts, ListUserTradesOpts, MaxSlippage, ModifyOrderParams, ModifyOrderResult,
     OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, PreviewOrderParams,
-    PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, UserTrade, UserTradesList,
+    PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, TriggerPriceSourceKind, UserTrade,
+    UserTradesList,
 };
 use crate::proto::orders::v1::{
     BatchCancelItem as ProtoBatchCancelItem, BatchCancelOrdersRequest, BatchCreateOrdersRequest,
@@ -31,9 +32,9 @@ use crate::proto::orders::v1::{
     GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, LimitFok, LimitGtc, LimitGtd,
     LimitIoc, MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, PreviewOrderRequest,
     RiskExecution, RiskLimitGtc, RiskPolicy, SelfTradePreventionMode, Side, StopLossPolicy,
-    TakeProfitPolicy, TrailingStopPolicy, batch_replace_order_item, cancel_order_request,
-    get_order_request, get_user_trades_request, market_ioc, modify_order_request, order_intent,
-    risk_execution, risk_policy, trailing_stop_policy,
+    TakeProfitPolicy, TrailingStopPolicy, TriggerPriceSource, batch_replace_order_item,
+    cancel_order_request, get_order_request, get_user_trades_request, market_ioc,
+    modify_order_request, order_intent, risk_execution, risk_policy, trailing_stop_policy,
 };
 use crate::types::{
     Price, Quantity, resolve_price_ticks, resolve_qty_scaled, resolve_quote_qty_scaled,
@@ -331,6 +332,7 @@ impl OrdersService {
                     trades,
                     transfers,
                     next_page_token: String::new(),
+                    executions_complete: page.executions_complete,
                 });
             }
             page_token = Some(page.next_page_token);
@@ -626,13 +628,7 @@ impl OrdersService {
 
     /// Map the flat public [`RiskLeg`] (`order_type`/`limit_price`) onto a child
     /// [`RiskExecution`] variant.
-    #[allow(deprecated)]
     fn encode_risk_child(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<RiskExecution> {
-        if leg.trigger_price_source.is_some() {
-            return Err(Error::validation(
-                "attached risk always uses last trade; trigger_price_source cannot be supplied",
-            ));
-        }
         let child_ty = leg.order_type.unwrap_or(CreateOrderType::Market);
         let execution = match (child_ty, leg.limit_price.as_ref()) {
             (CreateOrderType::Market, None) => risk_execution::Execution::MarketIoc(Box::default()),
@@ -667,6 +663,7 @@ impl OrdersService {
                 })?,
                 symbol,
             )?,
+            trigger_price_source: risk_trigger_price_source(leg.trigger_price_source),
             ..Default::default()
         };
         *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol)?;
@@ -681,6 +678,7 @@ impl OrdersService {
                 })?,
                 symbol,
             )?,
+            trigger_price_source: risk_trigger_price_source(leg.trigger_price_source),
             ..Default::default()
         };
         *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol)?;
@@ -693,19 +691,17 @@ impl OrdersService {
         stop: &TrailingStop,
         symbol: Option<&str>,
     ) -> Result<TrailingStopPolicy> {
-        // `trigger_price_source`/`order_type` were dropped from the trailing-stop
-        // policy wire; the child is an implicit market execution.
-        if stop.trigger_price_source.is_some() {
-            return Err(Error::validation(
-                "attached risk always uses last trade; trigger_price_source cannot be supplied",
-            ));
-        }
+        // `order_type` is not on the trailing-stop policy wire; the child is an
+        // implicit market execution.
         if stop.order_type.is_some() {
             return Err(Error::validation(
                 "attached trailing_stop child is always market; order_type cannot be supplied",
             ));
         }
-        let mut proto = TrailingStopPolicy::default();
+        let mut proto = TrailingStopPolicy {
+            trigger_price_source: risk_trigger_price_source(stop.trigger_price_source),
+            ..Default::default()
+        };
         if let Some(activation) = stop.activation_price.as_ref() {
             proto.activation_price_ticks = self.resolve_constraint_price(activation, symbol)?;
         }
@@ -1473,6 +1469,19 @@ impl TradesService {
     }
 }
 
+/// `None` sends nothing: the server then watches the last trade price.
+fn risk_trigger_price_source(
+    kind: Option<TriggerPriceSourceKind>,
+) -> buffa::EnumValue<TriggerPriceSource> {
+    match kind {
+        None => TriggerPriceSource::TriggerPriceSourceUnspecified,
+        Some(TriggerPriceSourceKind::LastPrice) => TriggerPriceSource::LastPrice,
+        Some(TriggerPriceSourceKind::IndexPrice) => TriggerPriceSource::IndexPrice,
+        Some(TriggerPriceSourceKind::MarkPrice) => TriggerPriceSource::MarkPrice,
+    }
+    .into()
+}
+
 fn order_trades_projection_complete(result: &GetOrderResult) -> bool {
     let Some(order) = result.order.as_ref() else {
         return false;
@@ -1703,8 +1712,14 @@ mod tests {
         assert!(client.orders.encode_modify_params(no_patch).is_err());
     }
 
+    fn stop_leg_source(policy: &RiskPolicy) -> buffa::EnumValue<TriggerPriceSource> {
+        match policy.stop_leg.as_ref().expect("stop leg") {
+            risk_policy::StopLeg::StopLoss(leg) => leg.trigger_price_source,
+            risk_policy::StopLeg::TrailingStop(leg) => leg.trigger_price_source,
+        }
+    }
+
     #[test]
-    #[allow(deprecated)]
     fn attached_risk_encodes_on_create_and_modify() {
         use crate::models::{AttachedRisk, RiskLeg, TriggerPriceSourceKind};
 
@@ -1756,8 +1771,15 @@ mod tests {
         let modify_wire = client.orders.encode_modify_params(modify).unwrap();
         assert!(modify_wire.new_attached_risk.is_set());
 
-        let mut unsupported = create;
-        unsupported
+        // No source sends nothing: the server watches the last trade price.
+        let policy = order.attached_risk.as_option().unwrap();
+        assert_eq!(
+            policy.take_profit.as_option().unwrap().trigger_price_source,
+            TriggerPriceSource::TriggerPriceSourceUnspecified
+        );
+
+        let mut index = create;
+        index
             .attached_risk
             .as_mut()
             .unwrap()
@@ -1765,12 +1787,140 @@ mod tests {
             .as_mut()
             .unwrap()
             .trigger_price_source = Some(TriggerPriceSourceKind::IndexPrice);
-        let err = client
-            .orders
-            .encode_create_params(&unsupported)
-            .unwrap_err();
-        assert!(matches!(&err, Error::Validation(_)));
-        assert!(err.to_string().contains("always uses last trade"));
+        let wire = client.orders.encode_create_params(&index).unwrap();
+        let policy = wire
+            .order
+            .as_option()
+            .unwrap()
+            .attached_risk
+            .as_option()
+            .unwrap();
+        assert_eq!(
+            policy.take_profit.as_option().unwrap().trigger_price_source,
+            TriggerPriceSource::IndexPrice
+        );
+        assert_eq!(
+            stop_leg_source(policy),
+            TriggerPriceSource::TriggerPriceSourceUnspecified
+        );
+    }
+
+    /// An order read with attached legs feeds create and modify unchanged,
+    /// and each leg keeps the price it watches.
+    #[test]
+    fn attached_risk_read_round_trips_its_trigger_price_source() {
+        use crate::codecs::decode::order_from_proto;
+        use crate::models::TriggerPriceSourceKind;
+        use crate::proto::orders::v1::{
+            AttachedRisk as ProtoAttachedRisk, AttachedRiskStopLoss, AttachedRiskTakeProfit,
+            AttachedRiskTrailingStop, Order as ProtoOrder,
+        };
+
+        let market_child = || RiskExecution {
+            execution: Some(risk_execution::Execution::MarketIoc(Box::default())),
+            ..Default::default()
+        };
+        let read = |stop_loss: bool| ProtoOrder {
+            order_id: 1,
+            symbol_id: 7,
+            attached_risk: ProtoAttachedRisk {
+                take_profit: AttachedRiskTakeProfit {
+                    policy: TakeProfitPolicy {
+                        trigger_price_ticks: 51_000_000_000,
+                        child: market_child().into(),
+                        trigger_price_source: TriggerPriceSource::IndexPrice.into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                stop_loss: if stop_loss {
+                    AttachedRiskStopLoss {
+                        policy: StopLossPolicy {
+                            trigger_price_ticks: 49_000_000_000,
+                            child: market_child().into(),
+                            trigger_price_source: TriggerPriceSource::LastPrice.into(),
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    }
+                    .into()
+                } else {
+                    Default::default()
+                },
+                trailing_stop: if stop_loss {
+                    Default::default()
+                } else {
+                    AttachedRiskTrailingStop {
+                        policy: TrailingStopPolicy {
+                            trailing_distance: Some(
+                                trailing_stop_policy::TrailingDistance::TrailingDistanceBps(25),
+                            ),
+                            trigger_price_source: TriggerPriceSource::IndexPrice.into(),
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    }
+                    .into()
+                },
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+
+        let client = client();
+        for stop_loss in [true, false] {
+            let risk = order_from_proto(&read(stop_loss))
+                .unwrap()
+                .attached_risk
+                .expect("attached_risk");
+            assert_eq!(
+                risk.take_profit.as_ref().unwrap().trigger_price_source,
+                Some(TriggerPriceSourceKind::IndexPrice)
+            );
+
+            let mut create = create_params(
+                Quantity::from_scaled(
+                    10_000_000,
+                    Some(8),
+                    crate::QuantityDomain::OrderBase,
+                    Some("BTC-USDT".into()),
+                    Some(7),
+                )
+                .unwrap(),
+                Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+            );
+            create.attached_risk = Some(risk.clone());
+            let create_wire = client.orders.encode_create_params(&create).unwrap();
+            let mut modify = modify_params(None, None);
+            modify.new_attached_risk = Some(risk);
+            let modify_wire = client.orders.encode_modify_params(modify).unwrap();
+
+            for policy in [
+                create_wire
+                    .order
+                    .as_option()
+                    .unwrap()
+                    .attached_risk
+                    .as_option()
+                    .unwrap(),
+                modify_wire.new_attached_risk.as_option().unwrap(),
+            ] {
+                assert_eq!(
+                    policy.take_profit.as_option().unwrap().trigger_price_source,
+                    TriggerPriceSource::IndexPrice
+                );
+                if stop_loss {
+                    assert_eq!(stop_leg_source(policy), TriggerPriceSource::LastPrice);
+                } else {
+                    assert_eq!(stop_leg_source(policy), TriggerPriceSource::IndexPrice);
+                }
+            }
+        }
     }
 
     #[test]
@@ -1844,11 +1994,15 @@ mod tests {
             }),
             ..Default::default()
         });
-        let err = client
-            .orders
-            .encode_create_params(&with_source)
-            .unwrap_err();
-        assert!(err.to_string().contains("always uses last trade"));
+        let wire = client.orders.encode_create_params(&with_source).unwrap();
+        let policy = wire
+            .order
+            .as_option()
+            .unwrap()
+            .attached_risk
+            .as_option()
+            .unwrap();
+        assert_eq!(stop_leg_source(policy), TriggerPriceSource::IndexPrice);
 
         let mut with_order_type = base;
         with_order_type.attached_risk = Some(AttachedRisk {
@@ -2528,6 +2682,7 @@ mod tests {
             trades: vec![],
             transfers: vec![],
             next_page_token: String::new(),
+            executions_complete: false,
         };
         assert!(!order_trades_projection_complete(&incomplete));
 
@@ -2543,6 +2698,7 @@ mod tests {
             trades: vec![],
             transfers: vec![],
             next_page_token: String::new(),
+            executions_complete: false,
         };
         assert!(
             !order_trades_projection_complete(&open_unfilled),
@@ -2580,6 +2736,7 @@ mod tests {
             }],
             transfers: vec![],
             next_page_token: String::new(),
+            executions_complete: false,
         };
         assert!(order_trades_projection_complete(&complete));
     }

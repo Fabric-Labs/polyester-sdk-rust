@@ -28,6 +28,10 @@ pub struct CreateTriggerParams {
     /// price when no activation price is set). Must be `None` for a SELL
     /// trailing stop. Fixed at create.
     pub limit_price: Option<Price>,
+    /// Price a stop-loss, take-profit or trailing stop watches, with the
+    /// labels trigger reads use: `last`, `index` or `mark`. `None` or empty
+    /// watches the last trade price. Fixed at create. Rejected for TWAP and
+    /// ladder triggers.
     pub trigger_price_source: Option<String>,
     pub time_in_force: Option<CreateTimeInForce>,
     pub subaccount_id: Option<u64>,

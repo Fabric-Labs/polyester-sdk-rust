@@ -24,16 +24,31 @@
   `Ready` arrives once per server subscription when the stream reaches the
   account's read boundary; wait for it before relying on the stream. A
   consumer that joins a ready stream gets it right after its catch-up
-  snapshot.
+  snapshot. `Stale` carries an `OrdersStale` with `stale`, the lowercase
+  `reason` (`view_behind`, `order_unavailable`, ...) and `order_ids`: with
+  `order_unavailable` only those orders are not current, the rest of the
+  view is and units keep arriving. A later report replaces the earlier one,
+  and a consumer that joins a stale stream gets the current report.
 - Removed `codecs::decode::order_from_bytes`, the decoder for the retired
   order channel's publications.
 - `ModifyTriggerParams.limit_price` is removed: a trigger's child limit
   price is fixed at create, and the API rejects any modify that sets it.
-- `CancelAllOrdersResult`, `MarketTradesResult`, `GetTradesOpts` and
+- `CancelAllOrdersResult`, `CancelAllAfterResult`, `GetOrderResult`,
+  `LifecycleFlowSummary`, `MarketTradesResult`, `GetTradesOpts` and
   `Trigger` gain fields (below). These structs are not `#[non_exhaustive]`,
   so code that builds them with struct literals must add them.
 
 ### Fixed
+- An order create, trigger create, order cancel or order modify that was sent
+  but not confirmed in time (`ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN`) now reports
+  `mutation_outcome_unknown()` and `is_retryable()` true. It may still apply:
+  read the order or trigger back before retrying. Earlier versions reported
+  it as a definite failure. `errors::order_codes` lists these codes.
+- `AUTH_TEMPORARILY_UNAVAILABLE` is now retryable: the account request
+  changed nothing, so send the same request again.
 - **Stop-loss and take-profit triggers with a market child now send their
   slippage cap.** `max_slippage_ticks` / `max_slippage_bps` were dropped on
   create, so the child used the pair's default market slippage instead of
@@ -48,6 +63,30 @@
   never lost.
 
 ### Added
+- Index-price triggers and attached legs: `CreateTriggerParams.trigger_price_source`
+  (`last`, `index` or `mark`, the labels trigger reads use) is sent for
+  stop-loss, take-profit and trailing-stop triggers, and
+  `RiskLeg.trigger_price_source` / `TrailingStop.trigger_price_source` are
+  sent on order create and modify. `None` watches the last trade price.
+  Order reads now fill these leg fields, which are no longer deprecated, so
+  a read leg can be sent back unchanged. An unknown label is a validation
+  error, and TWAP and ladder triggers reject a price source.
+- `CancelAllOrdersResult.listing_status`: `included`, or
+  `not_retained_read_open_orders` when a retry with the same `request_id`
+  returns the original counts with an empty `cancelled_orders`. An empty
+  retried list does not mean nothing was canceled.
+- `CancelAllAfterResult.effective_scope`: the account, symbol and side the
+  armed switch cancels (`DeadManSwitchScope`); `None` when disabled.
+- `GetOrderResult.executions_complete`: true when the order's trades across
+  every page add up to its filled quantity.
+- `LifecycleFlowSummary.is_delayed`: an open flow that has made no progress
+  for well beyond its expected step time. Lifecycle reason
+  `deposit_source_not_confirmed`.
+- Trigger reads name the cancel reasons `account_repair`,
+  `pair_drain_trigger`, `pair_drain_twap`, `pair_drain_ladder` and
+  `pair_drain_attached_leg`, and the failure reasons
+  `index_price_unavailable` and `trigger_would_trigger_immediately`. Spot
+  config reports halted pairs as `PAIR_STATUS_HALTED`.
 - Standalone BUY trailing stops: `CreateTriggerParams.limit_price` is the
   required maximum price of a BUY trailing stop (`limit_price_ticks`), and
   must be `None` for a SELL one. Trigger reads show a BUY trailing stop

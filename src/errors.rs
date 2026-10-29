@@ -83,6 +83,31 @@ pub mod auth_codes {
     pub const MFA_ELEVATION_REQUIRED: &str = "AUTH_MFA_ELEVATION_REQUIRED";
     pub const MFA_LAST_FACTOR_REQUIRED: &str = "AUTH_MFA_LAST_FACTOR_REQUIRED";
     pub const INTERNAL_ERROR: &str = "AUTH_INTERNAL_ERROR";
+    /// The account request changed nothing; send the same request again.
+    pub const TEMPORARILY_UNAVAILABLE: &str = "AUTH_TEMPORARILY_UNAVAILABLE";
+}
+
+/// Stable orders.v1.ErrorDetail codes used for retry control flow.
+pub mod order_codes {
+    pub const ORDER_CANCEL_OUTCOME_UNKNOWN: &str = "ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN";
+    pub const ORDER_MODIFY_OUTCOME_UNKNOWN: &str = "ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN";
+    pub const ORDER_CREATE_OUTCOME_UNKNOWN: &str = "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN";
+    pub const TRIGGER_CREATE_OUTCOME_UNKNOWN: &str = "ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN";
+
+    /// A mutation that was sent but not confirmed in time; it may still
+    /// apply. The server returns these as Connect `deadline_exceeded` with
+    /// an orders error detail. Read the order or trigger back before
+    /// retrying.
+    pub const OUTCOME_UNKNOWN: &[&str] = &[
+        ORDER_CANCEL_OUTCOME_UNKNOWN,
+        ORDER_MODIFY_OUTCOME_UNKNOWN,
+        ORDER_CREATE_OUTCOME_UNKNOWN,
+        TRIGGER_CREATE_OUTCOME_UNKNOWN,
+    ];
+}
+
+fn is_outcome_unknown_code(code: &str) -> bool {
+    order_codes::OUTCOME_UNKNOWN.contains(&code)
 }
 
 impl Error {
@@ -115,26 +140,41 @@ impl Error {
 
     /// Whether retrying may succeed after backoff.
     ///
-    /// This is a transport-level classification, not a guarantee that a
-    /// mutation was not applied. For mutations, preserve the same idempotency
-    /// key and reconcile server state before retrying when
-    /// [`Self::mutation_outcome_unknown`] is true.
+    /// True for transport, rate-limit and server errors, for an order
+    /// mutation whose outcome is unknown (see
+    /// [`Self::mutation_outcome_unknown`]), and for
+    /// `AUTH_TEMPORARILY_UNAVAILABLE`, where the account request changed
+    /// nothing and the same request can be sent again.
+    ///
+    /// This is not a guarantee that a mutation was not applied. For
+    /// mutations, preserve the same idempotency key and reconcile server
+    /// state before retrying when [`Self::mutation_outcome_unknown`] is true.
     pub fn is_retryable(&self) -> bool {
-        matches!(
-            self,
-            Self::Transport(_) | Self::RateLimit { .. } | Self::Server(_)
-        )
+        match self {
+            Self::Transport(_) | Self::RateLimit { .. } | Self::Server(_) => true,
+            Self::Api { code, .. } => {
+                is_outcome_unknown_code(code) || code == auth_codes::TEMPORARILY_UNAVAILABLE
+            }
+            _ => false,
+        }
     }
 
     /// Whether this error can occur after the server accepted a mutation.
     ///
-    /// Callers must treat these failures as ambiguous: reconcile first and
-    /// reuse the original idempotency key if a retry is necessary.
+    /// True for transport, server and response-contract errors, and for an
+    /// order create, trigger create, order cancel or order modify that was
+    /// sent but not confirmed in time ([`order_codes::OUTCOME_UNKNOWN`]):
+    /// it may still apply.
+    ///
+    /// Callers must treat these failures as ambiguous: read the order or
+    /// trigger back first and reuse the original idempotency key if a retry
+    /// is necessary.
     pub fn mutation_outcome_unknown(&self) -> bool {
-        matches!(
-            self,
-            Self::Transport(_) | Self::ResponseContract { .. } | Self::Server(_)
-        )
+        match self {
+            Self::Transport(_) | Self::ResponseContract { .. } | Self::Server(_) => true,
+            Self::Api { code, .. } => is_outcome_unknown_code(code),
+            _ => false,
+        }
     }
 
     /// Server-requested retry delay in seconds, when supplied.
@@ -578,6 +618,76 @@ mod tests {
         assert!(contract.mutation_outcome_unknown());
 
         assert!(!Error::validation("bad price").is_retryable());
+    }
+
+    #[test]
+    fn outcome_unknown_order_codes_require_reconciliation() {
+        let cases = [
+            (
+                OrderErrorCode::ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN,
+                order_codes::ORDER_CANCEL_OUTCOME_UNKNOWN,
+            ),
+            (
+                OrderErrorCode::ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN,
+                order_codes::ORDER_MODIFY_OUTCOME_UNKNOWN,
+            ),
+            (
+                OrderErrorCode::ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN,
+                order_codes::ORDER_CREATE_OUTCOME_UNKNOWN,
+            ),
+            (
+                OrderErrorCode::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
+                order_codes::TRIGGER_CREATE_OUTCOME_UNKNOWN,
+            ),
+        ];
+        for (proto_code, want) in cases {
+            let detail = OrderErrorDetail {
+                code: EnumValue::Known(proto_code),
+                ..Default::default()
+            };
+            let mapped = map_connect_error(
+                ConnectError::new(ErrorCode::DeadlineExceeded, "not confirmed in time")
+                    .with_detail(ErrorDetail::from_message("orders.v1.ErrorDetail", &detail)),
+            );
+            match &mapped {
+                Error::Api { code, .. } => assert_eq!(code, want),
+                other => panic!("unexpected error: {other:?}"),
+            }
+            assert!(mapped.mutation_outcome_unknown(), "{want}");
+            assert!(mapped.is_retryable(), "{want}");
+        }
+
+        let definite = OrderErrorDetail {
+            code: EnumValue::Known(OrderErrorCode::ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY),
+            ..Default::default()
+        };
+        let mapped = map_connect_error(
+            ConnectError::new(ErrorCode::FailedPrecondition, "would trigger now").with_detail(
+                ErrorDetail::from_message("orders.v1.ErrorDetail", &definite),
+            ),
+        );
+        match &mapped {
+            Error::Api { code, .. } => {
+                assert_eq!(code, "ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY")
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+        assert!(!mapped.mutation_outcome_unknown());
+        assert!(!mapped.is_retryable());
+    }
+
+    #[test]
+    fn auth_temporarily_unavailable_is_retryable_and_changed_nothing() {
+        let mapped = map_auth(AuthErrorCode::AUTH_TEMPORARILY_UNAVAILABLE, "try again");
+        assert_eq!(
+            mapped.auth_error_code(),
+            Some(auth_codes::TEMPORARILY_UNAVAILABLE)
+        );
+        assert!(mapped.is_retryable());
+        assert!(!mapped.mutation_outcome_unknown());
+
+        let other = map_auth(AuthErrorCode::AUTH_REVISION_CONFLICT, "resource changed");
+        assert!(!other.is_retryable());
     }
 
     #[test]

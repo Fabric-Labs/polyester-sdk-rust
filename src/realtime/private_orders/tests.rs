@@ -12,7 +12,7 @@ use crate::proto::orders::v1::{Order as ProtoOrder, OrderStatus};
 use crate::proto::privatews::v1::{
     Available, Covered, Ready, RequestError, ResyncRequired, SnapshotBegin, SnapshotEnd,
     SnapshotPage, SubscribeExpiring, SubscribeRefreshed, Subscribed, TokenExpiring, Unavailable,
-    Unit, UnitEvent, order_event, resync_required, server_message::Frame,
+    UnavailableReason, Unit, UnitEvent, order_event, resync_required, server_message::Frame,
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::io::DuplexStream;
@@ -363,7 +363,7 @@ async fn expect_ready(consumer: &mut PrivateOrdersSubscription) {
     }
 }
 
-async fn expect_stale(consumer: &mut PrivateOrdersSubscription) -> bool {
+async fn expect_stale(consumer: &mut PrivateOrdersSubscription) -> OrdersStale {
     match next(consumer).await {
         PrivateOrdersEvent::Stale(stale) => stale,
         other => panic!("expected Stale, got {other:?}"),
@@ -648,7 +648,7 @@ async fn unavailable_and_available_toggle_the_stale_flag() {
     expect_snapshot(&mut consumer).await;
 
     server.send("s1", seq, Unavailable::default()).await;
-    assert!(expect_stale(&mut consumer).await);
+    assert!(expect_stale(&mut consumer).await.stale);
     // Ready may arrive while the view is stale: it describes the position delivered.
     server.send("s1", seq + 1, Ready::default()).await;
     expect_ready(&mut consumer).await;
@@ -663,7 +663,75 @@ async fn unavailable_and_available_toggle_the_stale_flag() {
         )
         .await;
     server.send("s1", seq + 3, Available::default()).await;
-    assert!(!expect_stale(&mut consumer).await);
+    assert_eq!(expect_stale(&mut consumer).await, OrdersStale::default());
+}
+
+#[tokio::test(start_paused = true)]
+async fn order_unavailable_names_its_orders_and_a_later_report_replaces_it() {
+    use crate::codecs::scalars::format_uint64_id;
+
+    let mut harness = Harness::new();
+    let mut consumer = harness.connect(ACCOUNT);
+    let (mut server, _) = harness.accept("s1").await;
+    expect_connected(&mut consumer).await;
+    let seq = server.snapshot("s1", 1, "c1", &[1, 2, 3]).await;
+    expect_snapshot(&mut consumer).await;
+
+    server
+        .send(
+            "s1",
+            seq,
+            Unavailable {
+                reason: UnavailableReason::ORDER_UNAVAILABLE.into(),
+                order_ids: vec![1, 3],
+                ..Default::default()
+            },
+        )
+        .await;
+    let only_some = OrdersStale {
+        stale: true,
+        reason: "order_unavailable".into(),
+        order_ids: vec![format_uint64_id(1), format_uint64_id(3)],
+    };
+    assert_eq!(expect_stale(&mut consumer).await, only_some);
+    // The rest of the view stays current: units keep arriving.
+    server.send("s1", seq + 1, unit("c1", "c2", &[2])).await;
+    assert_eq!(expect_unit(&mut consumer).await.orders, vec![order(2, 2)]);
+
+    // A consumer that joins later gets the current report.
+    let mut late = harness.connect(ACCOUNT);
+    expect_connected(&mut late).await;
+    expect_snapshot(&mut late).await;
+    assert_eq!(expect_stale(&mut late).await, only_some);
+
+    // A later report replaces the reason and the IDs.
+    server
+        .send(
+            "s1",
+            seq + 2,
+            Unavailable {
+                reason: UnavailableReason::VIEW_BEHIND.into(),
+                ..Default::default()
+            },
+        )
+        .await;
+    let whole_view = OrdersStale {
+        stale: true,
+        reason: "view_behind".into(),
+        order_ids: Vec::new(),
+    };
+    assert_eq!(expect_stale(&mut consumer).await, whole_view);
+    assert_eq!(expect_stale(&mut late).await, whole_view);
+
+    server.send("s1", seq + 3, Available::default()).await;
+    assert_eq!(expect_stale(&mut consumer).await, OrdersStale::default());
+    assert_eq!(expect_stale(&mut late).await, OrdersStale::default());
+
+    // Once caught up, a new consumer is not told the view is stale.
+    let mut after = harness.connect(ACCOUNT);
+    expect_connected(&mut after).await;
+    expect_snapshot(&mut after).await;
+    expect_quiet(&mut after, Duration::from_millis(100)).await;
 }
 
 #[tokio::test(start_paused = true)]
@@ -869,13 +937,13 @@ async fn consumers_of_one_account_share_one_server_subscription() {
     let seq = server.snapshot("s1", 1, "c1", &[1]).await;
     expect_snapshot(&mut first).await;
     server.send("s1", seq, Unavailable::default()).await;
-    assert!(expect_stale(&mut first).await);
+    assert!(expect_stale(&mut first).await.stale);
 
     // The second consumer catches up without a second server subscription.
     let mut second = harness.connect(ACCOUNT);
     expect_connected(&mut second).await;
     assert_eq!(expect_snapshot(&mut second).await, vec![order(1, 1)]);
-    assert!(expect_stale(&mut second).await);
+    assert!(expect_stale(&mut second).await.stale);
     assert_eq!(harness.subscribe_channels().len(), 1);
 
     server.send("s1", seq + 1, unit("c1", "c2", &[1])).await;

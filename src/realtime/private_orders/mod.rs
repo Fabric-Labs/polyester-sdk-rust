@@ -7,9 +7,9 @@
 
 use crate::auth::Credentials;
 use crate::codecs::decode::order_from_proto;
-use crate::codecs::decode::orders_unit_from_proto;
+use crate::codecs::decode::{orders_stale_from_proto, orders_unit_from_proto};
 use crate::errors::{Error, Result};
-use crate::models::{Order, OrdersUnit, PrivateOrdersEvent};
+use crate::models::{Order, OrdersStale, OrdersUnit, PrivateOrdersEvent};
 use crate::proto::privatews::v1::{
     Auth, Channel, ClientMessage, ServerMessage, Subscribe, SubscribeRefresh, Unsubscribe,
     client_message, request_error, server_message,
@@ -332,8 +332,9 @@ struct Subscription {
     orders: Option<BTreeMap<u64, Order>>,
     /// The last connection state consumers were told about.
     state: State,
-    /// Consumers were told the view is stale and not yet that it caught up.
-    stale: bool,
+    /// The last stale report consumers were told about, until they are told
+    /// the view caught up.
+    stale: Option<OrdersStale>,
     /// The current server subscription reached its read boundary (`ready`).
     ready: bool,
     /// Subscribe attempts since the subscription last delivered data; drives retry backoff.
@@ -541,8 +542,8 @@ impl Actor {
             if s.ready {
                 catch_up.push(PrivateOrdersEvent::Ready);
             }
-            if s.stale {
-                catch_up.push(PrivateOrdersEvent::Stale(true));
+            if let Some(stale) = &s.stale {
+                catch_up.push(PrivateOrdersEvent::Stale(stale.clone()));
             }
             if catch_up.into_iter().all(|event| offer(&consumer, event)) {
                 s.consumers.push(consumer);
@@ -566,7 +567,7 @@ impl Actor {
                 staged: None,
                 orders: None,
                 state: State::Pending,
-                stale: false,
+                stale: None,
                 ready: false,
                 retries: 0,
                 retry_at: None,
@@ -954,13 +955,16 @@ impl Actor {
                 let connected = s.state != State::Connected;
                 s.state = State::Connected;
                 // A new subscription reports Unavailable itself if its view is still behind.
-                let cleared = std::mem::take(&mut s.stale);
+                let cleared = s.stale.take().is_some();
                 self.by_sub.insert(msg.sub.clone(), request.account);
                 if connected {
                     self.deliver(request.account, PrivateOrdersEvent::Connected);
                 }
                 if cleared {
-                    self.deliver(request.account, PrivateOrdersEvent::Stale(false));
+                    self.deliver(
+                        request.account,
+                        PrivateOrdersEvent::Stale(OrdersStale::default()),
+                    );
                 }
                 return;
             }
@@ -1043,13 +1047,14 @@ impl Actor {
                     self.deliver(account, PrivateOrdersEvent::Ready);
                 }
             }
-            (Some(Frame::Unavailable(_)), _) => {
-                s.stale = true;
-                self.deliver(account, PrivateOrdersEvent::Stale(true));
+            (Some(Frame::Unavailable(unavailable)), _) => {
+                let stale = orders_stale_from_proto(unavailable);
+                s.stale = Some(stale.clone());
+                self.deliver(account, PrivateOrdersEvent::Stale(stale));
             }
             (Some(Frame::Available(_)), _) => {
-                s.stale = false;
-                self.deliver(account, PrivateOrdersEvent::Stale(false));
+                s.stale = None;
+                self.deliver(account, PrivateOrdersEvent::Stale(OrdersStale::default()));
             }
             (Some(Frame::SubscribeExpiring(_)), _) => self.refresh(account),
             (Some(Frame::Unsubscribed(_)), _) => {

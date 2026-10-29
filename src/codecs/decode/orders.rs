@@ -14,10 +14,11 @@ use crate::models::{
     AttachedRisk, AttachedRiskLegState, BatchCancelOrdersResult, BatchCancelResultItem,
     BatchCreateOrdersResult, BatchCreateResultItem, BatchReplaceAdmissionItem,
     BatchReplaceOrdersResult, BatchReplaceStatusItem, BatchReplaceStatusResult,
-    CancelAllAfterResult, CancelAllOrdersResult, CancelledOrder, CreateOrderType, GetOrderResult,
-    MaxSlippage, ModifyOrderResult, Order, OrderErrorDetail, OrderFieldViolation, OrderLineage,
-    OrderMutationResult, OrderTransfer, OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance,
-    TrailingStop, UserTrade, UserTradesList,
+    CancelAllAfterResult, CancelAllOrdersResult, CancelledOrder, CreateOrderType,
+    DeadManSwitchScope, GetOrderResult, MaxSlippage, ModifyOrderResult, Order, OrderErrorDetail,
+    OrderFieldViolation, OrderLineage, OrderMutationResult, OrderTransfer, OrdersList,
+    PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, TriggerPriceSourceKind, UserTrade,
+    UserTradesList,
 };
 use crate::proto::orders::v1::{
     AttachedRisk as ProtoAttachedRisk, AttachedRiskLegState as ProtoAttachedRiskLegState,
@@ -27,9 +28,9 @@ use crate::proto::orders::v1::{
     ErrorDetail, GetBatchReplaceStatusResponse, GetOpenOrdersResponse, GetOrderHistoryResponse,
     GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse, Order as ProtoOrder,
     OrderLineage as ProtoOrderLineage, OrderTransfer as ProtoOrderTransfer, PreviewOrderResponse,
-    RiskExecution, TrailingStopPolicy, UserTrade as ProtoUserTrade, batch_cancel_result_item,
-    batch_create_result_item, cancel_all_after_response, cancel_all_orders_response,
-    cancel_order_response, risk_execution, trailing_stop_policy,
+    RiskExecution, TrailingStopPolicy, TriggerPriceSource, UserTrade as ProtoUserTrade,
+    batch_cancel_result_item, batch_create_result_item, cancel_all_after_response,
+    cancel_all_orders_response, cancel_order_response, risk_execution, trailing_stop_policy,
 };
 use crate::proto::polyester::r#type::v1::U128;
 use buffa::Enumeration;
@@ -137,22 +138,37 @@ fn order_transfer_from_proto(msg: &ProtoOrderTransfer) -> Result<OrderTransfer> 
     })
 }
 
+/// The watched price of an attached-risk leg. Unspecified is `None` (last
+/// trade); a source this SDK version does not know is also `None`.
+fn risk_trigger_price_source(
+    value: buffa::EnumValue<TriggerPriceSource>,
+) -> Option<TriggerPriceSourceKind> {
+    match value.as_known()? {
+        TriggerPriceSource::LastPrice => Some(TriggerPriceSourceKind::LastPrice),
+        TriggerPriceSource::IndexPrice => Some(TriggerPriceSourceKind::IndexPrice),
+        TriggerPriceSource::MarkPrice => Some(TriggerPriceSourceKind::MarkPrice),
+        TriggerPriceSource::TriggerPriceSourceUnspecified => None,
+    }
+}
+
 /// Project an attached take-profit/stop-loss policy onto the flat public
 /// [`RiskLeg`]. The child execution determines `order_type`/`limit_price`.
-/// `trigger_price_source` is no longer part of the policy wire and is left empty.
-#[allow(deprecated)]
 fn decode_risk_leg(
-    policy: Option<(i64, Option<&RiskExecution>)>,
+    policy: Option<(
+        i64,
+        Option<&RiskExecution>,
+        buffa::EnumValue<TriggerPriceSource>,
+    )>,
     state: Option<&ProtoAttachedRiskLegState>,
 ) -> Result<Option<RiskLeg>> {
-    let policy = policy.filter(|(trigger_price_ticks, _)| *trigger_price_ticks > 0);
+    let policy = policy.filter(|(trigger_price_ticks, _, _)| *trigger_price_ticks > 0);
     let state = state.filter(|state| attached_risk_state_is_meaningful(state));
     if policy.is_none() && state.is_none() {
         return Ok(None);
     }
     let mut order_type = None;
     let mut limit_price = None;
-    if let Some(child) = policy.and_then(|(_, child)| child) {
+    if let Some(child) = policy.and_then(|(_, child, _)| child) {
         match child.execution.as_ref() {
             Some(risk_execution::Execution::MarketIoc(_)) => {
                 order_type = Some(CreateOrderType::Market);
@@ -165,8 +181,8 @@ fn decode_risk_leg(
         }
     }
     Ok(Some(RiskLeg {
-        trigger_price: policy.and_then(|(ticks, _)| decode_price_ticks(ticks, None)),
-        trigger_price_source: None,
+        trigger_price: policy.and_then(|(ticks, _, _)| decode_price_ticks(ticks, None)),
+        trigger_price_source: policy.and_then(|(_, _, source)| risk_trigger_price_source(source)),
         order_type,
         limit_price,
         state: state.map(attached_risk_leg_state_from_proto).transpose()?,
@@ -208,9 +224,9 @@ fn decode_trailing_stop(
         activation_price: policy
             .filter(|policy| policy.activation_price_ticks > 0)
             .and_then(|policy| decode_price_ticks(policy.activation_price_ticks, None)),
-        // `trigger_price_source`/`order_type` were dropped from the trailing-stop
-        // policy wire; the child is an implicit market execution.
-        trigger_price_source: None,
+        trigger_price_source: policy
+            .and_then(|policy| risk_trigger_price_source(policy.trigger_price_source)),
+        // The child is an implicit market execution.
         order_type: None,
         max_slippage,
         state: state.map(attached_risk_leg_state_from_proto).transpose()?,
@@ -258,9 +274,13 @@ fn attached_risk_from_proto(msg: &ProtoAttachedRisk) -> Result<Option<AttachedRi
         .as_option()
         .map(|leg| {
             decode_risk_leg(
-                leg.policy
-                    .as_option()
-                    .map(|policy| (policy.trigger_price_ticks, policy.child.as_option())),
+                leg.policy.as_option().map(|policy| {
+                    (
+                        policy.trigger_price_ticks,
+                        policy.child.as_option(),
+                        policy.trigger_price_source,
+                    )
+                }),
                 leg.state.as_option(),
             )
         })
@@ -271,9 +291,13 @@ fn attached_risk_from_proto(msg: &ProtoAttachedRisk) -> Result<Option<AttachedRi
         .as_option()
         .map(|leg| {
             decode_risk_leg(
-                leg.policy
-                    .as_option()
-                    .map(|policy| (policy.trigger_price_ticks, policy.child.as_option())),
+                leg.policy.as_option().map(|policy| {
+                    (
+                        policy.trigger_price_ticks,
+                        policy.child.as_option(),
+                        policy.trigger_price_source,
+                    )
+                }),
                 leg.state.as_option(),
             )
         })
@@ -382,6 +406,7 @@ pub fn get_order_from_proto(msg: &GetOrderResponse) -> Result<GetOrderResult> {
         trades,
         transfers,
         next_page_token: msg.next_page_token.clone(),
+        executions_complete: msg.executions_complete,
     })
 }
 
@@ -579,7 +604,22 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllO
             .collect(),
         total_cancelled: msg.total_cancelled,
         truncated: msg.truncated,
+        listing_status: cancel_all_listing_status_name(&msg.listing_status),
     })
+}
+
+fn cancel_all_listing_status_name(
+    status: &buffa::EnumValue<cancel_all_orders_response::ListingStatus>,
+) -> String {
+    use cancel_all_orders_response::ListingStatus;
+    match status.as_known() {
+        Some(ListingStatus::Included) => "included".to_owned(),
+        Some(ListingStatus::NotRetainedReadOpenOrders) => {
+            "not_retained_read_open_orders".to_owned()
+        }
+        Some(ListingStatus::ListingUnspecified) => String::new(),
+        None => format!("UNKNOWN({})", status.to_i32()),
+    }
 }
 
 fn cancel_all_status_name(
@@ -937,6 +977,14 @@ pub fn cancel_all_after_from_proto(msg: &CancelAllAfterResponse) -> Result<Cance
         effective_timeout_sec: msg.effective_timeout_sec,
         expires_at_ts_ns: TsNs::from_wire(msg.expires_at_ts_ns, "CancelAllAfter.expires_at_ts_ns")?
             .optional_string(),
+        effective_scope: msg
+            .effective_scope
+            .as_option()
+            .map(|scope| DeadManSwitchScope {
+                account_id: format_uint64_id(scope.account_id),
+                symbol_id: scope.symbol_id,
+                side: enum_value_side(scope.side),
+            }),
     })
 }
 
@@ -1059,6 +1107,7 @@ mod tests {
                             ..Default::default()
                         }
                         .into(),
+                        trigger_price_source: TriggerPriceSource::IndexPrice.into(),
                         ..Default::default()
                     }
                     .into(),
@@ -1089,8 +1138,10 @@ mod tests {
         assert!(risk.oco);
         let tp = risk.take_profit.expect("take_profit");
         assert_eq!(tp.trigger_price.as_ref().unwrap().as_ticks(), 6000);
-        // trigger_price_source is no longer carried on the policy wire.
-        assert!(tp.trigger_price_source.is_none());
+        assert_eq!(
+            tp.trigger_price_source,
+            Some(TriggerPriceSourceKind::IndexPrice)
+        );
         assert_eq!(tp.order_type, Some(CreateOrderType::Market));
         assert!(tp.limit_price.is_none());
         assert!(risk.stop_loss.is_none());
@@ -1101,6 +1152,7 @@ mod tests {
             Some(crate::models::MaxSlippage::Ticks(10))
         );
         assert_eq!(trailing.activation_price.as_ref().unwrap().as_ticks(), 5500);
+        // Unspecified watches the last trade price.
         assert!(trailing.trigger_price_source.is_none());
         assert!(trailing.order_type.is_none());
 
@@ -1667,6 +1719,44 @@ mod tests {
         assert_eq!(result.trades[0].fee_asset, "base");
         assert_eq!(result.trades[0].referral_share_amount_e18, "2");
         assert!(result.trades[0].fee_is_rebate);
+    }
+
+    #[test]
+    fn attached_risk_trigger_price_source_labels() {
+        let cases = [
+            (
+                TriggerPriceSource::TriggerPriceSourceUnspecified.into(),
+                None,
+            ),
+            (
+                TriggerPriceSource::LastPrice.into(),
+                Some(TriggerPriceSourceKind::LastPrice),
+            ),
+            (
+                TriggerPriceSource::IndexPrice.into(),
+                Some(TriggerPriceSourceKind::IndexPrice),
+            ),
+            (
+                TriggerPriceSource::MarkPrice.into(),
+                Some(TriggerPriceSourceKind::MarkPrice),
+            ),
+            (buffa::EnumValue::from(42), None),
+        ];
+        for (wire, want) in cases {
+            assert_eq!(risk_trigger_price_source(wire), want);
+        }
+    }
+
+    #[test]
+    fn get_order_reports_whether_executions_are_complete() {
+        let recording = get_order_from_proto(&GetOrderResponse::default()).unwrap();
+        assert!(!recording.executions_complete);
+        let complete = get_order_from_proto(&GetOrderResponse {
+            executions_complete: true,
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(complete.executions_complete);
     }
 
     #[test]
@@ -2269,6 +2359,89 @@ mod tests {
         assert!(decoded.cancelled_orders[199].client_order_id.is_empty());
         assert_eq!(decoded.total_cancelled, 203);
         assert!(decoded.truncated);
+    }
+
+    #[test]
+    fn cancel_all_reports_listing_status() {
+        use cancel_all_orders_response::ListingStatus;
+
+        let cases = [
+            (ListingStatus::ListingUnspecified.into(), ""),
+            (ListingStatus::Included.into(), "included"),
+            (
+                ListingStatus::NotRetainedReadOpenOrders.into(),
+                "not_retained_read_open_orders",
+            ),
+            (buffa::EnumValue::from(9), "UNKNOWN(9)"),
+        ];
+        for (listing_status, want) in cases {
+            // A retry keeps the original counts but not the listing.
+            let msg = CancelAllOrdersResponse {
+                status: cancel_all_orders_response::Status::Submitted.into(),
+                matched_orders: 4,
+                submitted_cancels: 4,
+                total_cancelled: 4,
+                listing_status,
+                ..Default::default()
+            };
+            let decoded = cancel_all_from_proto(&msg).unwrap();
+            assert_eq!(decoded.listing_status, want);
+            assert_eq!(decoded.total_cancelled, 4);
+            assert!(decoded.cancelled_orders.is_empty());
+        }
+    }
+
+    #[test]
+    fn cancel_all_after_reports_the_armed_scope() {
+        use crate::proto::orders::v1::DeadManSwitchScope as ProtoDeadManSwitchScope;
+
+        let armed = CancelAllAfterResponse {
+            status: cancel_all_after_response::Status::Armed.into(),
+            effective_timeout_sec: 30,
+            effective_scope: ProtoDeadManSwitchScope {
+                account_id: 77,
+                symbol_id: 3,
+                side: Side::Sell.into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            cancel_all_after_from_proto(&armed).unwrap().effective_scope,
+            Some(DeadManSwitchScope {
+                account_id: format_uint64_id(77),
+                symbol_id: 3,
+                side: "sell".into(),
+            })
+        );
+
+        let every_symbol_both_sides = CancelAllAfterResponse {
+            status: cancel_all_after_response::Status::Armed.into(),
+            effective_scope: ProtoDeadManSwitchScope {
+                account_id: 77,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let scope = cancel_all_after_from_proto(&every_symbol_both_sides)
+            .unwrap()
+            .effective_scope
+            .expect("scope");
+        assert_eq!(scope.symbol_id, 0);
+        assert!(scope.side.is_empty());
+
+        let disabled = CancelAllAfterResponse {
+            status: cancel_all_after_response::Status::Disabled.into(),
+            ..Default::default()
+        };
+        assert!(
+            cancel_all_after_from_proto(&disabled)
+                .unwrap()
+                .effective_scope
+                .is_none()
+        );
     }
 
     #[test]

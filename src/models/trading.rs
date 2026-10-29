@@ -89,6 +89,11 @@ pub struct GetOrderResult {
     pub trades: Vec<UserTrade>,
     pub transfers: Vec<OrderTransfer>,
     pub next_page_token: String,
+    /// True when the order's trades across every page add up to its filled
+    /// quantity. False while a recent execution is still being recorded:
+    /// `trades` then lists the executions recorded so far, and a later read
+    /// returns the rest. Always false when execution history is not included.
+    pub executions_complete: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -150,6 +155,12 @@ pub struct CancelAllOrdersResult {
     pub total_cancelled: u32,
     /// True when more orders were canceled than `cancelled_orders` lists.
     pub truncated: bool,
+    /// Whether `cancelled_orders` is available: `included` on the first
+    /// response, `not_retained_read_open_orders` when a retry with the same
+    /// `request_id` returns the original counts without the listing, empty
+    /// when not provided, or `UNKNOWN(<number>)`. An empty listing on a retry
+    /// does not mean nothing was canceled: read open orders for current state.
+    pub listing_status: String,
 }
 
 /// One order whose cancellation a cancel-all requested.
@@ -242,11 +253,9 @@ pub struct ModifyOrderParams {
     pub new_client_order_id: Option<String>,
 }
 
-/// Price source requested for trigger evaluation.
-///
-/// Attached order risk currently evaluates against last trade and cannot
-/// encode a caller-selected source. Standalone triggers expose their own
-/// supported semantics.
+/// Price an attached-risk leg watches. `None` on a leg watches the last
+/// trade price. `IndexPrice` watches the market's index price; the server
+/// rejects it on a market without one. `MarkPrice` is not supported on spot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TriggerPriceSourceKind {
     LastPrice,
@@ -260,11 +269,7 @@ pub struct RiskLeg {
     /// Trigger price when policy data was requested and supplied. State-only
     /// order reads leave this absent rather than fabricating a zero price.
     pub trigger_price: Option<Price>,
-    /// Deprecated for attached risk: any supplied value is rejected because
-    /// the wire contract always evaluates against last trade.
-    #[deprecated(
-        note = "attached risk always uses last trade; supplying trigger_price_source is rejected"
-    )]
+    /// Price the leg watches; `None` watches the last trade price.
     pub trigger_price_source: Option<TriggerPriceSourceKind>,
     pub order_type: Option<CreateOrderType>,
     pub limit_price: Option<Price>,
@@ -291,20 +296,16 @@ pub enum MaxSlippage {
 /// Trailing-stop attached-risk leg.
 ///
 /// Distance and optional max slippage must be positive. The child is always a
-/// market-IOC execution evaluated against last trade; supplying
-/// [`trigger_price_source`](Self::trigger_price_source) or
-/// [`order_type`](Self::order_type) is rejected.
+/// market-IOC execution; supplying [`order_type`](Self::order_type) is
+/// rejected.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrailingStop {
     /// Trailing distance when policy data was requested and supplied.
     /// State-only order reads leave this absent.
     pub distance: Option<TrailingDistance>,
     pub activation_price: Option<Price>,
-    /// Deprecated for attached trailing: any supplied value is rejected because
-    /// the wire contract always evaluates against last trade.
-    #[deprecated(
-        note = "attached trailing always uses last trade; supplying trigger_price_source is rejected"
-    )]
+    /// Price the trailing stop watches (activation, peak or trough, and
+    /// fire); `None` watches the last trade price.
     pub trigger_price_source: Option<TriggerPriceSourceKind>,
     /// Deprecated for attached trailing: any supplied value is rejected because
     /// the child is always an implicit market execution.
@@ -488,6 +489,22 @@ pub struct CancelAllAfterResult {
     pub status: String,
     pub effective_timeout_sec: u32,
     pub expires_at_ts_ns: String,
+    /// The orders the armed switch cancels when it expires. `None` when the
+    /// switch is disabled.
+    pub effective_scope: Option<DeadManSwitchScope>,
+}
+
+/// The recorded scope of an armed dead-man switch. Expiry cancels working
+/// orders in this scope, including working child orders; waiting triggers
+/// stay active and may create further orders.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeadManSwitchScope {
+    /// Public ID of the account or sub-account whose orders are canceled.
+    pub account_id: String,
+    /// Zero means all symbols.
+    pub symbol_id: u32,
+    /// `buy`, `sell`, empty for both sides, or `UNKNOWN(<number>)`.
+    pub side: String,
 }
 
 /// Options for [`crate::services::OrdersService::list_open_with`].

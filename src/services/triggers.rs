@@ -15,7 +15,9 @@ use crate::models::{
     FeeAsset, ListTriggersOpts, ModifyTriggerParams, ResumeTriggerParams, Trigger, TriggerEvent,
     TriggerEventsList, TriggerMutationResult, TriggersList,
 };
-use crate::proto::orders::v1::{FeeAsset as ProtoFeeAsset, SelfTradePreventionMode, Side};
+use crate::proto::orders::v1::{
+    FeeAsset as ProtoFeeAsset, SelfTradePreventionMode, Side, TriggerPriceSource,
+};
 use crate::proto::triggers::v1::{
     CancelTriggerRequest, ConditionalChildExecution, ConditionalTrigger, CreateTriggerRequest,
     GetTriggerRequest, LadderTrigger, ListTriggerEventsRequest, ListTriggersRequest,
@@ -164,9 +166,18 @@ impl TriggersService {
         if let Some(mode) = params.self_trade_prevention_mode.as_deref() {
             intent.self_trade_prevention_mode = Self::stp_mode(mode)?.into();
         }
-        if params.trigger_price_source.is_some() {
+        let trigger_price_source = match params.trigger_price_source.as_deref() {
+            Some(label) => Self::trigger_price_source(label)?,
+            None => TriggerPriceSource::TriggerPriceSourceUnspecified,
+        };
+        if trigger_price_source != TriggerPriceSource::TriggerPriceSourceUnspecified
+            && matches!(
+                params.trigger_type,
+                CreateTriggerType::Twap | CreateTriggerType::Ladder
+            )
+        {
             return Err(Error::validation(
-                "trigger_price_source is not supported by the current wire contract",
+                "trigger_price_source applies only to stop_loss, take_profit and trailing_stop triggers",
             ));
         }
 
@@ -188,6 +199,7 @@ impl TriggersService {
                 let mut cond = ConditionalTrigger {
                     trigger_price_ticks,
                     side: side.into(),
+                    trigger_price_source: trigger_price_source.into(),
                     ..Default::default()
                 };
                 *cond.child.get_or_insert_default() = self.encode_conditional_child(params)?;
@@ -202,6 +214,7 @@ impl TriggersService {
                 // price as `limit_price_ticks`; a SELL one has none.
                 let mut trailing = TrailingStopTrigger {
                     side: side.into(),
+                    trigger_price_source: trigger_price_source.into(),
                     ..Default::default()
                 };
                 match (params.side, params.limit_price.as_ref()) {
@@ -548,6 +561,19 @@ impl TriggersService {
             (FeeAsset::Base, CreateSide::Buy) => Ok(ProtoFeeAsset::Base),
             (FeeAsset::Base, CreateSide::Sell) => Err(Error::validation(
                 "fee_asset=base is only valid for BUY triggers",
+            )),
+        }
+    }
+
+    /// Same labels as trigger reads; empty sends nothing (last trade price).
+    fn trigger_price_source(label: &str) -> Result<TriggerPriceSource> {
+        match label.trim().to_ascii_lowercase().as_str() {
+            "" => Ok(TriggerPriceSource::TriggerPriceSourceUnspecified),
+            "last" => Ok(TriggerPriceSource::LastPrice),
+            "index" => Ok(TriggerPriceSource::IndexPrice),
+            "mark" => Ok(TriggerPriceSource::MarkPrice),
+            _ => Err(Error::validation(
+                "trigger_price_source must be last, index, or mark",
             )),
         }
     }
@@ -965,6 +991,115 @@ mod tests {
         assert!(err.to_string().contains("market child"), "{err}");
     }
 
+    /// A trigger read's price-source label feeds create unchanged.
+    #[test]
+    fn trigger_read_round_trips_its_trigger_price_source() {
+        use crate::codecs::decode::trigger_from_proto;
+        use crate::models::TriggerDetails;
+        use crate::proto::triggers::v1::{
+            StopDetails, TrailingDetails, Trigger as ProtoTrigger, trigger,
+            trigger_intent::Strategy,
+        };
+
+        let stop_read = trigger_from_proto(&ProtoTrigger {
+            trigger_id: 1,
+            symbol_id: 7,
+            runtime_details: Some(trigger::RuntimeDetails::Stop(Box::new(StopDetails {
+                trigger_price_ticks: 49_000_000_000_000,
+                trigger_price_source: TriggerPriceSource::IndexPrice.into(),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        });
+        let Some(TriggerDetails::Stop(stop)) = stop_read.details else {
+            panic!("expected stop details");
+        };
+        let trailing_read = trigger_from_proto(&ProtoTrigger {
+            trigger_id: 2,
+            symbol_id: 7,
+            runtime_details: Some(trigger::RuntimeDetails::Trailing(Box::new(
+                TrailingDetails {
+                    trailing_distance_bps: 25,
+                    trigger_price_source: TriggerPriceSource::IndexPrice.into(),
+                    ..Default::default()
+                },
+            ))),
+            ..Default::default()
+        });
+        let Some(TriggerDetails::Trailing(trailing_details)) = trailing_read.details else {
+            panic!("expected trailing details");
+        };
+
+        let client = client();
+        let mut params = create_params(
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+        for (label, want) in [
+            (
+                stop.trigger_price_source.clone(),
+                TriggerPriceSource::IndexPrice,
+            ),
+            ("last".to_owned(), TriggerPriceSource::LastPrice),
+            (
+                String::new(),
+                TriggerPriceSource::TriggerPriceSourceUnspecified,
+            ),
+        ] {
+            for trigger_type in [CreateTriggerType::StopLoss, CreateTriggerType::TakeProfit] {
+                params.trigger_type = trigger_type;
+                params.trigger_price_source = Some(label.clone());
+                let intent = client
+                    .triggers
+                    .encode_create_params(&params)
+                    .unwrap()
+                    .trigger
+                    .expect("trigger intent");
+                let (Some(Strategy::StopLoss(cond)) | Some(Strategy::TakeProfit(cond))) =
+                    intent.strategy.as_ref()
+                else {
+                    panic!("expected a conditional strategy, got {:?}", intent.strategy);
+                };
+                assert_eq!(cond.trigger_price_source, want, "{label:?}");
+            }
+        }
+        params.trigger_price_source = None;
+        let intent = client
+            .triggers
+            .encode_create_params(&params)
+            .unwrap()
+            .trigger
+            .expect("trigger intent");
+        let Some(Strategy::TakeProfit(cond)) = intent.strategy.as_ref() else {
+            panic!("expected TakeProfit strategy, got {:?}", intent.strategy);
+        };
+        assert_eq!(
+            cond.trigger_price_source,
+            TriggerPriceSource::TriggerPriceSourceUnspecified
+        );
+
+        let mut trailing = trailing_create(None);
+        trailing.trigger_price_source = Some(trailing_details.trigger_price_source.clone());
+        let intent = client
+            .triggers
+            .encode_create_params(&trailing)
+            .unwrap()
+            .trigger
+            .expect("trigger intent");
+        let Some(Strategy::TrailingStop(wire)) = intent.strategy.as_ref() else {
+            panic!("expected TrailingStop strategy, got {:?}", intent.strategy);
+        };
+        assert_eq!(wire.trigger_price_source, TriggerPriceSource::IndexPrice);
+
+        // TWAP and ladder triggers have no watched price.
+        let mut twap = params.clone();
+        twap.trigger_type = CreateTriggerType::Twap;
+        twap.trigger_price_source = Some("index".into());
+        let err = client.triggers.encode_create_params(&twap).unwrap_err();
+        assert!(err.to_string().contains("trigger_price_source"), "{err}");
+    }
+
     #[test]
     fn buy_trailing_stop_sends_its_maximum_price() {
         use crate::proto::triggers::v1::trigger_intent::Strategy;
@@ -1077,14 +1212,13 @@ mod tests {
                 .is_err()
         );
 
-        let mut unsupported_source = base.clone();
-        unsupported_source.trigger_price_source = Some("mark".into());
-        assert!(
-            client
-                .triggers
-                .encode_create_params(&unsupported_source)
-                .is_err()
-        );
+        let mut unknown_source = base.clone();
+        unknown_source.trigger_price_source = Some("oracle".into());
+        let err = client
+            .triggers
+            .encode_create_params(&unknown_source)
+            .unwrap_err();
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
 
         let mut trailing = base.clone();
         trailing.trigger_type = CreateTriggerType::TrailingStop;
