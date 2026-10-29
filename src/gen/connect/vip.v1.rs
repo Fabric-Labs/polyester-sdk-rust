@@ -66,7 +66,7 @@ pub const VIP_SERVICE_LIST_VIP_TIERS_SPEC: ::connectrpc::Spec = ::connectrpc::Sp
         "/vip.v1.VIPService/ListVIPTiers",
         ::connectrpc::StreamType::Unary,
     )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetVIPStatus` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -130,6 +130,7 @@ pub const VIP_SERVICE_GET_VIP_STATUS_SPEC: ::connectrpc::Spec = ::connectrpc::Sp
 pub trait VipService: Send + Sync + 'static {
     /// List the complete active VIP0 through VIP10 tier catalog in ascending tier
     /// order.
+    /// This public, caller-independent catalog supports cacheable ConnectRPC GET.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -207,7 +208,7 @@ impl<S: VipService> VipServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
-            .route_view(
+            .route_view_idempotent(
                 VIP_SERVICE_SERVICE_NAME,
                 "ListVIPTiers",
                 {
@@ -321,7 +322,7 @@ impl<T: VipService> ::connectrpc::Dispatcher for VipServiceServer<T> {
         match method {
             "ListVIPTiers" => {
                 Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
                         .with_spec(VIP_SERVICE_LIST_VIP_TIERS_SPEC),
                 )
             }

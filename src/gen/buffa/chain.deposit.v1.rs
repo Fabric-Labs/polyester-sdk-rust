@@ -466,8 +466,9 @@ pub struct ListDepositAddressesRequest {
     )]
     pub subaccount_id: u64,
     /// Optional PolyChain-registered source chain id filter. When omitted, the
-    /// response returns all known deposit addresses for the selected target,
-    /// ordered by ascending chain id.
+    /// response returns the known deposit addresses for the selected target on
+    /// chains that currently accept deposits, ordered by ascending chain id. A
+    /// chain whose deposits are unavailable returns FailedPrecondition.
     ///
     /// Field 2: `chain_id`
     #[serde(
@@ -606,7 +607,8 @@ pub const __LIST_DEPOSIT_ADDRESSES_REQUEST_JSON_ANY: ::buffa::type_registry::Jso
     is_wkt: false,
 };
 /// ListDepositAddressesResponse returns the known deposit addresses for the
-/// selected target, ordered by ascending chain id.
+/// selected target on chains that currently accept deposits, ordered by
+/// ascending chain id.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -1712,8 +1714,9 @@ pub mod __buffa {
             /// Field 1: `subaccount_id`
             pub subaccount_id: u64,
             /// Optional PolyChain-registered source chain id filter. When omitted, the
-            /// response returns all known deposit addresses for the selected target,
-            /// ordered by ascending chain id.
+            /// response returns the known deposit addresses for the selected target on
+            /// chains that currently accept deposits, ordered by ascending chain id. A
+            /// chain whose deposits are unavailable returns FailedPrecondition.
             ///
             /// Field 2: `chain_id`
             pub chain_id: u32,
@@ -1978,8 +1981,9 @@ pub mod __buffa {
                 self.0.reborrow().subaccount_id
             }
             /// Optional PolyChain-registered source chain id filter. When omitted, the
-            /// response returns all known deposit addresses for the selected target,
-            /// ordered by ascending chain id.
+            /// response returns the known deposit addresses for the selected target on
+            /// chains that currently accept deposits, ordered by ascending chain id. A
+            /// chain whose deposits are unavailable returns FailedPrecondition.
             ///
             /// Field 2: `chain_id`
             #[must_use]
@@ -2024,7 +2028,8 @@ pub mod __buffa {
             }
         }
         /// ListDepositAddressesResponse returns the known deposit addresses for the
-        /// selected target, ordered by ascending chain id.
+        /// selected target on chains that currently accept deposits, ordered by
+        /// ascending chain id.
         #[derive(Clone, Debug, Default)]
         pub struct ListDepositAddressesResponseView<'a> {
             /// Known deposit addresses for the selected target.

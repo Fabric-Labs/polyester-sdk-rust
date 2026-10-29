@@ -156,7 +156,8 @@ pub trait DepositAddressService: Send + Sync + 'static {
     /// chain. The acting caller's root account must have accepted the current
     /// terms, including requests using an API key or targeting a shared subaccount.
     /// Otherwise FailedPrecondition is returned. Listing and using existing deposit
-    /// addresses remain available without acceptance.
+    /// addresses remain available without acceptance. FailedPrecondition is also
+    /// returned when deposits on the requested chain are unavailable.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -179,8 +180,9 @@ pub trait DepositAddressService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// List known deposit addresses for one target. Results are served from
-    /// Polyester-owned state rather than a live upstream read.
+    /// List known deposit addresses for one target on chains that currently
+    /// accept deposits. Results are served from Polyester-owned state rather than
+    /// a live upstream read.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

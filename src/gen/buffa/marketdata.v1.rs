@@ -3493,6 +3493,9 @@ pub enum PairStatus {
     PAIR_STATUS_POST_ONLY = 4i32,
     /// New spot orders are blocked by reduce-only policy.
     PAIR_STATUS_REDUCE_ONLY = 5i32,
+    /// Trading is halted: only cancellations are accepted, and new orders are
+    /// rejected with MARKET_HALTED.
+    PAIR_STATUS_HALTED = 6i32,
 }
 impl PairStatus {
     ///Idiomatic alias for [`Self::PAIR_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -3513,6 +3516,9 @@ impl PairStatus {
     ///Idiomatic alias for [`Self::PAIR_STATUS_REDUCE_ONLY`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ReduceOnly: Self = Self::PAIR_STATUS_REDUCE_ONLY;
+    ///Idiomatic alias for [`Self::PAIR_STATUS_HALTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Halted: Self = Self::PAIR_STATUS_HALTED;
 }
 impl ::core::default::Default for PairStatus {
     fn default() -> Self {
@@ -3614,6 +3620,7 @@ impl ::buffa::Enumeration for PairStatus {
             3i32 => ::core::option::Option::Some(Self::PAIR_STATUS_CANCEL_ONLY),
             4i32 => ::core::option::Option::Some(Self::PAIR_STATUS_POST_ONLY),
             5i32 => ::core::option::Option::Some(Self::PAIR_STATUS_REDUCE_ONLY),
+            6i32 => ::core::option::Option::Some(Self::PAIR_STATUS_HALTED),
             _ => ::core::option::Option::None,
         }
     }
@@ -3628,6 +3635,7 @@ impl ::buffa::Enumeration for PairStatus {
             Self::PAIR_STATUS_CANCEL_ONLY => "PAIR_STATUS_CANCEL_ONLY",
             Self::PAIR_STATUS_POST_ONLY => "PAIR_STATUS_POST_ONLY",
             Self::PAIR_STATUS_REDUCE_ONLY => "PAIR_STATUS_REDUCE_ONLY",
+            Self::PAIR_STATUS_HALTED => "PAIR_STATUS_HALTED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -3650,6 +3658,9 @@ impl ::buffa::Enumeration for PairStatus {
             "PAIR_STATUS_REDUCE_ONLY" => {
                 ::core::option::Option::Some(Self::PAIR_STATUS_REDUCE_ONLY)
             }
+            "PAIR_STATUS_HALTED" => {
+                ::core::option::Option::Some(Self::PAIR_STATUS_HALTED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -3661,6 +3672,7 @@ impl ::buffa::Enumeration for PairStatus {
             Self::PAIR_STATUS_CANCEL_ONLY,
             Self::PAIR_STATUS_POST_ONLY,
             Self::PAIR_STATUS_REDUCE_ONLY,
+            Self::PAIR_STATUS_HALTED,
         ]
     }
 }
@@ -5511,6 +5523,11 @@ pub const __GET_CANDLES_COLUMNS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAn
 };
 /// CandlePoint is one OHLCV bucket represented with scaled integers.
 ///
+/// A primary candle opens at the previous candle's close, so consecutive
+/// candles join at every timeframe; a market's first candle opens at its first
+/// trade. High and low include the open. A bucket without trades is flat at
+/// the previous close with zero volume.
+///
 /// REST responses render these values as decimal strings in tuple order:
 /// \[ts_sec, open, high, low, close, volume, quote_volume\].
 #[derive(Clone, PartialEq, Default)]
@@ -5527,8 +5544,10 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// Opening price in quote units. Primary candles use scale 9; composite
-    /// reference candles use the pair's reference_price_scale from GetSpotConfig.
+    /// Opening price in quote units: for a primary candle, the previous
+    /// candle's close, or the first trade for a market's first candle. Primary
+    /// candles use scale 9; composite reference candles use the pair's
+    /// reference_price_scale from GetSpotConfig.
     ///
     /// Field 2: `open`
     #[serde(
@@ -5537,7 +5556,8 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub open: i64,
-    /// Highest traded price, using the same scale as open.
+    /// Highest price in the bucket, including the open, using the same scale as
+    /// open.
     ///
     /// Field 3: `high`
     #[serde(
@@ -5546,7 +5566,8 @@ pub struct CandlePoint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub high: i64,
-    /// Lowest traded price, using the same scale as open.
+    /// Lowest price in the bucket, including the open, using the same scale as
+    /// open.
     ///
     /// Field 4: `low`
     #[serde(
@@ -6108,8 +6129,9 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub ts_sec: ::buffa::alloc::vec::Vec<u64>,
-    /// Opening primary-market prices use scale 9. Reference prices use the pair's
-    /// reference_price_scale from GetSpotConfig.
+    /// Opening primary-market prices use scale 9: each is the previous candle's
+    /// close, or the first trade for a market's first candle. Reference prices
+    /// use the pair's reference_price_scale from GetSpotConfig.
     ///
     /// Field 4: `open`
     #[serde(
@@ -6118,8 +6140,8 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub open: ::buffa::alloc::vec::Vec<i64>,
-    /// Highest primary-market prices use scale 9. Reference prices use the pair's
-    /// reference_price_scale from GetSpotConfig.
+    /// Highest primary-market prices, including the open, use scale 9. Reference
+    /// prices use the pair's reference_price_scale from GetSpotConfig.
     ///
     /// Field 5: `high`
     #[serde(
@@ -6128,8 +6150,8 @@ pub struct GetCandlesColumnsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub high: ::buffa::alloc::vec::Vec<i64>,
-    /// Lowest primary-market prices use scale 9. Reference prices use the pair's
-    /// reference_price_scale from GetSpotConfig.
+    /// Lowest primary-market prices, including the open, use scale 9. Reference
+    /// prices use the pair's reference_price_scale from GetSpotConfig.
     ///
     /// Field 6: `low`
     #[serde(
@@ -7076,7 +7098,8 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
-    /// opening primary-market price in scale 9
+    /// Opening primary-market price in scale 9: the previous candle's close, or
+    /// the first trade for a market's first candle.
     ///
     /// Field 4: `open`
     #[serde(
@@ -7085,7 +7108,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub open: i64,
-    /// highest primary-market price in scale 9
+    /// highest primary-market price in scale 9, including the open
     ///
     /// Field 5: `high`
     #[serde(
@@ -7094,7 +7117,7 @@ pub struct Candle {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub high: i64,
-    /// lowest primary-market price in scale 9
+    /// lowest primary-market price in scale 9, including the open
     ///
     /// Field 6: `low`
     #[serde(
@@ -16701,6 +16724,11 @@ pub mod __buffa {
         }
         /// CandlePoint is one OHLCV bucket represented with scaled integers.
         ///
+        /// A primary candle opens at the previous candle's close, so consecutive
+        /// candles join at every timeframe; a market's first candle opens at its first
+        /// trade. High and low include the open. A bucket without trades is flat at
+        /// the previous close with zero volume.
+        ///
         /// REST responses render these values as decimal strings in tuple order:
         /// \[ts_sec, open, high, low, close, volume, quote_volume\].
         #[derive(Clone, Debug, Default)]
@@ -16709,16 +16737,20 @@ pub mod __buffa {
             ///
             /// Field 1: `ts_sec`
             pub ts_sec: u64,
-            /// Opening price in quote units. Primary candles use scale 9; composite
-            /// reference candles use the pair's reference_price_scale from GetSpotConfig.
+            /// Opening price in quote units: for a primary candle, the previous
+            /// candle's close, or the first trade for a market's first candle. Primary
+            /// candles use scale 9; composite reference candles use the pair's
+            /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 2: `open`
             pub open: i64,
-            /// Highest traded price, using the same scale as open.
+            /// Highest price in the bucket, including the open, using the same scale as
+            /// open.
             ///
             /// Field 3: `high`
             pub high: i64,
-            /// Lowest traded price, using the same scale as open.
+            /// Lowest price in the bucket, including the open, using the same scale as
+            /// open.
             ///
             /// Field 4: `low`
             pub low: i64,
@@ -17114,22 +17146,26 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// Opening price in quote units. Primary candles use scale 9; composite
-            /// reference candles use the pair's reference_price_scale from GetSpotConfig.
+            /// Opening price in quote units: for a primary candle, the previous
+            /// candle's close, or the first trade for a market's first candle. Primary
+            /// candles use scale 9; composite reference candles use the pair's
+            /// reference_price_scale from GetSpotConfig.
             ///
             /// Field 2: `open`
             #[must_use]
             pub fn open(&self) -> i64 {
                 self.0.reborrow().open
             }
-            /// Highest traded price, using the same scale as open.
+            /// Highest price in the bucket, including the open, using the same scale as
+            /// open.
             ///
             /// Field 3: `high`
             #[must_use]
             pub fn high(&self) -> i64 {
                 self.0.reborrow().high
             }
-            /// Lowest traded price, using the same scale as open.
+            /// Lowest price in the bucket, including the open, using the same scale as
+            /// open.
             ///
             /// Field 4: `low`
             #[must_use]
@@ -17680,18 +17716,19 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: ::buffa::RepeatedView<'a, u64>,
-            /// Opening primary-market prices use scale 9. Reference prices use the pair's
-            /// reference_price_scale from GetSpotConfig.
+            /// Opening primary-market prices use scale 9: each is the previous candle's
+            /// close, or the first trade for a market's first candle. Reference prices
+            /// use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 4: `open`
             pub open: ::buffa::RepeatedView<'a, i64>,
-            /// Highest primary-market prices use scale 9. Reference prices use the pair's
-            /// reference_price_scale from GetSpotConfig.
+            /// Highest primary-market prices, including the open, use scale 9. Reference
+            /// prices use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 5: `high`
             pub high: ::buffa::RepeatedView<'a, i64>,
-            /// Lowest primary-market prices use scale 9. Reference prices use the pair's
-            /// reference_price_scale from GetSpotConfig.
+            /// Lowest primary-market prices, including the open, use scale 9. Reference
+            /// prices use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 6: `low`
             pub low: ::buffa::RepeatedView<'a, i64>,
@@ -18692,24 +18729,25 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> &::buffa::RepeatedView<'_, u64> {
                 &self.0.reborrow().ts_sec
             }
-            /// Opening primary-market prices use scale 9. Reference prices use the pair's
-            /// reference_price_scale from GetSpotConfig.
+            /// Opening primary-market prices use scale 9: each is the previous candle's
+            /// close, or the first trade for a market's first candle. Reference prices
+            /// use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 4: `open`
             #[must_use]
             pub fn open(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().open
             }
-            /// Highest primary-market prices use scale 9. Reference prices use the pair's
-            /// reference_price_scale from GetSpotConfig.
+            /// Highest primary-market prices, including the open, use scale 9. Reference
+            /// prices use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 5: `high`
             #[must_use]
             pub fn high(&self) -> &::buffa::RepeatedView<'_, i64> {
                 &self.0.reborrow().high
             }
-            /// Lowest primary-market prices use scale 9. Reference prices use the pair's
-            /// reference_price_scale from GetSpotConfig.
+            /// Lowest primary-market prices, including the open, use scale 9. Reference
+            /// prices use the pair's reference_price_scale from GetSpotConfig.
             ///
             /// Field 6: `low`
             #[must_use]
@@ -18846,15 +18884,16 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: u64,
-            /// opening primary-market price in scale 9
+            /// Opening primary-market price in scale 9: the previous candle's close, or
+            /// the first trade for a market's first candle.
             ///
             /// Field 4: `open`
             pub open: i64,
-            /// highest primary-market price in scale 9
+            /// highest primary-market price in scale 9, including the open
             ///
             /// Field 5: `high`
             pub high: i64,
-            /// lowest primary-market price in scale 9
+            /// lowest primary-market price in scale 9, including the open
             ///
             /// Field 6: `low`
             pub low: i64,
@@ -19282,21 +19321,22 @@ pub mod __buffa {
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
             }
-            /// opening primary-market price in scale 9
+            /// Opening primary-market price in scale 9: the previous candle's close, or
+            /// the first trade for a market's first candle.
             ///
             /// Field 4: `open`
             #[must_use]
             pub fn open(&self) -> i64 {
                 self.0.reborrow().open
             }
-            /// highest primary-market price in scale 9
+            /// highest primary-market price in scale 9, including the open
             ///
             /// Field 5: `high`
             #[must_use]
             pub fn high(&self) -> i64 {
                 self.0.reborrow().high
             }
-            /// lowest primary-market price in scale 9
+            /// lowest primary-market price in scale 9, including the open
             ///
             /// Field 6: `low`
             #[must_use]

@@ -66,7 +66,7 @@ pub const RATE_LIMIT_SERVICE_GET_RATE_LIMIT_CONFIG_SPEC: ::connectrpc::Spec = ::
         "/ratelimit.v1.RateLimitService/GetRateLimitConfig",
         ::connectrpc::StreamType::Unary,
     )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetTradingRateLimits` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -130,6 +130,7 @@ pub const RATE_LIMIT_SERVICE_GET_TRADING_RATE_LIMITS_SPEC: ::connectrpc::Spec = 
 pub trait RateLimitService: Send + Sync + 'static {
     /// Get the complete active placement and cancellation quota catalog for
     /// VIP0 through VIP10.
+    /// This public, caller-independent catalog supports cacheable ConnectRPC GET.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -208,7 +209,7 @@ impl<S: RateLimitService> RateLimitServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
-            .route_view(
+            .route_view_idempotent(
                 RATE_LIMIT_SERVICE_SERVICE_NAME,
                 "GetRateLimitConfig",
                 {
@@ -322,7 +323,7 @@ impl<T: RateLimitService> ::connectrpc::Dispatcher for RateLimitServiceServer<T>
         match method {
             "GetRateLimitConfig" => {
                 Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
                         .with_spec(RATE_LIMIT_SERVICE_GET_RATE_LIMIT_CONFIG_SPEC),
                 )
             }
