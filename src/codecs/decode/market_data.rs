@@ -487,6 +487,23 @@ mod tests {
     }
 
     #[test]
+    fn spot_config_names_halted_pairs() {
+        use crate::proto::marketdata::v1::{PairConfig, PairStatus};
+
+        let msg = GetSpotConfigResponse {
+            pairs: vec![PairConfig {
+                symbol: "BTC-USDT".into(),
+                symbol_id: 1,
+                status: PairStatus::PAIR_STATUS_HALTED.into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let spot = spot_config_from_proto(&msg);
+        assert_eq!(spot.raw["pairs"][0]["status"], "PAIR_STATUS_HALTED");
+    }
+
+    #[test]
     fn unknown_timeframe_preserves_numeric_value() {
         let msg = GetCandlesResponse {
             timeframe: buffa::EnumValue::from(77),

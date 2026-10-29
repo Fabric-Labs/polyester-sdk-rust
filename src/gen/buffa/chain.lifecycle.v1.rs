@@ -189,6 +189,10 @@ pub enum LifecycleReason {
     TRADING_WITHDRAW_CONTRACT_REVERTED = 301i32,
     /// A trading withdrawal could not be submitted because execution failed.
     TRADING_WITHDRAW_EXECUTION_FAILED = 302i32,
+    /// The deposit's source transaction was not confirmed on its chain within the
+    /// time the chain keeps an unconfirmed transaction pending. The deposit
+    /// resumes and completes if the transaction confirms later.
+    DEPOSIT_SOURCE_NOT_CONFIRMED = 400i32,
 }
 impl LifecycleReason {
     ///Idiomatic alias for [`Self::REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -230,6 +234,9 @@ impl LifecycleReason {
     ///Idiomatic alias for [`Self::TRADING_WITHDRAW_EXECUTION_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TradingWithdrawExecutionFailed: Self = Self::TRADING_WITHDRAW_EXECUTION_FAILED;
+    ///Idiomatic alias for [`Self::DEPOSIT_SOURCE_NOT_CONFIRMED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DepositSourceNotConfirmed: Self = Self::DEPOSIT_SOURCE_NOT_CONFIRMED;
 }
 impl ::core::default::Default for LifecycleReason {
     fn default() -> Self {
@@ -358,6 +365,7 @@ impl ::buffa::Enumeration for LifecycleReason {
             302i32 => {
                 ::core::option::Option::Some(Self::TRADING_WITHDRAW_EXECUTION_FAILED)
             }
+            400i32 => ::core::option::Option::Some(Self::DEPOSIT_SOURCE_NOT_CONFIRMED),
             _ => ::core::option::Option::None,
         }
     }
@@ -389,6 +397,7 @@ impl ::buffa::Enumeration for LifecycleReason {
             Self::TRADING_WITHDRAW_EXECUTION_FAILED => {
                 "TRADING_WITHDRAW_EXECUTION_FAILED"
             }
+            Self::DEPOSIT_SOURCE_NOT_CONFIRMED => "DEPOSIT_SOURCE_NOT_CONFIRMED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -438,6 +447,9 @@ impl ::buffa::Enumeration for LifecycleReason {
             "TRADING_WITHDRAW_EXECUTION_FAILED" => {
                 ::core::option::Option::Some(Self::TRADING_WITHDRAW_EXECUTION_FAILED)
             }
+            "DEPOSIT_SOURCE_NOT_CONFIRMED" => {
+                ::core::option::Option::Some(Self::DEPOSIT_SOURCE_NOT_CONFIRMED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -456,6 +468,7 @@ impl ::buffa::Enumeration for LifecycleReason {
             Self::TRADING_WITHDRAW_POLICY_DENIED,
             Self::TRADING_WITHDRAW_CONTRACT_REVERTED,
             Self::TRADING_WITHDRAW_EXECUTION_FAILED,
+            Self::DEPOSIT_SOURCE_NOT_CONFIRMED,
         ]
     }
 }
@@ -808,6 +821,10 @@ pub enum LifecycleSource {
     SOURCE_EXECUTOR = 3i32,
     /// Off-chain ledger posting or settlement fact.
     SOURCE_LEDGER = 4i32,
+    /// Lifecycle tracking itself, for an outcome it concludes when expected
+    /// progress does not arrive in time, such as an unconfirmed deposit source
+    /// transaction.
+    SOURCE_LIFECYCLE = 5i32,
 }
 impl LifecycleSource {
     ///Idiomatic alias for [`Self::SOURCE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -825,6 +842,9 @@ impl LifecycleSource {
     ///Idiomatic alias for [`Self::SOURCE_LEDGER`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const SourceLedger: Self = Self::SOURCE_LEDGER;
+    ///Idiomatic alias for [`Self::SOURCE_LIFECYCLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SourceLifecycle: Self = Self::SOURCE_LIFECYCLE;
 }
 impl ::core::default::Default for LifecycleSource {
     fn default() -> Self {
@@ -927,6 +947,7 @@ impl ::buffa::Enumeration for LifecycleSource {
             2i32 => ::core::option::Option::Some(Self::SOURCE_POLYESTER_CHAIN),
             3i32 => ::core::option::Option::Some(Self::SOURCE_EXECUTOR),
             4i32 => ::core::option::Option::Some(Self::SOURCE_LEDGER),
+            5i32 => ::core::option::Option::Some(Self::SOURCE_LIFECYCLE),
             _ => ::core::option::Option::None,
         }
     }
@@ -940,6 +961,7 @@ impl ::buffa::Enumeration for LifecycleSource {
             Self::SOURCE_POLYESTER_CHAIN => "SOURCE_POLYESTER_CHAIN",
             Self::SOURCE_EXECUTOR => "SOURCE_EXECUTOR",
             Self::SOURCE_LEDGER => "SOURCE_LEDGER",
+            Self::SOURCE_LIFECYCLE => "SOURCE_LIFECYCLE",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -953,6 +975,7 @@ impl ::buffa::Enumeration for LifecycleSource {
             }
             "SOURCE_EXECUTOR" => ::core::option::Option::Some(Self::SOURCE_EXECUTOR),
             "SOURCE_LEDGER" => ::core::option::Option::Some(Self::SOURCE_LEDGER),
+            "SOURCE_LIFECYCLE" => ::core::option::Option::Some(Self::SOURCE_LIFECYCLE),
             _ => ::core::option::Option::None,
         }
     }
@@ -963,6 +986,7 @@ impl ::buffa::Enumeration for LifecycleSource {
             Self::SOURCE_POLYESTER_CHAIN,
             Self::SOURCE_EXECUTOR,
             Self::SOURCE_LEDGER,
+            Self::SOURCE_LIFECYCLE,
         ]
     }
 }
@@ -5506,7 +5530,8 @@ pub struct FlowSummaryView {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub progress_timeline: ::buffa::alloc::vec::Vec<FlowTimelineItemView>,
-    /// Estimated Unix completion timestamp in milliseconds.
+    /// Estimated Unix completion timestamp in milliseconds. Zero while
+    /// `is_delayed` is true, because no reliable estimate exists then.
     ///
     /// Field 27: `estimated_completion_unix_ms`
     #[serde(
@@ -5516,6 +5541,19 @@ pub struct FlowSummaryView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub estimated_completion_unix_ms: u64,
+    /// True when an open flow has made no progress for well beyond the expected
+    /// time of its current step. Show the flow as delayed instead of an ETA; it
+    /// still completes normally once progress resumes. Always false for terminal
+    /// flows.
+    ///
+    /// Field 36: `is_delayed`
+    #[serde(
+        rename = "isDelayed",
+        alias = "is_delayed",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub is_delayed: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5552,6 +5590,7 @@ impl ::core::fmt::Debug for FlowSummaryView {
             .field("current_progress", &self.current_progress)
             .field("progress_timeline", &self.progress_timeline)
             .field("estimated_completion_unix_ms", &self.estimated_completion_unix_ms)
+            .field("is_delayed", &self.is_delayed)
             .finish()
     }
 }
@@ -5748,6 +5787,9 @@ impl ::buffa::Message for FlowSummaryView {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.is_delayed {
+            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5872,6 +5914,9 @@ impl ::buffa::Message for FlowSummaryView {
         if self.zipper_reason.is_set() {
             ::buffa::types::put_len_delimited_header(35u32, __cache.consume_next(), buf);
             self.zipper_reason.write_to(__cache, buf);
+        }
+        if self.is_delayed {
+            ::buffa::types::put_bool_field(36u32, self.is_delayed, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6123,6 +6168,13 @@ impl ::buffa::Message for FlowSummaryView {
                     ctx,
                 )?;
             }
+            36u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.is_delayed = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6160,6 +6212,7 @@ impl ::buffa::Message for FlowSummaryView {
         self.flow_id.clear();
         self.smart_account_address.clear();
         self.zipper_reason = ::buffa::MessageField::none();
+        self.is_delayed = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6635,6 +6688,22 @@ pub struct FlowStepView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub milestone_tx_ref: ::buffa::alloc::string::String,
+    /// Chain that holds `milestone_tx_ref`, as the `chain_id` of a chain returned
+    /// by `GetDepositWithdrawConfig`, the same id space as `polyester_chain_id`.
+    /// Link the transaction with that chain's `explorer_url`. Polyester Chain
+    /// transactions name Polyester Chain, a deposit's source-chain transaction
+    /// names its source chain, and a withdrawal's delivery transaction names its
+    /// destination chain. Zero when `milestone_tx_ref` is empty or is not a chain
+    /// transaction, such as a ledger settlement identifier.
+    ///
+    /// Field 26: `milestone_tx_chain_id`
+    #[serde(
+        rename = "milestoneTxChainId",
+        alias = "milestone_tx_chain_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub milestone_tx_chain_id: u32,
     /// Source that produced this visible step.
     ///
     /// Field 12: `lifecycle_source`
@@ -6781,6 +6850,7 @@ impl ::core::fmt::Debug for FlowStepView {
             .field("amount_e18", &self.amount_e18)
             .field("request_fee", &self.request_fee)
             .field("milestone_tx_ref", &self.milestone_tx_ref)
+            .field("milestone_tx_chain_id", &self.milestone_tx_chain_id)
             .field("lifecycle_source", &self.lifecycle_source)
             .field("lifecycle_reason", &self.lifecycle_reason)
             .field("zipper_reason", &self.zipper_reason)
@@ -6940,6 +7010,12 @@ impl ::buffa::Message for FlowStepView {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.milestone_tx_chain_id != 0u32 {
+            size
+                += 2u32
+                    + ::buffa::types::uint32_encoded_len(self.milestone_tx_chain_id)
+                        as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7027,6 +7103,9 @@ impl ::buffa::Message for FlowStepView {
         if self.zipper_reason.is_set() {
             ::buffa::types::put_len_delimited_header(25u32, __cache.consume_next(), buf);
             self.zipper_reason.write_to(__cache, buf);
+        }
+        if self.milestone_tx_chain_id != 0u32 {
+            ::buffa::types::put_uint32_field(26u32, self.milestone_tx_chain_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7203,6 +7282,13 @@ impl ::buffa::Message for FlowStepView {
                     ctx,
                 )?;
             }
+            26u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.milestone_tx_chain_id = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7231,6 +7317,7 @@ impl ::buffa::Message for FlowStepView {
         self.required_rejections = 0u32;
         self.request_fee = ::buffa::MessageField::none();
         self.zipper_reason = ::buffa::MessageField::none();
+        self.milestone_tx_chain_id = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7287,6 +7374,18 @@ pub struct FlowStepActivityView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub tx_ref: ::buffa::alloc::string::String,
+    /// Chain that holds `tx_ref`, with the meaning of
+    /// `FlowStepView.milestone_tx_chain_id`. Zero when `tx_ref` is empty or is not
+    /// a chain transaction.
+    ///
+    /// Field 17: `tx_chain_id`
+    #[serde(
+        rename = "txChainId",
+        alias = "tx_chain_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub tx_chain_id: u32,
     /// Activity occurrence timestamp in milliseconds since epoch (UTC).
     ///
     /// Field 3: `occurred_at_unix_ms`
@@ -7439,6 +7538,7 @@ impl ::core::fmt::Debug for FlowStepActivityView {
         f.debug_struct("FlowStepActivityView")
             .field("sequence", &self.sequence)
             .field("tx_ref", &self.tx_ref)
+            .field("tx_chain_id", &self.tx_chain_id)
             .field("occurred_at_unix_ms", &self.occurred_at_unix_ms)
             .field("lifecycle_source", &self.lifecycle_source)
             .field("lifecycle_reason", &self.lifecycle_reason)
@@ -7567,6 +7667,9 @@ impl ::buffa::Message for FlowStepActivityView {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.tx_chain_id != 0u32 {
+            size += 2u32 + ::buffa::types::uint32_encoded_len(self.tx_chain_id) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7635,6 +7738,9 @@ impl ::buffa::Message for FlowStepActivityView {
         if self.zipper_reason.is_set() {
             ::buffa::types::put_len_delimited_header(16u32, __cache.consume_next(), buf);
             self.zipper_reason.write_to(__cache, buf);
+        }
+        if self.tx_chain_id != 0u32 {
+            ::buffa::types::put_uint32_field(17u32, self.tx_chain_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7773,6 +7879,13 @@ impl ::buffa::Message for FlowStepActivityView {
                     ctx,
                 )?;
             }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.tx_chain_id = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7797,6 +7910,7 @@ impl ::buffa::Message for FlowStepActivityView {
         self.amount_e18 = ::buffa::MessageField::none();
         self.ledger_transfer_id.clear();
         self.zipper_reason = ::buffa::MessageField::none();
+        self.tx_chain_id = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -12748,10 +12862,18 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::FlowTimelineItemViewView<'a>,
             >,
-            /// Estimated Unix completion timestamp in milliseconds.
+            /// Estimated Unix completion timestamp in milliseconds. Zero while
+            /// `is_delayed` is true, because no reliable estimate exists then.
             ///
             /// Field 27: `estimated_completion_unix_ms`
             pub estimated_completion_unix_ms: u64,
+            /// True when an open flow has made no progress for well beyond the expected
+            /// time of its current step. Show the flow as delayed instead of an ETA; it
+            /// still completes normally once progress resumes. Always false for terminal
+            /// flows.
+            ///
+            /// Field 36: `is_delayed`
+            pub is_delayed: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for FlowSummaryViewView<'a> {
@@ -13103,6 +13225,13 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    36u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.is_delayed = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     26u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -13215,6 +13344,7 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     estimated_completion_unix_ms: self.estimated_completion_unix_ms,
+                    is_delayed: self.is_delayed,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -13412,6 +13542,9 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.is_delayed {
+                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -13593,6 +13726,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.zipper_reason.write_to(__cache, buf);
+                }
+                if self.is_delayed {
+                    ::buffa::types::put_bool_field(36u32, self.is_delayed, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -13811,6 +13947,9 @@ pub mod __buffa {
                                 &self.estimated_completion_unix_ms,
                             ),
                         )?;
+                }
+                if self.is_delayed {
+                    __map.serialize_entry("isDelayed", &self.is_delayed)?;
                 }
                 __map.end()
             }
@@ -14154,12 +14293,23 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().progress_timeline
             }
-            /// Estimated Unix completion timestamp in milliseconds.
+            /// Estimated Unix completion timestamp in milliseconds. Zero while
+            /// `is_delayed` is true, because no reliable estimate exists then.
             ///
             /// Field 27: `estimated_completion_unix_ms`
             #[must_use]
             pub fn estimated_completion_unix_ms(&self) -> u64 {
                 self.0.reborrow().estimated_completion_unix_ms
+            }
+            /// True when an open flow has made no progress for well beyond the expected
+            /// time of its current step. Show the flow as delayed instead of an ETA; it
+            /// still completes normally once progress resumes. Always false for terminal
+            /// flows.
+            ///
+            /// Field 36: `is_delayed`
+            #[must_use]
+            pub fn is_delayed(&self) -> bool {
+                self.0.reborrow().is_delayed
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<FlowSummaryViewView<'static>>>
@@ -14860,6 +15010,16 @@ pub mod __buffa {
             ///
             /// Field 11: `milestone_tx_ref`
             pub milestone_tx_ref: &'a str,
+            /// Chain that holds `milestone_tx_ref`, as the `chain_id` of a chain returned
+            /// by `GetDepositWithdrawConfig`, the same id space as `polyester_chain_id`.
+            /// Link the transaction with that chain's `explorer_url`. Polyester Chain
+            /// transactions name Polyester Chain, a deposit's source-chain transaction
+            /// names its source chain, and a withdrawal's delivery transaction names its
+            /// destination chain. Zero when `milestone_tx_ref` is empty or is not a chain
+            /// transaction, such as a ledger settlement identifier.
+            ///
+            /// Field 26: `milestone_tx_chain_id`
+            pub milestone_tx_chain_id: u32,
             /// Source that produced this visible step.
             ///
             /// Field 12: `lifecycle_source`
@@ -15061,6 +15221,15 @@ pub mod __buffa {
                         )?;
                         view.milestone_tx_ref = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    26u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.milestone_tx_chain_id = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
+                    }
                     12u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -15251,6 +15420,7 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     milestone_tx_ref: self.milestone_tx_ref.to_string(),
+                    milestone_tx_chain_id: self.milestone_tx_chain_id,
                     lifecycle_source: self.lifecycle_source,
                     lifecycle_reason: self.lifecycle_reason,
                     zipper_reason: match self.zipper_reason.as_option() {
@@ -15423,6 +15593,13 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.milestone_tx_chain_id != 0u32 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint32_encoded_len(
+                                self.milestone_tx_chain_id,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -15552,6 +15729,13 @@ pub mod __buffa {
                     );
                     self.zipper_reason.write_to(__cache, buf);
                 }
+                if self.milestone_tx_chain_id != 0u32 {
+                    ::buffa::types::put_uint32_field(
+                        26u32,
+                        self.milestone_tx_chain_id,
+                        buf,
+                    );
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -15616,6 +15800,17 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.milestone_tx_ref) {
                     __map.serialize_entry("milestoneTxRef", self.milestone_tx_ref)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.milestone_tx_chain_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "milestoneTxChainId",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.milestone_tx_chain_id,
+                            ),
+                        )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.lifecycle_source,
@@ -15877,6 +16072,19 @@ pub mod __buffa {
             pub fn milestone_tx_ref(&self) -> &'_ str {
                 self.0.reborrow().milestone_tx_ref
             }
+            /// Chain that holds `milestone_tx_ref`, as the `chain_id` of a chain returned
+            /// by `GetDepositWithdrawConfig`, the same id space as `polyester_chain_id`.
+            /// Link the transaction with that chain's `explorer_url`. Polyester Chain
+            /// transactions name Polyester Chain, a deposit's source-chain transaction
+            /// names its source chain, and a withdrawal's delivery transaction names its
+            /// destination chain. Zero when `milestone_tx_ref` is empty or is not a chain
+            /// transaction, such as a ledger settlement identifier.
+            ///
+            /// Field 26: `milestone_tx_chain_id`
+            #[must_use]
+            pub fn milestone_tx_chain_id(&self) -> u32 {
+                self.0.reborrow().milestone_tx_chain_id
+            }
             /// Source that produced this visible step.
             ///
             /// Field 12: `lifecycle_source`
@@ -16027,6 +16235,12 @@ pub mod __buffa {
             ///
             /// Field 2: `tx_ref`
             pub tx_ref: &'a str,
+            /// Chain that holds `tx_ref`, with the meaning of
+            /// `FlowStepView.milestone_tx_chain_id`. Zero when `tx_ref` is empty or is not
+            /// a chain transaction.
+            ///
+            /// Field 17: `tx_chain_id`
+            pub tx_chain_id: u32,
             /// Activity occurrence timestamp in milliseconds since epoch (UTC).
             ///
             /// Field 3: `occurred_at_unix_ms`
@@ -16139,6 +16353,13 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.tx_ref = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    17u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.tx_chain_id = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -16321,6 +16542,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::FlowStepActivityView {
                     sequence: self.sequence,
                     tx_ref: self.tx_ref.to_string(),
+                    tx_chain_id: self.tx_chain_id,
                     occurred_at_unix_ms: self.occurred_at_unix_ms,
                     lifecycle_source: self.lifecycle_source,
                     lifecycle_reason: self.lifecycle_reason,
@@ -16466,6 +16688,12 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.tx_chain_id != 0u32 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint32_encoded_len(self.tx_chain_id)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -16568,6 +16796,9 @@ pub mod __buffa {
                     );
                     self.zipper_reason.write_to(__cache, buf);
                 }
+                if self.tx_chain_id != 0u32 {
+                    ::buffa::types::put_uint32_field(17u32, self.tx_chain_id, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -16598,6 +16829,13 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.tx_ref) {
                     __map.serialize_entry("txRef", self.tx_ref)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.tx_chain_id) {
+                    __map
+                        .serialize_entry(
+                            "txChainId",
+                            &::buffa::json_helpers::ProtoJson(&self.tx_chain_id),
+                        )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(
                     &self.occurred_at_unix_ms,
@@ -16812,6 +17050,15 @@ pub mod __buffa {
             #[must_use]
             pub fn tx_ref(&self) -> &'_ str {
                 self.0.reborrow().tx_ref
+            }
+            /// Chain that holds `tx_ref`, with the meaning of
+            /// `FlowStepView.milestone_tx_chain_id`. Zero when `tx_ref` is empty or is not
+            /// a chain transaction.
+            ///
+            /// Field 17: `tx_chain_id`
+            #[must_use]
+            pub fn tx_chain_id(&self) -> u32 {
+                self.0.reborrow().tx_chain_id
             }
             /// Activity occurrence timestamp in milliseconds since epoch (UTC).
             ///

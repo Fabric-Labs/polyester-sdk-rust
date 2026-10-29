@@ -1028,6 +1028,73 @@ mod tests {
     }
 
     #[test]
+    fn newer_trigger_terminal_reasons_are_named() {
+        let cancels = [
+            (
+                TriggerCancelReason::TRIGGER_CANCEL_REASON_ACCOUNT_REPAIR,
+                "account_repair",
+            ),
+            (
+                TriggerCancelReason::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TRIGGER,
+                "pair_drain_trigger",
+            ),
+            (
+                TriggerCancelReason::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP,
+                "pair_drain_twap",
+            ),
+            (
+                TriggerCancelReason::TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER,
+                "pair_drain_ladder",
+            ),
+            (
+                TriggerCancelReason::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG,
+                "pair_drain_attached_leg",
+            ),
+        ];
+        for (reason, want) in cancels {
+            let trigger = trigger_from_proto(&ProtoTrigger {
+                trigger_id: 1,
+                terminal_reason: Some(trigger::TerminalReason::CancelReason(reason.into())),
+                ..Default::default()
+            });
+            assert_eq!(trigger.cancel_reason, want);
+            let event = trigger_event_from_proto(&ProtoTriggerEvent {
+                trigger_id: 1,
+                terminal_reason: Some(trigger_event::TerminalReason::CancelReason(reason.into())),
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(event.cancel_reason, want);
+        }
+
+        let failures = [
+            (
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE,
+                "index_price_unavailable",
+            ),
+            (
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
+                "trigger_would_trigger_immediately",
+            ),
+        ];
+        for (reason, want) in failures {
+            let trigger = trigger_from_proto(&ProtoTrigger {
+                trigger_id: 1,
+                terminal_reason: Some(trigger::TerminalReason::FailureReason(reason.into())),
+                ..Default::default()
+            });
+            assert_eq!(trigger.failure_reason, want);
+            let event = trigger_event_from_proto(&ProtoTriggerEvent {
+                trigger_id: 1,
+                terminal_reason: Some(trigger_event::TerminalReason::FailureReason(reason.into())),
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(event.failure_reason, want);
+        }
+    }
+
+    #[test]
     fn trigger_terminal_reasons_map_oneof_and_unspecified_is_empty() {
         let canceled = trigger_from_proto(&ProtoTrigger {
             trigger_id: 5,

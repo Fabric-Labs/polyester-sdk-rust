@@ -16,6 +16,11 @@ pub struct LifecycleFlowSummary {
     pub latest_step: String,
     pub is_open: bool,
     pub is_terminal: bool,
+    /// True when an open flow has made no progress for well beyond the
+    /// expected time of its current step. Show it as delayed instead of an
+    /// ETA; it still completes normally once progress resumes. Always false
+    /// for terminal flows and for transaction lookups, which do not report it.
+    pub is_delayed: bool,
     pub owner_account_id: String,
     pub smart_account_address: String,
     /// Product-facing reason label (`unspecified`, snake catalog labels, or

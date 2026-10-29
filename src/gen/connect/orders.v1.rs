@@ -1939,6 +1939,9 @@ pub const ORDERS_READ_SERVICE_GET_BATCH_REPLACE_STATUS_SPEC: ::connectrpc::Spec 
 pub trait OrdersReadService: Send + Sync + 'static {
     /// Retrieve non-terminal orders for an account.
     /// Supports optional subaccount, trigger, symbol, and side filters with cursor pagination.
+    /// While the current state of an order in scope is temporarily unavailable, the call
+    /// fails with a retryable UNAVAILABLE rather than omitting the order or returning a
+    /// stale state; retry the same request.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -1963,6 +1966,9 @@ pub trait OrdersReadService: Send + Sync + 'static {
     > + Send;
     /// Retrieve terminal order history for an account.
     /// Supports optional subaccount, trigger, symbol, side, status, and time-range filters with cursor pagination.
+    /// While the current state of an order on the page is temporarily unavailable, the call
+    /// fails with a retryable UNAVAILABLE rather than returning a stale state; retry the
+    /// same request.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

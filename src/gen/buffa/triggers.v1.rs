@@ -575,6 +575,23 @@ pub enum TriggerCancelReason {
     /// no child order was canceled by the user, and the first child order to be
     /// canceled was canceled by self-trade prevention.
     TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION = 4i32,
+    /// Ended by the exchange while it recovered your account. The account's
+    /// open orders on the market were canceled at the same time; place new
+    /// orders and triggers once the account trades again.
+    TRIGGER_CANCEL_REASON_ACCOUNT_REPAIR = 8i32,
+    /// The market was disabled: the exchange ended the stop-loss, take-profit or
+    /// trailing stop and released its reserved funds. The market's open orders
+    /// were canceled at the same time.
+    TRIGGER_CANCEL_REASON_PAIR_DRAIN_TRIGGER = 9i32,
+    /// The market was disabled: the exchange ended the TWAP and canceled its
+    /// resting slice, releasing its reserved funds.
+    TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP = 10i32,
+    /// The market was disabled: the exchange ended the ladder and canceled its
+    /// resting levels, releasing their reserved funds.
+    TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER = 11i32,
+    /// The market was disabled: the exchange ended the order's attached
+    /// take-profit or stop-loss and canceled the order and its working exit.
+    TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG = 12i32,
     /// The terminal state did not contain a cancellation reason.
     TRIGGER_CANCEL_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure canceled the trigger.
@@ -596,6 +613,21 @@ impl TriggerCancelReason {
     ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const SelfTradePrevention: Self = Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_ACCOUNT_REPAIR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AccountRepair: Self = Self::TRIGGER_CANCEL_REASON_ACCOUNT_REPAIR;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TRIGGER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PairDrainTrigger: Self = Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TRIGGER;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PairDrainTwap: Self = Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PairDrainLadder: Self = Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PairDrainAttachedLeg: Self = Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG;
     ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE;
@@ -715,6 +747,27 @@ impl ::buffa::Enumeration for TriggerCancelReason {
                     Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION,
                 )
             }
+            8i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_ACCOUNT_REPAIR)
+            }
+            9i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TRIGGER,
+                )
+            }
+            10i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP)
+            }
+            11i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER,
+                )
+            }
+            12i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG,
+                )
+            }
             998i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
@@ -743,6 +796,21 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             }
             Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION => {
                 "TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION"
+            }
+            Self::TRIGGER_CANCEL_REASON_ACCOUNT_REPAIR => {
+                "TRIGGER_CANCEL_REASON_ACCOUNT_REPAIR"
+            }
+            Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TRIGGER => {
+                "TRIGGER_CANCEL_REASON_PAIR_DRAIN_TRIGGER"
+            }
+            Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP => {
+                "TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP"
+            }
+            Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER => {
+                "TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER"
+            }
+            Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG => {
+                "TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG"
             }
             Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE"
@@ -773,6 +841,27 @@ impl ::buffa::Enumeration for TriggerCancelReason {
                     Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION,
                 )
             }
+            "TRIGGER_CANCEL_REASON_ACCOUNT_REPAIR" => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_ACCOUNT_REPAIR)
+            }
+            "TRIGGER_CANCEL_REASON_PAIR_DRAIN_TRIGGER" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TRIGGER,
+                )
+            }
+            "TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP" => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP)
+            }
+            "TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER,
+                )
+            }
+            "TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG,
+                )
+            }
             "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
@@ -791,6 +880,11 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             Self::TRIGGER_CANCEL_REASON_OCO,
             Self::TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL,
             Self::TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION,
+            Self::TRIGGER_CANCEL_REASON_ACCOUNT_REPAIR,
+            Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TRIGGER,
+            Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP,
+            Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER,
+            Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG,
             Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR,
         ]
@@ -905,8 +999,8 @@ pub enum TriggerFailureReason {
     /// The trigger's quantity was not valid.
     TRIGGER_FAILURE_REASON_QTY_INVALID = 103i32,
     /// The trigger's limit price was not valid, including a buy trailing stop's
-    /// maximum price below the last trade price when it was placed without an
-    /// activation price.
+    /// maximum price below the price it watches (the last traded price or the
+    /// index price) when it was placed without an activation price.
     TRIGGER_FAILURE_REASON_LIMIT_PRICE_INVALID = 104i32,
     /// The TWAP interval was not valid.
     TRIGGER_FAILURE_REASON_TWAP_INTERVAL_INVALID = 105i32,
@@ -990,6 +1084,14 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT = 235i32,
     /// The market's order limits weren't set yet when the trigger fired.
     TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE = 238i32,
+    /// The trigger watches the index price and the market has no index price.
+    TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE = 241i32,
+    /// The trigger price was already reached by the price the trigger watches
+    /// when the trigger was submitted (at or past it), so the trigger would have
+    /// fired at once. It never armed and sent no order; its reserved funds were
+    /// released. A price that reaches the trigger price after submission fires
+    /// the trigger normally.
+    TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY = 244i32,
     /// The terminal state did not contain a failure reason.
     TRIGGER_FAILURE_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure caused the trigger to fail.
@@ -1266,6 +1368,12 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const OrderLimitsUnavailable: Self = Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const IndexPriceUnavailable: Self = Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerWouldTriggerImmediately: Self = Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE;
@@ -1774,6 +1882,16 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
                 )
             }
+            241i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE,
+                )
+            }
+            244i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
+                )
+            }
             998i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -2055,6 +2173,12 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             }
             Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE => {
                 "TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE"
+            }
+            Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE => {
+                "TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE"
+            }
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY => {
+                "TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY"
             }
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE"
@@ -2476,6 +2600,16 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
                 )
             }
+            "TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE,
+                )
+            }
+            "TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
+                )
+            }
             "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -2579,6 +2713,8 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED,
             Self::TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT,
             Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
+            Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE,
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR,
         ]
@@ -3856,6 +3992,23 @@ pub struct ConditionalTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub child: ::buffa::MessageField<ConditionalChildExecution>,
+    /// Price the trigger watches. Unspecified or LAST_PRICE watches the last
+    /// traded price. INDEX_PRICE watches the market's index price; a market
+    /// without an index price fails the trigger with
+    /// TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE. MARK_PRICE is not
+    /// supported. Fixed at create: to change it, cancel the trigger and create a
+    /// new one.
+    ///
+    /// Field 4: `trigger_price_source`
+    #[serde(
+        rename = "triggerPriceSource",
+        alias = "trigger_price_source",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub trigger_price_source: ::buffa::EnumValue<
+        super::super::orders::v1::TriggerPriceSource,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3866,6 +4019,7 @@ impl ::core::fmt::Debug for ConditionalTrigger {
             .field("trigger_price_ticks", &self.trigger_price_ticks)
             .field("side", &self.side)
             .field("child", &self.child)
+            .field("trigger_price_source", &self.trigger_price_source)
             .finish()
     }
 }
@@ -3913,6 +4067,12 @@ impl ::buffa::Message for ConditionalTrigger {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3935,6 +4095,12 @@ impl ::buffa::Message for ConditionalTrigger {
         if self.child.is_set() {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             self.child.write_to(__cache, buf);
+        }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3974,6 +4140,15 @@ impl ::buffa::Message for ConditionalTrigger {
                     ctx,
                 )?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3985,6 +4160,7 @@ impl ::buffa::Message for ConditionalTrigger {
         self.trigger_price_ticks = 0i64;
         self.side = ::buffa::EnumValue::from(0);
         self.child = ::buffa::MessageField::none();
+        self.trigger_price_source = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4052,9 +4228,9 @@ pub struct TrailingStopTrigger {
     /// Maximum price of a trailing stop that buys, in quote units scaled by 1e9:
     /// the most its child pays per unit. Required when `side` is BUY and set
     /// aside for it with the child's fee; at least the activation price, or at
-    /// least the last trade price when no activation price is set. A rise that
-    /// fires above it still fires, and the child fills only at or below it. Must
-    /// be unset when `side` is SELL. Fixed at create.
+    /// least the price it watches (trigger_price_source) when no activation price
+    /// is set. A rise that fires above it still fires, and the child fills only
+    /// at or below it. Must be unset when `side` is SELL. Fixed at create.
     ///
     /// Field 7: `limit_price_ticks`
     #[serde(
@@ -4064,6 +4240,24 @@ pub struct TrailingStopTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub limit_price_ticks: i64,
+    /// Price the trailing stop watches: its activation, its peak or trough and
+    /// its fire all follow this price. Unspecified or LAST_PRICE watches the last
+    /// traded price. INDEX_PRICE watches the market's index price; a market
+    /// without an index price fails the trigger with
+    /// TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE. MARK_PRICE is not
+    /// supported. Fixed at create: to change it, cancel the trigger and create a
+    /// new one.
+    ///
+    /// Field 8: `trigger_price_source`
+    #[serde(
+        rename = "triggerPriceSource",
+        alias = "trigger_price_source",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub trigger_price_source: ::buffa::EnumValue<
+        super::super::orders::v1::TriggerPriceSource,
+    >,
     #[serde(flatten)]
     pub trailing_distance: ::core::option::Option<
         __buffa::oneof::trailing_stop_trigger::TrailingDistance,
@@ -4082,6 +4276,7 @@ impl ::core::fmt::Debug for TrailingStopTrigger {
             .field("activation_price_ticks", &self.activation_price_ticks)
             .field("side", &self.side)
             .field("limit_price_ticks", &self.limit_price_ticks)
+            .field("trigger_price_source", &self.trigger_price_source)
             .field("trailing_distance", &self.trailing_distance)
             .field("max_slippage", &self.max_slippage)
             .finish()
@@ -4157,6 +4352,12 @@ impl ::buffa::Message for TrailingStopTrigger {
                 += 1u32
                     + ::buffa::types::int64_encoded_len(self.limit_price_ticks) as u32;
         }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -4206,6 +4407,12 @@ impl ::buffa::Message for TrailingStopTrigger {
         }
         if self.limit_price_ticks != 0i64 {
             ::buffa::types::put_int64_field(7u32, self.limit_price_ticks, buf);
+        }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4285,6 +4492,15 @@ impl ::buffa::Message for TrailingStopTrigger {
                 )?;
                 self.limit_price_ticks = ::buffa::types::decode_int64(buf)?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4298,6 +4514,7 @@ impl ::buffa::Message for TrailingStopTrigger {
         self.max_slippage = ::core::option::Option::None;
         self.side = ::buffa::EnumValue::from(0);
         self.limit_price_ticks = 0i64;
+        self.trigger_price_source = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4330,6 +4547,9 @@ impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
                     ::buffa::EnumValue<super::super::orders::v1::Side>,
                 > = None;
                 let mut __f_limit_price_ticks: ::core::option::Option<i64> = None;
+                let mut __f_trigger_price_source: ::core::option::Option<
+                    ::buffa::EnumValue<super::super::orders::v1::TriggerPriceSource>,
+                > = None;
                 let mut __oneof_trailing_distance: ::core::option::Option<
                     __buffa::oneof::trailing_stop_trigger::TrailingDistance,
                 > = None;
@@ -4383,6 +4603,28 @@ impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
                                         d: D,
                                     ) -> ::core::result::Result<i64, D::Error> {
                                         ::buffa::json_helpers::int64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "triggerPriceSource" | "trigger_price_source" => {
+                            __f_trigger_price_source = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<
+                                        super::super::orders::v1::TriggerPriceSource,
+                                    >;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<
+                                            super::super::orders::v1::TriggerPriceSource,
+                                        >,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -4522,6 +4764,9 @@ impl<'de> serde::Deserialize<'de> for TrailingStopTrigger {
                 }
                 if let ::core::option::Option::Some(v) = __f_limit_price_ticks {
                     __r.limit_price_ticks = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_trigger_price_source {
+                    __r.trigger_price_source = v;
                 }
                 __r.trailing_distance = __oneof_trailing_distance;
                 __r.max_slippage = __oneof_max_slippage;
@@ -4956,7 +5201,7 @@ pub struct TwapTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
-    /// Total execution duration in milliseconds.
+    /// Total execution duration in milliseconds, at least 1000.
     ///
     /// Field 2: `duration_ms`
     #[serde(
@@ -4966,7 +5211,8 @@ pub struct TwapTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub duration_ms: i64,
-    /// Interval between slices in milliseconds.
+    /// Interval between slices in milliseconds, at least 100 and at most
+    /// duration_ms.
     ///
     /// Field 3: `slice_interval_ms`
     #[serde(
@@ -5634,7 +5880,8 @@ pub struct TriggerIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub fee_asset: ::buffa::EnumValue<super::super::orders::v1::FeeAsset>,
-    /// Child self-trade prevention mode. Defaults to EXPIRE_MAKER.
+    /// Child self-trade prevention mode against orders of the same root account,
+    /// including all its subaccounts. Defaults to EXPIRE_MAKER.
     ///
     /// Field 4: `self_trade_prevention_mode`
     #[serde(
@@ -5646,8 +5893,15 @@ pub struct TriggerIntent {
     pub self_trade_prevention_mode: ::buffa::EnumValue<
         super::super::orders::v1::SelfTradePreventionMode,
     >,
-    /// Client-provided trigger ID for idempotency. Retrying an accepted create
-    /// with the identical intent returns the same trigger. After a create fails
+    /// Client-provided trigger ID for idempotency, unique per sub-account, pair
+    /// and trigger type. While the trigger is active and for 60 seconds after it
+    /// reaches a terminal status, retrying the create with the identical intent
+    /// returns the same trigger, and a different intent with the same ID returns
+    /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. After those 60 seconds the ID is
+    /// free: a create that uses it is a new intent and creates a new trigger. To
+    /// learn the outcome of an earlier create after that window, read the
+    /// triggers with ListTriggers, which return each trigger's
+    /// client_trigger_id, instead of retrying the create. After a create fails
     /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
     /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
     /// At most 36 bytes in UTF-8 (36 ASCII characters); longer IDs are rejected
@@ -6326,6 +6580,10 @@ pub mod trigger_intent {
     pub use super::__buffa::view::oneof::trigger_intent::Strategy as StrategyView;
 }
 /// CreateTriggerRequest submits one standalone trigger intent for admission.
+/// A create sent but not confirmed in time fails with
+/// TRIGGER_CREATE_OUTCOME_UNKNOWN: the trigger may have been created, so read
+/// the triggers for its client_trigger_id before retrying. UNAVAILABLE means
+/// the trigger was not created.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -9194,8 +9452,11 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Trading symbol numeric identifier. Required for API-key market policy and
-    /// must match the stored trigger.
+    /// Optional trading symbol numeric identifier. Zero or omitted means the
+    /// trigger's own pair. When set, it must be the trigger's pair: another pair
+    /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
+    /// unchanged. An API key limited to specific markets must name the trigger's
+    /// pair.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -10508,8 +10769,11 @@ pub struct ResumeTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Trading symbol numeric identifier. Required for API-key market policy and
-    /// must match the stored trigger.
+    /// Optional trading symbol numeric identifier. Zero or omitted means the
+    /// trigger's own pair. When set, it must be the trigger's pair: another pair
+    /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
+    /// unchanged. An API key limited to specific markets must name the trigger's
+    /// pair.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -15279,6 +15543,17 @@ pub mod __buffa {
             pub child: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ConditionalChildExecutionView<'a>,
             >,
+            /// Price the trigger watches. Unspecified or LAST_PRICE watches the last
+            /// traded price. INDEX_PRICE watches the market's index price; a market
+            /// without an index price fails the trigger with
+            /// TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE. MARK_PRICE is not
+            /// supported. Fixed at create: to change it, cancel the trigger and create a
+            /// new one.
+            ///
+            /// Field 4: `trigger_price_source`
+            pub trigger_price_source: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::TriggerPriceSource,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ConditionalTriggerView<'a> {
@@ -15355,6 +15630,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -15394,6 +15678,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    trigger_price_source: self.trigger_price_source,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -15428,6 +15713,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -15455,6 +15746,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.child.write_to(__cache, buf);
+                }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -15493,6 +15790,15 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.child.as_option() {
                         __map.serialize_entry("child", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.trigger_price_source,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceSource",
+                            &self.trigger_price_source,
+                        )?;
                 }
                 __map.end()
             }
@@ -15617,6 +15923,22 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().child
             }
+            /// Price the trigger watches. Unspecified or LAST_PRICE watches the last
+            /// traded price. INDEX_PRICE watches the market's index price; a market
+            /// without an index price fails the trigger with
+            /// TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE. MARK_PRICE is not
+            /// supported. Fixed at create: to change it, cancel the trigger and create a
+            /// new one.
+            ///
+            /// Field 4: `trigger_price_source`
+            #[must_use]
+            pub fn trigger_price_source(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::orders::v1::TriggerPriceSource,
+            > {
+                self.0.reborrow().trigger_price_source
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<ConditionalTriggerView<'static>>>
         for ConditionalTriggerOwnedView {
@@ -15670,12 +15992,24 @@ pub mod __buffa {
             /// Maximum price of a trailing stop that buys, in quote units scaled by 1e9:
             /// the most its child pays per unit. Required when `side` is BUY and set
             /// aside for it with the child's fee; at least the activation price, or at
-            /// least the last trade price when no activation price is set. A rise that
-            /// fires above it still fires, and the child fills only at or below it. Must
-            /// be unset when `side` is SELL. Fixed at create.
+            /// least the price it watches (trigger_price_source) when no activation price
+            /// is set. A rise that fires above it still fires, and the child fills only
+            /// at or below it. Must be unset when `side` is SELL. Fixed at create.
             ///
             /// Field 7: `limit_price_ticks`
             pub limit_price_ticks: i64,
+            /// Price the trailing stop watches: its activation, its peak or trough and
+            /// its fire all follow this price. Unspecified or LAST_PRICE watches the last
+            /// traded price. INDEX_PRICE watches the market's index price; a market
+            /// without an index price fails the trigger with
+            /// TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE. MARK_PRICE is not
+            /// supported. Fixed at create: to change it, cancel the trigger and create a
+            /// new one.
+            ///
+            /// Field 8: `trigger_price_source`
+            pub trigger_price_source: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::TriggerPriceSource,
+            >,
             pub trailing_distance: ::core::option::Option<
                 super::super::__buffa::view::oneof::trailing_stop_trigger::TrailingDistance,
             >,
@@ -15739,6 +16073,15 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.limit_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -15816,6 +16159,7 @@ pub mod __buffa {
                     activation_price_ticks: self.activation_price_ticks,
                     side: self.side,
                     limit_price_ticks: self.limit_price_ticks,
+                    trigger_price_source: self.trigger_price_source,
                     trailing_distance: self
                         .trailing_distance
                         .as_ref()
@@ -15915,6 +16259,12 @@ pub mod __buffa {
                             + ::buffa::types::int64_encoded_len(self.limit_price_ticks)
                                 as u32;
                 }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -15970,6 +16320,12 @@ pub mod __buffa {
                 if self.limit_price_ticks != 0i64 {
                     ::buffa::types::put_int64_field(7u32, self.limit_price_ticks, buf);
                 }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(8u32, val, buf);
+                    }
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -16012,6 +16368,15 @@ pub mod __buffa {
                         .serialize_entry(
                             "limitPriceTicks",
                             &::buffa::json_helpers::ProtoJson(&self.limit_price_ticks),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.trigger_price_source,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceSource",
+                            &self.trigger_price_source,
                         )?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.trailing_distance {
@@ -16173,14 +16538,31 @@ pub mod __buffa {
             /// Maximum price of a trailing stop that buys, in quote units scaled by 1e9:
             /// the most its child pays per unit. Required when `side` is BUY and set
             /// aside for it with the child's fee; at least the activation price, or at
-            /// least the last trade price when no activation price is set. A rise that
-            /// fires above it still fires, and the child fills only at or below it. Must
-            /// be unset when `side` is SELL. Fixed at create.
+            /// least the price it watches (trigger_price_source) when no activation price
+            /// is set. A rise that fires above it still fires, and the child fills only
+            /// at or below it. Must be unset when `side` is SELL. Fixed at create.
             ///
             /// Field 7: `limit_price_ticks`
             #[must_use]
             pub fn limit_price_ticks(&self) -> i64 {
                 self.0.reborrow().limit_price_ticks
+            }
+            /// Price the trailing stop watches: its activation, its peak or trough and
+            /// its fire all follow this price. Unspecified or LAST_PRICE watches the last
+            /// traded price. INDEX_PRICE watches the market's index price; a market
+            /// without an index price fails the trigger with
+            /// TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE. MARK_PRICE is not
+            /// supported. Fixed at create: to change it, cancel the trigger and create a
+            /// new one.
+            ///
+            /// Field 8: `trigger_price_source`
+            #[must_use]
+            pub fn trigger_price_source(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::orders::v1::TriggerPriceSource,
+            > {
+                self.0.reborrow().trigger_price_source
             }
             /// Oneof `trailing_distance`.
             #[must_use]
@@ -16852,11 +17234,12 @@ pub mod __buffa {
             ///
             /// Field 1: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
-            /// Total execution duration in milliseconds.
+            /// Total execution duration in milliseconds, at least 1000.
             ///
             /// Field 2: `duration_ms`
             pub duration_ms: i64,
-            /// Interval between slices in milliseconds.
+            /// Interval between slices in milliseconds, at least 100 and at most
+            /// duration_ms.
             ///
             /// Field 3: `slice_interval_ms`
             pub slice_interval_ms: i64,
@@ -17299,14 +17682,15 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
                 self.0.reborrow().side
             }
-            /// Total execution duration in milliseconds.
+            /// Total execution duration in milliseconds, at least 1000.
             ///
             /// Field 2: `duration_ms`
             #[must_use]
             pub fn duration_ms(&self) -> i64 {
                 self.0.reborrow().duration_ms
             }
-            /// Interval between slices in milliseconds.
+            /// Interval between slices in milliseconds, at least 100 and at most
+            /// duration_ms.
             ///
             /// Field 3: `slice_interval_ms`
             #[must_use]
@@ -17777,14 +18161,22 @@ pub mod __buffa {
             pub fee_asset: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::FeeAsset,
             >,
-            /// Child self-trade prevention mode. Defaults to EXPIRE_MAKER.
+            /// Child self-trade prevention mode against orders of the same root account,
+            /// including all its subaccounts. Defaults to EXPIRE_MAKER.
             ///
             /// Field 4: `self_trade_prevention_mode`
             pub self_trade_prevention_mode: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::SelfTradePreventionMode,
             >,
-            /// Client-provided trigger ID for idempotency. Retrying an accepted create
-            /// with the identical intent returns the same trigger. After a create fails
+            /// Client-provided trigger ID for idempotency, unique per sub-account, pair
+            /// and trigger type. While the trigger is active and for 60 seconds after it
+            /// reaches a terminal status, retrying the create with the identical intent
+            /// returns the same trigger, and a different intent with the same ID returns
+            /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. After those 60 seconds the ID is
+            /// free: a create that uses it is a new intent and creates a new trigger. To
+            /// learn the outcome of an earlier create after that window, read the
+            /// triggers with ListTriggers, which return each trigger's
+            /// client_trigger_id, instead of retrying the create. After a create fails
             /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
             /// At most 36 bytes in UTF-8 (36 ASCII characters); longer IDs are rejected
@@ -18494,7 +18886,8 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::FeeAsset> {
                 self.0.reborrow().fee_asset
             }
-            /// Child self-trade prevention mode. Defaults to EXPIRE_MAKER.
+            /// Child self-trade prevention mode against orders of the same root account,
+            /// including all its subaccounts. Defaults to EXPIRE_MAKER.
             ///
             /// Field 4: `self_trade_prevention_mode`
             #[must_use]
@@ -18505,8 +18898,15 @@ pub mod __buffa {
             > {
                 self.0.reborrow().self_trade_prevention_mode
             }
-            /// Client-provided trigger ID for idempotency. Retrying an accepted create
-            /// with the identical intent returns the same trigger. After a create fails
+            /// Client-provided trigger ID for idempotency, unique per sub-account, pair
+            /// and trigger type. While the trigger is active and for 60 seconds after it
+            /// reaches a terminal status, retrying the create with the identical intent
+            /// returns the same trigger, and a different intent with the same ID returns
+            /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. After those 60 seconds the ID is
+            /// free: a create that uses it is a new intent and creates a new trigger. To
+            /// learn the outcome of an earlier create after that window, read the
+            /// triggers with ListTriggers, which return each trigger's
+            /// client_trigger_id, instead of retrying the create. After a create fails
             /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
             /// At most 36 bytes in UTF-8 (36 ASCII characters); longer IDs are rejected
@@ -18558,6 +18958,10 @@ pub mod __buffa {
             }
         }
         /// CreateTriggerRequest submits one standalone trigger intent for admission.
+        /// A create sent but not confirmed in time fails with
+        /// TRIGGER_CREATE_OUTCOME_UNKNOWN: the trigger may have been created, so read
+        /// the triggers for its client_trigger_id before retrying. UNAVAILABLE means
+        /// the trigger was not created.
         #[derive(Clone, Debug, Default)]
         pub struct CreateTriggerRequestView<'a> {
             /// Target sub-account. When omitted, uses the caller's root account.
@@ -23269,8 +23673,11 @@ pub mod __buffa {
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Trading symbol numeric identifier. Required for API-key market policy and
-            /// must match the stored trigger.
+            /// Optional trading symbol numeric identifier. Zero or omitted means the
+            /// trigger's own pair. When set, it must be the trigger's pair: another pair
+            /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
+            /// unchanged. An API key limited to specific markets must name the trigger's
+            /// pair.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -23835,8 +24242,11 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Trading symbol numeric identifier. Required for API-key market policy and
-            /// must match the stored trigger.
+            /// Optional trading symbol numeric identifier. Zero or omitted means the
+            /// trigger's own pair. When set, it must be the trigger's pair: another pair
+            /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
+            /// unchanged. An API key limited to specific markets must name the trigger's
+            /// pair.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -25065,8 +25475,11 @@ pub mod __buffa {
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Trading symbol numeric identifier. Required for API-key market policy and
-            /// must match the stored trigger.
+            /// Optional trading symbol numeric identifier. Zero or omitted means the
+            /// trigger's own pair. When set, it must be the trigger's pair: another pair
+            /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
+            /// unchanged. An API key limited to specific markets must name the trigger's
+            /// pair.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -25355,8 +25768,11 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Trading symbol numeric identifier. Required for API-key market policy and
-            /// must match the stored trigger.
+            /// Optional trading symbol numeric identifier. Zero or omitted means the
+            /// trigger's own pair. When set, it must be the trigger's pair: another pair
+            /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
+            /// unchanged. An API key limited to specific markets must name the trigger's
+            /// pair.
             ///
             /// Field 3: `symbol_id`
             #[must_use]

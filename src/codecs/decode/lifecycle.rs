@@ -45,6 +45,9 @@ fn lifecycle_reason_label(value: &buffa::EnumValue<LifecycleReason>) -> String {
         Some(LifecycleReason::TRADING_WITHDRAW_EXECUTION_FAILED) => {
             "trading_withdraw_execution_failed".to_owned()
         }
+        Some(LifecycleReason::DEPOSIT_SOURCE_NOT_CONFIRMED) => {
+            "deposit_source_not_confirmed".to_owned()
+        }
         None => format!("unknown_reason_{}", value.to_i32()),
     }
 }
@@ -98,6 +101,7 @@ fn flow_summary_from_proto(msg: &FlowSummaryView) -> LifecycleFlowSummary {
         latest_step: flow_step_label(&msg.current_step),
         is_open: msg.is_open,
         is_terminal: msg.is_terminal,
+        is_delayed: msg.is_delayed,
         owner_account_id: format_uint64_id(msg.owner_account_id),
         smart_account_address: msg.smart_account_address.clone(),
         lifecycle_reason: lifecycle_reason_label(&msg.lifecycle_reason),
@@ -123,6 +127,8 @@ fn flow_tx_match_from_proto(msg: &FlowTxMatchView) -> LifecycleFlowSummary {
         latest_step: flow_step_label(&msg.current_step),
         is_open: msg.is_open,
         is_terminal: msg.is_terminal,
+        // Transaction lookups do not report delay.
+        is_delayed: false,
         owner_account_id: format_uint64_id(msg.owner_account_id),
         smart_account_address: msg.smart_account_address.clone(),
         lifecycle_reason: lifecycle_reason_label(&msg.lifecycle_reason),
@@ -243,6 +249,28 @@ mod tests {
             let flow = flow_summary_message_from_proto(&msg);
             assert_eq!(flow.lifecycle_reason, expected);
         }
+    }
+
+    #[test]
+    fn open_deposit_reports_delay_and_unconfirmed_source() {
+        let msg = FlowSummaryView {
+            flow_id: "flow-deposit".into(),
+            flow_kind: FlowKindEnum::KIND_DEPOSIT.into(),
+            current_step: FlowStep::FLOW_STEP_SOURCE.into(),
+            is_open: true,
+            is_delayed: true,
+            lifecycle_reason: LifecycleReason::DEPOSIT_SOURCE_NOT_CONFIRMED.into(),
+            ..Default::default()
+        };
+        let flow = flow_summary_message_from_proto(&msg);
+        assert!(flow.is_delayed);
+        assert_eq!(flow.lifecycle_reason, "deposit_source_not_confirmed");
+
+        let on_time = flow_summary_message_from_proto(&FlowSummaryView {
+            is_open: true,
+            ..Default::default()
+        });
+        assert!(!on_time.is_delayed);
     }
 
     #[test]

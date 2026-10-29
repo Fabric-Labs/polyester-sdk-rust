@@ -35,9 +35,9 @@ pub enum PrivateOrdersEvent {
     /// subscription, so again after a reconnect or resubscribe; a consumer
     /// that joins a ready stream gets it right after its catch-up snapshot.
     Ready,
-    /// The account's live view is temporarily behind (`true`) or caught up
-    /// again (`false`). The stream recovers by itself.
-    Stale(bool),
+    /// Some or all of the account's live view is temporarily not current, or
+    /// all of it is current again. The stream recovers by itself.
+    Stale(OrdersStale),
     /// The connection or subscription carrying the stream dropped. It resumes
     /// from the last applied position by itself unless an [`Self::Error`]
     /// ended the stream.
@@ -45,6 +45,24 @@ pub enum PrivateOrdersEvent {
     /// A stream error. A terminal error is followed by
     /// [`Self::Disconnected`] and the end of the stream.
     Error(crate::errors::Error),
+}
+
+/// Freshness of an account's live order view.
+///
+/// A later stale report replaces the earlier reason and order IDs. A report
+/// with `stale` false means the whole view is current again.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OrdersStale {
+    pub stale: bool,
+    /// Why, in lowercase: `view_behind`, `not_ready`, `failover`,
+    /// `boundary_unavailable`, `order_unavailable`, or `UNKNOWN(<number>)`.
+    /// Empty when the server gives no reason and when `stale` is false.
+    pub reason: String,
+    /// For `order_unavailable`: public IDs of the orders whose current state
+    /// is unknown, ascending. Their rows show an earlier state, or none yet;
+    /// the rest of the view is current and units keep arriving. Empty for
+    /// every other reason, which covers the whole view.
+    pub order_ids: Vec<String>,
 }
 
 /// One change to an account's live order view.

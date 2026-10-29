@@ -371,6 +371,16 @@ its maximum price as `limit_price`; a SELL one (and an attached BUY leg) reads
 as a market IOC child with any cap in `max_slippage`. The trailing details
 carry the trough (BUY) or peak (SELL) price.
 
+Stop-loss, take-profit and trailing-stop triggers, and attached take-profit,
+stop-loss and trailing-stop legs, can watch the index price instead of the
+last trade price. Set `CreateTriggerParams.trigger_price_source` to `index`
+(labels `last`, `index`, `mark`, as trigger reads report them) or a leg's
+`trigger_price_source` to `TriggerPriceSourceKind::IndexPrice`; leave it
+`None` to watch the last trade price. A market without an index price
+rejects an index-price leg or fails an index-price trigger with
+`index_price_unavailable`. Mark price is not supported. Order and trigger
+reads report the source, so a read leg can be sent back unchanged.
+
 Stop-loss and take-profit triggers with a market child accept a slippage cap,
 `max_slippage_ticks` or `max_slippage_bps` (at most one; a SELL child takes
 fewer than 10000 bps). Without one, the pair's default market slippage
@@ -589,6 +599,16 @@ Classify failures with `Error::is_retryable()` and respect `Error::retry_after()
 `Error::mutation_outcome_unknown()` means the first request may have committed: reconcile state
 before retrying and reuse the same logical request identity.
 
+An order create, trigger create, order cancel or order modify that was sent but not confirmed in
+time fails with an `Error::Api` code from `errors::order_codes::OUTCOME_UNKNOWN` (for example
+`ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN`). It may still apply, so both predicates are true:
+read the order or trigger back before retrying. `AUTH_TEMPORARILY_UNAVAILABLE` is retryable and
+changed nothing, so `mutation_outcome_unknown()` is false for it.
+
+A `cancel_all_with` retry with the same `request_id` within 120 seconds returns the original
+counts with an empty `cancelled_orders` and `listing_status` `not_retained_read_open_orders`.
+An empty retried list does not mean nothing was canceled: read open orders for current state.
+
 Connect `ResourceExhausted` maps to `Error::RateLimit { detail, .. }`. When the server attaches
 `polyester.ratelimit.v1.RateLimitDetail` (top-level Connect detail or nested under
 `orders.v1.ErrorDetail.rate_limit`), `detail` carries `policy_class`, `scope`, `operation_id`, and
@@ -750,7 +770,7 @@ streams. Events arrive as `PrivateOrdersEvent`:
 | `Snapshot(orders)` | The account's full live view; replace local state with it |
 | `Unit(unit)` | One change: changed orders (complete), removed order IDs, and events (fills, cancels, rejections, command outcomes) |
 | `Ready` | The stream reached the account's read boundary: it reflects every acknowledgement and order read made before the subscription. Once per server subscription, so again after a reconnect |
-| `Stale(true)` / `Stale(false)` | The live view is temporarily behind / caught up again |
+| `Stale(stale)` | `stale.stale` true: the view is temporarily not current, with a `reason` such as `view_behind`. For `order_unavailable` only the orders in `order_ids` are not current; the rest of the view is, and units keep arriving. A later report replaces the earlier one. `stale.stale` false: all of the view is current again |
 | `Disconnected` | The stream dropped; it resumes by itself unless an error ended it |
 | `Error(error)` | A stream error; a terminal one is followed by `Disconnected` and the end of the stream |
 

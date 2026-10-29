@@ -138,7 +138,7 @@ impl ::buffa::Enumeration for Channel {
         &[Self::CHANNEL_UNSPECIFIED, Self::ORDERS]
     }
 }
-/// UnavailableReason names why an account's live view is behind.
+/// UnavailableReason names why an account's live view is not current.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum UnavailableReason {
@@ -152,6 +152,11 @@ pub enum UnavailableReason {
     FAILOVER = 3i32,
     /// The read fence could not be established for now.
     BOUNDARY_UNAVAILABLE = 4i32,
+    /// The current state of the orders that `order_ids` names is temporarily
+    /// unknown. Their rows, when the snapshot or a unit carried one, show an
+    /// earlier state; an order may have no row yet. The rest of the account's
+    /// view is current, and units keep arriving.
+    ORDER_UNAVAILABLE = 5i32,
 }
 impl UnavailableReason {
     ///Idiomatic alias for [`Self::UNAVAILABLE_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -169,6 +174,9 @@ impl UnavailableReason {
     ///Idiomatic alias for [`Self::BOUNDARY_UNAVAILABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const BoundaryUnavailable: Self = Self::BOUNDARY_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ORDER_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderUnavailable: Self = Self::ORDER_UNAVAILABLE;
 }
 impl ::core::default::Default for UnavailableReason {
     fn default() -> Self {
@@ -271,6 +279,7 @@ impl ::buffa::Enumeration for UnavailableReason {
             2i32 => ::core::option::Option::Some(Self::NOT_READY),
             3i32 => ::core::option::Option::Some(Self::FAILOVER),
             4i32 => ::core::option::Option::Some(Self::BOUNDARY_UNAVAILABLE),
+            5i32 => ::core::option::Option::Some(Self::ORDER_UNAVAILABLE),
             _ => ::core::option::Option::None,
         }
     }
@@ -284,6 +293,7 @@ impl ::buffa::Enumeration for UnavailableReason {
             Self::NOT_READY => "NOT_READY",
             Self::FAILOVER => "FAILOVER",
             Self::BOUNDARY_UNAVAILABLE => "BOUNDARY_UNAVAILABLE",
+            Self::ORDER_UNAVAILABLE => "ORDER_UNAVAILABLE",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -297,6 +307,7 @@ impl ::buffa::Enumeration for UnavailableReason {
             "BOUNDARY_UNAVAILABLE" => {
                 ::core::option::Option::Some(Self::BOUNDARY_UNAVAILABLE)
             }
+            "ORDER_UNAVAILABLE" => ::core::option::Option::Some(Self::ORDER_UNAVAILABLE),
             _ => ::core::option::Option::None,
         }
     }
@@ -307,6 +318,7 @@ impl ::buffa::Enumeration for UnavailableReason {
             Self::NOT_READY,
             Self::FAILOVER,
             Self::BOUNDARY_UNAVAILABLE,
+            Self::ORDER_UNAVAILABLE,
         ]
     }
 }
@@ -4724,6 +4736,8 @@ pub struct Unit {
     pub orders: ::buffa::alloc::vec::Vec<super::super::orders::v1::Order>,
     /// Public IDs of orders that left the live view: ended orders now kept in
     /// history, or orders that never got past admission. Not a cancellation.
+    /// An order that ends in this unit and leaves with it is also in `orders`,
+    /// with its final revision: apply `orders` first, then these removals.
     ///
     /// Field 4: `removed_order_ids`
     #[serde(
@@ -5616,9 +5630,10 @@ pub mod resync_required {
         }
     }
 }
-/// Unavailable says the account's live view is behind for now. Show it as
-/// stale until Available. The subscription stays and always recovers by
-/// itself; the client does nothing.
+/// Unavailable says the account's live view, or some of its orders, is not
+/// current for now. Show what it names as stale until Available. A later
+/// Unavailable replaces this one's reason and `order_ids`. The subscription
+/// stays and always recovers by itself; the client does nothing.
 /// Ready and Synced may still arrive meanwhile: they describe the position
 /// already delivered, which is unchanged.
 #[derive(Clone, PartialEq, Default)]
@@ -5634,13 +5649,28 @@ pub struct Unavailable {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub reason: ::buffa::EnumValue<UnavailableReason>,
+    /// For ORDER_UNAVAILABLE: the public IDs of the orders whose current state
+    /// is unknown, ascending. Empty for every other reason, which covers the
+    /// whole view.
+    ///
+    /// Field 2: `order_ids`
+    #[serde(
+        rename = "orderIds",
+        alias = "order_ids",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub order_ids: ::buffa::alloc::vec::Vec<u64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for Unavailable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("Unavailable").field("reason", &self.reason).finish()
+        f.debug_struct("Unavailable")
+            .field("reason", &self.reason)
+            .field("order_ids", &self.order_ids)
+            .finish()
     }
 }
 impl Unavailable {
@@ -5674,6 +5704,12 @@ impl ::buffa::Message for Unavailable {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if !self.order_ids.is_empty() {
+            let payload: u32 = self.order_ids.len() as u32
+                * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5688,6 +5724,14 @@ impl ::buffa::Message for Unavailable {
             let val = self.reason.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.order_ids.is_empty() {
+            let payload: u32 = self.order_ids.len() as u32
+                * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+            ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+            for &v in &self.order_ids {
+                ::buffa::types::encode_fixed64(v, buf);
             }
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -5712,6 +5756,37 @@ impl ::buffa::Message for Unavailable {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            2u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.order_ids.reserve(len / 8usize);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.order_ids
+                            .push(::buffa::types::decode_fixed64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Fixed64 {
+                    self.order_ids.push(::buffa::types::decode_fixed64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5721,6 +5796,7 @@ impl ::buffa::Message for Unavailable {
     }
     fn clear(&mut self) {
         self.reason = ::buffa::EnumValue::from(0);
+        self.order_ids.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5753,7 +5829,8 @@ pub const __UNAVAILABLE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa
     from_json: ::buffa::type_registry::any_from_json::<Unavailable>,
     is_wkt: false,
 };
-/// Available says the account's live view caught up after Unavailable.
+/// Available says the account's live view is current again after
+/// Unavailable: every order it holds shows its current state.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -14790,6 +14867,8 @@ pub mod __buffa {
             >,
             /// Public IDs of orders that left the live view: ended orders now kept in
             /// history, or orders that never got past admission. Not a cancellation.
+            /// An order that ends in this unit and leaves with it is also in `orders`,
+            /// with its final revision: apply `orders` first, then these removals.
             ///
             /// Field 4: `removed_order_ids`
             pub removed_order_ids: ::buffa::RepeatedView<'a, u64>,
@@ -15189,6 +15268,8 @@ pub mod __buffa {
             }
             /// Public IDs of orders that left the live view: ended orders now kept in
             /// history, or orders that never got past admission. Not a cancellation.
+            /// An order that ends in this unit and leaves with it is also in `orders`,
+            /// with its final revision: apply `orders` first, then these removals.
             ///
             /// Field 4: `removed_order_ids`
             #[must_use]
@@ -16257,9 +16338,10 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// Unavailable says the account's live view is behind for now. Show it as
-        /// stale until Available. The subscription stays and always recovers by
-        /// itself; the client does nothing.
+        /// Unavailable says the account's live view, or some of its orders, is not
+        /// current for now. Show what it names as stale until Available. A later
+        /// Unavailable replaces this one's reason and `order_ids`. The subscription
+        /// stays and always recovers by itself; the client does nothing.
         /// Ready and Synced may still arrive meanwhile: they describe the position
         /// already delivered, which is unchanged.
         #[derive(Clone, Debug, Default)]
@@ -16268,6 +16350,12 @@ pub mod __buffa {
             ///
             /// Field 1: `reason`
             pub reason: ::buffa::EnumValue<super::super::UnavailableReason>,
+            /// For ORDER_UNAVAILABLE: the public IDs of the orders whose current state
+            /// is unknown, ascending. Empty for every other reason, which covers the
+            /// whole view.
+            ///
+            /// Field 2: `order_ids`
+            pub order_ids: ::buffa::RepeatedView<'a, u64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for UnavailableView<'a> {
@@ -16310,6 +16398,30 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    2u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.order_ids.reserve(payload.len() / 8usize);
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.order_ids
+                                    .push(::buffa::types::decode_fixed64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Fixed64
+                        {
+                            view.order_ids
+                                .push(::buffa::types::decode_fixed64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -16340,6 +16452,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::Unavailable {
                     reason: self.reason,
+                    order_ids: self.order_ids.to_vec(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -16360,6 +16473,13 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if !self.order_ids.is_empty() {
+                    let payload: u32 = self.order_ids.len() as u32
+                        * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -16375,6 +16495,14 @@ pub mod __buffa {
                     let val = self.reason.to_i32();
                     if val != 0 {
                         ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.order_ids.is_empty() {
+                    let payload: u32 = self.order_ids.len() as u32
+                        * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                    ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+                    for &v in &self.order_ids {
+                        ::buffa::types::encode_fixed64(v, buf);
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -16400,6 +16528,13 @@ pub mod __buffa {
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.reason) {
                     __map.serialize_entry("reason", &self.reason)?;
+                }
+                if !self.order_ids.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "orderIds",
+                            &::buffa::json_helpers::RepeatedJson(&self.order_ids),
+                        )?;
                 }
                 __map.end()
             }
@@ -16502,6 +16637,15 @@ pub mod __buffa {
             pub fn reason(&self) -> ::buffa::EnumValue<super::super::UnavailableReason> {
                 self.0.reborrow().reason
             }
+            /// For ORDER_UNAVAILABLE: the public IDs of the orders whose current state
+            /// is unknown, ascending. Empty for every other reason, which covers the
+            /// whole view.
+            ///
+            /// Field 2: `order_ids`
+            #[must_use]
+            pub fn order_ids(&self) -> &::buffa::RepeatedView<'_, u64> {
+                &self.0.reborrow().order_ids
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<UnavailableView<'static>>>
         for UnavailableOwnedView {
@@ -16533,7 +16677,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// Available says the account's live view caught up after Unavailable.
+        /// Available says the account's live view is current again after
+        /// Unavailable: every order it holds shows its current state.
         #[derive(Clone, Debug, Default)]
         pub struct AvailableView<'a> {
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,

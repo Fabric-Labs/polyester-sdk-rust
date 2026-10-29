@@ -601,8 +601,10 @@ impl ::buffa::Enumeration for FeeAsset {
         &[Self::FEE_ASSET_UNSPECIFIED, Self::QUOTE, Self::BASE]
     }
 }
-/// SelfTradePreventionMode controls which orders expire when they would trade
-/// against another order from the same account.
+/// SelfTradePreventionMode controls which orders expire when an order would
+/// trade against another order of the same root account, including all its
+/// subaccounts: two subaccounts of one root never trade with each other. The
+/// incoming order's mode decides which orders expire.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum SelfTradePreventionMode {
@@ -891,7 +893,7 @@ pub enum ErrorCode {
     ERROR_CODE_EMPTY_BOOK = 62i32,
     /// FOK order rejected due to insufficient immediate liquidity.
     ERROR_CODE_FOK_INSUFFICIENT_LIQUIDITY = 63i32,
-    /// Client order ID points to an order that already reached terminal state.
+    /// The order has already ended (filled, canceled or expired).
     ERROR_CODE_ORDER_ALREADY_TERMINAL = 64i32,
     /// Trigger-specific error codes (40-49 range).
     /// Trigger price is invalid (e.g., TP below current price for long).
@@ -1212,7 +1214,8 @@ pub enum ErrorCode {
     /// placed.
     ERROR_CODE_QUICKSWAP_CAPACITY_REACHED = 291i32,
     /// An exit order placed by one of the order's attached take-profit or stop
-    /// legs is still working, so attached legs can't be added now. Nothing
+    /// legs is still working, so the order's attached legs can't be added,
+    /// edited, paused or resumed now; removing a leg is still accepted. Nothing
     /// changed; retry once the exit completes.
     ERROR_CODE_ATTACHED_EXIT_WORKING = 292i32,
     /// The account already has the most triggers one account may have on this
@@ -1248,6 +1251,24 @@ pub enum ErrorCode {
     /// back in line, so new orders, changes and trigger orders are paused for a
     /// short time. Nothing changed; cancels still work. Try again shortly.
     ERROR_CODE_ACCOUNT_REPAIRING = 300i32,
+    /// The new trigger price of a stop-loss or take-profit is already reached by
+    /// the price the trigger watches (at or past it), so the trigger would fire at
+    /// once and send its order. Nothing changed; the trigger keeps its previous
+    /// trigger price. Returned by ModifyTrigger, and by an order modify that moves
+    /// an attached take-profit or stop-loss of an order with a fill. Choose a
+    /// trigger price the market has not reached.
+    ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY = 302i32,
+    /// The order was sent but not confirmed in time. Its outcome is unknown and
+    /// it may have been accepted; read the order by its client order ID, or read
+    /// open orders, before retrying. For a batch create, every item's outcome is
+    /// unknown; read them back, or repeat the batch with the same request ID and
+    /// payload within 15 minutes, which returns decided items' original results
+    /// and retries the rest without admitting any item twice.
+    ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN = 303i32,
+    /// The trigger was sent but not confirmed in time. Its outcome is unknown and
+    /// it may have been created; read the triggers for its client trigger ID
+    /// before retrying.
+    ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN = 304i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1793,6 +1814,15 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_ACCOUNT_REPAIRING`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AccountRepairing: Self = Self::ERROR_CODE_ACCOUNT_REPAIRING;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerWouldTriggerImmediately: Self = Self::ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderCreateOutcomeUnknown: Self = Self::ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerCreateOutcomeUnknown: Self = Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -2375,6 +2405,21 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             299i32 => ::core::option::Option::Some(Self::ERROR_CODE_ORDER_REPAIRING),
             300i32 => ::core::option::Option::Some(Self::ERROR_CODE_ACCOUNT_REPAIRING),
+            302i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
+                )
+            }
+            303i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN,
+                )
+            }
+            304i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -2758,6 +2803,15 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_ORDER_REPAIRING => "ERROR_CODE_ORDER_REPAIRING",
             Self::ERROR_CODE_ACCOUNT_REPAIRING => "ERROR_CODE_ACCOUNT_REPAIRING",
+            Self::ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY => {
+                "ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY"
+            }
+            Self::ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN => {
+                "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN"
+            }
+            Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN => {
+                "ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -3399,6 +3453,21 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_ACCOUNT_REPAIRING" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_ACCOUNT_REPAIRING)
             }
+            "ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
+                )
+            }
+            "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN,
+                )
+            }
+            "ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -3585,6 +3654,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN,
             Self::ERROR_CODE_ORDER_REPAIRING,
             Self::ERROR_CODE_ACCOUNT_REPAIRING,
+            Self::ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
+            Self::ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN,
+            Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
         ]
     }
 }
@@ -3592,19 +3664,22 @@ impl ::buffa::Enumeration for ErrorCode {
 /// Trigger System: Risk Controls + Conditional Orders
 /// =============================================================================
 ///
-/// TriggerPriceSource defines which price feed to use for trigger evaluation.
-/// v1 supports LAST_PRICE only; INDEX_PRICE and MARK_PRICE are reserved for
-/// future.
+/// TriggerPriceSource defines which price a trigger watches. Standalone
+/// stop-loss, take-profit and trailing-stop triggers watch LAST_PRICE unless
+/// INDEX_PRICE is requested; MARK_PRICE is not supported on spot markets.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum TriggerPriceSource {
     /// Trigger price source was not provided; spot triggers default to LAST_PRICE.
     TRIGGER_PRICE_SOURCE_UNSPECIFIED = 0i32,
-    /// Last traded price (default for spot).
+    /// Last traded price on the market (default for spot).
     LAST_PRICE = 1i32,
-    /// Index price aggregated from external exchanges (future).
+    /// The market's index price, aggregated from external exchanges. A trigger
+    /// that watches it acts only on a current index value: while the index is
+    /// stale or unavailable the trigger stays armed and waits, and never fires on
+    /// an outdated value.
     INDEX_PRICE = 2i32,
-    /// Mark price for perpetuals (future).
+    /// Mark price for perpetuals; not supported on spot markets.
     MARK_PRICE = 3i32,
 }
 impl TriggerPriceSource {
@@ -5544,7 +5619,8 @@ pub struct OrderIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub fee_asset: ::buffa::EnumValue<FeeAsset>,
-    /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
+    /// Self-trade prevention mode against orders of the same root account,
+    /// including all its subaccounts. Defaults to EXPIRE_MAKER if unspecified.
     ///
     /// Field 22: `self_trade_prevention_mode`
     #[serde(
@@ -6377,6 +6453,9 @@ pub mod order_intent {
 /// after an ambiguous transport timeout. Supply client_order_id to reconcile
 /// through GetOrder; without it, a lost acknowledgement may leave the outcome
 /// unknown. An immediate lookup miss does not prove that admission failed.
+/// A create sent but not confirmed in time fails with
+/// ORDER_CREATE_OUTCOME_UNKNOWN: the order may have been accepted, so read it
+/// back before retrying. UNAVAILABLE means the order was not accepted.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -7114,6 +7193,7 @@ pub const __PREVIEW_ORDER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
 };
 /// PreviewOrderResponse reports whether an order is currently admissible and
 /// returns any sizing and price-protection values resolved during evaluation.
+/// Quote debit and fees are not returned.
 /// The result is advisory: account, market, and policy inputs may change, and
 /// CreateOrder always evaluates the intent again.
 #[derive(Clone, PartialEq, Default)]
@@ -7138,8 +7218,9 @@ pub struct PreviewOrderResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub rejection: ::buffa::MessageField<ErrorDetail>,
-    /// Gross base quantity resolved for execution, scaled by the pair's
-    /// base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
+    /// Gross base quantity resolved for execution. REST returns resolvedBaseQty as
+    /// a decimal string in base asset units, for example "0.005". Protobuf uses the
+    /// pair's base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
     ///
     /// Field 3: `resolved_base_qty_scaled`
     #[serde(
@@ -7149,8 +7230,10 @@ pub struct PreviewOrderResponse {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub resolved_base_qty_scaled: ::core::option::Option<i64>,
-    /// Protective execution boundary in quote units scaled by 1e9. This is not an
-    /// expected fill price. Present when price protection was resolved.
+    /// Protective execution boundary. REST returns protectedPriceBound as a decimal
+    /// string in quote asset units per base asset unit, for example "2751.6".
+    /// Protobuf uses quote units scaled by 1e9. This is not an expected fill price.
+    /// Present when price protection was resolved.
     ///
     /// Field 4: `protected_price_bound_ticks`
     #[serde(
@@ -8983,8 +9066,9 @@ pub mod risk_execution {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::risk_execution::Execution as ExecutionView;
 }
-/// TakeProfitPolicy defines a take-profit attached to an order. It evaluates
-/// last trade price, arms after the parent fills, and submits the selected child.
+/// TakeProfitPolicy defines a take-profit attached to an order. It watches the
+/// last traded price or the index price (trigger_price_source), arms after the
+/// parent fills, and submits the selected child.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -9007,6 +9091,22 @@ pub struct TakeProfitPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub child: ::buffa::MessageField<RiskExecution>,
+    /// Price the take-profit watches. Unspecified or LAST_PRICE watches the last
+    /// traded price. INDEX_PRICE watches the market's index price; on a market
+    /// without an index price the order is rejected with terminal reason
+    /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
+    /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
+    /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+    /// another source replaces the leg.
+    ///
+    /// Field 3: `trigger_price_source`
+    #[serde(
+        rename = "triggerPriceSource",
+        alias = "trigger_price_source",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub trigger_price_source: ::buffa::EnumValue<TriggerPriceSource>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9016,6 +9116,7 @@ impl ::core::fmt::Debug for TakeProfitPolicy {
         f.debug_struct("TakeProfitPolicy")
             .field("trigger_price_ticks", &self.trigger_price_ticks)
             .field("child", &self.child)
+            .field("trigger_price_source", &self.trigger_price_source)
             .finish()
     }
 }
@@ -9057,6 +9158,12 @@ impl ::buffa::Message for TakeProfitPolicy {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -9073,6 +9180,12 @@ impl ::buffa::Message for TakeProfitPolicy {
         if self.child.is_set() {
             ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
             self.child.write_to(__cache, buf);
+        }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9105,6 +9218,15 @@ impl ::buffa::Message for TakeProfitPolicy {
                     ctx,
                 )?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9115,6 +9237,7 @@ impl ::buffa::Message for TakeProfitPolicy {
     fn clear(&mut self) {
         self.trigger_price_ticks = 0i64;
         self.child = ::buffa::MessageField::none();
+        self.trigger_price_source = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9147,8 +9270,9 @@ pub const __TAKE_PROFIT_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     from_json: ::buffa::type_registry::any_from_json::<TakeProfitPolicy>,
     is_wkt: false,
 };
-/// StopLossPolicy defines a stop-loss attached to an order. It evaluates last
-/// trade price, arms after the parent fills, and submits the selected child.
+/// StopLossPolicy defines a stop-loss attached to an order. It watches the last
+/// traded price or the index price (trigger_price_source), arms after the
+/// parent fills, and submits the selected child.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -9171,6 +9295,22 @@ pub struct StopLossPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub child: ::buffa::MessageField<RiskExecution>,
+    /// Price the stop-loss watches. Unspecified or LAST_PRICE watches the last
+    /// traded price. INDEX_PRICE watches the market's index price; on a market
+    /// without an index price the order is rejected with terminal reason
+    /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
+    /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
+    /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+    /// another source replaces the leg.
+    ///
+    /// Field 3: `trigger_price_source`
+    #[serde(
+        rename = "triggerPriceSource",
+        alias = "trigger_price_source",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub trigger_price_source: ::buffa::EnumValue<TriggerPriceSource>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9180,6 +9320,7 @@ impl ::core::fmt::Debug for StopLossPolicy {
         f.debug_struct("StopLossPolicy")
             .field("trigger_price_ticks", &self.trigger_price_ticks)
             .field("child", &self.child)
+            .field("trigger_price_source", &self.trigger_price_source)
             .finish()
     }
 }
@@ -9221,6 +9362,12 @@ impl ::buffa::Message for StopLossPolicy {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -9237,6 +9384,12 @@ impl ::buffa::Message for StopLossPolicy {
         if self.child.is_set() {
             ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
             self.child.write_to(__cache, buf);
+        }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9269,6 +9422,15 @@ impl ::buffa::Message for StopLossPolicy {
                     ctx,
                 )?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9279,6 +9441,7 @@ impl ::buffa::Message for StopLossPolicy {
     fn clear(&mut self) {
         self.trigger_price_ticks = 0i64;
         self.child = ::buffa::MessageField::none();
+        self.trigger_price_source = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9330,6 +9493,23 @@ pub struct TrailingStopPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub activation_price_ticks: i64,
+    /// Price the trailing stop watches and trails: its peak or trough, activation
+    /// and fire all follow this price. Unspecified or LAST_PRICE watches the last
+    /// traded price. INDEX_PRICE watches the market's index price; on a market
+    /// without an index price the order is rejected with terminal reason
+    /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
+    /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
+    /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+    /// another source replaces the leg.
+    ///
+    /// Field 8: `trigger_price_source`
+    #[serde(
+        rename = "triggerPriceSource",
+        alias = "trigger_price_source",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub trigger_price_source: ::buffa::EnumValue<TriggerPriceSource>,
     #[serde(flatten)]
     pub trailing_distance: ::core::option::Option<
         __buffa::oneof::trailing_stop_policy::TrailingDistance,
@@ -9346,6 +9526,7 @@ impl ::core::fmt::Debug for TrailingStopPolicy {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("TrailingStopPolicy")
             .field("activation_price_ticks", &self.activation_price_ticks)
+            .field("trigger_price_source", &self.trigger_price_source)
             .field("trailing_distance", &self.trailing_distance)
             .field("max_slippage", &self.max_slippage)
             .finish()
@@ -9408,6 +9589,12 @@ impl ::buffa::Message for TrailingStopPolicy {
                 }
             }
         }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -9445,6 +9632,12 @@ impl ::buffa::Message for TrailingStopPolicy {
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageBps(x) => {
                     ::buffa::types::put_int32_field(7u32, *x, buf);
                 }
+            }
+        }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
             }
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -9511,6 +9704,15 @@ impl ::buffa::Message for TrailingStopPolicy {
                     ),
                 );
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9522,6 +9724,7 @@ impl ::buffa::Message for TrailingStopPolicy {
         self.trailing_distance = ::core::option::Option::None;
         self.activation_price_ticks = 0i64;
         self.max_slippage = ::core::option::Option::None;
+        self.trigger_price_source = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9550,6 +9753,9 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                 mut map: A,
             ) -> ::core::result::Result<TrailingStopPolicy, A::Error> {
                 let mut __f_activation_price_ticks: ::core::option::Option<i64> = None;
+                let mut __f_trigger_price_source: ::core::option::Option<
+                    ::buffa::EnumValue<TriggerPriceSource>,
+                > = None;
                 let mut __oneof_trailing_distance: ::core::option::Option<
                     __buffa::oneof::trailing_stop_policy::TrailingDistance,
                 > = None;
@@ -9568,6 +9774,24 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                                         d: D,
                                     ) -> ::core::result::Result<i64, D::Error> {
                                         ::buffa::json_helpers::int64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "triggerPriceSource" | "trigger_price_source" => {
+                            __f_trigger_price_source = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<TriggerPriceSource>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<TriggerPriceSource>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -9702,6 +9926,9 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                 if let ::core::option::Option::Some(v) = __f_activation_price_ticks {
                     __r.activation_price_ticks = v;
                 }
+                if let ::core::option::Option::Some(v) = __f_trigger_price_source {
+                    __r.trigger_price_source = v;
+                }
                 __r.trailing_distance = __oneof_trailing_distance;
                 __r.max_slippage = __oneof_max_slippage;
                 Ok(__r)
@@ -9751,9 +9978,11 @@ pub mod trailing_stop_policy {
 /// an exit for the whole remaining position, rounded down to the pair's step
 /// size; a remainder below one step stays in the balance. If another leg's
 /// condition is met while that exit works, the working exit is canceled; once
-/// it ends, that leg is checked again against the latest trade and, if its
-/// condition still holds, exits what remains. After an exit ends, the legs keep
-/// protecting whatever position remains.
+/// it ends, that leg is checked again against the latest price it watches and,
+/// if its condition still holds, exits what remains. After an exit ends, the legs keep
+/// protecting whatever position remains, unless you canceled the exit: canceling
+/// a leg's exit order, alone or with a cancel-all, ends that leg, and with oco
+/// set the other leg too.
 ///
 /// The legs end once the parent order is terminal and no position they can
 /// exit remains: the leg whose exit ended last completes, and the others are
@@ -9778,7 +10007,13 @@ pub struct RiskPolicy {
     /// trailing stop) are linked and shown as one-cancels-the-other. Requires a
     /// take-profit and exactly one stop leg. The legs of every parent share one
     /// position and end together as described on RiskPolicy, so this setting
-    /// does not change when exits are submitted or canceled. Default is false.
+    /// does not change when exits are submitted. It decides what canceling an
+    /// exit order ends: with oco set, canceling one leg's exit ends both legs;
+    /// without it, only that leg ends and the other keeps protecting the
+    /// remaining position. Changing only this setting with ModifyOrder keeps
+    /// the existing legs, with their IDs, arming and a trailing stop's tracked
+    /// peak; changing a leg's terms, such as its trigger price, limit price or
+    /// trailing distance, still replaces that leg. Default is false.
     ///
     /// Field 4: `oco`
     #[serde(
@@ -10650,8 +10885,11 @@ pub struct CancelAllOrdersResponse {
     /// which they were created), at most 200. When more orders were canceled,
     /// these are the 200 oldest and `truncated` is true; the order update stream
     /// and read paths report every one. Empty when `dry_run` is set. Retrying
-    /// with the same `request_id` and criteria within the replay window returns
-    /// the same list.
+    /// with the same `request_id` and criteria within 120 seconds returns the
+    /// original status, counts and timestamp, an empty list, and
+    /// `listing_status = NOT_RETAINED_READ_OPEN_ORDERS`. It requests no new
+    /// cancellations. Read open orders for current state and use order updates
+    /// for final outcomes.
     ///
     /// Field 7: `cancelled_orders`
     #[serde(
@@ -10682,6 +10920,17 @@ pub struct CancelAllOrdersResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub truncated: bool,
+    /// Availability of the historical listing. An empty retry listing does not
+    /// change the original counts or mean that no cancellations were requested.
+    ///
+    /// Field 10: `listing_status`
+    #[serde(
+        rename = "listingStatus",
+        alias = "listing_status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub listing_status: ::buffa::EnumValue<cancel_all_orders_response::ListingStatus>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -10698,6 +10947,7 @@ impl ::core::fmt::Debug for CancelAllOrdersResponse {
             .field("cancelled_orders", &self.cancelled_orders)
             .field("total_cancelled", &self.total_cancelled)
             .field("truncated", &self.truncated)
+            .field("listing_status", &self.listing_status)
             .finish()
     }
 }
@@ -10772,6 +11022,12 @@ impl ::buffa::Message for CancelAllOrdersResponse {
         if self.truncated {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
+        {
+            let val = self.listing_status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -10813,6 +11069,12 @@ impl ::buffa::Message for CancelAllOrdersResponse {
         }
         if self.truncated {
             ::buffa::types::put_bool_field(9u32, self.truncated, buf);
+        }
+        {
+            let val = self.listing_status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(10u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -10898,6 +11160,15 @@ impl ::buffa::Message for CancelAllOrdersResponse {
                 )?;
                 self.truncated = ::buffa::types::decode_bool(buf)?;
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.listing_status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -10915,6 +11186,7 @@ impl ::buffa::Message for CancelAllOrdersResponse {
         self.cancelled_orders.clear();
         self.total_cancelled = 0u32;
         self.truncated = false;
+        self.listing_status = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -11094,6 +11366,162 @@ pub mod cancel_all_orders_response {
         }
         fn values() -> &'static [Self] {
             &[Self::STATUS_UNSPECIFIED, Self::SUBMITTED, Self::DRY_RUN]
+        }
+    }
+    /// Availability of the order listing, separate from the submission outcome.
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum ListingStatus {
+        /// Listing availability was not provided.
+        LISTING_UNSPECIFIED = 0i32,
+        /// The initial response includes its listing, possibly empty, up to 200 orders.
+        INCLUDED = 1i32,
+        /// A retry returns its original outcome and counts without the historical
+        /// listing. Read open orders for current state and use order updates for
+        /// final outcomes. No new cancellations are requested by the retry.
+        NOT_RETAINED_READ_OPEN_ORDERS = 2i32,
+    }
+    impl ListingStatus {
+        ///Idiomatic alias for [`Self::LISTING_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const ListingUnspecified: Self = Self::LISTING_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::INCLUDED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Included: Self = Self::INCLUDED;
+        ///Idiomatic alias for [`Self::NOT_RETAINED_READ_OPEN_ORDERS`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const NotRetainedReadOpenOrders: Self = Self::NOT_RETAINED_READ_OPEN_ORDERS;
+    }
+    impl ::core::default::Default for ListingStatus {
+        fn default() -> Self {
+            Self::LISTING_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for ListingStatus {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ListingStatus {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = ListingStatus;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!(
+                            "a string, integer, or null for ", stringify!(ListingStatus)
+                        ),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<ListingStatus, E> {
+                    <ListingStatus as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<ListingStatus, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <ListingStatus as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<ListingStatus, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <ListingStatus as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<ListingStatus, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for ListingStatus {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for ListingStatus {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::LISTING_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::INCLUDED),
+                2i32 => ::core::option::Option::Some(Self::NOT_RETAINED_READ_OPEN_ORDERS),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::LISTING_UNSPECIFIED => "LISTING_UNSPECIFIED",
+                Self::INCLUDED => "INCLUDED",
+                Self::NOT_RETAINED_READ_OPEN_ORDERS => "NOT_RETAINED_READ_OPEN_ORDERS",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "LISTING_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::LISTING_UNSPECIFIED)
+                }
+                "INCLUDED" => ::core::option::Option::Some(Self::INCLUDED),
+                "NOT_RETAINED_READ_OPEN_ORDERS" => {
+                    ::core::option::Option::Some(Self::NOT_RETAINED_READ_OPEN_ORDERS)
+                }
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[
+                Self::LISTING_UNSPECIFIED,
+                Self::INCLUDED,
+                Self::NOT_RETAINED_READ_OPEN_ORDERS,
+            ]
         }
     }
 }
@@ -11348,6 +11776,191 @@ pub const __CANCEL_ALL_AFTER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEn
     from_json: ::buffa::type_registry::any_from_json::<CancelAllAfterRequest>,
     is_wkt: false,
 };
+/// DeadManSwitchScope describes the recorded scope of an armed dead-man switch.
+/// Expiry cancels working orders in this scope, including working child orders.
+/// Waiting triggers remain active and may create further orders.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeadManSwitchScope {
+    /// Public ID of the account or sub-account whose orders are canceled.
+    ///
+    /// Field 1: `account_id`
+    #[serde(
+        rename = "accountId",
+        alias = "account_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub account_id: u64,
+    /// Symbol ID whose orders are canceled. Zero or omitted means all symbols.
+    ///
+    /// Field 2: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
+    /// Order side that is canceled. SIDE_UNSPECIFIED or omitted means both sides.
+    ///
+    /// Field 3: `side`
+    #[serde(
+        rename = "side",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub side: ::buffa::EnumValue<Side>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeadManSwitchScope {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeadManSwitchScope")
+            .field("account_id", &self.account_id)
+            .field("symbol_id", &self.symbol_id)
+            .field("side", &self.side)
+            .finish()
+    }
+}
+impl DeadManSwitchScope {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.DeadManSwitchScope";
+}
+::buffa::impl_default_instance!(DeadManSwitchScope);
+impl ::buffa::MessageName for DeadManSwitchScope {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "DeadManSwitchScope";
+    const FULL_NAME: &'static str = "orders.v1.DeadManSwitchScope";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.DeadManSwitchScope";
+}
+impl ::buffa::Message for DeadManSwitchScope {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.account_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.account_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.account_id, buf);
+        }
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.symbol_id, buf);
+        }
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.account_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.account_id = 0u64;
+        self.symbol_id = 0u32;
+        self.side = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeadManSwitchScope {
+    const PROTO_FQN: &'static str = "orders.v1.DeadManSwitchScope";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeadManSwitchScope {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DEAD_MAN_SWITCH_SCOPE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.DeadManSwitchScope",
+    to_json: ::buffa::type_registry::any_to_json::<DeadManSwitchScope>,
+    from_json: ::buffa::type_registry::any_from_json::<DeadManSwitchScope>,
+    is_wkt: false,
+};
 /// CancelAllAfterResponse returns dead-man switch arming/disable status.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -11400,6 +12013,17 @@ pub struct CancelAllAfterResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_ns: u64,
+    /// Recorded scope after arming or refreshing. Absent when disabled.
+    /// Describes the current armed switch only. Cancellations already in progress
+    /// are unaffected by a later refresh or disable.
+    ///
+    /// Field 6: `effective_scope`
+    #[serde(
+        rename = "effectiveScope",
+        alias = "effective_scope",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub effective_scope: ::buffa::MessageField<DeadManSwitchScope>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -11412,6 +12036,7 @@ impl ::core::fmt::Debug for CancelAllAfterResponse {
             .field("expires_at_ts_ns", &self.expires_at_ts_ns)
             .field("ts", &self.ts)
             .field("ts_ns", &self.ts_ns)
+            .field("effective_scope", &self.effective_scope)
             .finish()
     }
 }
@@ -11468,6 +12093,14 @@ impl ::buffa::Message for CancelAllAfterResponse {
         if self.ts_ns != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
         }
+        if self.effective_scope.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.effective_scope.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -11496,6 +12129,10 @@ impl ::buffa::Message for CancelAllAfterResponse {
         }
         if self.ts_ns != 0u64 {
             ::buffa::types::put_uint64_field(5u32, self.ts_ns, buf);
+        }
+        if self.effective_scope.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.effective_scope.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -11551,6 +12188,17 @@ impl ::buffa::Message for CancelAllAfterResponse {
                 )?;
                 self.ts_ns = ::buffa::types::decode_uint64(buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.effective_scope.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -11564,6 +12212,7 @@ impl ::buffa::Message for CancelAllAfterResponse {
         self.expires_at_ts_ns = 0u64;
         self.ts = ::buffa::MessageField::none();
         self.ts_ns = 0u64;
+        self.effective_scope = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -12532,9 +13181,13 @@ pub struct BatchCreateOrdersRequest {
     )]
     pub subaccount_id: ::core::option::Option<u64>,
     /// Required account-scoped idempotency key for the entire ordered batch.
-    /// Reusing it with the same payload within 15 minutes replays the original
-    /// per-item results and timestamp. Reusing it with a different payload during
-    /// that window returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
+    /// Reusing it with the same payload within 15 minutes returns each decided
+    /// item's original result and result time, and retries the items still
+    /// unresolved, never admitting an already admitted item again. Reusing it
+    /// with a different payload during that window returns
+    /// CONFLICT_IDEMPOTENCY_KEY_REUSE. After 15 minutes the ID is free: a repeat
+    /// is a new request and can place its orders again, so read the items back
+    /// instead of repeating an older batch.
     ///
     /// Field 2: `request_id`
     #[serde(
@@ -13014,7 +13667,10 @@ pub struct ModifyOrderRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub new_qty_scaled: ::core::option::Option<i64>,
-    /// Replacement attached-risk policy for the order.
+    /// Replacement attached-risk policy for the order. The order's change and its
+    /// take-profit, stop-loss and trailing legs apply together: either all of
+    /// them change, or the whole modify is refused and the order and its legs
+    /// stay as they were.
     ///
     /// Field 7: `new_attached_risk`
     #[serde(
@@ -23399,8 +24055,10 @@ pub mod get_order_request {
     pub use super::__buffa::view::oneof::get_order_request::Key as KeyView;
 }
 /// GetOrderResponse returns order details and a bounded execution page.
-/// Order state, trades and transfers are eventually consistent;
-/// one page's execution quantities need not equal the order's cumulative quantity.
+/// The order shows a fill as soon as it executes; its trades are recorded
+/// shortly after. executions_complete says whether the trades already account
+/// for every execution the order shows. Transfers are eventually consistent and
+/// can trail the trades they settle.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -23444,6 +24102,20 @@ pub struct GetOrderResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub next_page_token: ::buffa::alloc::string::String,
+    /// True when the order's trades through its generation, across every page,
+    /// add up exactly to its cum_qty_scaled. False while a recent execution is
+    /// still being recorded: trades then lists the executions recorded so far,
+    /// and a later read returns the rest. Always false when execution history is
+    /// not included.
+    ///
+    /// Field 7: `executions_complete`
+    #[serde(
+        rename = "executionsComplete",
+        alias = "executions_complete",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub executions_complete: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -23455,6 +24127,7 @@ impl ::core::fmt::Debug for GetOrderResponse {
             .field("trades", &self.trades)
             .field("transfers", &self.transfers)
             .field("next_page_token", &self.next_page_token)
+            .field("executions_complete", &self.executions_complete)
             .finish()
     }
 }
@@ -23512,6 +24185,9 @@ impl ::buffa::Message for GetOrderResponse {
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
         }
+        if self.executions_complete {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -23536,6 +24212,9 @@ impl ::buffa::Message for GetOrderResponse {
         }
         if !self.next_page_token.is_empty() {
             ::buffa::types::put_string_field(6u32, &self.next_page_token, buf);
+        }
+        if self.executions_complete {
+            ::buffa::types::put_bool_field(7u32, self.executions_complete, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -23586,6 +24265,13 @@ impl ::buffa::Message for GetOrderResponse {
                 )?;
                 ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.executions_complete = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -23598,6 +24284,7 @@ impl ::buffa::Message for GetOrderResponse {
         self.trades.clear();
         self.transfers.clear();
         self.next_page_token.clear();
+        self.executions_complete = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -26022,7 +26709,8 @@ pub mod __buffa {
             ///
             /// Field 21: `fee_asset`
             pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
-            /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
+            /// Self-trade prevention mode against orders of the same root account,
+            /// including all its subaccounts. Defaults to EXPIRE_MAKER if unspecified.
             ///
             /// Field 22: `self_trade_prevention_mode`
             pub self_trade_prevention_mode: ::buffa::EnumValue<
@@ -26895,7 +27583,8 @@ pub mod __buffa {
             pub fn fee_asset(&self) -> ::buffa::EnumValue<super::super::FeeAsset> {
                 self.0.reborrow().fee_asset
             }
-            /// Self-trade prevention mode. Defaults to EXPIRE_MAKER if unspecified.
+            /// Self-trade prevention mode against orders of the same root account,
+            /// including all its subaccounts. Defaults to EXPIRE_MAKER if unspecified.
             ///
             /// Field 22: `self_trade_prevention_mode`
             #[must_use]
@@ -26969,6 +27658,9 @@ pub mod __buffa {
         /// after an ambiguous transport timeout. Supply client_order_id to reconcile
         /// through GetOrder; without it, a lost acknowledgement may leave the outcome
         /// unknown. An immediate lookup miss does not prove that admission failed.
+        /// A create sent but not confirmed in time fails with
+        /// ORDER_CREATE_OUTCOME_UNKNOWN: the order may have been accepted, so read it
+        /// back before retrying. UNAVAILABLE means the order was not accepted.
         #[derive(Clone, Debug, Default)]
         pub struct CreateOrderRequestView<'a> {
             /// Target sub-account numeric ID. When omitted, uses caller's root account.
@@ -28272,6 +28964,7 @@ pub mod __buffa {
         }
         /// PreviewOrderResponse reports whether an order is currently admissible and
         /// returns any sizing and price-protection values resolved during evaluation.
+        /// Quote debit and fees are not returned.
         /// The result is advisory: account, market, and policy inputs may change, and
         /// CreateOrder always evaluates the intent again.
         #[derive(Clone, Debug, Default)]
@@ -28288,13 +28981,16 @@ pub mod __buffa {
             pub rejection: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ErrorDetailView<'a>,
             >,
-            /// Gross base quantity resolved for execution, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
+            /// Gross base quantity resolved for execution. REST returns resolvedBaseQty as
+            /// a decimal string in base asset units, for example "0.005". Protobuf uses the
+            /// pair's base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
             ///
             /// Field 3: `resolved_base_qty_scaled`
             pub resolved_base_qty_scaled: ::core::option::Option<i64>,
-            /// Protective execution boundary in quote units scaled by 1e9. This is not an
-            /// expected fill price. Present when price protection was resolved.
+            /// Protective execution boundary. REST returns protectedPriceBound as a decimal
+            /// string in quote asset units per base asset unit, for example "2751.6".
+            /// Protobuf uses quote units scaled by 1e9. This is not an expected fill price.
+            /// Present when price protection was resolved.
             ///
             /// Field 4: `protected_price_bound_ticks`
             pub protected_price_bound_ticks: ::core::option::Option<i64>,
@@ -28706,16 +29402,19 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().rejection
             }
-            /// Gross base quantity resolved for execution, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
+            /// Gross base quantity resolved for execution. REST returns resolvedBaseQty as
+            /// a decimal string in base asset units, for example "0.005". Protobuf uses the
+            /// pair's base_quantity_scale from GetSpotConfig. Present when sizing was resolved.
             ///
             /// Field 3: `resolved_base_qty_scaled`
             #[must_use]
             pub fn resolved_base_qty_scaled(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().resolved_base_qty_scaled
             }
-            /// Protective execution boundary in quote units scaled by 1e9. This is not an
-            /// expected fill price. Present when price protection was resolved.
+            /// Protective execution boundary. REST returns protectedPriceBound as a decimal
+            /// string in quote asset units per base asset unit, for example "2751.6".
+            /// Protobuf uses quote units scaled by 1e9. This is not an expected fill price.
+            /// Present when price protection was resolved.
             ///
             /// Field 4: `protected_price_bound_ticks`
             #[must_use]
@@ -31235,8 +31934,9 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// TakeProfitPolicy defines a take-profit attached to an order. It evaluates
-        /// last trade price, arms after the parent fills, and submits the selected child.
+        /// TakeProfitPolicy defines a take-profit attached to an order. It watches the
+        /// last traded price or the index price (trigger_price_source), arms after the
+        /// parent fills, and submits the selected child.
         #[derive(Clone, Debug, Default)]
         pub struct TakeProfitPolicyView<'a> {
             /// Trigger price in quote units scaled by 1e9.
@@ -31248,6 +31948,18 @@ pub mod __buffa {
             /// Field 2: `child`
             pub child: ::buffa::MessageFieldView<
                 super::super::__buffa::view::RiskExecutionView<'a>,
+            >,
+            /// Price the take-profit watches. Unspecified or LAST_PRICE watches the last
+            /// traded price. INDEX_PRICE watches the market's index price; on a market
+            /// without an index price the order is rejected with terminal reason
+            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
+            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
+            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// another source replaces the leg.
+            ///
+            /// Field 3: `trigger_price_source`
+            pub trigger_price_source: ::buffa::EnumValue<
+                super::super::TriggerPriceSource,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -31316,6 +32028,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -31354,6 +32075,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    trigger_price_source: self.trigger_price_source,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -31382,6 +32104,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -31403,6 +32131,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.child.write_to(__cache, buf);
+                }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -31438,6 +32172,15 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.child.as_option() {
                         __map.serialize_entry("child", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.trigger_price_source,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceSource",
+                            &self.trigger_price_source,
+                        )?;
                 }
                 __map.end()
             }
@@ -31553,6 +32296,21 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().child
             }
+            /// Price the take-profit watches. Unspecified or LAST_PRICE watches the last
+            /// traded price. INDEX_PRICE watches the market's index price; on a market
+            /// without an index price the order is rejected with terminal reason
+            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
+            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
+            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// another source replaces the leg.
+            ///
+            /// Field 3: `trigger_price_source`
+            #[must_use]
+            pub fn trigger_price_source(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::TriggerPriceSource> {
+                self.0.reborrow().trigger_price_source
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<TakeProfitPolicyView<'static>>>
         for TakeProfitPolicyOwnedView {
@@ -31584,8 +32342,9 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// StopLossPolicy defines a stop-loss attached to an order. It evaluates last
-        /// trade price, arms after the parent fills, and submits the selected child.
+        /// StopLossPolicy defines a stop-loss attached to an order. It watches the last
+        /// traded price or the index price (trigger_price_source), arms after the
+        /// parent fills, and submits the selected child.
         #[derive(Clone, Debug, Default)]
         pub struct StopLossPolicyView<'a> {
             /// Trigger price in quote units scaled by 1e9.
@@ -31597,6 +32356,18 @@ pub mod __buffa {
             /// Field 2: `child`
             pub child: ::buffa::MessageFieldView<
                 super::super::__buffa::view::RiskExecutionView<'a>,
+            >,
+            /// Price the stop-loss watches. Unspecified or LAST_PRICE watches the last
+            /// traded price. INDEX_PRICE watches the market's index price; on a market
+            /// without an index price the order is rejected with terminal reason
+            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
+            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
+            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// another source replaces the leg.
+            ///
+            /// Field 3: `trigger_price_source`
+            pub trigger_price_source: ::buffa::EnumValue<
+                super::super::TriggerPriceSource,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -31665,6 +32436,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -31703,6 +32483,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    trigger_price_source: self.trigger_price_source,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -31731,6 +32512,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -31752,6 +32539,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.child.write_to(__cache, buf);
+                }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -31787,6 +32580,15 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.child.as_option() {
                         __map.serialize_entry("child", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.trigger_price_source,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceSource",
+                            &self.trigger_price_source,
+                        )?;
                 }
                 __map.end()
             }
@@ -31902,6 +32704,21 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().child
             }
+            /// Price the stop-loss watches. Unspecified or LAST_PRICE watches the last
+            /// traded price. INDEX_PRICE watches the market's index price; on a market
+            /// without an index price the order is rejected with terminal reason
+            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
+            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
+            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// another source replaces the leg.
+            ///
+            /// Field 3: `trigger_price_source`
+            #[must_use]
+            pub fn trigger_price_source(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::TriggerPriceSource> {
+                self.0.reborrow().trigger_price_source
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<StopLossPolicyView<'static>>>
         for StopLossPolicyOwnedView {
@@ -31944,6 +32761,19 @@ pub mod __buffa {
             ///
             /// Field 3: `activation_price_ticks`
             pub activation_price_ticks: i64,
+            /// Price the trailing stop watches and trails: its peak or trough, activation
+            /// and fire all follow this price. Unspecified or LAST_PRICE watches the last
+            /// traded price. INDEX_PRICE watches the market's index price; on a market
+            /// without an index price the order is rejected with terminal reason
+            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
+            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
+            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// another source replaces the leg.
+            ///
+            /// Field 8: `trigger_price_source`
+            pub trigger_price_source: ::buffa::EnumValue<
+                super::super::TriggerPriceSource,
+            >,
             pub trailing_distance: ::core::option::Option<
                 super::super::__buffa::view::oneof::trailing_stop_policy::TrailingDistance,
             >,
@@ -31991,6 +32821,15 @@ pub mod __buffa {
                         view.activation_price_ticks = ::buffa::types::decode_int64(
                             &mut cur,
                         )?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -32066,6 +32905,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::TrailingStopPolicy {
                     activation_price_ticks: self.activation_price_ticks,
+                    trigger_price_source: self.trigger_price_source,
                     trailing_distance: self
                         .trailing_distance
                         .as_ref()
@@ -32153,6 +32993,12 @@ pub mod __buffa {
                         }
                     }
                 }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -32199,6 +33045,12 @@ pub mod __buffa {
                         }
                     }
                 }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(8u32, val, buf);
+                    }
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -32229,6 +33081,15 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(
                                 &self.activation_price_ticks,
                             ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.trigger_price_source,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceSource",
+                            &self.trigger_price_source,
                         )?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.trailing_distance {
@@ -32380,6 +33241,22 @@ pub mod __buffa {
             pub fn activation_price_ticks(&self) -> i64 {
                 self.0.reborrow().activation_price_ticks
             }
+            /// Price the trailing stop watches and trails: its peak or trough, activation
+            /// and fire all follow this price. Unspecified or LAST_PRICE watches the last
+            /// traded price. INDEX_PRICE watches the market's index price; on a market
+            /// without an index price the order is rejected with terminal reason
+            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
+            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
+            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// another source replaces the leg.
+            ///
+            /// Field 8: `trigger_price_source`
+            #[must_use]
+            pub fn trigger_price_source(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::TriggerPriceSource> {
+                self.0.reborrow().trigger_price_source
+            }
             /// Oneof `trailing_distance`.
             #[must_use]
             pub fn trailing_distance(
@@ -32438,9 +33315,11 @@ pub mod __buffa {
         /// an exit for the whole remaining position, rounded down to the pair's step
         /// size; a remainder below one step stays in the balance. If another leg's
         /// condition is met while that exit works, the working exit is canceled; once
-        /// it ends, that leg is checked again against the latest trade and, if its
-        /// condition still holds, exits what remains. After an exit ends, the legs keep
-        /// protecting whatever position remains.
+        /// it ends, that leg is checked again against the latest price it watches and,
+        /// if its condition still holds, exits what remains. After an exit ends, the legs keep
+        /// protecting whatever position remains, unless you canceled the exit: canceling
+        /// a leg's exit order, alone or with a cancel-all, ends that leg, and with oco
+        /// set the other leg too.
         ///
         /// The legs end once the parent order is terminal and no position they can
         /// exit remains: the leg whose exit ended last completes, and the others are
@@ -32460,7 +33339,13 @@ pub mod __buffa {
             /// trailing stop) are linked and shown as one-cancels-the-other. Requires a
             /// take-profit and exactly one stop leg. The legs of every parent share one
             /// position and end together as described on RiskPolicy, so this setting
-            /// does not change when exits are submitted or canceled. Default is false.
+            /// does not change when exits are submitted. It decides what canceling an
+            /// exit order ends: with oco set, canceling one leg's exit ends both legs;
+            /// without it, only that leg ends and the other keeps protecting the
+            /// remaining position. Changing only this setting with ModifyOrder keeps
+            /// the existing legs, with their IDs, arming and a trailing stop's tracked
+            /// peak; changing a leg's terms, such as its trigger price, limit price or
+            /// trailing distance, still replaces that leg. Default is false.
             ///
             /// Field 4: `oco`
             pub oco: bool,
@@ -32900,7 +33785,13 @@ pub mod __buffa {
             /// trailing stop) are linked and shown as one-cancels-the-other. Requires a
             /// take-profit and exactly one stop leg. The legs of every parent share one
             /// position and end together as described on RiskPolicy, so this setting
-            /// does not change when exits are submitted or canceled. Default is false.
+            /// does not change when exits are submitted. It decides what canceling an
+            /// exit order ends: with oco set, canceling one leg's exit ends both legs;
+            /// without it, only that leg ends and the other keeps protecting the
+            /// remaining position. Changing only this setting with ModifyOrder keeps
+            /// the existing legs, with their IDs, arming and a trailing stop's tracked
+            /// peak; changing a leg's terms, such as its trigger price, limit price or
+            /// trailing distance, still replaces that leg. Default is false.
             ///
             /// Field 4: `oco`
             #[must_use]
@@ -33743,8 +34634,11 @@ pub mod __buffa {
             /// which they were created), at most 200. When more orders were canceled,
             /// these are the 200 oldest and `truncated` is true; the order update stream
             /// and read paths report every one. Empty when `dry_run` is set. Retrying
-            /// with the same `request_id` and criteria within the replay window returns
-            /// the same list.
+            /// with the same `request_id` and criteria within 120 seconds returns the
+            /// original status, counts and timestamp, an empty list, and
+            /// `listing_status = NOT_RETAINED_READ_OPEN_ORDERS`. It requests no new
+            /// cancellations. Read open orders for current state and use order updates
+            /// for final outcomes.
             ///
             /// Field 7: `cancelled_orders`
             pub cancelled_orders: ::buffa::RepeatedView<
@@ -33761,6 +34655,13 @@ pub mod __buffa {
             ///
             /// Field 9: `truncated`
             pub truncated: bool,
+            /// Availability of the historical listing. An empty retry listing does not
+            /// change the original counts or mean that no cancellations were requested.
+            ///
+            /// Field 10: `listing_status`
+            pub listing_status: ::buffa::EnumValue<
+                super::super::cancel_all_orders_response::ListingStatus,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CancelAllOrdersResponseView<'a> {
@@ -33872,6 +34773,15 @@ pub mod __buffa {
                         )?;
                         view.truncated = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.listing_status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -33936,6 +34846,7 @@ pub mod __buffa {
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     total_cancelled: self.total_cancelled,
                     truncated: self.truncated,
+                    listing_status: self.listing_status,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -34002,6 +34913,12 @@ pub mod __buffa {
                 if self.truncated {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
+                {
+                    let val = self.listing_status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -34052,6 +34969,12 @@ pub mod __buffa {
                 }
                 if self.truncated {
                     ::buffa::types::put_bool_field(9u32, self.truncated, buf);
+                }
+                {
+                    let val = self.listing_status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(10u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -34124,6 +35047,11 @@ pub mod __buffa {
                 }
                 if self.truncated {
                     __map.serialize_entry("truncated", &self.truncated)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.listing_status,
+                ) {
+                    __map.serialize_entry("listingStatus", &self.listing_status)?;
                 }
                 __map.end()
             }
@@ -34283,8 +35211,11 @@ pub mod __buffa {
             /// which they were created), at most 200. When more orders were canceled,
             /// these are the 200 oldest and `truncated` is true; the order update stream
             /// and read paths report every one. Empty when `dry_run` is set. Retrying
-            /// with the same `request_id` and criteria within the replay window returns
-            /// the same list.
+            /// with the same `request_id` and criteria within 120 seconds returns the
+            /// original status, counts and timestamp, an empty list, and
+            /// `listing_status = NOT_RETAINED_READ_OPEN_ORDERS`. It requests no new
+            /// cancellations. Read open orders for current state and use order updates
+            /// for final outcomes.
             ///
             /// Field 7: `cancelled_orders`
             #[must_use]
@@ -34311,6 +35242,18 @@ pub mod __buffa {
             #[must_use]
             pub fn truncated(&self) -> bool {
                 self.0.reborrow().truncated
+            }
+            /// Availability of the historical listing. An empty retry listing does not
+            /// change the original counts or mean that no cancellations were requested.
+            ///
+            /// Field 10: `listing_status`
+            #[must_use]
+            pub fn listing_status(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::cancel_all_orders_response::ListingStatus,
+            > {
+                self.0.reborrow().listing_status
             }
         }
         impl ::core::convert::From<
@@ -34771,6 +35714,348 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// DeadManSwitchScope describes the recorded scope of an armed dead-man switch.
+        /// Expiry cancels working orders in this scope, including working child orders.
+        /// Waiting triggers remain active and may create further orders.
+        #[derive(Clone, Debug, Default)]
+        pub struct DeadManSwitchScopeView<'a> {
+            /// Public ID of the account or sub-account whose orders are canceled.
+            ///
+            /// Field 1: `account_id`
+            pub account_id: u64,
+            /// Symbol ID whose orders are canceled. Zero or omitted means all symbols.
+            ///
+            /// Field 2: `symbol_id`
+            pub symbol_id: u32,
+            /// Order side that is canceled. SIDE_UNSPECIFIED or omitted means both sides.
+            ///
+            /// Field 3: `side`
+            pub side: ::buffa::EnumValue<super::super::Side>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DeadManSwitchScopeView<'a> {
+            type Owned = super::super::DeadManSwitchScope;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.account_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.side = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeadManSwitchScope,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeadManSwitchScope,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeadManSwitchScope {
+                    account_id: self.account_id,
+                    symbol_id: self.symbol_id,
+                    side: self.side,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeadManSwitchScopeView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.account_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.account_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.account_id, buf);
+                }
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.symbol_id, buf);
+                }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeadManSwitchScopeView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.account_id) {
+                    __map
+                        .serialize_entry(
+                            "accountId",
+                            &::buffa::json_helpers::ProtoJson(&self.account_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
+                    __map.serialize_entry("side", &self.side)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeadManSwitchScopeView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "DeadManSwitchScope";
+            const FULL_NAME: &'static str = "orders.v1.DeadManSwitchScope";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.DeadManSwitchScope";
+        }
+        ::buffa::impl_default_view_instance!(DeadManSwitchScopeView);
+        ::buffa::impl_view_reborrow!(DeadManSwitchScopeView);
+        /** Self-contained, `'static` owned view of a `DeadManSwitchScope` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeadManSwitchScopeView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeadManSwitchScopeView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeadManSwitchScopeOwnedView(
+            ::buffa::OwnedView<DeadManSwitchScopeView<'static>>,
+        );
+        impl DeadManSwitchScopeOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeadManSwitchScopeOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeadManSwitchScopeOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeadManSwitchScope,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeadManSwitchScopeOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DeadManSwitchScopeView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeadManSwitchScopeView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeadManSwitchScope,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public ID of the account or sub-account whose orders are canceled.
+            ///
+            /// Field 1: `account_id`
+            #[must_use]
+            pub fn account_id(&self) -> u64 {
+                self.0.reborrow().account_id
+            }
+            /// Symbol ID whose orders are canceled. Zero or omitted means all symbols.
+            ///
+            /// Field 2: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
+            }
+            /// Order side that is canceled. SIDE_UNSPECIFIED or omitted means both sides.
+            ///
+            /// Field 3: `side`
+            #[must_use]
+            pub fn side(&self) -> ::buffa::EnumValue<super::super::Side> {
+                self.0.reborrow().side
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DeadManSwitchScopeView<'static>>>
+        for DeadManSwitchScopeOwnedView {
+            fn from(inner: ::buffa::OwnedView<DeadManSwitchScopeView<'static>>) -> Self {
+                DeadManSwitchScopeOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeadManSwitchScopeOwnedView>
+        for ::buffa::OwnedView<DeadManSwitchScopeView<'static>> {
+            fn from(wrapper: DeadManSwitchScopeOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DeadManSwitchScopeView<'static>>>
+        for DeadManSwitchScopeOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DeadManSwitchScopeView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DeadManSwitchScope {
+            type View<'a> = DeadManSwitchScopeView<'a>;
+            type ViewHandle = DeadManSwitchScopeOwnedView;
+        }
+        impl ::serde::Serialize for DeadManSwitchScopeOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// CancelAllAfterResponse returns dead-man switch arming/disable status.
         #[derive(Clone, Debug, Default)]
         pub struct CancelAllAfterResponseView<'a> {
@@ -34798,6 +36083,14 @@ pub mod __buffa {
             ///
             /// Field 5: `ts_ns`
             pub ts_ns: u64,
+            /// Recorded scope after arming or refreshing. Absent when disabled.
+            /// Describes the current armed switch only. Cancellations already in progress
+            /// are unaffected by a later refresh or disable.
+            ///
+            /// Field 6: `effective_scope`
+            pub effective_scope: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DeadManSwitchScopeView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CancelAllAfterResponseView<'a> {
@@ -34888,6 +36181,31 @@ pub mod __buffa {
                         )?;
                         view.ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.effective_scope.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.effective_scope = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DeadManSwitchScopeView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -34929,6 +36247,14 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     ts_ns: self.ts_ns,
+                    effective_scope: match self.effective_scope.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DeadManSwitchScope,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -34973,6 +36299,14 @@ pub mod __buffa {
                 if self.ts_ns != 0u64 {
                     size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
                 }
+                if self.effective_scope.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.effective_scope.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -35010,6 +36344,14 @@ pub mod __buffa {
                 }
                 if self.ts_ns != 0u64 {
                     ::buffa::types::put_uint64_field(5u32, self.ts_ns, buf);
+                }
+                if self.effective_scope.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.effective_scope.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -35064,6 +36406,14 @@ pub mod __buffa {
                             "tsNs",
                             &::buffa::json_helpers::ProtoJson(&self.ts_ns),
                         )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .effective_scope
+                        .as_option()
+                    {
+                        __map.serialize_entry("effectiveScope", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -35201,6 +36551,19 @@ pub mod __buffa {
             #[must_use]
             pub fn ts_ns(&self) -> u64 {
                 self.0.reborrow().ts_ns
+            }
+            /// Recorded scope after arming or refreshing. Absent when disabled.
+            /// Describes the current armed switch only. Cancellations already in progress
+            /// are unaffected by a later refresh or disable.
+            ///
+            /// Field 6: `effective_scope`
+            #[must_use]
+            pub fn effective_scope(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DeadManSwitchScopeView<'_>,
+            > {
+                &self.0.reborrow().effective_scope
             }
         }
         impl ::core::convert::From<
@@ -36464,9 +37827,13 @@ pub mod __buffa {
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
             /// Required account-scoped idempotency key for the entire ordered batch.
-            /// Reusing it with the same payload within 15 minutes replays the original
-            /// per-item results and timestamp. Reusing it with a different payload during
-            /// that window returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
+            /// Reusing it with the same payload within 15 minutes returns each decided
+            /// item's original result and result time, and retries the items still
+            /// unresolved, never admitting an already admitted item again. Reusing it
+            /// with a different payload during that window returns
+            /// CONFLICT_IDEMPOTENCY_KEY_REUSE. After 15 minutes the ID is free: a repeat
+            /// is a new request and can place its orders again, so read the items back
+            /// instead of repeating an older batch.
             ///
             /// Field 2: `request_id`
             pub request_id: &'a str,
@@ -36775,9 +38142,13 @@ pub mod __buffa {
                 self.0.reborrow().subaccount_id
             }
             /// Required account-scoped idempotency key for the entire ordered batch.
-            /// Reusing it with the same payload within 15 minutes replays the original
-            /// per-item results and timestamp. Reusing it with a different payload during
-            /// that window returns CONFLICT_IDEMPOTENCY_KEY_REUSE.
+            /// Reusing it with the same payload within 15 minutes returns each decided
+            /// item's original result and result time, and retries the items still
+            /// unresolved, never admitting an already admitted item again. Reusing it
+            /// with a different payload during that window returns
+            /// CONFLICT_IDEMPOTENCY_KEY_REUSE. After 15 minutes the ID is free: a repeat
+            /// is a new request and can place its orders again, so read the items back
+            /// instead of repeating an older batch.
             ///
             /// Field 2: `request_id`
             #[must_use]
@@ -37340,7 +38711,10 @@ pub mod __buffa {
             ///
             /// Field 6: `new_qty_scaled`
             pub new_qty_scaled: ::core::option::Option<i64>,
-            /// Replacement attached-risk policy for the order.
+            /// Replacement attached-risk policy for the order. The order's change and its
+            /// take-profit, stop-loss and trailing legs apply together: either all of
+            /// them change, or the whole modify is refused and the order and its legs
+            /// stay as they were.
             ///
             /// Field 7: `new_attached_risk`
             pub new_attached_risk: ::buffa::MessageFieldView<
@@ -37908,7 +39282,10 @@ pub mod __buffa {
             pub fn new_qty_scaled(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().new_qty_scaled
             }
-            /// Replacement attached-risk policy for the order.
+            /// Replacement attached-risk policy for the order. The order's change and its
+            /// take-profit, stop-loss and trailing legs apply together: either all of
+            /// them change, or the whole modify is refused and the order and its legs
+            /// stay as they were.
             ///
             /// Field 7: `new_attached_risk`
             #[must_use]
@@ -51727,8 +53104,10 @@ pub mod __buffa {
             }
         }
         /// GetOrderResponse returns order details and a bounded execution page.
-        /// Order state, trades and transfers are eventually consistent;
-        /// one page's execution quantities need not equal the order's cumulative quantity.
+        /// The order shows a fill as soon as it executes; its trades are recorded
+        /// shortly after. executions_complete says whether the trades already account
+        /// for every execution the order shows. Transfers are eventually consistent and
+        /// can trail the trades they settle.
         #[derive(Clone, Debug, Default)]
         pub struct GetOrderResponseView<'a> {
             /// Requested order, if found.
@@ -51758,6 +53137,14 @@ pub mod __buffa {
             ///
             /// Field 6: `next_page_token`
             pub next_page_token: &'a str,
+            /// True when the order's trades through its generation, across every page,
+            /// add up exactly to its cum_qty_scaled. False while a recent execution is
+            /// still being recorded: trades then lists the executions recorded so far,
+            /// and a later read returns the rest. Always false when execution history is
+            /// not included.
+            ///
+            /// Field 7: `executions_complete`
+            pub executions_complete: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetOrderResponseView<'a> {
@@ -51822,6 +53209,15 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.executions_complete = ::buffa::types::decode_bool(
+                            &mut cur,
+                        )?;
                     }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -51901,6 +53297,7 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     next_page_token: self.next_page_token.to_string(),
+                    executions_complete: self.executions_complete,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -51945,6 +53342,9 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.next_page_token)
                                 as u32;
                 }
+                if self.executions_complete {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -51983,6 +53383,9 @@ pub mod __buffa {
                 if !self.next_page_token.is_empty() {
                     ::buffa::types::put_string_field(6u32, &self.next_page_token, buf);
                 }
+                if self.executions_complete {
+                    ::buffa::types::put_bool_field(7u32, self.executions_complete, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -52017,6 +53420,13 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
                     __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                if self.executions_complete {
+                    __map
+                        .serialize_entry(
+                            "executionsComplete",
+                            &self.executions_complete,
+                        )?;
                 }
                 __map.end()
             }
@@ -52156,6 +53566,17 @@ pub mod __buffa {
             #[must_use]
             pub fn next_page_token(&self) -> &'_ str {
                 self.0.reborrow().next_page_token
+            }
+            /// True when the order's trades through its generation, across every page,
+            /// add up exactly to its cum_qty_scaled. False while a recent execution is
+            /// still being recorded: trades then lists the executions recorded so far,
+            /// and a later read returns the rest. Always false when execution history is
+            /// not included.
+            ///
+            /// Field 7: `executions_complete`
+            #[must_use]
+            pub fn executions_complete(&self) -> bool {
+                self.0.reborrow().executions_complete
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetOrderResponseView<'static>>>
@@ -54318,6 +55739,7 @@ pub mod __buffa {
         reg.register_json_any(super::__CANCELLED_ORDER_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ALL_ORDERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ALL_AFTER_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DEAD_MAN_SWITCH_SCOPE_JSON_ANY);
         reg.register_json_any(super::__CANCEL_ALL_AFTER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__BATCH_CREATE_ACCEPTED_JSON_ANY);
         reg.register_json_any(super::__BATCH_CREATE_REJECTED_JSON_ANY);
@@ -54458,6 +55880,10 @@ pub use self::__buffa::view::CancelAllOrdersResponseOwnedView;
 pub use self::__buffa::view::CancelAllAfterRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::CancelAllAfterRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeadManSwitchScopeView;
+#[doc(inline)]
+pub use self::__buffa::view::DeadManSwitchScopeOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CancelAllAfterResponseView;
 #[doc(inline)]

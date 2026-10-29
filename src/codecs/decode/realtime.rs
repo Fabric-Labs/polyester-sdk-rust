@@ -19,7 +19,9 @@ use crate::models::{
     OrderBookDeltaUpdate, PriceQtyPair, SubAccount, SubaccountPolicy, Trigger, TriggerEvent,
     UserTrade, ZippedAssetSupplyBatch,
 };
-use crate::models::{OrderCommandOutcome, OrderFill, OrderStreamEvent, OrderUnitEvent, OrdersUnit};
+use crate::models::{
+    OrderCommandOutcome, OrderFill, OrderStreamEvent, OrderUnitEvent, OrdersStale, OrdersUnit,
+};
 use crate::proto::auth::v1::{
     AccountIdentity as ProtoAccountIdentity, AddressBookViewInvalidated, ApiKey as ProtoApiKey,
     ApiPolicyView, Subaccount, SubaccountPolicyView,
@@ -33,7 +35,9 @@ use crate::proto::marketdata::v1::{
 use crate::proto::marketoverview::v1::MarketOverviewBatch;
 use crate::proto::orderbook::v1::OrderBookDelta;
 use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, UserTrade as ProtoUserTrade};
-use crate::proto::privatews::v1::{Unit as ProtoUnit, unit_event};
+use crate::proto::privatews::v1::{
+    Unavailable as ProtoUnavailable, UnavailableReason, Unit as ProtoUnit, unit_event,
+};
 use crate::proto::triggers::v1::{Trigger as ProtoTrigger, TriggerEvent as ProtoTriggerEvent};
 
 fn decode_proto<M: Message + Default>(payload: &[u8]) -> Result<M> {
@@ -206,6 +210,22 @@ pub fn orders_unit_from_proto(msg: &ProtoUnit) -> Result<OrdersUnit> {
     })
 }
 
+/// Decode a private order stream `Unavailable` frame.
+pub fn orders_stale_from_proto(msg: &ProtoUnavailable) -> OrdersStale {
+    OrdersStale {
+        stale: true,
+        reason: match msg.reason.as_known() {
+            Some(UnavailableReason::UNAVAILABLE_REASON_UNSPECIFIED) => String::new(),
+            _ => lowercase_enum_label(msg.reason),
+        },
+        order_ids: msg
+            .order_ids
+            .iter()
+            .map(|id| format_uint64_id(*id))
+            .collect(),
+    }
+}
+
 fn order_unit_event_from_proto(kind: &unit_event::Kind) -> OrderUnitEvent {
     match kind {
         unit_event::Kind::Order(event) => OrderUnitEvent::Order(OrderStreamEvent {
@@ -256,6 +276,46 @@ mod tests {
     use super::*;
     use crate::proto::orders::v1::Order as ProtoOrder;
     use crate::proto::orders::v1::{OrderStatus, OrderType, Side, TimeInForce};
+
+    #[test]
+    fn orders_stale_keeps_reason_and_order_ids() {
+        let cases = [
+            (
+                UnavailableReason::UNAVAILABLE_REASON_UNSPECIFIED.into(),
+                vec![],
+                "",
+                vec![],
+            ),
+            (
+                UnavailableReason::VIEW_BEHIND.into(),
+                vec![],
+                "view_behind",
+                vec![],
+            ),
+            (
+                UnavailableReason::ORDER_UNAVAILABLE.into(),
+                vec![5, 9],
+                "order_unavailable",
+                vec![format_uint64_id(5), format_uint64_id(9)],
+            ),
+            (buffa::EnumValue::from(77), vec![], "UNKNOWN(77)", vec![]),
+        ];
+        for (reason, ids, want_reason, want_ids) in cases {
+            let stale = orders_stale_from_proto(&ProtoUnavailable {
+                reason,
+                order_ids: ids,
+                ..Default::default()
+            });
+            assert_eq!(
+                stale,
+                OrdersStale {
+                    stale: true,
+                    reason: want_reason.into(),
+                    order_ids: want_ids,
+                }
+            );
+        }
+    }
 
     #[test]
     fn orders_unit_decodes_orders_removals_and_events() {

@@ -36903,6 +36903,8 @@ pub enum AuthErrorCode {
     AUTH_SUBACCOUNT_CHALLENGE_INVALID = 44i32,
     /// Social account is already linked to another Polyester account.
     AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED = 45i32,
+    /// The request could not be completed right now and changed nothing. Retry the same request.
+    AUTH_TEMPORARILY_UNAVAILABLE = 46i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -37040,6 +37042,9 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthSocialAccountAlreadyLinked: Self = Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED;
+    ///Idiomatic alias for [`Self::AUTH_TEMPORARILY_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthTemporarilyUnavailable: Self = Self::AUTH_TEMPORARILY_UNAVAILABLE;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -37198,6 +37203,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             45i32 => {
                 ::core::option::Option::Some(Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED)
             }
+            46i32 => ::core::option::Option::Some(Self::AUTH_TEMPORARILY_UNAVAILABLE),
             _ => ::core::option::Option::None,
         }
     }
@@ -37265,6 +37271,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED => {
                 "AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED"
             }
+            Self::AUTH_TEMPORARILY_UNAVAILABLE => "AUTH_TEMPORARILY_UNAVAILABLE",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -37404,6 +37411,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED" => {
                 ::core::option::Option::Some(Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED)
             }
+            "AUTH_TEMPORARILY_UNAVAILABLE" => {
+                ::core::option::Option::Some(Self::AUTH_TEMPORARILY_UNAVAILABLE)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -37454,6 +37464,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_SOCIAL_VERIFICATION_INVALID_STATE,
             Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID,
             Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED,
+            Self::AUTH_TEMPORARILY_UNAVAILABLE,
         ]
     }
 }
