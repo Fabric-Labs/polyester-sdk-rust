@@ -984,6 +984,9 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_PAIR_POST_ONLY = 62i32,
     /// The account had its maximum number of open orders.
     TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL = 64i32,
+    /// The account had its maximum number of resting orders in this market when
+    /// a limit TWAP slice was due.
+    TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_PER_PAIR = 65i32,
     /// The child order's self-trade prevention mode was not accepted.
     TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED = 66i32,
     /// The trading pair was busy with the account's earlier requests.
@@ -1233,6 +1236,9 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MaxOpenOrdersTotal: Self = Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_PER_PAIR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxOpenOrdersPerPair: Self = Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_PER_PAIR;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const StpModeNotAllowed: Self = Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED;
@@ -1661,6 +1667,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL,
                 )
             }
+            65i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_PER_PAIR,
+                )
+            }
             66i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED,
@@ -2039,6 +2050,9 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL => {
                 "TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL"
             }
+            Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_PER_PAIR => {
+                "TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_PER_PAIR"
+            }
             Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED => {
                 "TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED"
             }
@@ -2379,6 +2393,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL,
                 )
             }
+            "TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_PER_PAIR" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_PER_PAIR,
+                )
+            }
             "TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED,
@@ -2668,6 +2687,7 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_MAX_NOTIONAL,
             Self::TRIGGER_FAILURE_REASON_PAIR_POST_ONLY,
             Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_TOTAL,
+            Self::TRIGGER_FAILURE_REASON_MAX_OPEN_ORDERS_PER_PAIR,
             Self::TRIGGER_FAILURE_REASON_STP_MODE_NOT_ALLOWED,
             Self::TRIGGER_FAILURE_REASON_PAIR_BACKLOGGED,
             Self::TRIGGER_FAILURE_REASON_MODE_NOT_SUPPORTED,

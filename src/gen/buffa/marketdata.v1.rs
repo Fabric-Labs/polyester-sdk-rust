@@ -8021,6 +8021,58 @@ pub struct PairConfig {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub reference_price_scale: u32,
+    /// Largest quantity of one limit order, as a decimal string in base-asset
+    /// units. A replace is checked on its new total less the quantity already
+    /// filled. An order above it is rejected with MAX_QTY. Absent when the pair
+    /// has no maximum.
+    ///
+    /// Field 20: `max_limit_qty_base`
+    #[serde(
+        rename = "maxLimitQtyBase",
+        alias = "max_limit_qty_base",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub max_limit_qty_base: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Largest quantity of one market order, as a decimal string in base-asset
+    /// units. A market order sized by quote amount is checked once converted to
+    /// base. An order above it is rejected with MAX_QTY. Absent when the pair
+    /// has no maximum.
+    ///
+    /// Field 21: `max_market_qty_base`
+    #[serde(
+        rename = "maxMarketQtyBase",
+        alias = "max_market_qty_base",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub max_market_qty_base: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Largest notional of one order, as a decimal string in quote-asset units:
+    /// its quantity times its limit price, or times its protection price for a
+    /// market order, compared exactly with no rounding. An order above it is
+    /// rejected with MAX_NOTIONAL. Absent when the pair has no maximum.
+    ///
+    /// Field 22: `max_order_notional_quote`
+    #[serde(
+        rename = "maxOrderNotionalQuote",
+        alias = "max_order_notional_quote",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub max_order_notional_quote: ::core::option::Option<::buffa::alloc::string::String>,
+    /// The venue's default limit on resting orders a typical account may hold on
+    /// this pair at once: good-till-cancelled and good-till-date orders that have
+    /// not ended. Immediate-or-cancel, fill-or-kill and market orders never
+    /// count, and a replaced order keeps its place. An order past it is rejected
+    /// with MAX_OPEN_ORDERS_PER_PAIR. An account may have a lower limit of its
+    /// own; that is not part of this public configuration and would be returned
+    /// by an account-scoped read.
+    ///
+    /// Field 23: `max_open_orders_per_pair`
+    #[serde(
+        rename = "maxOpenOrdersPerPair",
+        alias = "max_open_orders_per_pair",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub max_open_orders_per_pair: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8053,6 +8105,10 @@ impl ::core::fmt::Debug for PairConfig {
             )
             .field("max_client_ref_drift_bps", &self.max_client_ref_drift_bps)
             .field("reference_price_scale", &self.reference_price_scale)
+            .field("max_limit_qty_base", &self.max_limit_qty_base)
+            .field("max_market_qty_base", &self.max_market_qty_base)
+            .field("max_order_notional_quote", &self.max_order_notional_quote)
+            .field("max_open_orders_per_pair", &self.max_open_orders_per_pair)
             .finish()
     }
 }
@@ -8062,6 +8118,38 @@ impl PairConfig {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.PairConfig";
+}
+impl PairConfig {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::max_limit_qty_base`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_max_limit_qty_base(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.max_limit_qty_base = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::max_market_qty_base`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_max_market_qty_base(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.max_market_qty_base = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::max_order_notional_quote`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_max_order_notional_quote(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.max_order_notional_quote = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(PairConfig);
 impl ::buffa::MessageName for PairConfig {
@@ -8179,6 +8267,21 @@ impl ::buffa::Message for PairConfig {
                     + ::buffa::types::uint32_encoded_len(self.reference_price_scale)
                         as u32;
         }
+        if let Some(ref v) = self.max_limit_qty_base {
+            size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if let Some(ref v) = self.max_market_qty_base {
+            size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if let Some(ref v) = self.max_order_notional_quote {
+            size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if self.max_open_orders_per_pair != 0u32 {
+            size
+                += 2u32
+                    + ::buffa::types::uint32_encoded_len(self.max_open_orders_per_pair)
+                        as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8259,6 +8362,18 @@ impl ::buffa::Message for PairConfig {
         }
         if self.reference_price_scale != 0u32 {
             ::buffa::types::put_uint32_field(19u32, self.reference_price_scale, buf);
+        }
+        if let Some(ref v) = self.max_limit_qty_base {
+            ::buffa::types::put_string_field(20u32, v, buf);
+        }
+        if let Some(ref v) = self.max_market_qty_base {
+            ::buffa::types::put_string_field(21u32, v, buf);
+        }
+        if let Some(ref v) = self.max_order_notional_quote {
+            ::buffa::types::put_string_field(22u32, v, buf);
+        }
+        if self.max_open_orders_per_pair != 0u32 {
+            ::buffa::types::put_uint32_field(23u32, self.max_open_orders_per_pair, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8424,6 +8539,49 @@ impl ::buffa::Message for PairConfig {
                 )?;
                 self.reference_price_scale = ::buffa::types::decode_uint32(buf)?;
             }
+            20u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .max_limit_qty_base
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            21u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .max_market_qty_base
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            22u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .max_order_notional_quote
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            23u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_open_orders_per_pair = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8451,6 +8609,10 @@ impl ::buffa::Message for PairConfig {
         self.default_market_slippage_bps_sell = 0i32;
         self.max_client_ref_drift_bps = 0i32;
         self.reference_price_scale = 0u32;
+        self.max_limit_qty_base = ::core::option::Option::None;
+        self.max_market_qty_base = ::core::option::Option::None;
+        self.max_order_notional_quote = ::core::option::Option::None;
+        self.max_open_orders_per_pair = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8618,6 +8780,23 @@ pub struct GetSpotConfigResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub ts_sec: u64,
+    /// The venue's default limit on resting orders a typical account may hold
+    /// across all pairs together: good-till-cancelled and good-till-date orders
+    /// that have not ended. Immediate-or-cancel, fill-or-kill and market orders
+    /// never count, and a replaced order keeps its place. An order past it is
+    /// rejected with MAX_OPEN_ORDERS_TOTAL. Each pair's own limit is
+    /// PairConfig.max_open_orders_per_pair. An account may have a lower limit of
+    /// its own; that is not part of this public configuration and would be
+    /// returned by an account-scoped read.
+    ///
+    /// Field 4: `max_open_orders_total`
+    #[serde(
+        rename = "maxOpenOrdersTotal",
+        alias = "max_open_orders_total",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub max_open_orders_total: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8628,6 +8807,7 @@ impl ::core::fmt::Debug for GetSpotConfigResponse {
             .field("assets", &self.assets)
             .field("pairs", &self.pairs)
             .field("ts_sec", &self.ts_sec)
+            .field("max_open_orders_total", &self.max_open_orders_total)
             .finish()
     }
 }
@@ -8675,6 +8855,12 @@ impl ::buffa::Message for GetSpotConfigResponse {
         if self.ts_sec != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_sec) as u32;
         }
+        if self.max_open_orders_total != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.max_open_orders_total)
+                        as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8695,6 +8881,9 @@ impl ::buffa::Message for GetSpotConfigResponse {
         }
         if self.ts_sec != 0u64 {
             ::buffa::types::put_uint64_field(3u32, self.ts_sec, buf);
+        }
+        if self.max_open_orders_total != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.max_open_orders_total, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8734,6 +8923,13 @@ impl ::buffa::Message for GetSpotConfigResponse {
                 )?;
                 self.ts_sec = ::buffa::types::decode_uint64(buf)?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_open_orders_total = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8745,6 +8941,7 @@ impl ::buffa::Message for GetSpotConfigResponse {
         self.assets.clear();
         self.pairs.clear();
         self.ts_sec = 0u64;
+        self.max_open_orders_total = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -20256,6 +20453,37 @@ pub mod __buffa {
             ///
             /// Field 19: `reference_price_scale`
             pub reference_price_scale: u32,
+            /// Largest quantity of one limit order, as a decimal string in base-asset
+            /// units. A replace is checked on its new total less the quantity already
+            /// filled. An order above it is rejected with MAX_QTY. Absent when the pair
+            /// has no maximum.
+            ///
+            /// Field 20: `max_limit_qty_base`
+            pub max_limit_qty_base: ::core::option::Option<&'a str>,
+            /// Largest quantity of one market order, as a decimal string in base-asset
+            /// units. A market order sized by quote amount is checked once converted to
+            /// base. An order above it is rejected with MAX_QTY. Absent when the pair
+            /// has no maximum.
+            ///
+            /// Field 21: `max_market_qty_base`
+            pub max_market_qty_base: ::core::option::Option<&'a str>,
+            /// Largest notional of one order, as a decimal string in quote-asset units:
+            /// its quantity times its limit price, or times its protection price for a
+            /// market order, compared exactly with no rounding. An order above it is
+            /// rejected with MAX_NOTIONAL. Absent when the pair has no maximum.
+            ///
+            /// Field 22: `max_order_notional_quote`
+            pub max_order_notional_quote: ::core::option::Option<&'a str>,
+            /// The venue's default limit on resting orders a typical account may hold on
+            /// this pair at once: good-till-cancelled and good-till-date orders that have
+            /// not ended. Immediate-or-cancel, fill-or-kill and market orders never
+            /// count, and a replaced order keeps its place. An order past it is rejected
+            /// with MAX_OPEN_ORDERS_PER_PAIR. An account may have a lower limit of its
+            /// own; that is not part of this public configuration and would be returned
+            /// by an account-scoped read.
+            ///
+            /// Field 23: `max_open_orders_per_pair`
+            pub max_open_orders_per_pair: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for PairConfigView<'a> {
@@ -20492,6 +20720,42 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    20u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.max_limit_qty_base = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    21u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.max_market_qty_base = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    22u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.max_order_notional_quote = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    23u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_open_orders_per_pair = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -20557,6 +20821,12 @@ pub mod __buffa {
                         .default_market_slippage_bps_sell,
                     max_client_ref_drift_bps: self.max_client_ref_drift_bps,
                     reference_price_scale: self.reference_price_scale,
+                    max_limit_qty_base: self.max_limit_qty_base.map(|s| s.to_string()),
+                    max_market_qty_base: self.max_market_qty_base.map(|s| s.to_string()),
+                    max_order_notional_quote: self
+                        .max_order_notional_quote
+                        .map(|s| s.to_string()),
+                    max_open_orders_per_pair: self.max_open_orders_per_pair,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -20691,6 +20961,22 @@ pub mod __buffa {
                                 self.reference_price_scale,
                             ) as u32;
                 }
+                if let Some(ref v) = self.max_limit_qty_base {
+                    size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if let Some(ref v) = self.max_market_qty_base {
+                    size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if let Some(ref v) = self.max_order_notional_quote {
+                    size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if self.max_open_orders_per_pair != 0u32 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint32_encoded_len(
+                                self.max_open_orders_per_pair,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -20806,6 +21092,22 @@ pub mod __buffa {
                     ::buffa::types::put_uint32_field(
                         19u32,
                         self.reference_price_scale,
+                        buf,
+                    );
+                }
+                if let Some(ref v) = self.max_limit_qty_base {
+                    ::buffa::types::put_string_field(20u32, v, buf);
+                }
+                if let Some(ref v) = self.max_market_qty_base {
+                    ::buffa::types::put_string_field(21u32, v, buf);
+                }
+                if let Some(ref v) = self.max_order_notional_quote {
+                    ::buffa::types::put_string_field(22u32, v, buf);
+                }
+                if self.max_open_orders_per_pair != 0u32 {
+                    ::buffa::types::put_uint32_field(
+                        23u32,
+                        self.max_open_orders_per_pair,
                         buf,
                     );
                 }
@@ -20953,6 +21255,27 @@ pub mod __buffa {
                             "referencePriceScale",
                             &::buffa::json_helpers::ProtoJson(
                                 &self.reference_price_scale,
+                            ),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.max_limit_qty_base {
+                    __map.serialize_entry("maxLimitQtyBase", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.max_market_qty_base {
+                    __map.serialize_entry("maxMarketQtyBase", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.max_order_notional_quote
+                {
+                    __map.serialize_entry("maxOrderNotionalQuote", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.max_open_orders_per_pair,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "maxOpenOrdersPerPair",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.max_open_orders_per_pair,
                             ),
                         )?;
                 }
@@ -21201,6 +21524,49 @@ pub mod __buffa {
             #[must_use]
             pub fn reference_price_scale(&self) -> u32 {
                 self.0.reborrow().reference_price_scale
+            }
+            /// Largest quantity of one limit order, as a decimal string in base-asset
+            /// units. A replace is checked on its new total less the quantity already
+            /// filled. An order above it is rejected with MAX_QTY. Absent when the pair
+            /// has no maximum.
+            ///
+            /// Field 20: `max_limit_qty_base`
+            #[must_use]
+            pub fn max_limit_qty_base(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().max_limit_qty_base
+            }
+            /// Largest quantity of one market order, as a decimal string in base-asset
+            /// units. A market order sized by quote amount is checked once converted to
+            /// base. An order above it is rejected with MAX_QTY. Absent when the pair
+            /// has no maximum.
+            ///
+            /// Field 21: `max_market_qty_base`
+            #[must_use]
+            pub fn max_market_qty_base(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().max_market_qty_base
+            }
+            /// Largest notional of one order, as a decimal string in quote-asset units:
+            /// its quantity times its limit price, or times its protection price for a
+            /// market order, compared exactly with no rounding. An order above it is
+            /// rejected with MAX_NOTIONAL. Absent when the pair has no maximum.
+            ///
+            /// Field 22: `max_order_notional_quote`
+            #[must_use]
+            pub fn max_order_notional_quote(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().max_order_notional_quote
+            }
+            /// The venue's default limit on resting orders a typical account may hold on
+            /// this pair at once: good-till-cancelled and good-till-date orders that have
+            /// not ended. Immediate-or-cancel, fill-or-kill and market orders never
+            /// count, and a replaced order keeps its place. An order past it is rejected
+            /// with MAX_OPEN_ORDERS_PER_PAIR. An account may have a lower limit of its
+            /// own; that is not part of this public configuration and would be returned
+            /// by an account-scoped read.
+            ///
+            /// Field 23: `max_open_orders_per_pair`
+            #[must_use]
+            pub fn max_open_orders_per_pair(&self) -> u32 {
+                self.0.reborrow().max_open_orders_per_pair
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<PairConfigView<'static>>>
@@ -21495,6 +21861,17 @@ pub mod __buffa {
             ///
             /// Field 3: `ts_sec`
             pub ts_sec: u64,
+            /// The venue's default limit on resting orders a typical account may hold
+            /// across all pairs together: good-till-cancelled and good-till-date orders
+            /// that have not ended. Immediate-or-cancel, fill-or-kill and market orders
+            /// never count, and a replaced order keeps its place. An order past it is
+            /// rejected with MAX_OPEN_ORDERS_TOTAL. Each pair's own limit is
+            /// PairConfig.max_open_orders_per_pair. An account may have a lower limit of
+            /// its own; that is not part of this public configuration and would be
+            /// returned by an account-scoped read.
+            ///
+            /// Field 4: `max_open_orders_total`
+            pub max_open_orders_total: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetSpotConfigResponseView<'a> {
@@ -21534,6 +21911,15 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.ts_sec = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_open_orders_total = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -21605,6 +21991,7 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     ts_sec: self.ts_sec,
+                    max_open_orders_total: self.max_open_orders_total,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -21639,6 +22026,13 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_sec) as u32;
                 }
+                if self.max_open_orders_total != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(
+                                self.max_open_orders_total,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -21668,6 +22062,13 @@ pub mod __buffa {
                 }
                 if self.ts_sec != 0u64 {
                     ::buffa::types::put_uint64_field(3u32, self.ts_sec, buf);
+                }
+                if self.max_open_orders_total != 0u32 {
+                    ::buffa::types::put_uint32_field(
+                        4u32,
+                        self.max_open_orders_total,
+                        buf,
+                    );
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -21701,6 +22102,17 @@ pub mod __buffa {
                         .serialize_entry(
                             "tsSec",
                             &::buffa::json_helpers::ProtoJson(&self.ts_sec),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.max_open_orders_total,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "maxOpenOrdersTotal",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.max_open_orders_total,
+                            ),
                         )?;
                 }
                 __map.end()
@@ -21829,6 +22241,20 @@ pub mod __buffa {
             #[must_use]
             pub fn ts_sec(&self) -> u64 {
                 self.0.reborrow().ts_sec
+            }
+            /// The venue's default limit on resting orders a typical account may hold
+            /// across all pairs together: good-till-cancelled and good-till-date orders
+            /// that have not ended. Immediate-or-cancel, fill-or-kill and market orders
+            /// never count, and a replaced order keeps its place. An order past it is
+            /// rejected with MAX_OPEN_ORDERS_TOTAL. Each pair's own limit is
+            /// PairConfig.max_open_orders_per_pair. An account may have a lower limit of
+            /// its own; that is not part of this public configuration and would be
+            /// returned by an account-scoped read.
+            ///
+            /// Field 4: `max_open_orders_total`
+            #[must_use]
+            pub fn max_open_orders_total(&self) -> u32 {
+                self.0.reborrow().max_open_orders_total
             }
         }
         impl ::core::convert::From<

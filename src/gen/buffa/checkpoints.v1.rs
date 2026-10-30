@@ -2392,11 +2392,24 @@ pub struct AssetAmount {
     pub amount: ::buffa::alloc::string::String,
     /// USD value, encoded as a base-10 decimal string without separators or a
     /// currency symbol. Omitted when the asset had no USD price at the required
-    /// time.
+    /// time, and always when excluded_from_value is true.
     ///
     /// Field 3: `usd`
     #[serde(rename = "usd", skip_serializing_if = "::core::option::Option::is_none")]
     pub usd: ::core::option::Option<::buffa::alloc::string::String>,
+    /// True when the asset does not count toward account value, for example a
+    /// test token that cannot be traded. It is listed by amount only, has no
+    /// USD value and is left out of every USD total, which it never makes
+    /// approximate or omitted.
+    ///
+    /// Field 4: `excluded_from_value`
+    #[serde(
+        rename = "excludedFromValue",
+        alias = "excluded_from_value",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub excluded_from_value: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2407,6 +2420,7 @@ impl ::core::fmt::Debug for AssetAmount {
             .field("asset", &self.asset)
             .field("amount", &self.amount)
             .field("usd", &self.usd)
+            .field("excluded_from_value", &self.excluded_from_value)
             .finish()
     }
 }
@@ -2453,6 +2467,9 @@ impl ::buffa::Message for AssetAmount {
         if let Some(ref v) = self.usd {
             size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
+        if self.excluded_from_value {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -2471,6 +2488,9 @@ impl ::buffa::Message for AssetAmount {
         }
         if let Some(ref v) = self.usd {
             ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if self.excluded_from_value {
+            ::buffa::types::put_bool_field(4u32, self.excluded_from_value, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2509,6 +2529,13 @@ impl ::buffa::Message for AssetAmount {
                     buf,
                 )?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.excluded_from_value = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2520,6 +2547,7 @@ impl ::buffa::Message for AssetAmount {
         self.asset.clear();
         self.amount.clear();
         self.usd = ::core::option::Option::None;
+        self.excluded_from_value = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2558,7 +2586,8 @@ pub const __ASSET_AMOUNT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct FlowTotal {
-    /// Number of operations.
+    /// Number of operations, including operations in assets excluded from
+    /// value.
     ///
     /// Field 1: `count`
     #[serde(
@@ -2567,9 +2596,10 @@ pub struct FlowTotal {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub count: u64,
-    /// USD total, encoded as a non-negative base-10 decimal string without
-    /// separators or a currency symbol. Omitted when any operation had no USD
-    /// value.
+    /// USD total over assets that count toward account value, encoded as a
+    /// non-negative base-10 decimal string without separators or a currency
+    /// symbol. Assets excluded from value add nothing. Omitted when any other
+    /// operation had no USD value.
     ///
     /// Field 2: `usd`
     #[serde(rename = "usd", skip_serializing_if = "::core::option::Option::is_none")]
@@ -2928,7 +2958,7 @@ pub struct FundingFlowSummary {
     )]
     pub chains: ::buffa::alloc::vec::Vec<ChainFlow>,
     /// Totals per asset, by asset ascending, each valued in USD when it was
-    /// made.
+    /// made. Assets excluded from value are listed by amount only.
     ///
     /// Field 3: `amounts`
     #[serde(
@@ -3096,7 +3126,8 @@ pub const __FUNDING_FLOW_SUMMARY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
     from_json: ::buffa::type_registry::any_from_json::<FundingFlowSummary>,
     is_wkt: false,
 };
-/// FundingDay is the deposit and withdrawal value of one UTC day.
+/// FundingDay is the deposit and withdrawal value of one UTC day, over assets
+/// that count toward account value; assets excluded from value add nothing.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -3696,7 +3727,8 @@ pub struct Checkpoint {
     )]
     pub portfolio_value: ::buffa::alloc::vec::Vec<PortfolioValuePoint>,
     /// Trading balance per asset at the end of the season, valued in USD at that
-    /// time. Shown for the record only.
+    /// time; assets excluded from value are listed by amount only. Shown for
+    /// the record only.
     ///
     /// Field 39: `trading_balances`
     #[serde(
@@ -3707,7 +3739,8 @@ pub struct Checkpoint {
     )]
     pub trading_balances: ::buffa::alloc::vec::Vec<AssetAmount>,
     /// Funding balance per asset at the end of the season, valued in USD at that
-    /// time. Shown for the record only.
+    /// time; assets excluded from value are listed by amount only. Shown for
+    /// the record only.
     ///
     /// Field 40: `funding_balances`
     #[serde(
@@ -3783,7 +3816,7 @@ pub struct Checkpoint {
     )]
     pub daily_claims: u64,
     /// Daily claim totals per asset, by asset ascending, each valued in USD
-    /// when it was paid.
+    /// when it was paid. Assets excluded from value are listed by amount only.
     ///
     /// Field 48: `daily_claim_amounts`
     #[serde(
@@ -3794,9 +3827,10 @@ pub struct Checkpoint {
     )]
     pub daily_claim_amounts: ::buffa::alloc::vec::Vec<AssetAmount>,
     /// USD value brought in during the season: daily claim payouts, deposits
-    /// and transfers in, each valued when it happened. Encoded as a
-    /// non-negative base-10 decimal string without separators or a currency
-    /// symbol. Omitted when any part had no USD value.
+    /// and transfers in, each valued when it happened, over assets that count
+    /// toward account value; assets excluded from value add nothing. Encoded as
+    /// a non-negative base-10 decimal string without separators or a currency
+    /// symbol. Omitted when any other part had no USD value.
     ///
     /// Field 49: `inflow_usd`
     #[serde(
@@ -3806,9 +3840,10 @@ pub struct Checkpoint {
     )]
     pub inflow_usd: ::core::option::Option<::buffa::alloc::string::String>,
     /// USD value taken out during the season: withdrawals and transfers out,
-    /// each valued when it happened. Encoded as a non-negative base-10 decimal
-    /// string without separators or a currency symbol. Omitted when any part had
-    /// no USD value.
+    /// each valued when it happened, over assets that count toward account
+    /// value; assets excluded from value add nothing. Encoded as a non-negative
+    /// base-10 decimal string without separators or a currency symbol. Omitted
+    /// when any other part had no USD value.
     ///
     /// Field 50: `outflow_usd`
     #[serde(
@@ -3827,9 +3862,10 @@ pub struct Checkpoint {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub net_inflow_usd: ::core::option::Option<::buffa::alloc::string::String>,
-    /// USD value of all trading and funding balances at the end of the season,
-    /// encoded as a base-10 decimal string. Omitted when any balance had no USD
-    /// value.
+    /// USD value of all trading and funding balances at the end of the season
+    /// that count toward account value, encoded as a base-10 decimal string.
+    /// Assets excluded from value add nothing. Omitted when any other balance
+    /// had no USD value.
     ///
     /// Field 52: `final_value_usd`
     #[serde(
@@ -9044,10 +9080,17 @@ pub mod __buffa {
             pub amount: &'a str,
             /// USD value, encoded as a base-10 decimal string without separators or a
             /// currency symbol. Omitted when the asset had no USD price at the required
-            /// time.
+            /// time, and always when excluded_from_value is true.
             ///
             /// Field 3: `usd`
             pub usd: ::core::option::Option<&'a str>,
+            /// True when the asset does not count toward account value, for example a
+            /// test token that cannot be traded. It is listed by amount only, has no
+            /// USD value and is left out of every USD total, which it never makes
+            /// approximate or omitted.
+            ///
+            /// Field 4: `excluded_from_value`
+            pub excluded_from_value: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AssetAmountView<'a> {
@@ -9102,6 +9145,15 @@ pub mod __buffa {
                         )?;
                         view.usd = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.excluded_from_value = ::buffa::types::decode_bool(
+                            &mut cur,
+                        )?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -9134,6 +9186,7 @@ pub mod __buffa {
                     asset: self.asset.to_string(),
                     amount: self.amount.to_string(),
                     usd: self.usd.map(|s| s.to_string()),
+                    excluded_from_value: self.excluded_from_value,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -9160,6 +9213,9 @@ pub mod __buffa {
                 if let Some(ref v) = self.usd {
                     size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
+                if self.excluded_from_value {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -9179,6 +9235,9 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.usd {
                     ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                if self.excluded_from_value {
+                    ::buffa::types::put_bool_field(4u32, self.excluded_from_value, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -9209,6 +9268,13 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.usd {
                     __map.serialize_entry("usd", __v)?;
+                }
+                if self.excluded_from_value {
+                    __map
+                        .serialize_entry(
+                            "excludedFromValue",
+                            &self.excluded_from_value,
+                        )?;
                 }
                 __map.end()
             }
@@ -9321,12 +9387,22 @@ pub mod __buffa {
             }
             /// USD value, encoded as a base-10 decimal string without separators or a
             /// currency symbol. Omitted when the asset had no USD price at the required
-            /// time.
+            /// time, and always when excluded_from_value is true.
             ///
             /// Field 3: `usd`
             #[must_use]
             pub fn usd(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().usd
+            }
+            /// True when the asset does not count toward account value, for example a
+            /// test token that cannot be traded. It is listed by amount only, has no
+            /// USD value and is left out of every USD total, which it never makes
+            /// approximate or omitted.
+            ///
+            /// Field 4: `excluded_from_value`
+            #[must_use]
+            pub fn excluded_from_value(&self) -> bool {
+                self.0.reborrow().excluded_from_value
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AssetAmountView<'static>>>
@@ -9363,13 +9439,15 @@ pub mod __buffa {
         /// happened.
         #[derive(Clone, Debug, Default)]
         pub struct FlowTotalView<'a> {
-            /// Number of operations.
+            /// Number of operations, including operations in assets excluded from
+            /// value.
             ///
             /// Field 1: `count`
             pub count: u64,
-            /// USD total, encoded as a non-negative base-10 decimal string without
-            /// separators or a currency symbol. Omitted when any operation had no USD
-            /// value.
+            /// USD total over assets that count toward account value, encoded as a
+            /// non-negative base-10 decimal string without separators or a currency
+            /// symbol. Assets excluded from value add nothing. Omitted when any other
+            /// operation had no USD value.
             ///
             /// Field 2: `usd`
             pub usd: ::core::option::Option<&'a str>,
@@ -9604,16 +9682,18 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Number of operations.
+            /// Number of operations, including operations in assets excluded from
+            /// value.
             ///
             /// Field 1: `count`
             #[must_use]
             pub fn count(&self) -> u64 {
                 self.0.reborrow().count
             }
-            /// USD total, encoded as a non-negative base-10 decimal string without
-            /// separators or a currency symbol. Omitted when any operation had no USD
-            /// value.
+            /// USD total over assets that count toward account value, encoded as a
+            /// non-negative base-10 decimal string without separators or a currency
+            /// symbol. Assets excluded from value add nothing. Omitted when any other
+            /// operation had no USD value.
             ///
             /// Field 2: `usd`
             #[must_use]
@@ -10037,7 +10117,7 @@ pub mod __buffa {
                 super::super::__buffa::view::ChainFlowView<'a>,
             >,
             /// Totals per asset, by asset ascending, each valued in USD when it was
-            /// made.
+            /// made. Assets excluded from value are listed by amount only.
             ///
             /// Field 3: `amounts`
             pub amounts: ::buffa::RepeatedView<
@@ -10368,7 +10448,7 @@ pub mod __buffa {
                 &self.0.reborrow().chains
             }
             /// Totals per asset, by asset ascending, each valued in USD when it was
-            /// made.
+            /// made. Assets excluded from value are listed by amount only.
             ///
             /// Field 3: `amounts`
             #[must_use]
@@ -10411,7 +10491,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// FundingDay is the deposit and withdrawal value of one UTC day.
+        /// FundingDay is the deposit and withdrawal value of one UTC day, over assets
+        /// that count toward account value; assets excluded from value add nothing.
         #[derive(Clone, Debug, Default)]
         pub struct FundingDayView<'a> {
             /// UTC date, formatted as YYYY-MM-DD.
@@ -10938,7 +11019,8 @@ pub mod __buffa {
                 super::super::__buffa::view::PortfolioValuePointView<'a>,
             >,
             /// Trading balance per asset at the end of the season, valued in USD at that
-            /// time. Shown for the record only.
+            /// time; assets excluded from value are listed by amount only. Shown for
+            /// the record only.
             ///
             /// Field 39: `trading_balances`
             pub trading_balances: ::buffa::RepeatedView<
@@ -10946,7 +11028,8 @@ pub mod __buffa {
                 super::super::__buffa::view::AssetAmountView<'a>,
             >,
             /// Funding balance per asset at the end of the season, valued in USD at that
-            /// time. Shown for the record only.
+            /// time; assets excluded from value are listed by amount only. Shown for
+            /// the record only.
             ///
             /// Field 40: `funding_balances`
             pub funding_balances: ::buffa::RepeatedView<
@@ -10994,7 +11077,7 @@ pub mod __buffa {
             /// Field 47: `daily_claims`
             pub daily_claims: u64,
             /// Daily claim totals per asset, by asset ascending, each valued in USD
-            /// when it was paid.
+            /// when it was paid. Assets excluded from value are listed by amount only.
             ///
             /// Field 48: `daily_claim_amounts`
             pub daily_claim_amounts: ::buffa::RepeatedView<
@@ -11002,16 +11085,18 @@ pub mod __buffa {
                 super::super::__buffa::view::AssetAmountView<'a>,
             >,
             /// USD value brought in during the season: daily claim payouts, deposits
-            /// and transfers in, each valued when it happened. Encoded as a
-            /// non-negative base-10 decimal string without separators or a currency
-            /// symbol. Omitted when any part had no USD value.
+            /// and transfers in, each valued when it happened, over assets that count
+            /// toward account value; assets excluded from value add nothing. Encoded as
+            /// a non-negative base-10 decimal string without separators or a currency
+            /// symbol. Omitted when any other part had no USD value.
             ///
             /// Field 49: `inflow_usd`
             pub inflow_usd: ::core::option::Option<&'a str>,
             /// USD value taken out during the season: withdrawals and transfers out,
-            /// each valued when it happened. Encoded as a non-negative base-10 decimal
-            /// string without separators or a currency symbol. Omitted when any part had
-            /// no USD value.
+            /// each valued when it happened, over assets that count toward account
+            /// value; assets excluded from value add nothing. Encoded as a non-negative
+            /// base-10 decimal string without separators or a currency symbol. Omitted
+            /// when any other part had no USD value.
             ///
             /// Field 50: `outflow_usd`
             pub outflow_usd: ::core::option::Option<&'a str>,
@@ -11020,9 +11105,10 @@ pub mod __buffa {
             ///
             /// Field 51: `net_inflow_usd`
             pub net_inflow_usd: ::core::option::Option<&'a str>,
-            /// USD value of all trading and funding balances at the end of the season,
-            /// encoded as a base-10 decimal string. Omitted when any balance had no USD
-            /// value.
+            /// USD value of all trading and funding balances at the end of the season
+            /// that count toward account value, encoded as a base-10 decimal string.
+            /// Assets excluded from value add nothing. Omitted when any other balance
+            /// had no USD value.
             ///
             /// Field 52: `final_value_usd`
             pub final_value_usd: ::core::option::Option<&'a str>,
@@ -13457,7 +13543,8 @@ pub mod __buffa {
                 &self.0.reborrow().portfolio_value
             }
             /// Trading balance per asset at the end of the season, valued in USD at that
-            /// time. Shown for the record only.
+            /// time; assets excluded from value are listed by amount only. Shown for
+            /// the record only.
             ///
             /// Field 39: `trading_balances`
             #[must_use]
@@ -13470,7 +13557,8 @@ pub mod __buffa {
                 &self.0.reborrow().trading_balances
             }
             /// Funding balance per asset at the end of the season, valued in USD at that
-            /// time. Shown for the record only.
+            /// time; assets excluded from value are listed by amount only. Shown for
+            /// the record only.
             ///
             /// Field 40: `funding_balances`
             #[must_use]
@@ -13554,7 +13642,7 @@ pub mod __buffa {
                 self.0.reborrow().daily_claims
             }
             /// Daily claim totals per asset, by asset ascending, each valued in USD
-            /// when it was paid.
+            /// when it was paid. Assets excluded from value are listed by amount only.
             ///
             /// Field 48: `daily_claim_amounts`
             #[must_use]
@@ -13567,9 +13655,10 @@ pub mod __buffa {
                 &self.0.reborrow().daily_claim_amounts
             }
             /// USD value brought in during the season: daily claim payouts, deposits
-            /// and transfers in, each valued when it happened. Encoded as a
-            /// non-negative base-10 decimal string without separators or a currency
-            /// symbol. Omitted when any part had no USD value.
+            /// and transfers in, each valued when it happened, over assets that count
+            /// toward account value; assets excluded from value add nothing. Encoded as
+            /// a non-negative base-10 decimal string without separators or a currency
+            /// symbol. Omitted when any other part had no USD value.
             ///
             /// Field 49: `inflow_usd`
             #[must_use]
@@ -13577,9 +13666,10 @@ pub mod __buffa {
                 self.0.reborrow().inflow_usd
             }
             /// USD value taken out during the season: withdrawals and transfers out,
-            /// each valued when it happened. Encoded as a non-negative base-10 decimal
-            /// string without separators or a currency symbol. Omitted when any part had
-            /// no USD value.
+            /// each valued when it happened, over assets that count toward account
+            /// value; assets excluded from value add nothing. Encoded as a non-negative
+            /// base-10 decimal string without separators or a currency symbol. Omitted
+            /// when any other part had no USD value.
             ///
             /// Field 50: `outflow_usd`
             #[must_use]
@@ -13594,9 +13684,10 @@ pub mod __buffa {
             pub fn net_inflow_usd(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().net_inflow_usd
             }
-            /// USD value of all trading and funding balances at the end of the season,
-            /// encoded as a base-10 decimal string. Omitted when any balance had no USD
-            /// value.
+            /// USD value of all trading and funding balances at the end of the season
+            /// that count toward account value, encoded as a base-10 decimal string.
+            /// Assets excluded from value add nothing. Omitted when any other balance
+            /// had no USD value.
             ///
             /// Field 52: `final_value_usd`
             #[must_use]
