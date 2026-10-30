@@ -1269,6 +1269,12 @@ pub enum ErrorCode {
     /// it may have been created; read the triggers for its client trigger ID
     /// before retrying.
     ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN = 304i32,
+    /// The account has reached its maximum number of resting orders in this
+    /// market. Good-till-cancelled and good-till-date orders count until they
+    /// end; immediate-or-cancel, fill-or-kill and market orders never count, and
+    /// a replace keeps its order's place. Nothing changed; cancel a resting order
+    /// in this market first.
+    ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR = 306i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1823,6 +1829,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TriggerCreateOutcomeUnknown: Self = Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxOpenOrdersPerPair: Self = Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -2420,6 +2429,9 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
                 )
             }
+            306i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -2811,6 +2823,9 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN => {
                 "ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN"
+            }
+            Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR => {
+                "ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR"
             }
         }
     }
@@ -3468,6 +3483,9 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
                 )
             }
+            "ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -3657,6 +3675,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
             Self::ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN,
             Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
+            Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR,
         ]
     }
 }
@@ -8392,6 +8411,19 @@ pub struct ErrorDetail {
     pub rate_limit: ::buffa::MessageField<
         super::super::polyester::ratelimit::v1::RateLimitDetail,
     >,
+    /// Public order ID holding this account's client order ID when a create is
+    /// rejected with CONFLICT_DUPLICATE_CLIENT_ORDER_ID. Present only when an
+    /// existing holder is known; omitted for duplicates rejected within the same
+    /// batch before an order is assigned. Use GetOrder to obtain its current state.
+    ///
+    /// Field 4: `existing_order_id`
+    #[serde(
+        rename = "existingOrderId",
+        alias = "existing_order_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub existing_order_id: ::core::option::Option<u64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8402,6 +8434,7 @@ impl ::core::fmt::Debug for ErrorDetail {
             .field("code", &self.code)
             .field("violations", &self.violations)
             .field("rate_limit", &self.rate_limit)
+            .field("existing_order_id", &self.existing_order_id)
             .finish()
     }
 }
@@ -8411,6 +8444,15 @@ impl ErrorDetail {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.ErrorDetail";
+}
+impl ErrorDetail {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::existing_order_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_existing_order_id(mut self, value: u64) -> Self {
+        self.existing_order_id = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(ErrorDetail);
 impl ::buffa::MessageName for ErrorDetail {
@@ -8452,6 +8494,9 @@ impl ::buffa::Message for ErrorDetail {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.existing_order_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8475,6 +8520,9 @@ impl ::buffa::Message for ErrorDetail {
         if self.rate_limit.is_set() {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             self.rate_limit.write_to(__cache, buf);
+        }
+        if let Some(v) = self.existing_order_id {
+            ::buffa::types::put_fixed64_field(4u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8516,6 +8564,15 @@ impl ::buffa::Message for ErrorDetail {
                     ctx,
                 )?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.existing_order_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8527,6 +8584,7 @@ impl ::buffa::Message for ErrorDetail {
         self.code = ::buffa::EnumValue::from(0);
         self.violations.clear();
         self.rate_limit = ::buffa::MessageField::none();
+        self.existing_order_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -30636,6 +30694,13 @@ pub mod __buffa {
                     'a,
                 >,
             >,
+            /// Public order ID holding this account's client order ID when a create is
+            /// rejected with CONFLICT_DUPLICATE_CLIENT_ORDER_ID. Present only when an
+            /// existing holder is known; omitted for duplicates rejected within the same
+            /// batch before an order is assigned. Use GetOrder to obtain its current state.
+            ///
+            /// Field 4: `existing_order_id`
+            pub existing_order_id: ::core::option::Option<u64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ErrorDetailView<'a> {
@@ -30703,6 +30768,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.existing_order_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -30761,6 +30835,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    existing_order_id: self.existing_order_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -30797,6 +30872,9 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.existing_order_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -30829,6 +30907,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.rate_limit.write_to(__cache, buf);
+                }
+                if let Some(v) = self.existing_order_id {
+                    ::buffa::types::put_fixed64_field(4u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -30864,6 +30945,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("rateLimit", __v)?;
                     }
+                }
+                if let ::core::option::Option::Some(__v) = self.existing_order_id {
+                    __map
+                        .serialize_entry(
+                            "existingOrderId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
                 }
                 __map.end()
             }
@@ -30990,6 +31078,16 @@ pub mod __buffa {
                 >,
             > {
                 &self.0.reborrow().rate_limit
+            }
+            /// Public order ID holding this account's client order ID when a create is
+            /// rejected with CONFLICT_DUPLICATE_CLIENT_ORDER_ID. Present only when an
+            /// existing holder is known; omitted for duplicates rejected within the same
+            /// batch before an order is assigned. Use GetOrder to obtain its current state.
+            ///
+            /// Field 4: `existing_order_id`
+            #[must_use]
+            pub fn existing_order_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().existing_order_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ErrorDetailView<'static>>>
