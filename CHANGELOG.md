@@ -1,6 +1,38 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
+
+Package version: `0.3.0`. Git tag: `v0.3.0`. Released 2026-10-31.
+
+**What a trading bot gains.** Public trade, fill, ledger transfer and
+trigger-event subscriptions now deliver every event; before, all but one
+event of each batch was lost. `SpotConfig` and the catalog expose each pair's
+order limits as typed values, including the new cap on one market order's
+notional, so a bot can size orders before it sends them. A clock-skew
+rejection from the API gateway is the retryable `Error::TimestampSkew` and no
+longer ends a private order stream for good; other API-key rejections keep
+their code. A duplicate client order ID names the order that already holds
+it, replacement orders report the quantity they inherited, and slippage caps
+and trigger inputs are checked before sending the way the API checks them.
+
+This release works on devnet today, and on testnet after testnet's next
+upgrade, which brings the new private order stream.
+
+**Breaking changes**
+- Batched subscriptions yield every event, and the single-event decoders
+  (`market_trade_from_bytes`, `user_trade_from_bytes`,
+  `ledger_transfer_from_bytes`, `trigger_event_from_bytes`) are replaced by
+  their `..._batch_from_bytes` versions, which return one result per event.
+- `spot_config_from_proto` returns `Result`.
+- Connect `unimplemented` and a bare HTTP 501 are `Error::NotImplemented`
+  instead of `Error::RouteNotFound` or `Error::Api`.
+- `max_slippage_bps` is at most 9999 for a market order that sells, every
+  trailing stop and `triggers.modify`.
+- The `mark` trigger price source is rejected locally.
+- A buy trailing stop's `limit_price` must be at least its
+  `activation_price`.
+- Public structs gain fields, so code that builds them with a struct literal
+  must set them.
 
 ### Breaking
 - **Batched realtime publications deliver every event.** Public trades,
