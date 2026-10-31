@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Internal
+- `sdk-capabilities.json` no longer carries `publicDescriptorSha256` or `generatedAt`, so a proto publication that only changes `src/gen/` and `manifest.json` no longer makes it stale; `manifest.json` stays the single source of the descriptor hash.
+
 ## 0.2.1
 
 Package version: `0.2.1`. Git tag: `v0.2.1`.
