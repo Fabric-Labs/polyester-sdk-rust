@@ -877,8 +877,6 @@ def build_capabilities(result: CoverageResult, root: Path) -> dict[str, Any]:
     return {
         "schemaVersion": 1,
         "sdk": result.sdk,
-        "generatedAt": _utc_now_iso(),
-        "publicDescriptorSha256": result.descriptor_sha256,
         "capabilities": rows,
         "unmappedWrappedServices": unmapped,
     }
@@ -891,11 +889,7 @@ def capabilities_match(existing: Path, payload: dict) -> bool:
         current = json.loads(existing.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return False
-    a = dict(current)
-    b = dict(payload)
-    a.pop("generatedAt", None)
-    b.pop("generatedAt", None)
-    return a == b
+    return current == payload
 
 
 def build_readme_capabilities_inner(capabilities: dict[str, Any]) -> str:
