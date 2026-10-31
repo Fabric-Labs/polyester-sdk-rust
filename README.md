@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** `0.2.0` (git tag `v0.2.0`). Pre-1.0: minor releases may break the API.
+**Status:** `0.2.1` (git tag `v0.2.1`). Pre-1.0: minor releases may break the API.
 The Go, Python and Rust SDKs share one SemVer version and are released together.
 Proprietary license (not open source). API-key only; no browser login or JWT flows.
 
@@ -85,7 +85,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.2.0"
+polyester-sdk = "0.2.1"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -95,7 +95,7 @@ To pin a git tag instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.2.0" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.2.1" }
 ```
 
 For development from a git checkout:
@@ -596,11 +596,14 @@ Classify failures with `Error::is_retryable()` and respect `Error::retry_after()
 `Error::mutation_outcome_unknown()` means the first request may have committed: reconcile state
 before retrying and reuse the same logical request identity.
 
-An order create, trigger create, order cancel or order modify that was sent but not confirmed in
-time fails with an `Error::Api` code from `errors::order_codes::OUTCOME_UNKNOWN` (for example
-`ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN`). It may still apply, so both predicates are true:
-read the order or trigger back before retrying. `AUTH_TEMPORARILY_UNAVAILABLE` is retryable and
-changed nothing, so `mutation_outcome_unknown()` is false for it.
+An order create, cancel or modify, or a trigger create or change, that was sent but not confirmed
+in time fails with an `Error::Api` code from `errors::order_codes::OUTCOME_UNKNOWN`: every
+`orders.v1` error code ending in `_OUTCOME_UNKNOWN` (for example
+`ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN` or `ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN`). It may
+still apply, so `mutation_outcome_unknown()` is true and `is_retryable()` is false: a blind retry
+can place a second order. Read the order or trigger back, and reuse the same idempotency key if you
+send it again. `AUTH_TEMPORARILY_UNAVAILABLE` and `ERROR_CODE_ACCOUNT_REPAIRING` are retryable and
+changed nothing, so `mutation_outcome_unknown()` is false for them.
 
 A `cancel_all_with` retry with the same `request_id` within 120 seconds returns the original
 counts with an empty `cancelled_orders` and `listing_status` `not_retained_read_open_orders`.
@@ -639,15 +642,16 @@ use polyester::{Client, Result};
 async fn create_with_reconciliation(client: &Client, params: CreateOrderParams) -> Result<()> {
     match client.orders.create(params.clone()).await {
         Ok(order) => println!("{}", order.order_id),
+        Err(error) if error.mutation_outcome_unknown() => {
+            // The order may have been admitted. Look up params.client_order_id
+            // (get / list_open) before creating again with the same client_order_id.
+            // A second create with the same id is rejected if the first attempt admitted.
+        }
         Err(error) if error.is_retryable() => {
-            if error.mutation_outcome_unknown() {
-                // Look up params.client_order_id (get / list_open) before create again.
-                // A second create with the same id is rejected if the first attempt admitted.
-            }
             if let Some(seconds) = error.retry_after() {
                 tokio::time::sleep(std::time::Duration::from_secs_f64(seconds)).await;
             }
-            // Only create again with the same client_order_id if no order was admitted.
+            // Nothing was applied; create again with the same client_order_id.
         }
         Err(error) => return Err(error),
     }
