@@ -7,7 +7,7 @@
 
 use crate::codecs::scalars::{MAX_PROTOCOL_SCALE, validate_protocol_scale};
 use crate::errors::{Error, Result};
-use crate::models::{DepositWithdrawConfig, ZippedAssetSupplyUpdate};
+use crate::models::{DepositWithdrawConfig, PairOrderLimits, ZippedAssetSupplyUpdate};
 use crate::realtime::{read_unpoisoned, write_unpoisoned};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -56,6 +56,52 @@ fn parse_optional_scale(value: Option<&Value>, field: &str) -> Result<Option<u32
         .transpose()
 }
 
+/// Check a spot-config order limit: a non-negative decimal string such as
+/// `"5000000"` or `"0.5"`, as the API publishes it.
+pub(crate) fn validate_decimal_limit(field: &str, value: &str) -> Result<()> {
+    let (whole, fraction) = value.split_once('.').unwrap_or((value, "0"));
+    let digits = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    if digits(whole) && digits(fraction) {
+        Ok(())
+    } else {
+        Err(Error::validation(format!(
+            "spot config {field} must be a decimal string, got {value:?}"
+        )))
+    }
+}
+
+fn parse_decimal_limit(value: Option<&Value>, field: &str) -> Result<Option<String>> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(limit)) => {
+            validate_decimal_limit(field, limit)?;
+            Ok(Some(limit.clone()))
+        }
+        Some(_) => Err(Error::validation(format!(
+            "spot config {field} must be a decimal string"
+        ))),
+    }
+}
+
+/// An open-order count; omitted (proto3 zero) reads as 0, "unpublished".
+fn parse_open_orders_limit(value: Option<&Value>, field: &str) -> Result<u32> {
+    let Some(value) = value else {
+        return Ok(0);
+    };
+    value
+        .as_u64()
+        .and_then(|raw| u32::try_from(raw).ok())
+        .ok_or_else(|| {
+            Error::validation(format!(
+                "spot config {field} must be an unsigned 32-bit integer"
+            ))
+        })
+}
+
+fn field<'a>(object: &'a Value, snake: &str, camel: &str) -> Option<&'a Value> {
+    object.get(snake).or_else(|| object.get(camel))
+}
+
 #[derive(Debug, Default)]
 pub struct Manager {
     inner: RwLock<Inner>,
@@ -71,6 +117,8 @@ struct Inner {
     symbol_to_quote_scale: HashMap<String, u32>,
     id_to_market_data_volume_scale: HashMap<u32, u32>,
     id_to_reference_price_scale: HashMap<u32, u32>,
+    id_to_order_limits: HashMap<u32, PairOrderLimits>,
+    max_open_orders_total: u32,
     asset_to_ledger_id: HashMap<String, u32>,
     asset_to_qty_scale: HashMap<String, u32>,
     zipped_id_to_scale: HashMap<u32, u32>,
@@ -91,6 +139,8 @@ struct SpotSnapshot {
     symbol_to_quote_scale: HashMap<String, u32>,
     id_to_market_data_volume_scale: HashMap<u32, u32>,
     id_to_reference_price_scale: HashMap<u32, u32>,
+    id_to_order_limits: HashMap<u32, PairOrderLimits>,
+    max_open_orders_total: u32,
     orderbook_buckets: HashMap<String, Vec<String>>,
     spot_config: Value,
 }
@@ -105,6 +155,10 @@ struct ZipperSnapshot {
 
 fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
     let mut snap = SpotSnapshot {
+        max_open_orders_total: parse_open_orders_limit(
+            field(&value, "max_open_orders_total", "maxOpenOrdersTotal"),
+            "max_open_orders_total",
+        )?,
         spot_config: value.clone(),
         ..Default::default()
     };
@@ -190,6 +244,33 @@ fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
             snap.id_to_reference_price_scale
                 .insert(symbol_id, reference_scale);
         }
+        snap.id_to_order_limits.insert(
+            symbol_id,
+            PairOrderLimits {
+                symbol: symbol.to_owned(),
+                symbol_id,
+                max_limit_qty_base: parse_decimal_limit(
+                    field(m, "max_limit_qty_base", "maxLimitQtyBase"),
+                    "max_limit_qty_base",
+                )?,
+                max_market_qty_base: parse_decimal_limit(
+                    field(m, "max_market_qty_base", "maxMarketQtyBase"),
+                    "max_market_qty_base",
+                )?,
+                max_order_notional_quote: parse_decimal_limit(
+                    field(m, "max_order_notional_quote", "maxOrderNotionalQuote"),
+                    "max_order_notional_quote",
+                )?,
+                max_market_notional_quote: parse_decimal_limit(
+                    field(m, "max_market_notional_quote", "maxMarketNotionalQuote"),
+                    "max_market_notional_quote",
+                )?,
+                max_open_orders_per_pair: parse_open_orders_limit(
+                    field(m, "max_open_orders_per_pair", "maxOpenOrdersPerPair"),
+                    "max_open_orders_per_pair",
+                )?,
+            },
+        );
         // Optional catalog minima/tick/step fields are ignored here. Venue
         // admission owns those checks; zero-valued optional minima must not
         // block hydration of otherwise valid spot rows.
@@ -549,6 +630,33 @@ impl Manager {
             .copied()
     }
 
+    /// Per-order and open-order limits of a pair, or `None` when the symbol
+    /// is unknown or the spot catalog is not hydrated.
+    pub fn pair_order_limits_for_symbol(&self, symbol: &str) -> Option<PairOrderLimits> {
+        let inner = read_unpoisoned(&self.inner);
+        let id = inner.symbol_to_id.get(symbol)?;
+        inner.id_to_order_limits.get(id).cloned()
+    }
+
+    /// [`Self::pair_order_limits_for_symbol`] by Connect `symbol_id`.
+    pub fn pair_order_limits_for_symbol_id(&self, id: u32) -> Option<PairOrderLimits> {
+        read_unpoisoned(&self.inner)
+            .id_to_order_limits
+            .get(&id)
+            .cloned()
+    }
+
+    /// Default resting-order (GTC and GTD) limit for a typical account across
+    /// all pairs: `Some(0)` when unpublished, `None` before the spot catalog
+    /// is hydrated. An account may have a lower limit of its own.
+    pub fn max_open_orders_total(&self) -> Option<u32> {
+        let inner = read_unpoisoned(&self.inner);
+        inner
+            .spot_config
+            .is_some()
+            .then_some(inner.max_open_orders_total)
+    }
+
     /// Pair scale for composite reference-candle prices. Primary prices use the fixed price scale 9.
     pub fn reference_price_scale_for_symbol_id(&self, id: u32) -> Option<u32> {
         read_unpoisoned(&self.inner)
@@ -634,6 +742,8 @@ fn apply_spot(inner: &mut Inner, snap: SpotSnapshot) {
     inner.symbol_to_quote_scale = snap.symbol_to_quote_scale;
     inner.id_to_market_data_volume_scale = snap.id_to_market_data_volume_scale;
     inner.id_to_reference_price_scale = snap.id_to_reference_price_scale;
+    inner.id_to_order_limits = snap.id_to_order_limits;
+    inner.max_open_orders_total = snap.max_open_orders_total;
     inner.orderbook_buckets = snap.orderbook_buckets;
     inner.spot_config = Some(snap.spot_config);
 }
@@ -650,6 +760,66 @@ fn apply_zipper(inner: &mut Inner, snap: ZipperSnapshot) {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn catalog_exposes_pair_order_limits_and_open_order_total() {
+        let m = Manager::new();
+        assert_eq!(m.max_open_orders_total(), None);
+        m.hydrate_spot_config_json(json!({
+            "maxOpenOrdersTotal": 1000,
+            "pairs": [
+                {
+                    "symbol": "BTC-USDT",
+                    "symbolId": 1,
+                    "baseQuantityScale": 8,
+                    "maxLimitQtyBase": "100",
+                    "maxMarketQtyBase": "25.5",
+                    "maxOrderNotionalQuote": "5000000",
+                    "maxMarketNotionalQuote": "250000",
+                    "maxOpenOrdersPerPair": 200
+                },
+                {"symbol": "ETH-USDT", "symbol_id": 2, "base_quantity_scale": 8}
+            ]
+        }))
+        .unwrap();
+        assert_eq!(m.max_open_orders_total(), Some(1000));
+        let btc = m.pair_order_limits_for_symbol("BTC-USDT").unwrap();
+        assert_eq!(btc, m.pair_order_limits_for_symbol_id(1).unwrap());
+        assert_eq!(btc.max_limit_qty_base.as_deref(), Some("100"));
+        assert_eq!(btc.max_market_qty_base.as_deref(), Some("25.5"));
+        assert_eq!(btc.max_order_notional_quote.as_deref(), Some("5000000"));
+        assert_eq!(btc.max_market_notional_quote.as_deref(), Some("250000"));
+        assert_eq!(btc.max_open_orders_per_pair, 200);
+        let eth = m.pair_order_limits_for_symbol("ETH-USDT").unwrap();
+        assert_eq!(
+            eth,
+            PairOrderLimits {
+                symbol: "ETH-USDT".into(),
+                symbol_id: 2,
+                ..Default::default()
+            }
+        );
+        assert_eq!(m.pair_order_limits_for_symbol("SOL-USDT"), None);
+    }
+
+    #[test]
+    fn catalog_rejects_malformed_order_limits_atomically() {
+        let m = Manager::new();
+        for pair in [
+            json!({"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8,
+                   "maxMarketNotionalQuote": "1e6"}),
+            json!({"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8,
+                   "maxLimitQtyBase": 100}),
+            json!({"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8,
+                   "maxOpenOrdersPerPair": -1}),
+        ] {
+            assert!(
+                m.hydrate_spot_config_json(json!({"pairs": [pair]}))
+                    .is_err()
+            );
+            assert_eq!(m.pair_order_limits_for_symbol("BTC-USDT"), None);
+        }
+    }
 
     #[test]
     fn hydrate_spot_pairs_sets_symbol_scale_and_buckets() {

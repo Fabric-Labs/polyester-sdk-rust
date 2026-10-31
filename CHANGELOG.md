@@ -2,6 +2,74 @@
 
 ## Unreleased
 
+### Breaking
+- **Batched realtime publications deliver every event.** Public trades,
+  user fills, ledger transfers and trigger events arrive as batches; before,
+  each batch was decoded as one event and the rest were lost. The
+  subscriptions now yield every event in order. The single-event decoders
+  `market_trade_from_bytes`, `user_trade_from_bytes`,
+  `ledger_transfer_from_bytes` and `trigger_event_from_bytes` are replaced by
+  `market_trade_batch_from_bytes`, `user_trade_batch_from_bytes`,
+  `ledger_transfer_batch_from_bytes` and `trigger_event_batch_from_bytes`,
+  which return one result per event.
+- `spot_config_from_proto` returns `Result`: a malformed order limit is an
+  error instead of an untyped value.
+- Connect `unimplemented` and a bare HTTP 501 are `Error::NotImplemented`
+  instead of `Error::RouteNotFound` or `Error::Api`. A bare HTTP 404 is still
+  `Error::RouteNotFound`; `Error::is_not_implemented()` is true for both.
+- Slippage caps match the API. A market order that sells, every trailing
+  stop (standalone or attached, buy or sell) and `triggers.modify` take at
+  most 9999 bps; they accepted 10000, which the API rejects. A buy market
+  order, a buy stop-loss or take-profit market child and a TWAP slice still
+  take 10000.
+- The `mark` trigger price source is rejected locally (standalone triggers
+  and attached legs): spot markets have no mark price.
+- A buy trailing stop's `limit_price` must be at least its
+  `activation_price`.
+- Public structs gain fields (see Added), so code that builds them with a
+  struct literal must set them.
+
+### Fixed
+- **API-gateway rejections keep their code.** The gateway rejects API-key
+  requests with a plain JSON body such as `401 {"code":"TIMESTAMP_SKEW"}`.
+  It was reported as a generic `Error::Auth` with no code, so a clock-skew
+  rejection was not retryable and ended a private order stream for good. Now
+  `TIMESTAMP_SKEW` is the retryable `Error::TimestampSkew`, and any other
+  code (`SIGNATURE_INVALID`, `KEY_DISABLED`, `IP_NOT_ALLOWED`, ...) is the
+  non-retryable `Error::ApiKeyRejected` with its code and HTTP status. This
+  covers Connect calls and the realtime token requests.
+- A market overview subscription created with `symbols` keeps only those
+  markets in buffered and live updates, not only in its first snapshot.
+
+### Added
+- Typed spot-config order limits: `SpotConfig.pair_order_limits`
+  (`PairOrderLimits` with `max_limit_qty_base`, `max_market_qty_base`,
+  `max_order_notional_quote`, `max_market_notional_quote` and
+  `max_open_orders_per_pair`) and `SpotConfig.max_open_orders_total`. The
+  decimal limits are `None` when the pair has no maximum. The catalog
+  exposes the same values: `catalogs.pair_order_limits_for_symbol()`,
+  `pair_order_limits_for_symbol_id()` and `max_open_orders_total()`.
+- `Order.inherited_cum_qty`: the filled quantity a replacement inherited
+  from its predecessors.
+- `action_taken` on `BatchReplaceAdmissionItem` and `BatchReplaceStatusItem`:
+  `replaced`, or `amended` for a cancel-only outcome with no successor.
+- A duplicate client order ID rejection names the order that already holds
+  the ID, when the server knows it: `Error::existing_order_id()` for single
+  creates and `BatchCreateResultItem.existing_order_id` for batch creates.
+- `LedgerTransfer.transfer_id`, shared by both legs of a transfer.
+- `triggers.modify` and `triggers.resume_with` / `resume_by_id` no longer
+  need a symbol; without one they target the trigger's own market.
+- `TriggerTrailingDetails.trigger_price`: a trailing stop's current
+  threshold.
+- `VIPStatus.settled_volume_quality` and `average_aop_quality`
+  (`VIPMetricQuality`: `status` and `incomplete_hours`). When the volume's
+  status is `price_unavailable`, `settled_volume_30d_usd` is a lower bound.
+- `realtime::Client::subscribe_proto_batch` for batched channels. An event
+  that fails to decode is reported through the subscription's error
+  callback, and the rest of its batch is still delivered.
+- `auth_codes::TIMESTAMP_SKEW`; `Error::auth_error_code()` also returns the
+  gateway code of `Error::TimestampSkew` and `Error::ApiKeyRejected`.
+
 ### Internal
 - `sdk-capabilities.json` no longer carries `publicDescriptorSha256` or `generatedAt`, so a proto publication that only changes `src/gen/` and `manifest.json` no longer makes it stale; `manifest.json` stays the single source of the descriptor hash.
 

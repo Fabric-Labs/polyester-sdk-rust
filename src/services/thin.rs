@@ -851,6 +851,9 @@ impl TransfersService {
     }
 
     /// Subscribe to private transfer updates (requires `realtime` feature).
+    ///
+    /// Each publication batches transfer legs; every leg arrives on its own,
+    /// oldest first. `(transfer_id, account_code, is_debit)` identifies a leg.
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
@@ -860,7 +863,10 @@ impl TransfersService {
         let channel = format!("private:ledger:transfers:{account}:proto");
         self.ctx
             .realtime
-            .subscribe_proto(&channel, crate::codecs::decode::ledger_transfer_from_bytes)
+            .subscribe_proto_batch(
+                &channel,
+                crate::codecs::decode::ledger_transfer_batch_from_bytes,
+            )
             .await
     }
 }

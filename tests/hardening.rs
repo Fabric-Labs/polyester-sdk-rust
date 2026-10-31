@@ -38,10 +38,10 @@ fn publication_decoders() -> Vec<(&'static str, PublicationDecoder)> {
         account_identity_from_bytes, address_book_invalidation_from_bytes, api_key_from_bytes,
         api_policy_from_bytes, asset_balance_from_bytes, candle_point_from_bytes,
         flow_detail_from_bytes, flow_summary_from_bytes, heatmap_live_bucket_from_bytes,
-        ledger_transfer_from_bytes, market_overview_batch_from_bytes, market_trade_from_bytes,
-        orderbook_delta_from_bytes, subaccount_from_bytes, subaccount_policy_from_bytes,
-        trigger_event_from_bytes, trigger_from_bytes, user_trade_from_bytes,
-        zipped_asset_supply_batch_from_bytes,
+        ledger_transfer_batch_from_bytes, market_overview_batch_from_bytes,
+        market_trade_batch_from_bytes, orderbook_delta_from_bytes, subaccount_from_bytes,
+        subaccount_policy_from_bytes, trigger_event_batch_from_bytes, trigger_from_bytes,
+        user_trade_batch_from_bytes, zipped_asset_supply_batch_from_bytes,
     };
 
     macro_rules! decoder {
@@ -54,12 +54,12 @@ fn publication_decoders() -> Vec<(&'static str, PublicationDecoder)> {
     }
 
     vec![
-        decoder!("user_trade", user_trade_from_bytes),
+        decoder!("user_trade_batch", user_trade_batch_from_bytes),
         decoder!("asset_balance", asset_balance_from_bytes),
-        decoder!("ledger_transfer", ledger_transfer_from_bytes),
+        decoder!("ledger_transfer_batch", ledger_transfer_batch_from_bytes),
         decoder!("trigger", trigger_from_bytes),
-        decoder!("trigger_event", trigger_event_from_bytes),
-        decoder!("market_trade", market_trade_from_bytes(8)),
+        decoder!("trigger_event_batch", trigger_event_batch_from_bytes),
+        decoder!("market_trade_batch", market_trade_batch_from_bytes(8)),
         decoder!("orderbook_delta", orderbook_delta_from_bytes),
         decoder!("flow_summary", flow_summary_from_bytes),
         decoder!("flow_detail", flow_detail_from_bytes),
@@ -951,9 +951,13 @@ async fn l2_rest_and_realtime_market_trades_attach_catalog_scale_metadata() {
         })
         .await;
         let active = Arc::new(AtomicUsize::new(0));
+        let batch = polyester::proto::marketdata::v1::MarketTradeBatch {
+            events: vec![proto_trade.clone()],
+            ..Default::default()
+        };
         let ws = MockWsServer::spawn_centrifugo_publication_after_handshake(
             active,
-            proto_trade.encode_to_vec(),
+            batch.encode_to_vec(),
         )
         .await;
         let client = Client::new(Config {
@@ -3497,4 +3501,623 @@ async fn l2_backfill_resumes_from_zero_watermarks() {
         assert!(request.page_token.is_empty());
         assert!(request.start_time.as_option().is_none());
     }
+}
+
+fn api_key_client(http: &MockHttpServer) -> Client {
+    Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .expect("client")
+}
+
+async fn auth_me_error(script: fn() -> hardening_support::HttpScript) -> Error {
+    let http = MockHttpServer::spawn(move |_| script()).await;
+    api_key_client(&http)
+        .auth
+        .me()
+        .await
+        .expect_err("rejection must fail the call")
+}
+
+fn json_body(status: u16, content_type: &str, body: &str) -> hardening_support::HttpScript {
+    hardening_support::HttpScript::Raw {
+        status,
+        headers: vec![
+            ("Content-Type".into(), content_type.into()),
+            ("Content-Length".into(), body.len().to_string()),
+        ],
+        body: body.as_bytes().to_vec(),
+    }
+}
+
+// Devnet's gateway rejects a stale API-key signature as
+// `401 application/json {"code":"TIMESTAMP_SKEW"}`, which is not a Connect
+// error. The rejection happens before any service sees the request, so a
+// retry that signs again is safe.
+#[tokio::test]
+async fn l2_gateway_timestamp_skew_json_is_retryable() {
+    for script in [
+        (|| json_body(401, "application/json", r#"{"code":"TIMESTAMP_SKEW"}"#))
+            as fn() -> hardening_support::HttpScript,
+        || {
+            json_body(
+                401,
+                "application/problem+json",
+                r#"{"type":"about:blank","status":401,"code":"TIMESTAMP_SKEW"}"#,
+            )
+        },
+    ] {
+        let err = auth_me_error(script).await;
+        assert!(
+            matches!(err, Error::TimestampSkew { status: 401 }),
+            "{err:?}"
+        );
+        assert!(
+            err.is_retryable(),
+            "TIMESTAMP_SKEW must be retryable: {err:?}"
+        );
+        assert!(
+            !err.mutation_outcome_unknown(),
+            "the gateway rejected the request before any service saw it: {err:?}"
+        );
+        assert_eq!(err.auth_error_code(), Some("TIMESTAMP_SKEW"), "{err:?}");
+    }
+}
+
+#[tokio::test]
+async fn l2_gateway_api_key_rejections_carry_their_code_and_are_not_retryable() {
+    let err =
+        auth_me_error(|| json_body(401, "application/json", r#"{"code":"SIGNATURE_INVALID"}"#))
+            .await;
+    match &err {
+        Error::ApiKeyRejected { status, code } => {
+            assert_eq!((*status, code.as_str()), (401, "SIGNATURE_INVALID"));
+        }
+        other => panic!("expected ApiKeyRejected, got {other:?}"),
+    }
+    assert!(!err.is_retryable(), "{err:?}");
+    assert_eq!(err.auth_error_code(), Some("SIGNATURE_INVALID"), "{err:?}");
+
+    let err =
+        auth_me_error(|| json_body(403, "application/json", r#"{"code":"IP_NOT_ALLOWED"}"#)).await;
+    assert!(
+        matches!(&err, Error::ApiKeyRejected { status: 403, code } if code == "IP_NOT_ALLOWED"),
+        "{err:?}"
+    );
+    assert!(!err.is_retryable(), "{err:?}");
+}
+
+#[tokio::test]
+async fn l2_connect_json_errors_and_other_json_bodies_keep_their_mapping() {
+    // A Connect error body is still read by Connect itself.
+    let err = auth_me_error(|| {
+        json_body(
+            401,
+            "application/json",
+            r#"{"code":"unauthenticated","message":"missing signature"}"#,
+        )
+    })
+    .await;
+    assert!(
+        matches!(&err, Error::Auth(message) if message.contains("missing signature")),
+        "{err:?}"
+    );
+    let err = auth_me_error(|| {
+        json_body(
+            503,
+            "application/json",
+            r#"{"code":"unavailable","message":"draining"}"#,
+        )
+    })
+    .await;
+    assert!(
+        matches!(err, Error::Server(_)) && err.is_retryable(),
+        "{err:?}"
+    );
+    // A non-Connect code on a status other than 401/403 is left to Connect's
+    // status mapping.
+    let err =
+        auth_me_error(|| json_body(503, "application/json", r#"{"code":"MAINTENANCE"}"#)).await;
+    assert!(matches!(err, Error::Server(_)), "{err:?}");
+}
+
+#[tokio::test]
+async fn l2_unimplemented_and_bare_501_map_to_not_implemented() {
+    let err = auth_me_error(|| {
+        json_body(
+            501,
+            "application/json",
+            r#"{"code":"unimplemented","message":"auth.v1.AuthService/Me is not implemented"}"#,
+        )
+    })
+    .await;
+    assert!(
+        matches!(&err, Error::NotImplemented { message } if message.contains("not implemented")),
+        "{err:?}"
+    );
+    assert!(err.is_not_implemented() && !err.is_retryable(), "{err:?}");
+
+    // A Connect `unimplemented` without a message is still the server
+    // saying it does not implement the call, not a missing route.
+    let err =
+        auth_me_error(|| json_body(501, "application/json", r#"{"code":"unimplemented"}"#)).await;
+    assert!(matches!(err, Error::NotImplemented { .. }), "{err:?}");
+
+    // A bare HTTP 501, whatever its body, is NotImplemented: JSON bodies that
+    // are not Connect errors included.
+    for script in [
+        (|| json_body(501, "text/plain", "Not Implemented"))
+            as fn() -> hardening_support::HttpScript,
+        || json_body(501, "application/json", "{}"),
+        || json_body(501, "application/json", r#"{"message":"Not Implemented"}"#),
+    ] {
+        let err = auth_me_error(script).await;
+        assert!(matches!(err, Error::NotImplemented { .. }), "{err:?}");
+        assert!(err.is_not_implemented() && !err.is_retryable(), "{err:?}");
+    }
+
+    // A bare 404, empty or with a non-Connect JSON body, stays the narrower
+    // RouteNotFound.
+    for script in [
+        (|| hardening_support::HttpScript::NotFound) as fn() -> hardening_support::HttpScript,
+        || json_body(404, "application/json", "{}"),
+        || json_body(404, "text/html", "<h1>404 page not found</h1>"),
+    ] {
+        let err = auth_me_error(script).await;
+        assert!(matches!(err, Error::RouteNotFound { .. }), "{err:?}");
+        assert!(err.is_not_implemented(), "{err:?}");
+    }
+
+    // A Connect `not_found` error carried on HTTP 404 is a missing resource,
+    // not a missing route.
+    let err = auth_me_error(|| {
+        json_body(
+            404,
+            "application/json",
+            r#"{"code":"not_found","message":"no such order"}"#,
+        )
+    })
+    .await;
+    assert!(!err.is_not_implemented(), "{err:?}");
+}
+
+#[tokio::test]
+async fn l2_realtime_token_gateway_rejections_are_typed() {
+    for (body, retryable) in [
+        (r#"{"code":"TIMESTAMP_SKEW"}"#, true),
+        (r#"{"code":"SIGNATURE_INVALID"}"#, false),
+    ] {
+        let http = MockHttpServer::spawn(move |_| hardening_support::HttpScript::Json {
+            status: 401,
+            body: body.as_bytes().to_vec(),
+        })
+        .await;
+        let active = Arc::new(AtomicUsize::new(0));
+        let ws = MockWsServer::spawn_centrifugo_public(active).await;
+        let rt = private_rt(&ws, &http, Duration::from_secs(2));
+        let err = subscribe_raw_err(&rt, PRIVATE_CHANNEL).await;
+        if retryable {
+            assert!(
+                matches!(err, Error::TimestampSkew { status: 401 }),
+                "{err:?}"
+            );
+        } else {
+            assert!(
+                matches!(&err, Error::ApiKeyRejected { status: 401, code } if code == "SIGNATURE_INVALID"),
+                "{err:?}"
+            );
+        }
+        assert_eq!(err.is_retryable(), retryable, "{err:?}");
+    }
+}
+
+/// Client whose realtime token endpoints answer, so private channels connect
+/// to `ws` and receive its one publication.
+async fn streaming_client(ws: &MockWsServer) -> (Client, MockHttpServer) {
+    let http = MockHttpServer::spawn(|req| {
+        if req.path == "/v1/rt/token" || req.path.starts_with("/v1/rt/subscribe") {
+            hardening_support::HttpScript::Json {
+                status: 200,
+                body: br#"{"token":"t"}"#.to_vec(),
+            }
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: ws.ws_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        timeout: Duration::from_secs(2),
+        ..Default::default()
+    })
+    .expect("client");
+    (client, http)
+}
+
+async fn recv_n<T>(sub: &mut polyester::realtime::TypedSubscription<T>, n: usize) -> Vec<T> {
+    let mut out = Vec::with_capacity(n);
+    for _ in 0..n {
+        out.push(
+            tokio::time::timeout(Duration::from_secs(2), sub.recv_result())
+                .await
+                .expect("publication deadline")
+                .expect("no stream error")
+                .expect("stream open"),
+        );
+    }
+    out
+}
+
+// Every realtime trade, fill, transfer and trigger-event publication is a
+// batch; each of its events must reach the caller, in order.
+#[tokio::test]
+async fn l2_batched_publications_deliver_every_event_in_order() {
+    use polyester::proto::ledger::read::v1::{TransferRow, TransferRowBatch};
+    use polyester::proto::marketdata::v1::{MarketTrade, MarketTradeBatch};
+    use polyester::proto::orders::v1::{UserTrade, UserTradeBatch};
+    use polyester::proto::triggers::v1::{TriggerEvent, TriggerEventBatch};
+
+    let active = Arc::new(AtomicUsize::new(0));
+
+    let trades = MarketTradeBatch {
+        events: (1..=3)
+            .map(|match_id| MarketTrade {
+                symbol_id: 1,
+                match_id,
+                qty_scaled: 1,
+                price_ticks: 1,
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    };
+    let ws = MockWsServer::spawn_centrifugo_publication_after_handshake(
+        active.clone(),
+        trades.encode_to_vec(),
+    )
+    .await;
+    let (client, _http) = streaming_client(&ws).await;
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8}]
+        }))
+        .unwrap();
+    let mut sub = client
+        .market_data
+        .subscribe_trades("BTC-USDT")
+        .await
+        .unwrap();
+    let got: Vec<String> = recv_n(&mut sub, 3)
+        .await
+        .into_iter()
+        .map(|t| t.match_id)
+        .collect();
+    assert_eq!(got, ["1", "2", "3"]);
+    sub.close();
+
+    let fills = UserTradeBatch {
+        events: (10..=11)
+            .map(|match_id| UserTrade {
+                symbol_id: 1,
+                match_id,
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    };
+    let ws = MockWsServer::spawn_centrifugo_publication_after_handshake(
+        active.clone(),
+        fills.encode_to_vec(),
+    )
+    .await;
+    let (client, _http) = streaming_client(&ws).await;
+    let mut sub = client.trades.subscribe(Some("acct")).await.unwrap();
+    let got: Vec<String> = recv_n(&mut sub, 2)
+        .await
+        .into_iter()
+        .map(|t| t.match_id)
+        .collect();
+    assert_eq!(got, ["10", "11"]);
+    sub.close();
+
+    let transfer_id = "340282366920938463463374607431768211455";
+    let transfers = TransferRowBatch {
+        events: [true, false]
+            .into_iter()
+            .map(|is_debit| TransferRow {
+                asset_id: 2,
+                is_debit,
+                transfer_id: transfer_id.into(),
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    };
+    let ws = MockWsServer::spawn_centrifugo_publication_after_handshake(
+        active.clone(),
+        transfers.encode_to_vec(),
+    )
+    .await;
+    let (client, _http) = streaming_client(&ws).await;
+    let mut sub = client.transfers.subscribe(Some("acct")).await.unwrap();
+    let got = recv_n(&mut sub, 2).await;
+    assert_eq!(
+        got.iter()
+            .map(|t| (t.transfer_id.as_str(), t.is_debit))
+            .collect::<Vec<_>>(),
+        [(transfer_id, true), (transfer_id, false)]
+    );
+    sub.close();
+
+    let events = TriggerEventBatch {
+        events: (1..=2)
+            .map(|ts_ns| TriggerEvent {
+                trigger_id: 5,
+                symbol_id: 1,
+                ts_ns,
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    };
+    let ws = MockWsServer::spawn_centrifugo_publication_after_handshake(
+        active.clone(),
+        events.encode_to_vec(),
+    )
+    .await;
+    let (client, _http) = streaming_client(&ws).await;
+    let mut sub = client
+        .triggers
+        .subscribe_events(Some("acct"))
+        .await
+        .unwrap();
+    let got: Vec<String> = recv_n(&mut sub, 2)
+        .await
+        .into_iter()
+        .map(|e| e.ts_ns)
+        .collect();
+    assert_eq!(got, ["1", "2"]);
+    sub.close();
+}
+
+#[tokio::test]
+async fn l2_batch_member_error_is_reported_without_dropping_the_rest() {
+    let active = Arc::new(AtomicUsize::new(0));
+    let ws =
+        MockWsServer::spawn_centrifugo_publication_after_handshake(active, vec![1, 2, 3]).await;
+    let rt = RealtimeClient::new(ws.ws_url(), "", None, None);
+    let mut sub = rt
+        .subscribe_proto_batch(PUBLIC_CHANNEL, |bytes: &[u8]| {
+            Ok(bytes
+                .iter()
+                .map(|b| {
+                    if *b == 2 {
+                        Err(Error::realtime("bad member"))
+                    } else {
+                        Ok(*b)
+                    }
+                })
+                .collect())
+        })
+        .await
+        .unwrap();
+    let reported = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let sink = reported.clone();
+    sub.set_on_error(move |err| sink.lock().unwrap().push(err.to_string()));
+    assert_eq!(recv_n(&mut sub, 2).await, [1, 3]);
+    assert_eq!(*reported.lock().unwrap(), ["bad member"]);
+    assert!(sub.is_alive(), "a bad member must not end the subscription");
+    sub.close();
+}
+
+// The overview channel carries every market. A subscription filtered to some
+// symbols must not pick up the others from buffered or live publications.
+#[tokio::test]
+async fn l2_filtered_market_overview_drops_other_markets() {
+    use polyester::proto::marketoverview::v1::{
+        ListMarketOverviewResponse, MarketOverview, MarketOverviewBatch,
+    };
+    use polyester::services::MarketOverviewCreateSubscriptionOptions;
+
+    let row = |symbol_id, last_price_ticks| MarketOverview {
+        symbol_id,
+        last_price_ticks,
+        ..Default::default()
+    };
+    let publication = MarketOverviewBatch {
+        markets: vec![row(1, 5_000_000_000), row(2, 7_000_000_000)],
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let active = Arc::new(AtomicUsize::new(0));
+    let ws = MockWsServer::spawn_centrifugo_publication_after_handshake(active, publication).await;
+    let snapshot = ListMarketOverviewResponse {
+        markets: vec![row(1, 1_000_000_000)],
+        ..Default::default()
+    };
+    let spot = spot_config_fixture();
+    let zipper = zipper_config_fixture();
+    let http = MockHttpServer::spawn(move |req| match req.path.as_str() {
+        "/marketoverview.v1.MarketOverviewService/ListMarketOverview" => {
+            connect_proto_ok(&snapshot)
+        }
+        SPOT_CONFIG_PATH => connect_proto_ok(&spot),
+        ZIPPER_CONFIG_PATH => connect_proto_ok(&zipper),
+        _ => hardening_support::HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: ws.ws_url(),
+        hydrate_catalogs: true,
+        timeout: Duration::from_secs(2),
+        ..Default::default()
+    })
+    .unwrap();
+    let mut subscription = client
+        .market_overview
+        .create_subscription(MarketOverviewCreateSubscriptionOptions {
+            symbols: Some(vec!["BTC-USDT".into()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let mut saw_live_price = false;
+    while !saw_live_price {
+        let rows = tokio::time::timeout(Duration::from_secs(2), subscription.updates().recv())
+            .await
+            .expect("overview update deadline")
+            .expect("overview stream open");
+        assert!(
+            rows.iter().all(|row| row.symbol_id == 1),
+            "unrelated market leaked into a filtered subscription: {rows:?}"
+        );
+        saw_live_price = rows
+            .iter()
+            .any(|row| row.last_price.as_ref().is_some_and(|p| p.format() == "5"));
+    }
+    subscription.close();
+}
+
+// Trigger modify and resume no longer need a symbol: the server targets the
+// trigger's own market when `symbol_id` is 0.
+#[tokio::test]
+async fn l2_trigger_modify_and_resume_send_without_a_symbol() {
+    use polyester::models::ModifyTriggerParams;
+    use polyester::proto::triggers::v1::{ModifyTriggerRequest, ResumeTriggerRequest};
+
+    let seen = Arc::new(std::sync::Mutex::new(Vec::<(String, u32)>::new()));
+    let sink = seen.clone();
+    let http = MockHttpServer::spawn(move |req| {
+        let symbol_id = match req.path.as_str() {
+            "/triggers.v1.TriggersService/ModifyTrigger" => {
+                ModifyTriggerRequest::decode_from_slice(&req.body).map(|r| r.symbol_id)
+            }
+            "/triggers.v1.TriggersService/ResumeTrigger" => {
+                ResumeTriggerRequest::decode_from_slice(&req.body).map(|r| r.symbol_id)
+            }
+            _ => return hardening_support::HttpScript::NotFound,
+        };
+        sink.lock()
+            .unwrap()
+            .push((req.path.clone(), symbol_id.expect("request decodes")));
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = api_key_client(&http);
+
+    let _ = client.triggers.resume_by_id("1", None, None).await;
+    let _ = client
+        .triggers
+        .modify(ModifyTriggerParams {
+            trigger_id: "1".into(),
+            subaccount_id: None,
+            symbol: None,
+            symbol_id: None,
+            trigger_price: None,
+            activation_price: None,
+            trailing_distance_ticks: None,
+            trailing_distance_bps: None,
+            max_slippage_ticks: None,
+            max_slippage_bps: Some(9_999),
+        })
+        .await;
+    assert_eq!(
+        *seen.lock().unwrap(),
+        [
+            ("/triggers.v1.TriggersService/ResumeTrigger".to_owned(), 0),
+            ("/triggers.v1.TriggersService/ModifyTrigger".to_owned(), 0),
+        ]
+    );
+}
+
+fn encoded_body(
+    status: u16,
+    content_type: &str,
+    encoding: &str,
+    body: &str,
+) -> hardening_support::HttpScript {
+    let body = connectrpc::CompressionRegistry::default()
+        .compress(encoding, body.as_bytes())
+        .expect("supported encoding")
+        .to_vec();
+    hardening_support::HttpScript::Raw {
+        status,
+        headers: vec![
+            ("Content-Type".into(), content_type.into()),
+            ("Content-Encoding".into(), encoding.into()),
+            ("Content-Length".into(), body.len().to_string()),
+        ],
+        body,
+    }
+}
+
+// A Content-Encoding (gzip, or an explicit identity) must not hide a bare
+// HTTP status or a gateway code, and must not turn a Connect error body into
+// a bare one.
+#[tokio::test]
+async fn l2_encoded_failed_responses_keep_their_classification() {
+    for script in [
+        (|| encoded_body(501, "text/plain", "gzip", "Not Implemented"))
+            as fn() -> hardening_support::HttpScript,
+        || encoded_body(501, "text/plain", "identity", "Not Implemented"),
+        || encoded_body(501, "application/json", "gzip", "{}"),
+        || {
+            encoded_body(
+                501,
+                "application/json",
+                "gzip",
+                r#"{"code":"unimplemented"}"#,
+            )
+        },
+    ] {
+        let err = auth_me_error(script).await;
+        assert!(matches!(err, Error::NotImplemented { .. }), "{err:?}");
+    }
+    for script in [
+        (|| encoded_body(404, "text/plain", "identity", "404 page not found"))
+            as fn() -> hardening_support::HttpScript,
+        || encoded_body(404, "text/plain", "gzip", "404 page not found"),
+        || encoded_body(404, "application/json", "gzip", "{}"),
+    ] {
+        let err = auth_me_error(script).await;
+        assert!(matches!(err, Error::RouteNotFound { .. }), "{err:?}");
+    }
+    // A compressed Connect not_found stays a resource error.
+    let err = auth_me_error(|| {
+        encoded_body(
+            404,
+            "application/json",
+            "gzip",
+            r#"{"code":"not_found","message":"no such order"}"#,
+        )
+    })
+    .await;
+    assert!(
+        !err.is_not_implemented() && err.to_string().contains("no such order"),
+        "{err:?}"
+    );
+    // A compressed gateway rejection keeps its code.
+    let err = auth_me_error(|| {
+        encoded_body(
+            401,
+            "application/json",
+            "gzip",
+            r#"{"code":"TIMESTAMP_SKEW"}"#,
+        )
+    })
+    .await;
+    assert!(
+        matches!(err, Error::TimestampSkew { status: 401 }),
+        "{err:?}"
+    );
 }

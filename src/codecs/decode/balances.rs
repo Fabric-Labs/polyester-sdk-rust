@@ -177,6 +177,7 @@ pub fn transfer_row_from_proto(msg: &TransferRow) -> LedgerTransfer {
         is_debit: msg.is_debit,
         source: transfer_side_from_proto(msg.source.as_option()),
         destination: transfer_side_from_proto(msg.destination.as_option()),
+        transfer_id: msg.transfer_id.clone(),
     }
 }
 

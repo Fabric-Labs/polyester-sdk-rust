@@ -28,17 +28,15 @@ use crate::proto::auth::v1::{
 };
 use crate::proto::chain::lifecycle::v1::{FlowDetailView, FlowSummaryView};
 use crate::proto::chain::zipper::v1::ZippedAssetSupplyBatch as ProtoZippedAssetSupplyBatch;
-use crate::proto::ledger::read::v1::{AssetBalance as ProtoAssetBalance, TransferRow};
-use crate::proto::marketdata::v1::{
-    CandlePoint, HeatmapLiveBucket, MarketTrade as ProtoMarketTrade,
-};
+use crate::proto::ledger::read::v1::{AssetBalance as ProtoAssetBalance, TransferRowBatch};
+use crate::proto::marketdata::v1::{CandlePoint, HeatmapLiveBucket, MarketTradeBatch};
 use crate::proto::marketoverview::v1::MarketOverviewBatch;
 use crate::proto::orderbook::v1::OrderBookDelta;
-use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, UserTrade as ProtoUserTrade};
+use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, UserTradeBatch};
 use crate::proto::privatews::v1::{
     Unavailable as ProtoUnavailable, UnavailableReason, Unit as ProtoUnit, unit_event,
 };
-use crate::proto::triggers::v1::{Trigger as ProtoTrigger, TriggerEvent as ProtoTriggerEvent};
+use crate::proto::triggers::v1::{Trigger as ProtoTrigger, TriggerEventBatch};
 
 fn decode_proto<M: Message + Default>(payload: &[u8]) -> Result<M> {
     if payload.is_empty() {
@@ -55,9 +53,11 @@ fn decode_proto<M: Message + Default>(payload: &[u8]) -> Result<M> {
     M::decode_from_slice(payload).map_err(|e| Error::realtime(format!("proto decode: {e}")))
 }
 
-pub fn user_trade_from_bytes(payload: &[u8]) -> Result<UserTrade> {
-    let msg = decode_proto::<ProtoUserTrade>(payload)?;
-    user_trade_from_proto(&msg)
+/// Decode a `UserTradeBatch` publication: every fill in order. A fill that
+/// fails to convert is an `Err` member; the others are still returned.
+pub fn user_trade_batch_from_bytes(payload: &[u8]) -> Result<Vec<Result<UserTrade>>> {
+    let msg = decode_proto::<UserTradeBatch>(payload)?;
+    Ok(msg.events.iter().map(user_trade_from_proto).collect())
 }
 
 pub fn asset_balance_from_bytes(payload: &[u8]) -> Result<AssetBalance> {
@@ -65,9 +65,14 @@ pub fn asset_balance_from_bytes(payload: &[u8]) -> Result<AssetBalance> {
     Ok(asset_balance_from_proto(&msg))
 }
 
-pub fn ledger_transfer_from_bytes(payload: &[u8]) -> Result<LedgerTransfer> {
-    let msg = decode_proto::<TransferRow>(payload)?;
-    Ok(transfer_row_from_proto(&msg))
+/// Decode a `TransferRowBatch` publication: every transfer leg in order.
+pub fn ledger_transfer_batch_from_bytes(payload: &[u8]) -> Result<Vec<Result<LedgerTransfer>>> {
+    let msg = decode_proto::<TransferRowBatch>(payload)?;
+    Ok(msg
+        .events
+        .iter()
+        .map(|row| Ok(transfer_row_from_proto(row)))
+        .collect())
 }
 
 pub fn trigger_from_bytes(payload: &[u8]) -> Result<Trigger> {
@@ -75,17 +80,26 @@ pub fn trigger_from_bytes(payload: &[u8]) -> Result<Trigger> {
     Ok(trigger_from_proto(&msg))
 }
 
-pub fn trigger_event_from_bytes(payload: &[u8]) -> Result<TriggerEvent> {
-    let msg = decode_proto::<ProtoTriggerEvent>(payload)?;
-    trigger_event_from_proto(&msg)
+/// Decode a `TriggerEventBatch` publication: every event in order. An event
+/// that fails to convert is an `Err` member; the others are still returned.
+pub fn trigger_event_batch_from_bytes(payload: &[u8]) -> Result<Vec<Result<TriggerEvent>>> {
+    let msg = decode_proto::<TriggerEventBatch>(payload)?;
+    Ok(msg.events.iter().map(trigger_event_from_proto).collect())
 }
 
-pub fn market_trade_from_bytes(
+/// Decoder for a `MarketTradeBatch` publication: every trade in execution
+/// order. A trade that fails to convert is an `Err` member; the others are
+/// still returned.
+pub fn market_trade_batch_from_bytes(
     quantity_scale: u32,
-) -> impl Fn(&[u8]) -> Result<MarketTrade> + Send + Sync + 'static {
+) -> impl Fn(&[u8]) -> Result<Vec<Result<MarketTrade>>> + Send + Sync + 'static {
     move |payload: &[u8]| {
-        let msg = decode_proto::<ProtoMarketTrade>(payload)?;
-        market_trade_from_proto(&msg, quantity_scale)
+        let msg = decode_proto::<MarketTradeBatch>(payload)?;
+        Ok(msg
+            .events
+            .iter()
+            .map(|trade| market_trade_from_proto(trade, quantity_scale))
+            .collect())
     }
 }
 
@@ -451,18 +465,22 @@ mod tests {
     }
 
     #[test]
-    fn market_trade_from_bytes_maps_side() {
-        let msg = ProtoMarketTrade {
-            symbol_id: 1,
-            match_id: 99,
-            is_buy: true,
-            price_ticks: 100,
-            qty_scaled: 5,
-            ts_ns: 123,
+    fn market_trade_batch_from_bytes_maps_side() {
+        let msg = MarketTradeBatch {
+            events: vec![crate::proto::marketdata::v1::MarketTrade {
+                symbol_id: 1,
+                match_id: 99,
+                is_buy: true,
+                price_ticks: 100,
+                qty_scaled: 5,
+                ts_ns: 123,
+                ..Default::default()
+            }],
             ..Default::default()
         };
         let bytes = msg.encode_to_vec();
-        let trade = market_trade_from_bytes(6)(&bytes).expect("decode");
+        let trades = market_trade_batch_from_bytes(6)(&bytes).expect("decode");
+        let trade = trades[0].as_ref().expect("trade");
         assert_eq!(trade.match_id, "99");
         assert_eq!(trade.side, "buy");
         assert_eq!(

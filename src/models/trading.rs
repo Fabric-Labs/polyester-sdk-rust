@@ -20,6 +20,10 @@ pub struct Order {
     pub orig_qty: Option<Quantity>,
     pub cum_qty: Option<Quantity>,
     pub leaves_qty: Option<Quantity>,
+    /// Filled base quantity this replacement inherited from its predecessors
+    /// when it was accepted; zero for an original order. `cum_qty` minus
+    /// this is what this generation executed itself.
+    pub inherited_cum_qty: Option<Quantity>,
     pub price: Option<Price>,
     pub avg_px: Option<Price>,
     pub created_ts_ns: String,
@@ -178,6 +182,11 @@ pub struct BatchCreateResultItem {
     pub client_order_id: String,
     pub code: String,
     pub rate_limit: Option<super::RateLimitDetail>,
+    /// Public ID of the order that already holds this client order ID, when
+    /// the item is rejected with `ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID`
+    /// and the server knows the holder. Absent for a duplicate within the
+    /// same batch.
+    pub existing_order_id: Option<String>,
     /// Public ID of the attached take-profit trigger, when an accepted order has one.
     pub take_profit_trigger_id: Option<String>,
     /// Public ID of the attached stop-loss trigger, when an accepted order has one.
@@ -427,6 +436,10 @@ pub struct BatchReplaceAdmissionItem {
     pub old_order_id: String,
     pub client_order_id: String,
     pub replacement_order_id: String,
+    /// `replaced` when a successor order took over, or `amended` for a
+    /// cancel-only outcome with no successor: keep tracking `old_order_id`
+    /// until it is terminal. Empty for a rejected item.
+    pub action_taken: String,
     pub code: String,
     pub rate_limit: Option<super::RateLimitDetail>,
 }
@@ -447,6 +460,8 @@ pub struct BatchReplaceStatusItem {
     pub phase: String,
     pub old_order_id: String,
     pub replacement_order_id: String,
+    /// `replaced` or `amended` (cancel-only, no successor); empty until known.
+    pub action_taken: String,
     pub order_status: String,
     pub code: String,
     pub updated_ts_ns: u64,

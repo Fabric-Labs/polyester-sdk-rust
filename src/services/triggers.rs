@@ -29,14 +29,22 @@ use crate::proto::triggers::v1::{
 use crate::types::{resolve_price_ticks, resolve_qty_scaled};
 
 const MAX_BPS: i32 = 10_000;
+/// Slippage cap shared by every trailing stop, every child that sells, and a
+/// modify (which does not say what it changes): a 100% cap would leave a sell
+/// no positive price to sell at.
+const MAX_SELLING_SLIPPAGE_BPS: i32 = MAX_BPS - 1;
 
 fn validate_bps(field: &str, bps: i32, allow_clear: bool) -> Result<()> {
+    validate_bps_at_most(field, bps, allow_clear, MAX_BPS)
+}
+
+fn validate_bps_at_most(field: &str, bps: i32, allow_clear: bool, max: i32) -> Result<()> {
     if allow_clear && bps == 0 {
         return Ok(());
     }
-    if !(1..=MAX_BPS).contains(&bps) {
+    if !(1..=max).contains(&bps) {
         return Err(Error::validation(format!(
-            "{field} must be between 1 and {MAX_BPS}"
+            "{field} must be between 1 and {max}"
         )));
     }
     Ok(())
@@ -272,6 +280,16 @@ impl TriggersService {
                     trailing.activation_price_ticks =
                         self.resolve_catalog_price(price, &params.symbol)?;
                 }
+                // A buy that arms at the activation price must be allowed to
+                // pay at least that much.
+                if matches!(params.side, CreateSide::Buy)
+                    && trailing.activation_price_ticks > 0
+                    && trailing.limit_price_ticks < trailing.activation_price_ticks
+                {
+                    return Err(Error::validation(
+                        "a buy trailing_stop limit_price (its maximum price) must be at least its activation_price",
+                    ));
+                }
                 if let Some(ticks) = params.max_slippage_ticks {
                     if ticks <= 0 {
                         return Err(Error::validation("max_slippage_ticks must be positive"));
@@ -279,7 +297,7 @@ impl TriggersService {
                     trailing.max_slippage =
                         Some(trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(ticks));
                 } else if let Some(bps) = params.max_slippage_bps {
-                    validate_bps("max_slippage_bps", bps, false)?;
+                    validate_bps_at_most("max_slippage_bps", bps, false, MAX_SELLING_SLIPPAGE_BPS)?;
                     trailing.max_slippage =
                         Some(trailing_stop_trigger::MaxSlippage::MaxSlippageBps(bps));
                 }
@@ -507,11 +525,10 @@ impl TriggersService {
         let mut req = ModifyTriggerRequest {
             trigger_id: id_to_u64(&params.trigger_id, "trigger_id")?,
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
-            symbol_id: self.ctx.catalogs.required_symbol_id(
-                params.symbol.as_deref(),
-                params.symbol_id,
-                "modify",
-            )?,
+            symbol_id: self
+                .ctx
+                .catalogs
+                .optional_symbol_id(params.symbol.as_deref(), params.symbol_id)?,
             ..Default::default()
         };
         if let Some(price) = params.trigger_price.as_ref() {
@@ -549,7 +566,7 @@ impl TriggersService {
             }
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageTicks(ticks));
         } else if let Some(bps) = params.max_slippage_bps {
-            validate_bps("max_slippage_bps", bps, true)?;
+            validate_bps_at_most("max_slippage_bps", bps, true, MAX_SELLING_SLIPPAGE_BPS)?;
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageBps(bps));
         }
         Ok(req)
@@ -571,9 +588,11 @@ impl TriggersService {
             "" => Ok(TriggerPriceSource::TriggerPriceSourceUnspecified),
             "last" => Ok(TriggerPriceSource::LastPrice),
             "index" => Ok(TriggerPriceSource::IndexPrice),
-            "mark" => Ok(TriggerPriceSource::MarkPrice),
+            "mark" => Err(Error::validation(
+                "trigger_price_source mark is not supported: spot markets have no mark price",
+            )),
             _ => Err(Error::validation(
-                "trigger_price_source must be last, index, or mark",
+                "trigger_price_source must be last or index",
             )),
         }
     }
@@ -688,7 +707,9 @@ impl TriggersService {
         .await
     }
 
-    /// Resume a trigger. Connect requires `symbol` or `symbol_id`.
+    /// Resume a trigger. `symbol` / `symbol_id` are optional: leave both out
+    /// to target the trigger's own market. An API key restricted to some
+    /// markets must name the market.
     pub async fn resume_with(&self, params: ResumeTriggerParams) -> Result<TriggerMutationResult> {
         if params.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
@@ -696,11 +717,10 @@ impl TriggersService {
         self.resume(ResumeTriggerRequest {
             trigger_id: id_to_u64(&params.trigger_id, "trigger_id")?,
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
-            symbol_id: self.ctx.catalogs.required_symbol_id(
-                params.symbol.as_deref(),
-                params.symbol_id,
-                "resume",
-            )?,
+            symbol_id: self
+                .ctx
+                .catalogs
+                .optional_symbol_id(params.symbol.as_deref(), params.symbol_id)?,
             ..Default::default()
         })
         .await
@@ -751,6 +771,11 @@ impl TriggersService {
     }
 
     /// Subscribe to private trigger events (requires `realtime` feature).
+    ///
+    /// Each publication batches events; every event arrives on its own,
+    /// oldest first per symbol. An event that fails to decode is reported
+    /// through the subscription's error callback without dropping the rest
+    /// of its batch.
     pub async fn subscribe_events(
         &self,
         account_id: Option<&str>,
@@ -759,7 +784,10 @@ impl TriggersService {
         let channel = format!("private:spot:triggers:events:{account}:proto");
         self.ctx
             .realtime
-            .subscribe_proto(&channel, crate::codecs::decode::trigger_event_from_bytes)
+            .subscribe_proto_batch(
+                &channel,
+                crate::codecs::decode::trigger_event_batch_from_bytes,
+            )
             .await
     }
 }
@@ -1316,19 +1344,19 @@ mod tests {
         let client = client();
         client
             .triggers
-            .encode_create_params(&trailing_create(Some(10_000)))
+            .encode_create_params(&trailing_create(Some(9_999)))
             .unwrap();
         assert!(
             client
                 .triggers
-                .encode_create_params(&trailing_create(Some(10_001)))
+                .encode_create_params(&trailing_create(Some(10_000)))
                 .is_err()
         );
 
         let modify_too_high = ModifyTriggerParams {
             trigger_id: "1".into(),
             symbol: Some("BTC-USDT".into()),
-            max_slippage_bps: Some(10_001),
+            max_slippage_bps: Some(10_000),
             ..modify_params(None, None)
         };
         assert!(
@@ -1393,20 +1421,33 @@ mod tests {
     #[test]
     fn poly_4684_standalone_trailing_slippage_bps_boundaries_preexisting() {
         let client = client();
-        for bps in [1, 10_000] {
-            client
-                .triggers
-                .encode_create_params(&trailing_create(Some(bps)))
-                .unwrap();
-        }
-        for bps in [0, 10_001] {
-            assert!(
+        // Every trailing stop takes at most 9999 bps, whatever its side.
+        for side in [CreateSide::Buy, CreateSide::Sell] {
+            let trailing = |bps| {
+                let mut params = trailing_create(Some(bps));
+                params.side = side;
+                if matches!(side, CreateSide::Buy) {
+                    params.limit_price = Some(
+                        crate::Price::from_decimal_str("51000", Some("BTC-USDT".into())).unwrap(),
+                    );
+                }
+                params
+            };
+            for bps in [1, 9_999] {
                 client
                     .triggers
-                    .encode_create_params(&trailing_create(Some(bps)))
-                    .is_err(),
-                "standalone max_slippage_bps={bps} must be rejected"
-            );
+                    .encode_create_params(&trailing(bps))
+                    .unwrap_or_else(|e| panic!("{side:?} max_slippage_bps={bps}: {e}"));
+            }
+            for bps in [0, 10_000] {
+                assert!(
+                    client
+                        .triggers
+                        .encode_create_params(&trailing(bps))
+                        .is_err(),
+                    "{side:?} standalone max_slippage_bps={bps} must be rejected"
+                );
+            }
         }
 
         let base = ModifyTriggerParams {
@@ -1414,7 +1455,7 @@ mod tests {
             symbol: Some("BTC-USDT".into()),
             ..modify_params(None, None)
         };
-        for bps in [1, 10_000] {
+        for bps in [1, 9_999] {
             client
                 .triggers
                 .encode_modify_params(&ModifyTriggerParams {
@@ -1434,7 +1475,7 @@ mod tests {
             client
                 .triggers
                 .encode_modify_params(&ModifyTriggerParams {
-                    max_slippage_bps: Some(10_001),
+                    max_slippage_bps: Some(10_000),
                     ..base
                 })
                 .is_err()
@@ -1509,6 +1550,60 @@ mod tests {
             max_slippage_ticks: None,
             max_slippage_bps: None,
         }
+    }
+
+    #[test]
+    fn spot_triggers_reject_the_mark_price_source() {
+        let client = client();
+        let mut params = trailing_create(None);
+        params.trigger_price_source = Some("mark".into());
+        let err = client.triggers.encode_create_params(&params).unwrap_err();
+        assert!(err.to_string().contains("no mark price"), "{err}");
+        params.trigger_price_source = Some("index".into());
+        client.triggers.encode_create_params(&params).unwrap();
+    }
+
+    #[test]
+    fn buy_trailing_stop_limit_price_must_cover_its_activation_price() {
+        let client = client();
+        let price = |p: &str| crate::Price::from_decimal_str(p, Some("BTC-USDT".into())).unwrap();
+        let mut params = trailing_create(None);
+        params.side = CreateSide::Buy;
+        params.activation_price = Some(price("50000"));
+        params.limit_price = Some(price("49999.99"));
+        let err = client.triggers.encode_create_params(&params).unwrap_err();
+        assert!(
+            err.to_string().contains("at least its activation_price"),
+            "{err}"
+        );
+        params.limit_price = Some(price("50000"));
+        client.triggers.encode_create_params(&params).unwrap();
+        // Without an activation price there is nothing to compare.
+        params.activation_price = None;
+        params.limit_price = Some(price("1"));
+        client.triggers.encode_create_params(&params).unwrap();
+    }
+
+    #[test]
+    fn trigger_modify_without_a_symbol_targets_the_triggers_own_market() {
+        let client = client();
+        let req = client
+            .triggers
+            .encode_modify_params(&ModifyTriggerParams {
+                symbol: None,
+                max_slippage_bps: Some(50),
+                ..modify_params(None, None)
+            })
+            .expect("symbol is optional");
+        assert_eq!(req.symbol_id, 0);
+        let req = client
+            .triggers
+            .encode_modify_params(&ModifyTriggerParams {
+                max_slippage_bps: Some(50),
+                ..modify_params(None, None)
+            })
+            .unwrap();
+        assert_eq!(req.symbol_id, 7, "a named market is still resolved");
     }
 
     #[test]

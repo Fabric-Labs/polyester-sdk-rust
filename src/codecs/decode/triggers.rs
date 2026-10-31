@@ -199,6 +199,10 @@ fn trigger_details_from_proto(
                 } else {
                     None
                 },
+                trigger_price: trailing
+                    .trigger_price_ticks
+                    .filter(|ticks| *ticks > 0)
+                    .and_then(|ticks| decode_price_ticks(ticks, symbol.clone())),
                 max_slippage: if trailing.max_slippage_ticks > 0 {
                     decode_price_ticks(trailing.max_slippage_ticks, symbol.clone())
                 } else {
@@ -829,6 +833,20 @@ mod tests {
             trailing.activation_price.as_ref().unwrap().format(),
             "80000"
         );
+        assert_eq!(
+            trailing.trigger_price.as_ref().unwrap().format(),
+            "80295.505"
+        );
+
+        // Before it is armed, a trailing stop has no threshold yet.
+        let mut unarmed = msg.clone();
+        if let Some(trigger::RuntimeDetails::Trailing(details)) = unarmed.runtime_details.as_mut() {
+            details.trigger_price_ticks = None;
+        }
+        let Some(TriggerDetails::Trailing(trailing)) = trigger_from_proto(&unarmed).details else {
+            panic!("expected trailing details");
+        };
+        assert!(trailing.trigger_price.is_none());
 
         // A SELL trailing stop has no maximum price.
         let mut sell = msg.clone();

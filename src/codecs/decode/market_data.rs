@@ -7,14 +7,16 @@ use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::{TsNs, format_price_ticks, format_qty_scaled};
 use crate::errors::{Error, Result};
 use crate::models::{
-    Candle, CandlesResult, MarketTrade, MarketTradesResult, SpotConfig, TradeEpochEnd,
+    Candle, CandlesResult, MarketTrade, MarketTradesResult, PairOrderLimits, SpotConfig,
+    TradeEpochEnd,
 };
 use crate::proto::marketdata::v1::{
     CandlePoint, GetCandlesColumnsResponse, GetCandlesResponse, GetSpotConfigResponse,
-    GetTradesResponse, MarketTrade as ProtoMarketTrade, Timeframe,
+    GetTradesResponse, MarketTrade as ProtoMarketTrade, PairConfig, Timeframe,
 };
 
-pub fn spot_config_from_proto(msg: &GetSpotConfigResponse) -> SpotConfig {
+/// Decode a spot config. Fails when an order limit is not a decimal string.
+pub fn spot_config_from_proto(msg: &GetSpotConfigResponse) -> Result<SpotConfig> {
     let mut raw = api_data_from_proto(msg).raw;
     // proto3 omits scalar zeroes during proto-JSON conversion. Quantity scale
     // zero is nevertheless valid, so restore the typed wire value rather than
@@ -54,7 +56,41 @@ pub fn spot_config_from_proto(msg: &GetSpotConfigResponse) -> SpotConfig {
             }
         }
     }
-    SpotConfig { raw }
+    let pair_order_limits = msg
+        .pairs
+        .iter()
+        .map(pair_order_limits_from_proto)
+        .collect::<Result<Vec<_>>>()?;
+    Ok(SpotConfig {
+        raw,
+        pair_order_limits,
+        max_open_orders_total: msg.max_open_orders_total,
+    })
+}
+
+fn pair_order_limits_from_proto(pair: &PairConfig) -> Result<PairOrderLimits> {
+    let decimal = |field: &str, value: &Option<String>| -> Result<Option<String>> {
+        if let Some(limit) = value {
+            crate::catalogs::validate_decimal_limit(field, limit)
+                .map_err(|e| Error::response_contract("GetSpotConfig", e.to_string()))?;
+        }
+        Ok(value.clone())
+    };
+    Ok(PairOrderLimits {
+        symbol: pair.symbol.clone(),
+        symbol_id: pair.symbol_id,
+        max_limit_qty_base: decimal("max_limit_qty_base", &pair.max_limit_qty_base)?,
+        max_market_qty_base: decimal("max_market_qty_base", &pair.max_market_qty_base)?,
+        max_order_notional_quote: decimal(
+            "max_order_notional_quote",
+            &pair.max_order_notional_quote,
+        )?,
+        max_market_notional_quote: decimal(
+            "max_market_notional_quote",
+            &pair.max_market_notional_quote,
+        )?,
+        max_open_orders_per_pair: pair.max_open_orders_per_pair,
+    })
 }
 
 pub fn timeframe_label(tf: Timeframe) -> &'static str {
@@ -357,6 +393,85 @@ fn reference_candles_from_columns(
 mod tests {
     use super::*;
 
+    fn limited_pair(symbol_id: u32, symbol: &str) -> PairConfig {
+        PairConfig {
+            symbol_id,
+            symbol: symbol.into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn spot_config_exposes_typed_order_limits() {
+        let mut btc = limited_pair(1, "BTC-USDT");
+        btc.max_limit_qty_base = Some("100".into());
+        btc.max_market_qty_base = Some("25.5".into());
+        btc.max_order_notional_quote = Some("5000000".into());
+        btc.max_market_notional_quote = Some("250000.25".into());
+        btc.max_open_orders_per_pair = 200;
+        let msg = GetSpotConfigResponse {
+            pairs: vec![btc, limited_pair(2, "ETH-USDT")],
+            max_open_orders_total: 1000,
+            ..Default::default()
+        };
+        let spot = spot_config_from_proto(&msg).expect("decode");
+        assert_eq!(spot.max_open_orders_total, 1000);
+        assert_eq!(
+            spot.pair_order_limits,
+            vec![
+                PairOrderLimits {
+                    symbol: "BTC-USDT".into(),
+                    symbol_id: 1,
+                    max_limit_qty_base: Some("100".into()),
+                    max_market_qty_base: Some("25.5".into()),
+                    max_order_notional_quote: Some("5000000".into()),
+                    max_market_notional_quote: Some("250000.25".into()),
+                    max_open_orders_per_pair: 200,
+                },
+                // Absent limits mean "no maximum", not zero.
+                PairOrderLimits {
+                    symbol: "ETH-USDT".into(),
+                    symbol_id: 2,
+                    ..Default::default()
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn spot_config_rejects_malformed_order_limits() {
+        type Setter = fn(&mut PairConfig, String);
+        let setters: [(&str, Setter); 4] = [
+            ("max_limit_qty_base", |p, v| p.max_limit_qty_base = Some(v)),
+            ("max_market_qty_base", |p, v| {
+                p.max_market_qty_base = Some(v)
+            }),
+            ("max_order_notional_quote", |p, v| {
+                p.max_order_notional_quote = Some(v)
+            }),
+            ("max_market_notional_quote", |p, v| {
+                p.max_market_notional_quote = Some(v)
+            }),
+        ];
+        for (field, set) in setters {
+            for bad in ["", "-1", "1e6", "1.", ".5", "1,000", " 5", "NaN"] {
+                let mut pair = limited_pair(1, "BTC-USDT");
+                set(&mut pair, bad.to_owned());
+                let msg = GetSpotConfigResponse {
+                    pairs: vec![pair],
+                    ..Default::default()
+                };
+                let err =
+                    spot_config_from_proto(&msg).expect_err("a malformed limit must not decode");
+                assert!(
+                    matches!(err, Error::ResponseContract { .. })
+                        && err.to_string().contains(field),
+                    "{field}={bad:?}: {err}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn gap_free_backfill_fields_decode() {
         use crate::proto::marketdata::v1::TradeEpochEnd as ProtoTradeEpochEnd;
@@ -473,7 +588,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let spot = spot_config_from_proto(&msg);
+        let spot = spot_config_from_proto(&msg).unwrap();
         assert_eq!(spot.raw["pairs"][0]["baseQuantityScale"], 0);
         assert_eq!(spot.raw["pairs"][0]["quoteQuantityScale"], 0);
         assert!(spot.raw["pairs"][0].get("base_quantity_scale").is_none());
@@ -499,7 +614,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let spot = spot_config_from_proto(&msg);
+        let spot = spot_config_from_proto(&msg).unwrap();
         assert_eq!(spot.raw["pairs"][0]["status"], "PAIR_STATUS_HALTED");
     }
 

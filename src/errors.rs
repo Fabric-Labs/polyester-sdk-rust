@@ -67,6 +67,28 @@ pub enum Error {
          devnet or disabled in this environment."
     )]
     RouteNotFound { procedure: String },
+    /// The server does not implement this call: Connect `unimplemented` or a
+    /// bare HTTP 501. A bare HTTP 404 is [`Error::RouteNotFound`] instead.
+    /// Not retryable.
+    #[error("not implemented: {message}")]
+    NotImplemented { message: String },
+    /// The API-key request timestamp is outside the server's allowed skew
+    /// window (`TIMESTAMP_SKEW`), usually because the local clock is off.
+    ///
+    /// Retryable: the API gateway rejected the request before any service
+    /// saw it, and a retry signs it again with a fresh timestamp. If it
+    /// persists, fix the local clock. For large bursts, bound concurrency so
+    /// requests do not wait locally past the skew window.
+    #[error(
+        "API-key request timestamp is outside the allowed skew window (HTTP {status}); check the local clock"
+    )]
+    TimestampSkew { status: u16 },
+    /// The API gateway rejected an API-key request before any service saw
+    /// it, for example `SIGNATURE_INVALID`, `KEY_DISABLED` or
+    /// `IP_NOT_ALLOWED`. Not retryable: fix the key, signature or allowlist.
+    /// [`Error::auth_error_code`] returns `code`.
+    #[error("API-key request rejected (HTTP {status}, code {code})")]
+    ApiKeyRejected { status: u16, code: String },
     #[error("{0}")]
     Realtime(String),
     /// Realtime subscription queue was full; the subscription fails instead of
@@ -85,6 +107,9 @@ pub mod auth_codes {
     pub const INTERNAL_ERROR: &str = "AUTH_INTERNAL_ERROR";
     /// The account request changed nothing; send the same request again.
     pub const TEMPORARILY_UNAVAILABLE: &str = "AUTH_TEMPORARILY_UNAVAILABLE";
+    /// API-gateway rejection of an API-key request whose timestamp is outside
+    /// the allowed skew window; see [`super::Error::TimestampSkew`].
+    pub const TIMESTAMP_SKEW: &str = "TIMESTAMP_SKEW";
 }
 
 /// Stable orders.v1.ErrorDetail codes used for retry control flow.
@@ -122,6 +147,22 @@ pub mod order_codes {
     });
 }
 
+/// [`Error::Api`] metadata key holding [`Error::existing_order_id`].
+const EXISTING_ORDER_ID_METADATA: &str = "existing_order_id";
+
+/// Error for an API-gateway rejection of an API-key request: `code` comes
+/// from the gateway's `{"code": ...}` JSON body.
+pub(crate) fn gateway_rejection_error(status: u16, code: &str) -> Error {
+    if code == auth_codes::TIMESTAMP_SKEW {
+        Error::TimestampSkew { status }
+    } else {
+        Error::ApiKeyRejected {
+            status,
+            code: code.to_owned(),
+        }
+    }
+}
+
 fn is_outcome_unknown_code(code: &str) -> bool {
     order_codes::OUTCOME_UNKNOWN.contains(&code)
 }
@@ -156,10 +197,10 @@ impl Error {
 
     /// Whether retrying may succeed after backoff.
     ///
-    /// True for transport, rate-limit and server errors, and for
-    /// `AUTH_TEMPORARILY_UNAVAILABLE` and `ERROR_CODE_ACCOUNT_REPAIRING`,
-    /// where the request changed nothing and the same request can be sent
-    /// again.
+    /// True for transport, rate-limit and server errors, for
+    /// [`Self::TimestampSkew`], and for `AUTH_TEMPORARILY_UNAVAILABLE` and
+    /// `ERROR_CODE_ACCOUNT_REPAIRING`, where the request changed nothing and
+    /// the same request can be sent again.
     ///
     /// False for an order or trigger mutation whose outcome is unknown
     /// ([`order_codes::OUTCOME_UNKNOWN`]): it may still apply, so a blind
@@ -172,7 +213,10 @@ impl Error {
     /// preserve the same idempotency key before retrying.
     pub fn is_retryable(&self) -> bool {
         match self {
-            Self::Transport(_) | Self::RateLimit { .. } | Self::Server(_) => true,
+            Self::Transport(_)
+            | Self::RateLimit { .. }
+            | Self::Server(_)
+            | Self::TimestampSkew { .. } => true,
             Self::Api { code, .. } => {
                 code == auth_codes::TEMPORARILY_UNAVAILABLE
                     || code == order_codes::ACCOUNT_REPAIRING
@@ -207,10 +251,36 @@ impl Error {
         }
     }
 
-    /// Structured auth.v1.AuthErrorDetail code when this is an [`Error::Api`].
+    /// Structured error code: the auth.v1.AuthErrorDetail (or other service)
+    /// code of an [`Error::Api`], or the API-gateway code of an
+    /// [`Error::ApiKeyRejected`] or [`Error::TimestampSkew`].
     pub fn auth_error_code(&self) -> Option<&str> {
         match self {
-            Self::Api { code, .. } => Some(code.as_str()),
+            Self::Api { code, .. } | Self::ApiKeyRejected { code, .. } => Some(code.as_str()),
+            Self::TimestampSkew { .. } => Some(auth_codes::TIMESTAMP_SKEW),
+            _ => None,
+        }
+    }
+
+    /// True for [`Self::NotImplemented`] and its narrower case
+    /// [`Self::RouteNotFound`]: the server does not offer this call.
+    pub fn is_not_implemented(&self) -> bool {
+        matches!(
+            self,
+            Self::NotImplemented { .. } | Self::RouteNotFound { .. }
+        )
+    }
+
+    /// Public ID of the order that already holds the client order ID, when a
+    /// create is rejected with `ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID`
+    /// and the server knows the holder. Read it with `orders.get` to learn
+    /// its current state.
+    pub fn existing_order_id(&self) -> Option<&str> {
+        match self {
+            Self::Api { metadata, .. } => metadata
+                .iter()
+                .find(|(key, _)| key == EXISTING_ORDER_ID_METADATA)
+                .map(|(_, value)| value.as_str()),
             _ => None,
         }
     }
@@ -358,6 +428,28 @@ pub fn map_connect_error(err: ConnectError) -> Error {
         }
     };
     let header_retry = retry_after_seconds(&err);
+    let status = err.http_status().as_u16();
+    let raw_message = err.message.as_deref().unwrap_or_default();
+    let has_marker = |marker: &str| err.details.iter().any(|detail| detail.type_url == marker);
+    if has_marker(crate::transport::GATEWAY_REJECTION_TYPE) {
+        return gateway_rejection_error(status, raw_message);
+    }
+    if has_marker(crate::transport::BARE_HTTP_ERROR_TYPE) {
+        // A bare 404 means the route is missing; a bare 501 that the server
+        // does not implement the call.
+        return if status == 404 {
+            Error::RouteNotFound {
+                procedure: String::new(),
+            }
+        } else {
+            Error::NotImplemented {
+                message: fallback_message,
+            }
+        };
+    }
+    if raw_message == auth_codes::TIMESTAMP_SKEW {
+        return Error::TimestampSkew { status };
+    }
     for detail in &err.details {
         if let Some(auth_detail) = decode_auth_error_detail(detail) {
             let code = known_or_unknown_code(
@@ -402,10 +494,20 @@ pub fn map_connect_error(err: ConnectError) -> Error {
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
             }
+            let metadata = order_detail
+                .existing_order_id
+                .filter(|id| *id != 0)
+                .map(|id| {
+                    vec![(
+                        EXISTING_ORDER_ID_METADATA.to_owned(),
+                        crate::codecs::scalars::format_uint64_id(id),
+                    )]
+                })
+                .unwrap_or_default();
             return Error::Api {
                 message: fallback_message.clone(),
                 code,
-                metadata: Vec::new(),
+                metadata,
             };
         }
         if let Some(withdraw_detail) = decode_withdraw_error_detail(detail) {
@@ -459,22 +561,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
         ErrorCode::ResourceExhausted => rate_limit_error(message, None, header_retry),
         ErrorCode::Unavailable | ErrorCode::Internal => Error::Server(message),
         ErrorCode::DeadlineExceeded => Error::Transport(message),
-        ErrorCode::Unimplemented => {
-            if message.contains("not found")
-                || message.contains("unimplemented")
-                || message.contains("404")
-            {
-                Error::RouteNotFound {
-                    procedure: String::new(),
-                }
-            } else {
-                Error::Api {
-                    message,
-                    code: format!("{code:?}"),
-                    metadata: Vec::new(),
-                }
-            }
-        }
+        ErrorCode::Unimplemented => Error::NotImplemented { message },
         _ => Error::Api {
             message,
             code: format!("{code:?}"),
@@ -719,6 +806,57 @@ mod tests {
         }
         assert!(!mapped.mutation_outcome_unknown());
         assert!(!mapped.is_retryable());
+    }
+
+    #[test]
+    fn duplicate_client_order_id_rejection_exposes_existing_order_id() {
+        let detail = OrderErrorDetail {
+            code: EnumValue::Known(OrderErrorCode::ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID),
+            existing_order_id: Some(77),
+            ..Default::default()
+        };
+        let err = map_connect_error(
+            ConnectError::new(ErrorCode::AlreadyExists, "duplicate client order id").with_detail(
+                ErrorDetail::from_message("type.googleapis.com/orders.v1.ErrorDetail", &detail),
+            ),
+        );
+        assert_eq!(
+            err.existing_order_id(),
+            Some(crate::codecs::scalars::format_uint64_id(77).as_str())
+        );
+        assert_eq!(
+            err.auth_error_code(),
+            Some("ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID")
+        );
+        assert!(!err.is_retryable());
+
+        let without_holder = map_connect_error(
+            ConnectError::new(ErrorCode::AlreadyExists, "duplicate client order id").with_detail(
+                ErrorDetail::from_message(
+                    "type.googleapis.com/orders.v1.ErrorDetail",
+                    &OrderErrorDetail {
+                        code: EnumValue::Known(
+                            OrderErrorCode::ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID,
+                        ),
+                        ..Default::default()
+                    },
+                ),
+            ),
+        );
+        assert_eq!(without_holder.existing_order_id(), None);
+    }
+
+    #[test]
+    fn timestamp_skew_message_is_a_retryable_skew_error() {
+        let err = map_connect_error(ConnectError::new(
+            ErrorCode::Unauthenticated,
+            auth_codes::TIMESTAMP_SKEW,
+        ));
+        assert!(
+            matches!(err, Error::TimestampSkew { status: 401 }),
+            "{err:?}"
+        );
+        assert!(err.is_retryable() && !err.mutation_outcome_unknown());
     }
 
     #[test]

@@ -4,11 +4,17 @@ use crate::auth::{self, Credentials};
 use crate::errors::{Error, Result, map_connect_error};
 use crate::user_agent::user_agent;
 use buffa::Message;
-use connectrpc::ConnectError;
-use connectrpc::client::{CallOptions, ClientConfig, HttpClient};
+use bytes::Bytes;
+use connectrpc::client::{
+    BoxFuture, CallOptions, ClientBody, ClientConfig, ClientTransport, HttpClient,
+};
 use connectrpc::rustls;
-use http::{HeaderValue, Uri, header::USER_AGENT};
-use serde::Serialize;
+use connectrpc::{CompressionRegistry, ConnectError, ErrorCode, ErrorDetail};
+use http::header::{CONTENT_ENCODING, CONTENT_TYPE, USER_AGENT};
+use http::{HeaderValue, Request, Response, StatusCode, Uri};
+use http_body_util::{BodyExt, Either, Full, Limited};
+use hyper::body::Incoming;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -142,7 +148,198 @@ pub fn validate_ws_url(raw: &str, allow_insecure: bool) -> Result<url::Url> {
 }
 
 /// Shared transport handle used by all generated Connect clients.
-pub type SharedTransport = HttpClient;
+pub type SharedTransport = GatewayTransport;
+
+/// Type URL of the SDK-local Connect error detail that marks an API-gateway
+/// rejection. It never travels on the wire; [`GatewayTransport`] attaches it
+/// and [`crate::errors::map_connect_error`] reads it back.
+pub(crate) const GATEWAY_REJECTION_TYPE: &str = "polyester.sdk.GatewayRejection";
+
+/// Type URL of the SDK-local Connect error detail that marks a bare HTTP 404
+/// or 501: a failed response whose body is not a Connect error. The error's
+/// HTTP status is the response's.
+pub(crate) const BARE_HTTP_ERROR_TYPE: &str = "polyester.sdk.BareHttpError";
+
+/// Longest body excerpt kept in a bare HTTP error message.
+const BARE_HTTP_ERROR_EXCERPT_CHARS: usize = 256;
+
+/// [`HttpClient`] that keeps what Connect would lose from a failed response
+/// that is not a Connect error.
+///
+/// - The API gateway rejects API-key requests before any service sees them,
+///   with a plain JSON (or problem JSON) body such as
+///   `401 {"code":"TIMESTAMP_SKEW"}`. Connect would keep only the HTTP status
+///   and drop the code. This transport reports the code, so the rejection
+///   maps to [`Error::TimestampSkew`] or [`Error::ApiKeyRejected`].
+/// - A bare HTTP 404 or 501 (any body that is not a Connect error) keeps its
+///   real status, so it maps to [`Error::RouteNotFound`] or
+///   [`Error::NotImplemented`] rather than Connect's guess from the status.
+#[derive(Clone)]
+pub struct GatewayTransport {
+    inner: HttpClient,
+    /// The decoders connectrpc itself applies to a `Content-Encoding` body.
+    compression: CompressionRegistry,
+}
+
+impl GatewayTransport {
+    fn new(inner: HttpClient) -> Self {
+        Self {
+            inner,
+            compression: CompressionRegistry::default(),
+        }
+    }
+}
+
+type GatewayResponseBody = Either<Incoming, Full<Bytes>>;
+
+impl ClientTransport for GatewayTransport {
+    type ResponseBody = GatewayResponseBody;
+    type Error = ConnectError;
+
+    fn send(
+        &self,
+        request: Request<ClientBody>,
+    ) -> BoxFuture<'static, std::result::Result<Response<Self::ResponseBody>, ConnectError>> {
+        let response = self.inner.send(request);
+        let compression = self.compression.clone();
+        Box::pin(async move {
+            let response = response.await?;
+            let Some(is_json) = inspected_failure(&response) else {
+                return Ok(response.map(Either::Left));
+            };
+            let (parts, body) = response.into_parts();
+            let body = Limited::new(body, MAX_CONNECT_RESPONSE_BYTES)
+                .collect()
+                .await
+                .map_err(|e| ConnectError::unavailable(format!("read error response: {e}")))?
+                .to_bytes();
+            // Classify the decoded body; an encoding this client cannot
+            // decode leaves no readable Connect error, so it reads as empty.
+            let decoded = match parts
+                .headers
+                .get(CONTENT_ENCODING)
+                .and_then(|value| value.to_str().ok())
+            {
+                None => body.clone(),
+                Some(encoding) => compression
+                    .decompress_with_limit(
+                        &encoding.trim().to_ascii_lowercase(),
+                        body.clone(),
+                        MAX_CONNECT_RESPONSE_BYTES,
+                    )
+                    .unwrap_or_default(),
+            };
+            if let Some(err) = classify_failed_response(parts.status, is_json, &decoded) {
+                return Err(err);
+            }
+            // Hand Connect the response exactly as received, encoding included.
+            Ok(Response::from_parts(parts, Either::Right(Full::new(body))))
+        })
+    }
+}
+
+/// For a failed response that may need classifying, whether its body is
+/// JSON; `None` for everything else, which streams through untouched.
+/// Gateway rejections are JSON; bare 404 and 501 have any body.
+fn inspected_failure<B>(response: &Response<B>) -> Option<bool> {
+    let status = response.status();
+    if status.is_success() {
+        return None;
+    }
+    let is_json = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_ascii_lowercase)
+        .is_some_and(|value| {
+            value.starts_with("application/json") || value.starts_with("application/problem+json")
+        });
+    (is_json || status == StatusCode::NOT_FOUND || status == StatusCode::NOT_IMPLEMENTED)
+        .then_some(is_json)
+}
+
+/// The Connect error for a failed response that Connect would misreport, or
+/// `None` for a Connect error body or any other failure, which Connect then
+/// maps as usual.
+fn classify_failed_response(
+    status: StatusCode,
+    is_json: bool,
+    body: &[u8],
+) -> Option<ConnectError> {
+    #[derive(Deserialize)]
+    struct Body {
+        code: Option<String>,
+    }
+    let code = is_json
+        .then(|| serde_json::from_slice::<Body>(body).ok())
+        .flatten()
+        .and_then(|body| body.code)
+        .filter(|code| !code.is_empty());
+    if let Some(code) = code {
+        // Connect error codes are lowercase names such as `unimplemented`.
+        if code.parse::<ErrorCode>().is_ok() {
+            return None;
+        }
+        if let Some(err) = gateway_rejection(status, code) {
+            return Some(err);
+        }
+    }
+    if status != StatusCode::NOT_FOUND && status != StatusCode::NOT_IMPLEMENTED {
+        return None;
+    }
+    let text = String::from_utf8_lossy(body);
+    let excerpt: String = text
+        .trim()
+        .chars()
+        .take(BARE_HTTP_ERROR_EXCERPT_CHARS)
+        .collect();
+    let message = if excerpt.is_empty() {
+        format!("HTTP {}", status.as_u16())
+    } else {
+        format!("HTTP {}: {excerpt}", status.as_u16())
+    };
+    Some(sdk_marked_error(
+        ErrorCode::Unimplemented,
+        message,
+        status,
+        BARE_HTTP_ERROR_TYPE,
+    ))
+}
+
+/// The Connect error for an API-gateway rejection `code`, or `None` when the
+/// status is not one the gateway uses for it.
+fn gateway_rejection(status: StatusCode, code: String) -> Option<ConnectError> {
+    let connect_code = if code == crate::errors::auth_codes::TIMESTAMP_SKEW {
+        ErrorCode::Unauthenticated
+    } else {
+        match status {
+            StatusCode::UNAUTHORIZED => ErrorCode::Unauthenticated,
+            StatusCode::FORBIDDEN => ErrorCode::PermissionDenied,
+            _ => return None,
+        }
+    };
+    Some(sdk_marked_error(
+        connect_code,
+        code,
+        status,
+        GATEWAY_REJECTION_TYPE,
+    ))
+}
+
+fn sdk_marked_error(
+    code: ErrorCode,
+    message: String,
+    status: StatusCode,
+    marker: &str,
+) -> ConnectError {
+    ConnectError::new(code, message)
+        .with_http_status(status)
+        .with_detail(ErrorDetail {
+            type_url: marker.to_owned(),
+            value: None,
+            debug: None,
+        })
+}
 
 /// Owns HTTP client, Connect config, and optional credentials.
 #[derive(Clone)]
@@ -251,7 +448,7 @@ impl Factory {
     }
 }
 
-fn build_http_client(api_url: &str) -> Result<HttpClient> {
+fn build_http_client(api_url: &str) -> Result<GatewayTransport> {
     static INIT: std::sync::Once = std::sync::Once::new();
     INIT.call_once(|| {
         let _ = rustls::crypto::ring::default_provider().install_default();
@@ -265,9 +462,9 @@ fn build_http_client(api_url: &str) -> Result<HttpClient> {
                 .with_root_certificates(roots)
                 .with_no_client_auth(),
         );
-        Ok(HttpClient::with_tls(tls))
+        Ok(GatewayTransport::new(HttpClient::with_tls(tls)))
     } else if api_url.starts_with("http://") {
-        Ok(HttpClient::plaintext())
+        Ok(GatewayTransport::new(HttpClient::plaintext()))
     } else {
         Err(Error::validation(
             "api_url must start with http:// or https://",
@@ -279,6 +476,63 @@ fn build_http_client(api_url: &str) -> Result<HttpClient> {
 mod tests {
     use super::*;
     use crate::user_agent::user_agent;
+
+    #[test]
+    fn failed_responses_keep_their_status_and_gateway_code() {
+        let classify = |status: u16, is_json: bool, body: &str| {
+            classify_failed_response(
+                StatusCode::from_u16(status).unwrap(),
+                is_json,
+                body.as_bytes(),
+            )
+        };
+        let marker = |err: &ConnectError| {
+            err.details
+                .iter()
+                .map(|d| d.type_url.clone())
+                .collect::<Vec<_>>()
+        };
+
+        // Connect error bodies are left to Connect, with or without a message.
+        assert!(classify(501, true, r#"{"code":"unimplemented"}"#).is_none());
+        assert!(classify(404, true, r#"{"code":"not_found","message":"x"}"#).is_none());
+        // Other failures Connect maps correctly by status are left alone.
+        assert!(classify(500, true, "{}").is_none());
+        assert!(classify(503, true, r#"{"code":"MAINTENANCE"}"#).is_none());
+
+        for (status, is_json, body, message) in [
+            (404, false, "", "HTTP 404"),
+            (404, true, "{}", "HTTP 404: {}"),
+            (501, false, "Not Implemented", "HTTP 501: Not Implemented"),
+            (
+                501,
+                true,
+                r#"{"message":"Not Implemented"}"#,
+                r#"HTTP 501: {"message":"Not Implemented"}"#,
+            ),
+        ] {
+            let err = classify(status, is_json, body).expect("bare HTTP error");
+            assert_eq!(err.code, ErrorCode::Unimplemented);
+            assert_eq!(err.http_status().as_u16(), status);
+            assert_eq!(err.message.as_deref(), Some(message));
+            assert_eq!(marker(&err), [BARE_HTTP_ERROR_TYPE]);
+        }
+
+        let skew = classify(401, true, r#"{"code":"TIMESTAMP_SKEW"}"#).unwrap();
+        assert_eq!(
+            (
+                skew.code,
+                skew.http_status().as_u16(),
+                skew.message.as_deref()
+            ),
+            (ErrorCode::Unauthenticated, 401, Some("TIMESTAMP_SKEW"))
+        );
+        assert_eq!(marker(&skew), [GATEWAY_REJECTION_TYPE]);
+        let denied = classify(403, true, r#"{"code":"IP_NOT_ALLOWED"}"#).unwrap();
+        assert_eq!(denied.code, ErrorCode::PermissionDenied);
+        // A JSON body is only read for its code when it is JSON.
+        assert!(classify(401, false, r#"{"code":"TIMESTAMP_SKEW"}"#).is_none());
+    }
 
     #[test]
     fn connect_config_sets_polyester_user_agent() {
