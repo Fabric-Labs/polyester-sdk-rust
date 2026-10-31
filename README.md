@@ -5,8 +5,9 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** Alpha (`0.1.0-alpha.49`, git tag `v0.1.0a49`). Proprietary license
-(not open source). API-key only; no browser login or JWT flows.
+**Status:** `0.2.0` (git tag `v0.2.0`). Pre-1.0: minor releases may break the API.
+The Go, Python and Rust SDKs share one SemVer version and are released together.
+Proprietary license (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.90+
 
@@ -55,7 +56,7 @@ Rows marked **No** are intentional for API-key SDKs (use the TypeScript
 browser client for wallet login and session MFA).
 
 Full cross-language comparison:
-[SDK capability matrix](https://polyester.ai/docs/developer-docs/getting-started/sdk-capability-matrix).
+[SDK capability matrix](https://polyester.com/docs/developer-docs/getting-started/sdk-capability-matrix).
 <!-- sdk-capabilities:end -->
 
 `client.address_book` now wraps create/update/delete/copy for entries and tags.
@@ -84,22 +85,18 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.1.0-alpha.49"
+polyester-sdk = "0.2.0"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
 `realtime` / `chain` Cargo features are empty compatibility flags.
 
-For a private git checkout instead of crates.io:
+To pin a git tag instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.1.0a49" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.2.0" }
 ```
-
-The repository is currently private, so GitHub access and authenticated Git credentials are
-required for the git pin. If Cargo cannot use your credential helper, run it with
-`CARGO_NET_GIT_FETCH_WITH_CLI=true`.
 
 For development from a git checkout:
 
@@ -388,7 +385,7 @@ applies. A limit child takes no cap; its `limit_price` bounds it. Trigger
 reads expose the cap as `Trigger.max_slippage`.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
-[Market Order Price Protection](https://polyester.ai/developer-docs/shared-concepts/market-order-price-protection)
+[Market Order Price Protection](https://polyester.com/docs/developer-docs/shared-concepts/market-order-price-protection)
 before overriding `market_max_slippage`.
 
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
@@ -847,10 +844,14 @@ python3 scripts/check_sdk_coverage.py
 python3 scripts/check_sdk_coverage.py --write-capabilities  # refresh JSON + README table
 ```
 
-CI refreshes `sdk-capabilities.json` and the README capability table on pushes to
-`main` when they drift (not on pull-request CI).
+CI fails when `sdk-capabilities.json` or the README capability table is stale, and when
+`src/proto` / `src/connect_gen` do not match `scripts/gen_module_tree.py` output. Commit the
+regenerated files with your change; CI never commits to `main`.
 
-CI runs unit/lib and compile-fail UI tests only (`cargo test --lib --test ui`).
+CI runs on Rust 1.90 (the MSRV): `cargo fmt --check`, `cargo clippy --all-targets
+--all-features -- -D warnings`, and the unit, compile-fail UI and deterministic local tests
+(`cargo test --all-features --lib --test ui --test hardening --test a7_strict_live --test
+price_fixtures`). The `ui` snapshots match rustc 1.90 only.
 Live integration tests under `tests/integration/` (and `a7_strict_live`, which shells out to
 them) are **not** part of CI and are **excluded from the crates.io package**. Run them from a
 git checkout of this repository. They need `POLYESTER_API_KEY_ID` /

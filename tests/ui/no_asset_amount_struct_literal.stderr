@@ -1,4 +1,4 @@
-error[E0451]: fields `scaled`, `scale`, `domain` and `asset_id` of struct `AssetAmount` are private
+error[E0451]: fields `scaled`, `scale`, `domain` and `asset_id` of struct `polyester::AssetAmount` are private
  --> tests/ui/no_asset_amount_struct_literal.rs:6:9
   |
 5 |     let _ = AssetAmount {

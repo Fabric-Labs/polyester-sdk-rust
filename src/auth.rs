@@ -429,7 +429,7 @@ mod tests {
         let s = canonical_signing_string(
             "1700000000000",
             "POST",
-            "https://api-devnet.polyester.ai/orders.v1.OrdersService/CreateOrder",
+            "https://api.devnet.polyester.com/orders.v1.OrdersService/CreateOrder",
             b"",
         )
         .unwrap();
@@ -579,7 +579,7 @@ mod tests {
         let headers = creds
             .sign_request(
                 "POST",
-                "https://api-devnet.polyester.ai/orders.v1.OrdersService/CreateOrder",
+                "https://api.devnet.polyester.com/orders.v1.OrdersService/CreateOrder",
                 b"{}",
                 Some("1"),
             )

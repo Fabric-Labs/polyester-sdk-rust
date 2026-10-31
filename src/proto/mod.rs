@@ -9,6 +9,8 @@
 
 pub mod auth;
 pub mod chain;
+pub mod checkpoints;
+pub mod claims;
 pub mod collab;
 pub mod fees;
 pub mod layout;
@@ -21,6 +23,8 @@ pub mod polychart;
 pub mod polyester;
 pub mod privatews;
 pub mod ratelimit;
+pub mod rewards;
+pub mod swap;
 pub mod tradews;
 pub mod transfer;
 pub mod triggers;
