@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.2.1
+
+Package version: `0.2.1`. Git tag: `v0.2.1`.
+
+### Breaking/Safety
+- **Outcome-unknown errors are no longer retryable; read the order back and
+  reuse the idempotency key.** `Error::is_retryable()` now returns false for
+  every order error code ending in `_OUTCOME_UNKNOWN`
+  (`ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_ORDER_MODIFY_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN`,
+  `ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN`). In `0.2.0` it returned
+  true, so a generic retry loop could send a create again and place a
+  second order. `Error::mutation_outcome_unknown()` stays true for them.
+  This matches the Go, Python and TypeScript SDKs.
+- `order_codes::OUTCOME_UNKNOWN` is now a `static` read from the generated
+  `orders.v1.ErrorCode` names ending in `_OUTCOME_UNKNOWN`, instead of a
+  hand-written `const` list, so a code added to the API is covered when the
+  SDK is regenerated. It still dereferences to a `[&str]` slice
+  (`.contains()`, `.iter()`); it can no longer be used in a `const`.
+
+### Fixed
+- `ERROR_CODE_TRIGGER_CONTROL_OUTCOME_UNKNOWN` (a trigger cancel, pause,
+  resume or modify that was sent but not confirmed in time) was missing from
+  `order_codes::OUTCOME_UNKNOWN`, so `mutation_outcome_unknown()` returned
+  false for it. It now returns true.
+
+### Changed
+- `Error::is_retryable()` returns true for `ERROR_CODE_ACCOUNT_REPAIRING`:
+  the account's orders are paused for a short time while its balances are
+  brought back in line, nothing changed, and the same request can be sent
+  again shortly. `ERROR_CODE_ORDER_REPAIRING` stays non-retryable.
+- New constants `order_codes::TRIGGER_CONTROL_OUTCOME_UNKNOWN` and
+  `order_codes::ACCOUNT_REPAIRING`.
+- The crate description now reads "Rust SDK for the Polyester API with
+  generated protobuf types and ConnectRPC clients."
+
 ## 0.2.0
 
 Package version: `0.2.0`. Git tag: `v0.2.0`.
