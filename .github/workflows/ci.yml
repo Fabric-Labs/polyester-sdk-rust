@@ -5,9 +5,11 @@ on:
   push:
     branches:
       - main
+  # publish.yml runs these same checks before it publishes a tag.
+  workflow_call:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   rust:
@@ -17,9 +19,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          # Branch tip on main so the optional capability commit can push; PRs stay detached.
-          ref: ${{ github.event_name == 'push' && github.ref_name || github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Install Rust 1.90 toolchain
         uses: dtolnay/rust-toolchain@1.90.0
@@ -39,25 +39,18 @@ jobs:
       - name: Public disclosure (README / CHANGELOG)
         run: python3 scripts/check_public_disclosure.py
 
-      # Capability artifacts: refresh + optional bot commit only on main (never on PRs).
-      - name: Refresh SDK capability artifacts
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: python3 scripts/check_sdk_coverage.py --write-capabilities
-
-      - name: Commit capability artifacts if changed
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Generated module tree is current
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add sdk-capabilities.json README.md
-          if git diff --staged --quiet; then
-            echo "capability artifacts unchanged"
-            exit 0
+          python3 scripts/gen_module_tree.py
+          git add --intent-to-add src/proto src/connect_gen
+          if ! git diff --exit-code -- src/proto src/connect_gen; then
+            echo "src/proto or src/connect_gen is stale; run python3 scripts/gen_module_tree.py and commit the result" >&2
+            exit 1
           fi
-          git commit -m "chore: refresh sdk-capabilities and README table"
-          git push
 
-      - name: SDK Connect coverage
+      # Fails when sdk-capabilities.json or the README capability table is stale.
+      # CI never commits; run --write-capabilities locally and commit the result.
+      - name: SDK Connect coverage and capability artifacts
         run: python3 scripts/check_sdk_coverage.py
 
       - name: Refresh public capability matrix

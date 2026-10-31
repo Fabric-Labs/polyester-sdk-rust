@@ -1,16 +1,25 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
-### Fixed
-- `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
-  use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
-  Earlier versions pointed at `api-testnet.polyester.com`, which does not
-  exist, so every testnet call failed with a DNS error. The devnet preset and
-  `DEFAULT_API_URL` / `DEFAULT_WS_URL` now use the documented
-  `api.devnet.polyester.com` host.
+Package version: `0.2.0`. Git tag: `v0.2.0`.
+
+This release replaces `0.1.0-alpha.49` and covers every change since it.
+From `0.2.0` on, the Go, Python and Rust SDKs share one version number and
+are released together. Versions are plain SemVer (`0.2.0`, `0.2.1`, ...) and
+git tags are `vX.Y.Z`; the alpha pre-release suffixes (`0.1.0-alpha.N`, tag
+`v0.1.0aN`) are retired. Upgrade from any `0.1.0-alpha.*` release: those
+releases use hosts that no longer exist and a price scale 1,000 times off
+against the current API.
 
 ### Breaking
+- **Trading prices now use the published fixed scale of 9 decimals: one
+  price tick is 0.000000001 quote units.** `PRICE_TICK_SCALE` is `9`, so
+  `Price::from_decimal_str`, `Price::as_decimal`, `Price::format`, order,
+  trigger, trade, orderbook, market-overview and primary candle prices
+  encode and decode at 1e-9. Earlier releases used 1e-6 and are 1,000
+  times off against the current API. Code that builds `Price::from_ticks`
+  values by hand must multiply its old tick values by 1,000.
 - `OrdersService::subscribe` streams account orders over the private
   WebSocket (`/v1/ws/private`) and returns a `PrivateOrdersSubscription`
   of `PrivateOrdersEvent`s (`Connected`, `Snapshot`, `Unit`, `Ready`,
@@ -39,6 +48,12 @@
   so code that builds them with struct literals must add them.
 
 ### Fixed
+- `POLYESTER_TESTNET_ENVIRONMENT` and `environment_from_name("testnet")` now
+  use `https://api.testnet.polyester.com` and `wss://api.testnet.polyester.com`.
+  Earlier versions pointed at `api-testnet.polyester.com`, which does not
+  exist, so every testnet call failed with a DNS error. The devnet preset and
+  `DEFAULT_API_URL` / `DEFAULT_WS_URL` now use the documented
+  `api.devnet.polyester.com` host.
 - An order create, trigger create, order cancel or order modify that was sent
   but not confirmed in time (`ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN`,
   `ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN`,
@@ -113,15 +128,13 @@
 - Trigger events report `event_type = "activated"` when a standalone
   trailing trigger's activation condition is met and tracking begins.
   `trigger_event_type_from_label("activated")` filters for them.
+- The generated `proto` and `connect` modules now include `checkpoints::v1`,
+  `claims::v1`, `rewards::v1`, `swap::v1` and `swap::quickswap::v1`. Their
+  code was already in the package but was not compiled into the crate.
+  These services have no `Client` wrappers: they need an interactive
+  session or a broker key, which this API-key SDK does not use.
 
 ### Changed
-- **Trading prices now use the published fixed scale of 9 decimals: one
-  price tick is 0.000000001 quote units.** `PRICE_TICK_SCALE` is `9`, so
-  `Price::from_decimal_str`, `Price::as_decimal`, `Price::format`, order,
-  trigger, trade, orderbook, market-overview and primary candle prices
-  encode and decode at 1e-9. Earlier releases used 1e-6 and are 1,000
-  times off against the current API. Code that builds `Price::from_ticks`
-  values by hand must multiply its old tick values by 1,000.
 - `MaxSlippage::Ticks` and the trigger create/modify `max_slippage_ticks`
   are now `i64` absolute price ticks, matching the 64-bit contract fields.
 - Candle and market-overview base volume now use the base asset
@@ -131,6 +144,9 @@
   `GetCandlesOpts.include_reference` requests that series.
   `MarketOverviewEntry.volume_24h_base` is the decoded decimal when the
   catalog scale is known; `volume_24h_base_scaled` stays the integer.
+- The crate documentation link and the README links to the SDK capability
+  matrix and market order price protection point at the public docs on
+  `polyester.com`.
 
 ## 0.1.0a49
 
