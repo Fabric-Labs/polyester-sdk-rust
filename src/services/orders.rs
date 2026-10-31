@@ -73,11 +73,18 @@ fn validate_gtd_expire_at(when: SystemTime, now: SystemTime) -> Result<Timestamp
 }
 
 const MAX_BPS: i32 = 10_000;
+/// Slippage cap of a market order that sells and of every attached trailing
+/// stop: a 100% cap would leave a sell no positive price to sell at.
+const MAX_SELLING_SLIPPAGE_BPS: i32 = MAX_BPS - 1;
 
 fn validate_bps(field: &str, value: i32) -> Result<()> {
-    if !(1..=MAX_BPS).contains(&value) {
+    validate_bps_at_most(field, value, MAX_BPS)
+}
+
+fn validate_bps_at_most(field: &str, value: i32, max: i32) -> Result<()> {
+    if !(1..=max).contains(&value) {
         return Err(Error::validation(format!(
-            "{field} must be between 1 and {MAX_BPS}"
+            "{field} must be between 1 and {max}"
         )));
     }
     Ok(())
@@ -525,7 +532,11 @@ impl OrdersService {
                         Some(market_ioc::MaxSlippage::MaxSlippageTicks(value))
                     }
                     Some(MaxSlippage::Bps(value)) => {
-                        validate_bps("market_max_slippage_bps", value)?;
+                        let max = match params.side {
+                            CreateSide::Buy => MAX_BPS,
+                            CreateSide::Sell => MAX_SELLING_SLIPPAGE_BPS,
+                        };
+                        validate_bps_at_most("market_max_slippage_bps", value, max)?;
                         Some(market_ioc::MaxSlippage::MaxSlippageBps(value))
                     }
                     Some(_) => {
@@ -663,7 +674,7 @@ impl OrdersService {
                 })?,
                 symbol,
             )?,
-            trigger_price_source: risk_trigger_price_source(leg.trigger_price_source),
+            trigger_price_source: risk_trigger_price_source(leg.trigger_price_source)?,
             ..Default::default()
         };
         *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol)?;
@@ -678,7 +689,7 @@ impl OrdersService {
                 })?,
                 symbol,
             )?,
-            trigger_price_source: risk_trigger_price_source(leg.trigger_price_source),
+            trigger_price_source: risk_trigger_price_source(leg.trigger_price_source)?,
             ..Default::default()
         };
         *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol)?;
@@ -699,7 +710,7 @@ impl OrdersService {
             ));
         }
         let mut proto = TrailingStopPolicy {
-            trigger_price_source: risk_trigger_price_source(stop.trigger_price_source),
+            trigger_price_source: risk_trigger_price_source(stop.trigger_price_source)?,
             ..Default::default()
         };
         if let Some(activation) = stop.activation_price.as_ref() {
@@ -732,7 +743,9 @@ impl OrdersService {
                     trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)
                 }
                 MaxSlippage::Bps(v) => {
-                    validate_bps("max_slippage_bps", v)?;
+                    // The trailing stop's child can sell whichever side the
+                    // parent order is on.
+                    validate_bps_at_most("max_slippage_bps", v, MAX_SELLING_SLIPPAGE_BPS)?;
                     trailing_stop_policy::MaxSlippage::MaxSlippageBps(v)
                 }
             });
@@ -1456,6 +1469,10 @@ impl TradesService {
     }
 
     /// Subscribe to private user trade updates (requires `realtime` feature).
+    ///
+    /// Each publication batches fills; every fill arrives on its own, oldest
+    /// first per symbol. A fill that fails to decode is reported through the
+    /// subscription's error callback without dropping the rest of its batch.
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
@@ -1464,22 +1481,27 @@ impl TradesService {
         let channel = format!("private:spot:trades:{account}:proto");
         self.ctx
             .realtime
-            .subscribe_proto(&channel, crate::codecs::decode::user_trade_from_bytes)
+            .subscribe_proto_batch(&channel, crate::codecs::decode::user_trade_batch_from_bytes)
             .await
     }
 }
 
 /// `None` sends nothing: the server then watches the last trade price.
+/// Mark price is rejected: spot markets have none.
 fn risk_trigger_price_source(
     kind: Option<TriggerPriceSourceKind>,
-) -> buffa::EnumValue<TriggerPriceSource> {
-    match kind {
+) -> Result<buffa::EnumValue<TriggerPriceSource>> {
+    Ok(match kind {
         None => TriggerPriceSource::TriggerPriceSourceUnspecified,
         Some(TriggerPriceSourceKind::LastPrice) => TriggerPriceSource::LastPrice,
         Some(TriggerPriceSourceKind::IndexPrice) => TriggerPriceSource::IndexPrice,
-        Some(TriggerPriceSourceKind::MarkPrice) => TriggerPriceSource::MarkPrice,
+        Some(TriggerPriceSourceKind::MarkPrice) => {
+            return Err(Error::validation(
+                "attached trigger_price_source MarkPrice is not supported: spot markets have no mark price",
+            ));
+        }
     }
-    .into()
+    .into())
 }
 
 fn order_trades_projection_complete(result: &GetOrderResult) -> bool {
@@ -2042,19 +2064,30 @@ mod tests {
         market.price = None;
         market.post_only = None;
 
-        for bps in [1, 10_000] {
-            market.market_max_slippage = Some(MaxSlippage::Bps(bps));
-            assert!(
-                client.orders.encode_create_params(&market).is_ok(),
-                "market max_slippage_bps={bps} must be accepted"
-            );
-        }
-        for bps in [0, 10_001] {
-            market.market_max_slippage = Some(MaxSlippage::Bps(bps));
-            assert!(
-                client.orders.encode_create_params(&market).is_err(),
-                "market max_slippage_bps={bps} must be rejected"
-            );
+        // A buy accepts a 100% cap; a sell stops at 9999 bps.
+        for (side, accepted, rejected) in [
+            (CreateSide::Buy, [1, 10_000], [0, 10_001]),
+            (CreateSide::Sell, [1, 9_999], [0, 10_000]),
+        ] {
+            market.side = side;
+            for bps in accepted {
+                market.market_max_slippage = Some(MaxSlippage::Bps(bps));
+                assert!(
+                    client.orders.encode_create_params(&market).is_ok(),
+                    "{side:?} market max_slippage_bps={bps} must be accepted"
+                );
+            }
+            for bps in rejected {
+                market.market_max_slippage = Some(MaxSlippage::Bps(bps));
+                let err = client
+                    .orders
+                    .encode_create_params(&market)
+                    .expect_err("out-of-range cap");
+                assert!(
+                    matches!(err, Error::Validation(_)),
+                    "{side:?} market max_slippage_bps={bps} must be rejected: {err}"
+                );
+            }
         }
 
         let mut attached = create_params(
@@ -2068,39 +2101,83 @@ mod tests {
             .unwrap(),
             Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
         );
-        for bps in [1, 10_000] {
-            attached.attached_risk = Some(AttachedRisk {
-                trailing_stop: Some(TrailingStop {
-                    distance: Some(TrailingDistance::Bps(25)),
-                    activation_price: None,
-                    trigger_price_source: None,
-                    order_type: None,
-                    max_slippage: Some(MaxSlippage::Bps(bps)),
-                    state: None,
-                }),
-                ..Default::default()
-            });
-            assert!(
-                client.orders.encode_create_params(&attached).is_ok(),
-                "attached max_slippage_bps={bps} must be accepted"
-            );
+        // An attached trailing stop takes at most 9999 bps on either side.
+        for side in [CreateSide::Buy, CreateSide::Sell] {
+            attached.side = side;
+            for bps in [1, 9_999] {
+                attached.attached_risk = Some(AttachedRisk {
+                    trailing_stop: Some(TrailingStop {
+                        distance: Some(TrailingDistance::Bps(25)),
+                        activation_price: None,
+                        trigger_price_source: None,
+                        order_type: None,
+                        max_slippage: Some(MaxSlippage::Bps(bps)),
+                        state: None,
+                    }),
+                    ..Default::default()
+                });
+                assert!(
+                    client.orders.encode_create_params(&attached).is_ok(),
+                    "attached max_slippage_bps={bps} must be accepted"
+                );
+            }
+            for bps in [0, 10_000] {
+                attached.attached_risk = Some(AttachedRisk {
+                    trailing_stop: Some(TrailingStop {
+                        distance: Some(TrailingDistance::Bps(25)),
+                        activation_price: None,
+                        trigger_price_source: None,
+                        order_type: None,
+                        max_slippage: Some(MaxSlippage::Bps(bps)),
+                        state: None,
+                    }),
+                    ..Default::default()
+                });
+                assert!(
+                    client.orders.encode_create_params(&attached).is_err(),
+                    "attached max_slippage_bps={bps} must be rejected"
+                );
+            }
         }
-        for bps in [0, 10_001] {
-            attached.attached_risk = Some(AttachedRisk {
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn attached_legs_reject_the_mark_price_source() {
+        let client = client();
+        let mut params = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        for source in [
+            TriggerPriceSourceKind::MarkPrice,
+            TriggerPriceSourceKind::IndexPrice,
+        ] {
+            params.attached_risk = Some(AttachedRisk {
                 trailing_stop: Some(TrailingStop {
                     distance: Some(TrailingDistance::Bps(25)),
                     activation_price: None,
-                    trigger_price_source: None,
+                    trigger_price_source: Some(source),
                     order_type: None,
-                    max_slippage: Some(MaxSlippage::Bps(bps)),
+                    max_slippage: None,
                     state: None,
                 }),
                 ..Default::default()
             });
-            assert!(
-                client.orders.encode_create_params(&attached).is_err(),
-                "attached max_slippage_bps={bps} must be rejected"
-            );
+            let result = client.orders.encode_create_params(&params);
+            if source == TriggerPriceSourceKind::MarkPrice {
+                let err = result.unwrap_err();
+                assert!(err.to_string().contains("no mark price"), "{err}");
+            } else {
+                result.unwrap();
+            }
         }
     }
 
@@ -2668,6 +2745,7 @@ mod tests {
                     .unwrap(),
                 ),
                 leaves_qty: None,
+                inherited_cum_qty: None,
                 price: None,
                 avg_px: None,
                 created_ts_ns: String::new(),

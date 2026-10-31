@@ -332,6 +332,52 @@ impl Client {
         T: Send + 'static,
         F: Fn(&[u8]) -> Result<T> + Send + Sync + 'static,
     {
+        self.subscribe_publications(
+            channel,
+            move |bytes: &[u8]| decode(bytes).map(Publication::One),
+            auto_reconnect,
+        )
+        .await
+    }
+
+    /// Subscribe to a protobuf Centrifugo channel whose publications batch
+    /// several events, and receive every event in order.
+    ///
+    /// `decode` returns one result per batch member. A member that fails to
+    /// decode is reported through [`TypedSubscription::set_on_error`] and
+    /// [`TypedSubscription::err`], and the rest of its batch is still
+    /// delivered. A publication that is not a valid batch at all fails the
+    /// connection, as with [`Self::subscribe_proto`].
+    ///
+    /// Returns only after the initial websocket handshake and channel
+    /// subscription succeed.
+    pub async fn subscribe_proto_batch<T, F>(
+        &self,
+        channel: &str,
+        decode: F,
+    ) -> Result<TypedSubscription<T>>
+    where
+        T: Send + 'static,
+        F: Fn(&[u8]) -> Result<Vec<Result<T>>> + Send + Sync + 'static,
+    {
+        self.subscribe_publications(
+            channel,
+            move |bytes: &[u8]| decode(bytes).map(Publication::Batch),
+            true,
+        )
+        .await
+    }
+
+    async fn subscribe_publications<T, F>(
+        &self,
+        channel: &str,
+        decode: F,
+        auto_reconnect: bool,
+    ) -> Result<TypedSubscription<T>>
+    where
+        T: Send + 'static,
+        F: Fn(&[u8]) -> Result<Publication<T>> + Send + Sync + 'static,
+    {
         self.validate_channel(channel)?;
 
         let (stop_tx, mut stop_rx) = watch::channel(false);
@@ -471,7 +517,7 @@ impl Client {
         attempt: &mut SubscriptionAttempt<'_>,
     ) -> Result<()>
     where
-        F: Fn(&[u8]) -> Result<T>,
+        F: Fn(&[u8]) -> Result<Publication<T>>,
     {
         crate::transport::validate_ws_url(&self.ws_url, self.allow_insecure_http)?;
         let url = self.ws_endpoint();
@@ -555,13 +601,36 @@ impl Client {
                                     })?;
                             }
                             protocol::Incoming::Publication(bytes) => {
-                                let item = decode(&bytes)?;
-                                if !try_send_direct(
-                                    tx,
-                                    item,
-                                    "typed realtime subscription queue full; consumer too slow",
-                                )? {
-                                    return Ok(());
+                                let send = |item| {
+                                    try_send_direct(
+                                        tx,
+                                        item,
+                                        "typed realtime subscription queue full; consumer too slow",
+                                    )
+                                };
+                                match decode(&bytes)? {
+                                    Publication::One(item) => {
+                                        if !send(item)? {
+                                            return Ok(());
+                                        }
+                                    }
+                                    Publication::Batch(items) => {
+                                        for item in items {
+                                            match item {
+                                                Ok(item) => {
+                                                    if !send(item)? {
+                                                        return Ok(());
+                                                    }
+                                                }
+                                                // One bad member must not drop
+                                                // the rest of its batch.
+                                                Err(err) => record_subscription_error(
+                                                    attempt.error_state,
+                                                    err,
+                                                ),
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             protocol::Incoming::Reply {
@@ -591,6 +660,13 @@ impl Client {
             }
         }
     }
+}
+
+/// One decoded publication: a single event, or a batch whose members decode
+/// independently.
+enum Publication<T> {
+    One(T),
+    Batch(Vec<Result<T>>),
 }
 
 #[derive(Default)]

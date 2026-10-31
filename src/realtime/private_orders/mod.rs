@@ -419,7 +419,10 @@ fn backoff(attempt: u32, jitter: &mut u64) -> Duration {
 fn is_terminal_token_error(error: &Error) -> bool {
     matches!(
         error,
-        Error::Auth(_) | Error::PermissionDenied { .. } | Error::Validation(_)
+        Error::Auth(_)
+            | Error::ApiKeyRejected { .. }
+            | Error::PermissionDenied { .. }
+            | Error::Validation(_)
     )
 }
 

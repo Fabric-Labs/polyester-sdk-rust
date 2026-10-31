@@ -41,10 +41,45 @@ pub struct GetTradesOpts {
     pub after_trade_id: Option<u64>,
 }
 
-/// Spot pair catalog payload (Go `SpotConfig` raw-map escape hatch).
+/// Spot pair catalog payload (Go `SpotConfig` raw-map escape hatch) with its
+/// typed order limits.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpotConfig {
     pub raw: Value,
+    /// Order limits of each pair, in catalog order.
+    pub pair_order_limits: Vec<PairOrderLimits>,
+    /// Default resting-order (GTC and GTD) limit for a typical account across
+    /// all pairs; 0 when unpublished. An account may have a lower limit of
+    /// its own.
+    pub max_open_orders_total: u32,
+}
+
+/// Per-order and open-order limits of one spot pair.
+///
+/// The decimal maxima are strings in the pair's units, exactly as published,
+/// and `None` when the pair has no maximum (not zero). An order above one is
+/// rejected with `MAX_QTY` or `MAX_NOTIONAL`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PairOrderLimits {
+    pub symbol: String,
+    pub symbol_id: u32,
+    /// Largest quantity of one limit order in base units. A replacement is
+    /// checked on its new total less the quantity already filled.
+    pub max_limit_qty_base: Option<String>,
+    /// Largest quantity of one market order in base units, after converting
+    /// a quote-sized order to base.
+    pub max_market_qty_base: Option<String>,
+    /// Largest notional of one order in quote units: quantity times limit
+    /// price, or times protection price for a market order.
+    pub max_order_notional_quote: Option<String>,
+    /// Largest notional of one market order in quote units, compared exactly:
+    /// a buy is valued at its protection price, a sell at its reference price
+    /// (the touch or the client's reference price), before slippage.
+    pub max_market_notional_quote: Option<String>,
+    /// Default resting-order (GTC and GTD) limit for a typical account on
+    /// this pair; 0 when unpublished. An account may have a lower limit of
+    /// its own.
+    pub max_open_orders_per_pair: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -53,6 +53,12 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
         orig_qty: decode_qty_scaled(msg.orig_qty_scaled, None, None, symbol_id_opt),
         cum_qty: decode_qty_scaled_allow_zero(msg.cum_qty_scaled, None, None, symbol_id_opt),
         leaves_qty: decode_qty_scaled_allow_zero(msg.leaves_qty_scaled, None, None, symbol_id_opt),
+        inherited_cum_qty: decode_qty_scaled_allow_zero(
+            msg.inherited_cum_qty_scaled,
+            None,
+            None,
+            symbol_id_opt,
+        ),
         price: decode_price_ticks(msg.price_ticks, None),
         avg_px: decode_price_ticks(msg.avg_price_ticks, None),
         created_ts_ns: TsNs::from_wire(msg.created_ts_ns, "Order.created_ts_ns")?.optional_string(),
@@ -634,6 +640,10 @@ fn cancel_all_status_name(
 
 /// Per-item results now carry an `Accepted`/`Rejected` outcome oneof instead of
 /// flat status/order_id/code fields.
+fn optional_order_id(id: u64) -> Option<String> {
+    (id != 0).then(|| format_uint64_id(id))
+}
+
 pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchCreateOrdersResult> {
     let mut accepted = 0usize;
     let mut rejected = 0usize;
@@ -647,6 +657,7 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                 client_order_id: item.client_order_id.clone(),
                 code: String::new(),
                 rate_limit: None,
+                existing_order_id: None,
                 take_profit_trigger_id: None,
                 stop_loss_trigger_id: None,
                 trailing_stop_trigger_id: None,
@@ -676,6 +687,11 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                             .as_option()
                             .map(crate::codecs::decode::rate_limit_detail_from_proto)
                     });
+                    out.existing_order_id = value
+                        .error
+                        .as_option()
+                        .and_then(|err| err.existing_order_id)
+                        .and_then(optional_order_id);
                 }
                 None => {
                     return Err(Error::response_contract(
@@ -799,6 +815,7 @@ pub fn batch_replace_from_proto(
             old_order_id: format_uint64_id(item.old_order_id),
             replacement_order_id: format_uint64_id(item.replacement_order_id),
             client_order_id: item.client_order_id.clone(),
+            action_taken: modify_action_name(item.action_taken),
             code: item.code.clone(),
             rate_limit: item.error.as_option().and_then(|err| {
                 err.rate_limit
@@ -877,6 +894,7 @@ pub fn batch_replace_status_from_proto(
             phase: phase.to_owned(),
             old_order_id: format_uint64_id(item.old_order_id),
             replacement_order_id: format_uint64_id(item.replacement_order_id),
+            action_taken: modify_action_name(item.action_taken),
             order_status: enum_value_order_status(item.order_status).to_owned(),
             code: item.code.clone(),
             updated_ts_ns,
@@ -2152,6 +2170,132 @@ mod tests {
 
         let result = batch_create_from_proto(&msg).expect("unknown code stays observable");
         assert_eq!(result.results[0].code, "UNKNOWN_ERROR_CODE(999)");
+    }
+
+    #[test]
+    fn replacement_orders_expose_inherited_cum_qty() {
+        let replacement = order_from_proto(&ProtoOrder {
+            order_id: 2,
+            symbol_id: 1,
+            cum_qty_scaled: 70,
+            inherited_cum_qty_scaled: 40,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            replacement
+                .inherited_cum_qty
+                .as_ref()
+                .map(|q| q.as_scaled()),
+            Some(40)
+        );
+        let original = order_from_proto(&ProtoOrder {
+            order_id: 1,
+            symbol_id: 1,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            original.inherited_cum_qty.as_ref().map(|q| q.as_scaled()),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn batch_replace_items_expose_action_taken() {
+        use crate::proto::orders::v1::{
+            BatchReplaceAdmissionItem as ProtoAdmission, BatchReplaceStatusItem as ProtoStatus,
+            ModifyActionTaken,
+        };
+
+        let msg = BatchReplaceOrdersResponse {
+            batch_request_id: 9,
+            status: BatchReplaceAdmissionStatus::PartiallyAdmitted.into(),
+            results: vec![
+                ProtoAdmission {
+                    item_index: 0,
+                    status: BatchReplaceItemAdmissionStatus::Admitted.into(),
+                    old_order_id: 1,
+                    replacement_order_id: 2,
+                    action_taken: ModifyActionTaken::Replaced.into(),
+                    ..Default::default()
+                },
+                ProtoAdmission {
+                    item_index: 1,
+                    status: BatchReplaceItemAdmissionStatus::Admitted.into(),
+                    old_order_id: 3,
+                    action_taken: ModifyActionTaken::Amended.into(),
+                    ..Default::default()
+                },
+                ProtoAdmission {
+                    item_index: 2,
+                    status: BatchReplaceItemAdmissionStatus::Rejected.into(),
+                    old_order_id: 4,
+                    ..Default::default()
+                },
+            ],
+            accepted_count: 2,
+            rejected_count: 1,
+            ..Default::default()
+        };
+        let result = batch_replace_from_proto(&msg).unwrap();
+        let actions: Vec<&str> = result
+            .results
+            .iter()
+            .map(|item| item.action_taken.as_str())
+            .collect();
+        assert_eq!(actions, ["replaced", "amended", ""]);
+
+        let msg = GetBatchReplaceStatusResponse {
+            batch_request_id: 9,
+            admission_status: BatchReplaceAdmissionStatus::Admitted.into(),
+            items: vec![ProtoStatus {
+                item_index: 0,
+                phase: BatchReplacePhase::Terminal.into(),
+                old_order_id: 3,
+                action_taken: ModifyActionTaken::Amended.into(),
+                ..Default::default()
+            }],
+            accepted_count: 1,
+            ..Default::default()
+        };
+        let status = batch_replace_status_from_proto(&msg).unwrap();
+        assert_eq!(status.items[0].action_taken, "amended");
+    }
+
+    #[test]
+    fn batch_create_duplicate_rejection_exposes_existing_order_id() {
+        use crate::proto::orders::v1::{
+            BatchCreateRejected, BatchCreateResultItem as ProtoItem, ErrorCode, ErrorDetail,
+            batch_create_result_item,
+        };
+
+        let rejected = |client_order_id: &str, existing_order_id: Option<u64>| ProtoItem {
+            client_order_id: client_order_id.into(),
+            outcome: Some(batch_create_result_item::Outcome::Rejected(Box::new(
+                BatchCreateRejected {
+                    error: ErrorDetail {
+                        code: ErrorCode::ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID.into(),
+                        existing_order_id,
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                },
+            ))),
+            ..Default::default()
+        };
+        let msg = BatchCreateOrdersResponse {
+            results: vec![rejected("held", Some(77)), rejected("same-batch", None)],
+            rejected_count: 2,
+            ..Default::default()
+        };
+        let result = batch_create_from_proto(&msg).unwrap();
+        assert_eq!(
+            result.results[0].existing_order_id,
+            Some(format_uint64_id(77))
+        );
+        assert_eq!(result.results[1].existing_order_id, None);
     }
 
     #[test]

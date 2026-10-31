@@ -68,6 +68,8 @@ pub struct ModifyTriggerParams {
     pub trigger_id: String,
     pub subaccount_id: Option<u64>,
     /// Display symbol; resolved to Connect `symbol_id`. Mutually exclusive with [`Self::symbol_id`].
+    /// Optional: leave both out to target the trigger's own market. An API
+    /// key restricted to some markets must name it.
     pub symbol: Option<String>,
     /// Connect `symbol_id`. Mutually exclusive with [`Self::symbol`].
     pub symbol_id: Option<u32>,
@@ -76,8 +78,8 @@ pub struct ModifyTriggerParams {
     pub trailing_distance_ticks: Option<i64>,
     pub trailing_distance_bps: Option<i32>,
     /// Slippage cap of a trailing stop, or of a stop-loss or take-profit with
-    /// a market child. Zero clears the cap; a cleared cap on a market child
-    /// falls back to the pair's default market slippage.
+    /// a market child, at most 9999 bps. Zero clears the cap; a cleared cap
+    /// on a market child falls back to the pair's default market slippage.
     pub max_slippage_ticks: Option<i64>,
     pub max_slippage_bps: Option<i32>,
 }
@@ -88,6 +90,8 @@ pub struct ResumeTriggerParams {
     pub trigger_id: String,
     pub subaccount_id: Option<u64>,
     /// Display symbol; resolved to Connect `symbol_id`. Mutually exclusive with [`Self::symbol_id`].
+    /// Optional: leave both out to target the trigger's own market. An API
+    /// key restricted to some markets must name it.
     pub symbol: Option<String>,
     /// Connect `symbol_id`. Mutually exclusive with [`Self::symbol`].
     pub symbol_id: Option<u32>,
@@ -133,6 +137,9 @@ pub struct TriggerTrailingDetails {
     pub peak_price: Option<Price>,
     /// Lowest price seen, for a BUY trailing stop.
     pub trough_price: Option<Price>,
+    /// Current trigger threshold. It moves with the peak or trough, and is
+    /// `None` until the trailing stop is armed.
+    pub trigger_price: Option<Price>,
     pub max_slippage: Option<Price>,
     pub max_slippage_bps: i32,
     pub trigger_price_source: String,

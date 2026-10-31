@@ -1,7 +1,7 @@
 //! Signed HTTP token exchange for private Centrifugo channels.
 
 use crate::auth::{Credentials, encode_query_component};
-use crate::errors::{Error, Result};
+use crate::errors::{Error, Result, auth_codes, gateway_rejection_error};
 use crate::user_agent::{cloudflare_1010_message, is_cloudflare_browser_ban, user_agent};
 use http_body_util::{BodyExt, Empty, Limited};
 use hyper::header::{CONTENT_LENGTH, HeaderName, HeaderValue, USER_AGENT};
@@ -134,7 +134,16 @@ async fn fetch_rt_token(
 
     let (status, body) = outcome;
     let status_code = status.as_u16();
+    let gateway_code = gateway_code(&body);
+    if !status.is_success() && gateway_code.as_deref() == Some(auth_codes::TIMESTAMP_SKEW) {
+        return Err(Error::TimestampSkew {
+            status: status_code,
+        });
+    }
     if status_code == 401 {
+        if let Some(code) = gateway_code {
+            return Err(gateway_rejection_error(status_code, &code));
+        }
         return Err(Error::auth(format!(
             "{label}: authentication failed (HTTP 401)"
         )));
@@ -158,6 +167,16 @@ async fn fetch_rt_token(
         return Err(Error::realtime(format!("{label}: response missing token")));
     }
     Ok(payload.token)
+}
+
+/// The API gateway's rejection code from a `{"code": ...}` JSON body.
+fn gateway_code(body: &[u8]) -> Option<String> {
+    serde_json::from_slice::<serde_json::Value>(body)
+        .ok()?
+        .get("code")?
+        .as_str()
+        .filter(|code| !code.trim().is_empty())
+        .map(str::to_owned)
 }
 
 fn map_permission_denied(label: &str, endpoint: &str, status: u16, body: &[u8]) -> Error {

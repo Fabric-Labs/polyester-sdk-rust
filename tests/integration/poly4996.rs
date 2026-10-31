@@ -387,7 +387,7 @@ fn assert_typed_money_error(err: &Error, label: &str) {
         Error::Api { code, .. }
             if code.starts_with("ERROR_CODE_") || code.starts_with("UNKNOWN_ERROR_CODE") => {}
         Error::Auth(_) | Error::PermissionDenied { .. } => {}
-        Error::RouteNotFound { .. } => {
+        Error::RouteNotFound { .. } | Error::NotImplemented { .. } => {
             panic!("{label} not mounted on API host: {err}");
         }
         other => panic!("{label} did not raise a mapped SDK error: {other}"),

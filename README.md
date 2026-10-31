@@ -375,8 +375,10 @@ last trade price. Set `CreateTriggerParams.trigger_price_source` to `index`
 `trigger_price_source` to `TriggerPriceSourceKind::IndexPrice`; leave it
 `None` to watch the last trade price. A market without an index price
 rejects an index-price leg or fails an index-price trigger with
-`index_price_unavailable`. Mark price is not supported. Order and trigger
-reads report the source, so a read leg can be sent back unchanged.
+`index_price_unavailable`. Mark price is not supported on spot: a `mark`
+source or `TriggerPriceSourceKind::MarkPrice` leg fails locally with
+`Error::Validation`. Order and trigger reads report the source, so a read leg
+can be sent back unchanged.
 
 Stop-loss and take-profit triggers with a market child accept a slippage cap,
 `max_slippage_ticks` or `max_slippage_bps` (at most one; a SELL child takes
@@ -386,7 +388,36 @@ reads expose the cap as `Trigger.max_slippage`.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
 [Market Order Price Protection](https://polyester.com/docs/developer-docs/shared-concepts/market-order-price-protection)
-before overriding `market_max_slippage`.
+before overriding `market_max_slippage`. `MaxSlippage::Bps` is 1–10000 for a
+buy and 1–9999 for a sell: a 100% cap would leave a sell no positive price.
+An attached trailing stop's `max_slippage` takes at most 9999 bps on either
+side.
+
+A replacement order reports `Order.inherited_cum_qty`, the filled quantity it
+inherited from its predecessors (zero for an original order); `cum_qty` minus
+it is what this generation executed. A duplicate `client_order_id` is
+rejected with `ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID`, and
+`Error::existing_order_id()` (or `BatchCreateResultItem.existing_order_id`)
+names the order that holds it when the server knows it.
+
+Each spot pair publishes order limits, read with
+`market_data.get_spot_config()` (`SpotConfig.pair_order_limits`,
+`SpotConfig.max_open_orders_total`) or, after hydration,
+`catalogs.pair_order_limits_for_symbol("BTC-USDT")` and
+`catalogs.max_open_orders_total()`. `max_limit_qty_base`,
+`max_market_qty_base`, `max_order_notional_quote` and
+`max_market_notional_quote` are decimal strings, `None` when the pair has no
+maximum (not zero); an order above one is rejected with `MAX_QTY` or
+`MAX_NOTIONAL`. `max_open_orders_per_pair` and `max_open_orders_total` are
+the default resting-order limits for a typical account (0 when unpublished);
+an account may have a lower limit of its own.
+
+```rust,no_run
+client.wait_for_catalogs().await?;
+if let Some(limits) = client.catalogs.pair_order_limits_for_symbol("BTC-USDT") {
+    println!("max notional {:?}", limits.max_order_notional_quote);
+}
+```
 
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
 Do **not** pass floats. Price ticks are Polyester protocol price units (fixed
@@ -448,7 +479,10 @@ Public catalog reads need no credentials. Authenticated VIP status, effective sp
 account trading limits require an API key. `get_vip_status` has no subaccount selector: JWT
 and API-key callers receive the owning root group only. USD amounts and fee percents are
 decimal strings. Optional qualification metrics, timestamps, and next-tier thresholds stay
-omitted when unset. `policy_class` uses full protobuf enum names
+omitted when unset. `settled_volume_quality` and `average_aop_quality` say how complete each
+rolling 30-day metric is (`complete`, `price_unavailable` or `incomplete_history`, with
+`incomplete_hours`); when the volume's status is `price_unavailable`, `settled_volume_30d_usd`
+is a lower bound. `policy_class` uses full protobuf enum names
 (`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`).
 
 ```rust,no_run
@@ -489,9 +523,16 @@ When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 price is fixed at create: cancel the trigger and create a new one to change
 it. Send an explicit zero
 (`Price::from_ticks(0)` or `Some(0)`) to clear an existing activation price
-or maximum-slippage cap. Create/modify `max_slippage_bps` must be 1–10000;
-modify still accepts `0` to clear.
-Standalone and attached `trailing_distance_bps` also require 1–10000.
+or maximum-slippage cap. A trailing stop's `max_slippage_bps` (standalone or
+attached, buy or sell) and a modify's take 1–9999; modify still accepts `0`
+to clear. A buy market child and a TWAP slice take up to 10000.
+Standalone and attached `trailing_distance_bps` require 1–10000. A buy
+trailing stop's `limit_price` must be at least its `activation_price`.
+
+`triggers.modify` and `triggers.resume_with` / `resume_by_id` take an optional
+symbol: leave it out to target the trigger's own market. An API key limited to
+some markets must name the market. A trailing stop's runtime details expose
+`trigger_price`, its current threshold, once it is armed.
 
 `ListOpenOrdersOpts.trigger_id` / `ListOrderHistoryOpts.trigger_id` filter
 child orders created by a standalone trigger (TWAP/ladder slices).
@@ -605,6 +646,17 @@ can place a second order. Read the order or trigger back, and reuse the same ide
 send it again. `AUTH_TEMPORARILY_UNAVAILABLE` and `ERROR_CODE_ACCOUNT_REPAIRING` are retryable and
 changed nothing, so `mutation_outcome_unknown()` is false for them.
 
+The API gateway checks an API-key request's signature and timestamp before any service sees it.
+`Error::TimestampSkew` (`TIMESTAMP_SKEW`) means the request timestamp was outside the allowed skew
+window. It is retryable: the request did nothing, and a retry signs it again with a fresh
+timestamp. If it persists, fix the local clock. Other gateway rejections (`SIGNATURE_INVALID`,
+`KEY_DISABLED`, `IP_NOT_ALLOWED`, ...) are `Error::ApiKeyRejected { status, code }` and are not
+retryable. `Error::auth_error_code()` returns the code of either.
+
+`Error::NotImplemented` means the server does not offer the call (Connect `unimplemented` or HTTP
+501); `Error::RouteNotFound` is the narrower bare HTTP 404. `Error::is_not_implemented()` is true
+for both, and neither is retryable.
+
 A `cancel_all_with` retry with the same `request_id` within 120 seconds returns the original
 counts with an empty `cancelled_orders` and `listing_status` `not_retained_read_open_orders`.
 An empty retried list does not mean nothing was canceled: read open orders for current state.
@@ -633,7 +685,10 @@ predecessor IDs may be stale: use `replacement_order_id` from each result.
 Reuse the same `request_id` when retrying a logical batch, then poll
 `get_batch_replace_status`. Its item phases are `admitted`, `working`,
 `rejected`, and `terminal`; `is_batch_replace_settled()` means every item has
-left admission processing (`working` is live, not terminal execution).
+left admission processing (`working` is live, not terminal execution). Each
+admission and status item carries `action_taken`: `replaced` when a successor
+took over, or `amended` for a cancel-only outcome with no successor, in which
+case keep tracking `old_order_id` until it is terminal.
 
 ```rust,no_run
 use polyester::models::{CreateOrderParams, ModifyOrderParams};
@@ -753,6 +808,16 @@ send binary length-delimited Centrifugo commands, and decode protobuf
 publication payloads from `:proto` channels. ConnectRPC's optional JSON wire
 mode does not apply to realtime. Incoming WebSocket messages, frames, and
 protobuf record lengths are capped at 8 MiB.
+
+Public trade, user fill, ledger transfer and trigger-event publications are
+batches. Their subscriptions yield every event in order, one at a time; an
+event that fails to decode is reported through `set_on_error` and the rest of
+its batch is still delivered. Both legs of a ledger transfer share
+`LedgerTransfer.transfer_id`. Use `realtime::Client::subscribe_proto_batch`
+for a batched channel of your own.
+
+A market overview subscription created with `symbols` keeps only those
+markets, in its snapshot and in every update.
 
 Realtime subscription handles stop their background tasks when explicitly
 closed or dropped. Call `close()` when prompt shutdown matters; `Drop` provides

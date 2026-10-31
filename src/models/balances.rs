@@ -100,6 +100,10 @@ pub struct LedgerTransfer {
     pub is_debit: bool,
     pub source: Option<TransferSide>,
     pub destination: Option<TransferSide>,
+    /// Transfer ID, an unsigned 128-bit integer as a decimal string. Both
+    /// legs of a transfer share it; with `account_code` and `is_debit` it
+    /// identifies this leg. Empty when the server did not send one.
+    pub transfer_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

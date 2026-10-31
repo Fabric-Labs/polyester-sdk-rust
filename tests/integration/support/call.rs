@@ -4,7 +4,7 @@ use polyester::{Error, Result};
 
 /// True when the error means the route is not mounted on this API host.
 pub fn route_unavailable(err: &Error) -> bool {
-    matches!(err, Error::RouteNotFound { .. })
+    err.is_not_implemented()
         || matches!(
             err,
             Error::Api { code, .. }
@@ -28,7 +28,7 @@ pub fn is_not_found(err: &Error) -> bool {
             let c = code.to_ascii_lowercase();
             c.contains("not_found") || c == "5"
         }
-    ) || matches!(err, Error::RouteNotFound { .. })
+    ) || err.is_not_implemented()
 }
 
 pub fn jwt_session_only(err: &Error) -> bool {
@@ -126,8 +126,8 @@ where
 {
     match f().await {
         Ok(v) => v,
-        Err(Error::RouteNotFound { .. }) => {
-            panic!("{label} returned route not found on API host");
+        Err(err) if err.is_not_implemented() => {
+            panic!("{label} is not implemented on API host: {err}");
         }
         Err(err) => panic!("{label} failed: {err}"),
     }

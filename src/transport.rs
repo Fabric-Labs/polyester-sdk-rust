@@ -4,11 +4,17 @@ use crate::auth::{self, Credentials};
 use crate::errors::{Error, Result, map_connect_error};
 use crate::user_agent::user_agent;
 use buffa::Message;
-use connectrpc::ConnectError;
-use connectrpc::client::{CallOptions, ClientConfig, HttpClient};
+use bytes::Bytes;
+use connectrpc::client::{
+    BoxFuture, CallOptions, ClientBody, ClientConfig, ClientTransport, HttpClient,
+};
 use connectrpc::rustls;
-use http::{HeaderValue, Uri, header::USER_AGENT};
-use serde::Serialize;
+use connectrpc::{ConnectError, ErrorCode, ErrorDetail};
+use http::header::{CONTENT_ENCODING, CONTENT_TYPE, USER_AGENT};
+use http::{HeaderValue, Request, Response, StatusCode, Uri};
+use http_body_util::{BodyExt, Either, Full, Limited};
+use hyper::body::Incoming;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -142,7 +148,103 @@ pub fn validate_ws_url(raw: &str, allow_insecure: bool) -> Result<url::Url> {
 }
 
 /// Shared transport handle used by all generated Connect clients.
-pub type SharedTransport = HttpClient;
+pub type SharedTransport = GatewayTransport;
+
+/// Type URL of the SDK-local Connect error detail that marks an API-gateway
+/// rejection. It never travels on the wire; [`GatewayTransport`] attaches it
+/// and [`crate::errors::map_connect_error`] reads it back.
+pub(crate) const GATEWAY_REJECTION_TYPE: &str = "polyester.sdk.GatewayRejection";
+
+/// [`HttpClient`] that keeps the code of an API-gateway rejection.
+///
+/// The gateway rejects API-key requests before any service sees them, with
+/// a plain JSON (or problem JSON) body such as
+/// `401 {"code":"TIMESTAMP_SKEW"}`. That body is not a Connect error:
+/// Connect would keep only the HTTP status and drop the code. This transport
+/// turns such a rejection into a Connect error that names the code, so it
+/// maps to [`Error::TimestampSkew`] or [`Error::ApiKeyRejected`].
+#[derive(Clone)]
+pub struct GatewayTransport {
+    inner: HttpClient,
+}
+
+type GatewayResponseBody = Either<Incoming, Full<Bytes>>;
+
+impl ClientTransport for GatewayTransport {
+    type ResponseBody = GatewayResponseBody;
+    type Error = ConnectError;
+
+    fn send(
+        &self,
+        request: Request<ClientBody>,
+    ) -> BoxFuture<'static, std::result::Result<Response<Self::ResponseBody>, ConnectError>> {
+        let response = self.inner.send(request);
+        Box::pin(async move {
+            let response = response.await?;
+            if !may_be_gateway_rejection(&response) {
+                return Ok(response.map(Either::Left));
+            }
+            let (parts, body) = response.into_parts();
+            let body = Limited::new(body, MAX_CONNECT_RESPONSE_BYTES)
+                .collect()
+                .await
+                .map_err(|e| ConnectError::unavailable(format!("read error response: {e}")))?
+                .to_bytes();
+            if let Some(err) = gateway_rejection(parts.status, &body) {
+                return Err(err);
+            }
+            Ok(Response::from_parts(parts, Either::Right(Full::new(body))))
+        })
+    }
+}
+
+/// A failed, uncompressed JSON response: the only shape a gateway rejection
+/// has. Everything else streams through untouched.
+fn may_be_gateway_rejection<B>(response: &Response<B>) -> bool {
+    if response.status().is_success() || response.headers().contains_key(CONTENT_ENCODING) {
+        return false;
+    }
+    response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_ascii_lowercase)
+        .is_some_and(|value| {
+            value.starts_with("application/json") || value.starts_with("application/problem+json")
+        })
+}
+
+/// The Connect error for a gateway rejection body, or `None` for a Connect
+/// error body or any other JSON, which Connect then maps as usual.
+fn gateway_rejection(status: StatusCode, body: &[u8]) -> Option<ConnectError> {
+    #[derive(Deserialize)]
+    struct Body {
+        code: Option<String>,
+    }
+    let code = serde_json::from_slice::<Body>(body).ok()?.code?;
+    // Connect error codes are lowercase names such as `unauthenticated`.
+    if code.is_empty() || code.parse::<ErrorCode>().is_ok() {
+        return None;
+    }
+    let connect_code = if code == crate::errors::auth_codes::TIMESTAMP_SKEW {
+        ErrorCode::Unauthenticated
+    } else {
+        match status {
+            StatusCode::UNAUTHORIZED => ErrorCode::Unauthenticated,
+            StatusCode::FORBIDDEN => ErrorCode::PermissionDenied,
+            _ => return None,
+        }
+    };
+    Some(
+        ConnectError::new(connect_code, code)
+            .with_http_status(status)
+            .with_detail(ErrorDetail {
+                type_url: GATEWAY_REJECTION_TYPE.to_owned(),
+                value: None,
+                debug: None,
+            }),
+    )
+}
 
 /// Owns HTTP client, Connect config, and optional credentials.
 #[derive(Clone)]
@@ -251,7 +353,7 @@ impl Factory {
     }
 }
 
-fn build_http_client(api_url: &str) -> Result<HttpClient> {
+fn build_http_client(api_url: &str) -> Result<GatewayTransport> {
     static INIT: std::sync::Once = std::sync::Once::new();
     INIT.call_once(|| {
         let _ = rustls::crypto::ring::default_provider().install_default();
@@ -265,9 +367,13 @@ fn build_http_client(api_url: &str) -> Result<HttpClient> {
                 .with_root_certificates(roots)
                 .with_no_client_auth(),
         );
-        Ok(HttpClient::with_tls(tls))
+        Ok(GatewayTransport {
+            inner: HttpClient::with_tls(tls),
+        })
     } else if api_url.starts_with("http://") {
-        Ok(HttpClient::plaintext())
+        Ok(GatewayTransport {
+            inner: HttpClient::plaintext(),
+        })
     } else {
         Err(Error::validation(
             "api_url must start with http:// or https://",

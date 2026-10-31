@@ -102,7 +102,8 @@ impl MarketDataService {
         }
     }
 
-    /// Spot pair catalog (Go `SpotConfig` raw-map escape hatch).
+    /// Spot pair catalog (Go `SpotConfig` raw-map escape hatch) with typed
+    /// order limits. A malformed order limit is an error.
     pub async fn get_spot_config(&self) -> Result<SpotConfig> {
         let resp = unary::await_public(
             self.client()
@@ -110,7 +111,7 @@ impl MarketDataService {
         )
         .await?
         .into_owned();
-        Ok(spot_config_from_proto(&resp))
+        spot_config_from_proto(&resp)
     }
 
     /// Recent public trades for a symbol (resolves `symbol_id` via catalogs after hydrate).
@@ -264,6 +265,9 @@ impl MarketDataService {
     }
 
     /// Subscribe to public spot trades for a symbol (requires `realtime` feature + hydrated catalogs).
+    ///
+    /// Each publication batches trades; every trade arrives on its own, in
+    /// execution order.
     pub async fn subscribe_trades(
         &self,
         symbol: &str,
@@ -281,9 +285,9 @@ impl MarketDataService {
         let channel = format!("public:spot:market:trades:{symbol_id}:proto");
         self.ctx
             .realtime
-            .subscribe_proto(
+            .subscribe_proto_batch(
                 &channel,
-                crate::codecs::decode::market_trade_from_bytes(quantity_scale),
+                crate::codecs::decode::market_trade_batch_from_bytes(quantity_scale),
             )
             .await
     }
@@ -583,15 +587,15 @@ impl MarketOverviewService {
         {
             self.ctx.wait_for_catalogs().await?;
         }
-        let symbols = {
-            let resolved = self
-                .ctx
-                .catalogs
-                .resolve_symbol_ids(opts.symbols.as_deref())?;
-            // Keep the original display list for snapshot fetch; wire IDs are
-            // resolved again in `list`.
-            (!resolved.is_empty()).then_some(opts.symbols.clone().unwrap_or_default())
-        };
+        let symbol_ids: std::collections::HashSet<u32> = self
+            .ctx
+            .catalogs
+            .resolve_symbol_ids(opts.symbols.as_deref())?
+            .into_iter()
+            .collect();
+        // Keep the original display list for snapshot fetch; wire IDs are
+        // resolved again in `list`.
+        let symbols = (!symbol_ids.is_empty()).then_some(opts.symbols.clone().unwrap_or_default());
         let include_sparklines = opts.include_sparklines;
         let channel = "public:spot:market_overview:updates:proto".to_owned();
 
@@ -641,12 +645,16 @@ impl MarketOverviewService {
             }) as Arc<dyn Fn() + Send + Sync>
         };
 
+        // The channel carries every market; a filtered subscription keeps
+        // only its own, in buffered and live updates alike.
         let apply_rows = {
             let by_symbol_id = by_symbol_id.clone();
             Arc::new(move |rows: Vec<MarketOverviewEntry>| {
                 let mut map = crate::realtime::lock_unpoisoned(&by_symbol_id);
                 for row in rows {
-                    map.insert(row.symbol_id, row);
+                    if symbol_ids.is_empty() || symbol_ids.contains(&row.symbol_id) {
+                        map.insert(row.symbol_id, row);
+                    }
                 }
             }) as Arc<dyn Fn(Vec<MarketOverviewEntry>) + Send + Sync>
         };

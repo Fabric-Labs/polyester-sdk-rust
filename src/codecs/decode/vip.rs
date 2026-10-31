@@ -1,10 +1,12 @@
 //! Decode vip.v1 responses into public SDK models.
 
-use crate::models::{NextVIPTierThresholds, VIPStatus, VIPTier, VIPTiersList};
+use crate::models::{NextVIPTierThresholds, VIPMetricQuality, VIPStatus, VIPTier, VIPTiersList};
 use crate::proto::vip::v1::{
     GetVIPStatusResponse, ListVIPTiersResponse,
-    NextVIPTierThresholds as ProtoNextVIPTierThresholds, VIPTier as ProtoVIPTier,
+    NextVIPTierThresholds as ProtoNextVIPTierThresholds, VIPMetricQuality as ProtoVIPMetricQuality,
+    VIPMetricStatus, VIPTier as ProtoVIPTier,
 };
+use buffa::Enumeration;
 use buffa_types::google::protobuf::Timestamp;
 
 fn clone_timestamp(ts: Option<&Timestamp>) -> Option<Timestamp> {
@@ -60,6 +62,29 @@ pub fn vip_status_from_proto(msg: &GetVIPStatusResponse) -> VIPStatus {
             .next_tier_thresholds
             .as_option()
             .map(next_vip_tier_thresholds_from_proto),
+        settled_volume_quality: msg
+            .settled_volume_quality
+            .as_option()
+            .map(vip_metric_quality_from_proto),
+        average_aop_quality: msg
+            .average_aop_quality
+            .as_option()
+            .map(vip_metric_quality_from_proto),
+    }
+}
+
+fn vip_metric_quality_from_proto(msg: &ProtoVIPMetricQuality) -> VIPMetricQuality {
+    let status = match msg.status.as_known() {
+        Some(VIPMetricStatus::METRIC_UNSPECIFIED) => String::new(),
+        Some(status) => status
+            .proto_name()
+            .trim_start_matches("METRIC_")
+            .to_ascii_lowercase(),
+        None => format!("unknown({})", msg.status.to_i32()),
+    };
+    VIPMetricQuality {
+        status,
+        incomplete_hours: msg.incomplete_hours,
     }
 }
 
@@ -74,6 +99,53 @@ mod tests {
             nanos,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn vip_status_reports_metric_quality() {
+        let msg = GetVIPStatusResponse {
+            tier: 2,
+            settled_volume_30d_usd: Some("1250000".into()),
+            settled_volume_quality: ProtoVIPMetricQuality {
+                status: VIPMetricStatus::PRICE_UNAVAILABLE.into(),
+                incomplete_hours: 3,
+                ..Default::default()
+            }
+            .into(),
+            average_aop_quality: ProtoVIPMetricQuality {
+                status: VIPMetricStatus::COMPLETE.into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let status = vip_status_from_proto(&msg);
+        assert_eq!(
+            status.settled_volume_quality,
+            Some(VIPMetricQuality {
+                status: "price_unavailable".into(),
+                incomplete_hours: 3,
+            })
+        );
+        assert_eq!(
+            status.average_aop_quality,
+            Some(VIPMetricQuality {
+                status: "complete".into(),
+                incomplete_hours: 0,
+            })
+        );
+
+        let unknown = GetVIPStatusResponse {
+            settled_volume_quality: ProtoVIPMetricQuality {
+                status: buffa::EnumValue::Unknown(9),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let status = vip_status_from_proto(&unknown);
+        assert_eq!(status.settled_volume_quality.unwrap().status, "unknown(9)");
+        assert_eq!(status.average_aop_quality, None);
     }
 
     #[test]

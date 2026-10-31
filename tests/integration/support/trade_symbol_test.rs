@@ -12,6 +12,8 @@ fn spot_with_eth_first() -> SpotConfig {
                 {"symbol": "BTC-USDT", "symbol_id": 2, "base_quantity_scale": 8}
             ]
         }),
+        pair_order_limits: Vec::new(),
+        max_open_orders_total: 0,
     }
 }
 
