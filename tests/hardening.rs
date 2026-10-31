@@ -4039,3 +4039,85 @@ async fn l2_trigger_modify_and_resume_send_without_a_symbol() {
         ]
     );
 }
+
+fn encoded_body(
+    status: u16,
+    content_type: &str,
+    encoding: &str,
+    body: &str,
+) -> hardening_support::HttpScript {
+    let body = connectrpc::CompressionRegistry::default()
+        .compress(encoding, body.as_bytes())
+        .expect("supported encoding")
+        .to_vec();
+    hardening_support::HttpScript::Raw {
+        status,
+        headers: vec![
+            ("Content-Type".into(), content_type.into()),
+            ("Content-Encoding".into(), encoding.into()),
+            ("Content-Length".into(), body.len().to_string()),
+        ],
+        body,
+    }
+}
+
+// A Content-Encoding (gzip, or an explicit identity) must not hide a bare
+// HTTP status or a gateway code, and must not turn a Connect error body into
+// a bare one.
+#[tokio::test]
+async fn l2_encoded_failed_responses_keep_their_classification() {
+    for script in [
+        (|| encoded_body(501, "text/plain", "gzip", "Not Implemented"))
+            as fn() -> hardening_support::HttpScript,
+        || encoded_body(501, "text/plain", "identity", "Not Implemented"),
+        || encoded_body(501, "application/json", "gzip", "{}"),
+        || {
+            encoded_body(
+                501,
+                "application/json",
+                "gzip",
+                r#"{"code":"unimplemented"}"#,
+            )
+        },
+    ] {
+        let err = auth_me_error(script).await;
+        assert!(matches!(err, Error::NotImplemented { .. }), "{err:?}");
+    }
+    for script in [
+        (|| encoded_body(404, "text/plain", "identity", "404 page not found"))
+            as fn() -> hardening_support::HttpScript,
+        || encoded_body(404, "text/plain", "gzip", "404 page not found"),
+        || encoded_body(404, "application/json", "gzip", "{}"),
+    ] {
+        let err = auth_me_error(script).await;
+        assert!(matches!(err, Error::RouteNotFound { .. }), "{err:?}");
+    }
+    // A compressed Connect not_found stays a resource error.
+    let err = auth_me_error(|| {
+        encoded_body(
+            404,
+            "application/json",
+            "gzip",
+            r#"{"code":"not_found","message":"no such order"}"#,
+        )
+    })
+    .await;
+    assert!(
+        !err.is_not_implemented() && err.to_string().contains("no such order"),
+        "{err:?}"
+    );
+    // A compressed gateway rejection keeps its code.
+    let err = auth_me_error(|| {
+        encoded_body(
+            401,
+            "application/json",
+            "gzip",
+            r#"{"code":"TIMESTAMP_SKEW"}"#,
+        )
+    })
+    .await;
+    assert!(
+        matches!(err, Error::TimestampSkew { status: 401 }),
+        "{err:?}"
+    );
+}

@@ -9,7 +9,7 @@ use connectrpc::client::{
     BoxFuture, CallOptions, ClientBody, ClientConfig, ClientTransport, HttpClient,
 };
 use connectrpc::rustls;
-use connectrpc::{ConnectError, ErrorCode, ErrorDetail};
+use connectrpc::{CompressionRegistry, ConnectError, ErrorCode, ErrorDetail};
 use http::header::{CONTENT_ENCODING, CONTENT_TYPE, USER_AGENT};
 use http::{HeaderValue, Request, Response, StatusCode, Uri};
 use http_body_util::{BodyExt, Either, Full, Limited};
@@ -177,6 +177,17 @@ const BARE_HTTP_ERROR_EXCERPT_CHARS: usize = 256;
 #[derive(Clone)]
 pub struct GatewayTransport {
     inner: HttpClient,
+    /// The decoders connectrpc itself applies to a `Content-Encoding` body.
+    compression: CompressionRegistry,
+}
+
+impl GatewayTransport {
+    fn new(inner: HttpClient) -> Self {
+        Self {
+            inner,
+            compression: CompressionRegistry::default(),
+        }
+    }
 }
 
 type GatewayResponseBody = Either<Incoming, Full<Bytes>>;
@@ -190,6 +201,7 @@ impl ClientTransport for GatewayTransport {
         request: Request<ClientBody>,
     ) -> BoxFuture<'static, std::result::Result<Response<Self::ResponseBody>, ConnectError>> {
         let response = self.inner.send(request);
+        let compression = self.compression.clone();
         Box::pin(async move {
             let response = response.await?;
             let Some(is_json) = inspected_failure(&response) else {
@@ -201,20 +213,37 @@ impl ClientTransport for GatewayTransport {
                 .await
                 .map_err(|e| ConnectError::unavailable(format!("read error response: {e}")))?
                 .to_bytes();
-            if let Some(err) = classify_failed_response(parts.status, is_json, &body) {
+            // Classify the decoded body; an encoding this client cannot
+            // decode leaves no readable Connect error, so it reads as empty.
+            let decoded = match parts
+                .headers
+                .get(CONTENT_ENCODING)
+                .and_then(|value| value.to_str().ok())
+            {
+                None => body.clone(),
+                Some(encoding) => compression
+                    .decompress_with_limit(
+                        &encoding.trim().to_ascii_lowercase(),
+                        body.clone(),
+                        MAX_CONNECT_RESPONSE_BYTES,
+                    )
+                    .unwrap_or_default(),
+            };
+            if let Some(err) = classify_failed_response(parts.status, is_json, &decoded) {
                 return Err(err);
             }
+            // Hand Connect the response exactly as received, encoding included.
             Ok(Response::from_parts(parts, Either::Right(Full::new(body))))
         })
     }
 }
 
-/// For a failed, uncompressed response that may need classifying, whether
-/// its body is JSON; `None` for everything else, which streams through
-/// untouched. Gateway rejections are JSON; bare 404 and 501 have any body.
+/// For a failed response that may need classifying, whether its body is
+/// JSON; `None` for everything else, which streams through untouched.
+/// Gateway rejections are JSON; bare 404 and 501 have any body.
 fn inspected_failure<B>(response: &Response<B>) -> Option<bool> {
     let status = response.status();
-    if status.is_success() || response.headers().contains_key(CONTENT_ENCODING) {
+    if status.is_success() {
         return None;
     }
     let is_json = response
@@ -433,13 +462,9 @@ fn build_http_client(api_url: &str) -> Result<GatewayTransport> {
                 .with_root_certificates(roots)
                 .with_no_client_auth(),
         );
-        Ok(GatewayTransport {
-            inner: HttpClient::with_tls(tls),
-        })
+        Ok(GatewayTransport::new(HttpClient::with_tls(tls)))
     } else if api_url.starts_with("http://") {
-        Ok(GatewayTransport {
-            inner: HttpClient::plaintext(),
-        })
+        Ok(GatewayTransport::new(HttpClient::plaintext()))
     } else {
         Err(Error::validation(
             "api_url must start with http:// or https://",
