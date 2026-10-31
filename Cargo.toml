@@ -1,6 +1,6 @@
 [package]
 name = "polyester-sdk"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.90"
 description = "Rust SDK for the Polyester API with generated protobuf types and ConnectRPC clients."
