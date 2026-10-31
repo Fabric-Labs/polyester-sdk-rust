@@ -3641,13 +3641,48 @@ async fn l2_unimplemented_and_bare_501_map_to_not_implemented() {
     );
     assert!(err.is_not_implemented() && !err.is_retryable(), "{err:?}");
 
-    let err = auth_me_error(|| json_body(501, "text/plain", "Not Implemented")).await;
+    // A Connect `unimplemented` without a message is still the server
+    // saying it does not implement the call, not a missing route.
+    let err =
+        auth_me_error(|| json_body(501, "application/json", r#"{"code":"unimplemented"}"#)).await;
     assert!(matches!(err, Error::NotImplemented { .. }), "{err:?}");
 
-    // A bare 404 stays the narrower RouteNotFound.
-    let err = auth_me_error(|| hardening_support::HttpScript::NotFound).await;
-    assert!(matches!(err, Error::RouteNotFound { .. }), "{err:?}");
-    assert!(err.is_not_implemented(), "{err:?}");
+    // A bare HTTP 501, whatever its body, is NotImplemented: JSON bodies that
+    // are not Connect errors included.
+    for script in [
+        (|| json_body(501, "text/plain", "Not Implemented"))
+            as fn() -> hardening_support::HttpScript,
+        || json_body(501, "application/json", "{}"),
+        || json_body(501, "application/json", r#"{"message":"Not Implemented"}"#),
+    ] {
+        let err = auth_me_error(script).await;
+        assert!(matches!(err, Error::NotImplemented { .. }), "{err:?}");
+        assert!(err.is_not_implemented() && !err.is_retryable(), "{err:?}");
+    }
+
+    // A bare 404, empty or with a non-Connect JSON body, stays the narrower
+    // RouteNotFound.
+    for script in [
+        (|| hardening_support::HttpScript::NotFound) as fn() -> hardening_support::HttpScript,
+        || json_body(404, "application/json", "{}"),
+        || json_body(404, "text/html", "<h1>404 page not found</h1>"),
+    ] {
+        let err = auth_me_error(script).await;
+        assert!(matches!(err, Error::RouteNotFound { .. }), "{err:?}");
+        assert!(err.is_not_implemented(), "{err:?}");
+    }
+
+    // A Connect `not_found` error carried on HTTP 404 is a missing resource,
+    // not a missing route.
+    let err = auth_me_error(|| {
+        json_body(
+            404,
+            "application/json",
+            r#"{"code":"not_found","message":"no such order"}"#,
+        )
+    })
+    .await;
+    assert!(!err.is_not_implemented(), "{err:?}");
 }
 
 #[tokio::test]

@@ -430,12 +430,22 @@ pub fn map_connect_error(err: ConnectError) -> Error {
     let header_retry = retry_after_seconds(&err);
     let status = err.http_status().as_u16();
     let raw_message = err.message.as_deref().unwrap_or_default();
-    if err
-        .details
-        .iter()
-        .any(|detail| detail.type_url == crate::transport::GATEWAY_REJECTION_TYPE)
-    {
+    let has_marker = |marker: &str| err.details.iter().any(|detail| detail.type_url == marker);
+    if has_marker(crate::transport::GATEWAY_REJECTION_TYPE) {
         return gateway_rejection_error(status, raw_message);
+    }
+    if has_marker(crate::transport::BARE_HTTP_ERROR_TYPE) {
+        // A bare 404 means the route is missing; a bare 501 that the server
+        // does not implement the call.
+        return if status == 404 {
+            Error::RouteNotFound {
+                procedure: String::new(),
+            }
+        } else {
+            Error::NotImplemented {
+                message: fallback_message,
+            }
+        };
     }
     if raw_message == auth_codes::TIMESTAMP_SKEW {
         return Error::TimestampSkew { status };
@@ -551,22 +561,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
         ErrorCode::ResourceExhausted => rate_limit_error(message, None, header_retry),
         ErrorCode::Unavailable | ErrorCode::Internal => Error::Server(message),
         ErrorCode::DeadlineExceeded => Error::Transport(message),
-        // Connect reports a bare (non-Connect) HTTP 404 as `unimplemented`
-        // with an "HTTP error 404" message, and a JSON 404 that is not a
-        // Connect error as `unimplemented` with no message: the route is
-        // missing.
-        ErrorCode::Unimplemented
-            if raw_message.is_empty() || raw_message.starts_with("HTTP error 404") =>
-        {
-            Error::RouteNotFound {
-                procedure: String::new(),
-            }
-        }
         ErrorCode::Unimplemented => Error::NotImplemented { message },
-        // Connect has no code for a bare HTTP 501 and reports `unknown`.
-        ErrorCode::Unknown if raw_message.starts_with("HTTP error 501") => {
-            Error::NotImplemented { message }
-        }
         _ => Error::Api {
             message,
             code: format!("{code:?}"),
