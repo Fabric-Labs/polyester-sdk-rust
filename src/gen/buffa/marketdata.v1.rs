@@ -8073,6 +8073,22 @@ pub struct PairConfig {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub max_open_orders_per_pair: u32,
+    /// Largest notional of one market order, as a decimal string in quote-asset
+    /// units, compared exactly with no rounding. A market order is valued at the
+    /// top of the price range it may trade in: a buy at its protection price and
+    /// a sell at its reference price, the touch or the client's reference price,
+    /// before slippage. An order above it is rejected with MAX_NOTIONAL. Absent
+    /// when the pair has no maximum.
+    ///
+    /// Field 24: `max_market_notional_quote`
+    #[serde(
+        rename = "maxMarketNotionalQuote",
+        alias = "max_market_notional_quote",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub max_market_notional_quote: ::core::option::Option<
+        ::buffa::alloc::string::String,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8109,6 +8125,7 @@ impl ::core::fmt::Debug for PairConfig {
             .field("max_market_qty_base", &self.max_market_qty_base)
             .field("max_order_notional_quote", &self.max_order_notional_quote)
             .field("max_open_orders_per_pair", &self.max_open_orders_per_pair)
+            .field("max_market_notional_quote", &self.max_market_notional_quote)
             .finish()
     }
 }
@@ -8148,6 +8165,16 @@ impl PairConfig {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.max_order_notional_quote = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::max_market_notional_quote`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_max_market_notional_quote(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.max_market_notional_quote = Some(value.into());
         self
     }
 }
@@ -8282,6 +8309,9 @@ impl ::buffa::Message for PairConfig {
                     + ::buffa::types::uint32_encoded_len(self.max_open_orders_per_pair)
                         as u32;
         }
+        if let Some(ref v) = self.max_market_notional_quote {
+            size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8374,6 +8404,9 @@ impl ::buffa::Message for PairConfig {
         }
         if self.max_open_orders_per_pair != 0u32 {
             ::buffa::types::put_uint32_field(23u32, self.max_open_orders_per_pair, buf);
+        }
+        if let Some(ref v) = self.max_market_notional_quote {
+            ::buffa::types::put_string_field(24u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8582,6 +8615,18 @@ impl ::buffa::Message for PairConfig {
                 )?;
                 self.max_open_orders_per_pair = ::buffa::types::decode_uint32(buf)?;
             }
+            24u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .max_market_notional_quote
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8613,6 +8658,7 @@ impl ::buffa::Message for PairConfig {
         self.max_market_qty_base = ::core::option::Option::None;
         self.max_order_notional_quote = ::core::option::Option::None;
         self.max_open_orders_per_pair = 0u32;
+        self.max_market_notional_quote = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -20484,6 +20530,15 @@ pub mod __buffa {
             ///
             /// Field 23: `max_open_orders_per_pair`
             pub max_open_orders_per_pair: u32,
+            /// Largest notional of one market order, as a decimal string in quote-asset
+            /// units, compared exactly with no rounding. A market order is valued at the
+            /// top of the price range it may trade in: a buy at its protection price and
+            /// a sell at its reference price, the touch or the client's reference price,
+            /// before slippage. An order above it is rejected with MAX_NOTIONAL. Absent
+            /// when the pair has no maximum.
+            ///
+            /// Field 24: `max_market_notional_quote`
+            pub max_market_notional_quote: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for PairConfigView<'a> {
@@ -20756,6 +20811,15 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    24u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.max_market_notional_quote = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -20827,6 +20891,9 @@ pub mod __buffa {
                         .max_order_notional_quote
                         .map(|s| s.to_string()),
                     max_open_orders_per_pair: self.max_open_orders_per_pair,
+                    max_market_notional_quote: self
+                        .max_market_notional_quote
+                        .map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -20977,6 +21044,9 @@ pub mod __buffa {
                                 self.max_open_orders_per_pair,
                             ) as u32;
                 }
+                if let Some(ref v) = self.max_market_notional_quote {
+                    size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -21110,6 +21180,9 @@ pub mod __buffa {
                         self.max_open_orders_per_pair,
                         buf,
                     );
+                }
+                if let Some(ref v) = self.max_market_notional_quote {
+                    ::buffa::types::put_string_field(24u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -21278,6 +21351,10 @@ pub mod __buffa {
                                 &self.max_open_orders_per_pair,
                             ),
                         )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.max_market_notional_quote
+                {
+                    __map.serialize_entry("maxMarketNotionalQuote", __v)?;
                 }
                 __map.end()
             }
@@ -21567,6 +21644,18 @@ pub mod __buffa {
             #[must_use]
             pub fn max_open_orders_per_pair(&self) -> u32 {
                 self.0.reborrow().max_open_orders_per_pair
+            }
+            /// Largest notional of one market order, as a decimal string in quote-asset
+            /// units, compared exactly with no rounding. A market order is valued at the
+            /// top of the price range it may trade in: a buy at its protection price and
+            /// a sell at its reference price, the touch or the client's reference price,
+            /// before slippage. An order above it is rejected with MAX_NOTIONAL. Absent
+            /// when the pair has no maximum.
+            ///
+            /// Field 24: `max_market_notional_quote`
+            #[must_use]
+            pub fn max_market_notional_quote(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().max_market_notional_quote
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<PairConfigView<'static>>>
