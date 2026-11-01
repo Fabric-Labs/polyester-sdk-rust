@@ -95,8 +95,15 @@ pub struct OrderStreamEvent {
     /// `accepted`, `filled`, `canceled`, `rejected`, `replaced`,
     /// `attached_risk`, or `UNKNOWN(<number>)` for a future kind.
     pub kind: String,
-    /// The reason for a cancel, rejection or replace; 0 when none applies.
-    pub reason_code: u32,
+    /// For a `rejected` event, the order error code the Orders API returns for
+    /// the same refusal (for example `ERROR_CODE_POST_ONLY_CROSS`). Empty
+    /// otherwise.
+    pub reject_reason: String,
+    /// For a `canceled` event, why the order ended (for example
+    /// `CANCEL_REASON_USER_REQUEST`); also `CANCEL_REASON_REPLACED` on the
+    /// `replaced` event of the order a replace ended. Empty otherwise.
+    /// Both reasons are `UNKNOWN(<number>)` for a value this SDK does not know.
+    pub cancel_reason: String,
     /// The successor's public ID for a `replaced` event.
     pub replacement_order_id: Option<String>,
     /// The execution for a `filled` event.

@@ -527,8 +527,9 @@ pub const __PRICE_LEVEL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa
 };
 /// GetOrderBookResponse is a depth snapshot for the binary (protobuf) API (scaled integers).
 /// REST surfaces expose decimal strings via DTO conversion. A configured symbol
-/// without an initialized book returns a successful snapshot with sequence zero
-/// and empty bid and ask collections.
+/// whose book is being built, or was invalidated, returns a successful snapshot
+/// with available false and no levels: its book is unknown, not empty. Read
+/// available before treating empty sides as no liquidity.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -553,7 +554,8 @@ pub struct GetOrderBookResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub book_seq: u64,
-    /// Best bid first; descending price. Empty when there is no current liquidity.
+    /// Best bid first; descending price. When available is true, empty means no
+    /// current liquidity; when it is false, always empty.
     ///
     /// Field 3: `bids`
     #[serde(
@@ -562,7 +564,8 @@ pub struct GetOrderBookResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub bids: ::buffa::alloc::vec::Vec<PriceLevel>,
-    /// Best ask first; ascending price. Empty when there is no current liquidity.
+    /// Best ask first; ascending price. When available is true, empty means no
+    /// current liquidity; when it is false, always empty.
     ///
     /// Field 4: `asks`
     #[serde(
@@ -579,6 +582,18 @@ pub struct GetOrderBookResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub ts: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// True when the book is current: bids and asks are its levels, and empty
+    /// sides mean no liquidity. False while the book is being built or after it
+    /// was invalidated: its levels are unknown, not empty, and the response
+    /// carries none. Request the snapshot again later.
+    ///
+    /// Field 6: `available`
+    #[serde(
+        rename = "available",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub available: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -591,6 +606,7 @@ impl ::core::fmt::Debug for GetOrderBookResponse {
             .field("bids", &self.bids)
             .field("asks", &self.asks)
             .field("ts", &self.ts)
+            .field("available", &self.available)
             .finish()
     }
 }
@@ -649,6 +665,9 @@ impl ::buffa::Message for GetOrderBookResponse {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.available {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -676,6 +695,9 @@ impl ::buffa::Message for GetOrderBookResponse {
         if self.ts.is_set() {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.ts.write_to(__cache, buf);
+        }
+        if self.available {
+            ::buffa::types::put_bool_field(6u32, self.available, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -733,6 +755,13 @@ impl ::buffa::Message for GetOrderBookResponse {
                     ctx,
                 )?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.available = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -746,6 +775,7 @@ impl ::buffa::Message for GetOrderBookResponse {
         self.bids.clear();
         self.asks.clear();
         self.ts = ::buffa::MessageField::none();
+        self.available = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1717,8 +1747,9 @@ pub mod __buffa {
         }
         /// GetOrderBookResponse is a depth snapshot for the binary (protobuf) API (scaled integers).
         /// REST surfaces expose decimal strings via DTO conversion. A configured symbol
-        /// without an initialized book returns a successful snapshot with sequence zero
-        /// and empty bid and ask collections.
+        /// whose book is being built, or was invalidated, returns a successful snapshot
+        /// with available false and no levels: its book is unknown, not empty. Read
+        /// available before treating empty sides as no liquidity.
         #[derive(Clone, Debug, Default)]
         pub struct GetOrderBookResponseView<'a> {
             /// Numeric symbol identifier (client resolves to symbol string).
@@ -1729,14 +1760,16 @@ pub mod __buffa {
             ///
             /// Field 2: `book_seq`
             pub book_seq: u64,
-            /// Best bid first; descending price. Empty when there is no current liquidity.
+            /// Best bid first; descending price. When available is true, empty means no
+            /// current liquidity; when it is false, always empty.
             ///
             /// Field 3: `bids`
             pub bids: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::PriceLevelView<'a>,
             >,
-            /// Best ask first; ascending price. Empty when there is no current liquidity.
+            /// Best ask first; ascending price. When available is true, empty means no
+            /// current liquidity; when it is false, always empty.
             ///
             /// Field 4: `asks`
             pub asks: ::buffa::RepeatedView<
@@ -1749,6 +1782,13 @@ pub mod __buffa {
             pub ts: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// True when the book is current: bids and asks are its levels, and empty
+            /// sides mean no liquidity. False while the book is being built or after it
+            /// was invalidated: its levels are unknown, not empty, and the response
+            /// carries none. Request the snapshot again later.
+            ///
+            /// Field 6: `available`
+            pub available: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetOrderBookResponseView<'a> {
@@ -1820,6 +1860,13 @@ pub mod __buffa {
                                 );
                             }
                         }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.available = ::buffa::types::decode_bool(&mut cur)?;
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -1900,6 +1947,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    available: self.available,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -1948,6 +1996,9 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.available {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -1988,6 +2039,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.ts.write_to(__cache, buf);
+                }
+                if self.available {
+                    ::buffa::types::put_bool_field(6u32, self.available, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -2034,6 +2088,9 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.ts.as_option() {
                         __map.serialize_entry("ts", __v)?;
                     }
+                }
+                if self.available {
+                    __map.serialize_entry("available", &self.available)?;
                 }
                 __map.end()
             }
@@ -2145,7 +2202,8 @@ pub mod __buffa {
             pub fn book_seq(&self) -> u64 {
                 self.0.reborrow().book_seq
             }
-            /// Best bid first; descending price. Empty when there is no current liquidity.
+            /// Best bid first; descending price. When available is true, empty means no
+            /// current liquidity; when it is false, always empty.
             ///
             /// Field 3: `bids`
             #[must_use]
@@ -2157,7 +2215,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().bids
             }
-            /// Best ask first; ascending price. Empty when there is no current liquidity.
+            /// Best ask first; ascending price. When available is true, empty means no
+            /// current liquidity; when it is false, always empty.
             ///
             /// Field 4: `asks`
             #[must_use]
@@ -2179,6 +2238,16 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().ts
+            }
+            /// True when the book is current: bids and asks are its levels, and empty
+            /// sides mean no liquidity. False while the book is being built or after it
+            /// was invalidated: its levels are unknown, not empty, and the response
+            /// carries none. Request the snapshot again later.
+            ///
+            /// Field 6: `available`
+            #[must_use]
+            pub fn available(&self) -> bool {
+                self.0.reborrow().available
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetOrderBookResponseView<'static>>>

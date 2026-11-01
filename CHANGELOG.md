@@ -5,6 +5,15 @@
 **Breaking changes**
 - `Client::whiteboard`, `Client::polychart` and `Client::layout` are removed,
   because those APIs are no longer part of the public API.
+- `OrderStreamEvent::reason_code` is replaced by `reject_reason` and
+  `cancel_reason`. A rejected order's event names its refusal with the order
+  error code the Orders API returns (for example `ERROR_CODE_POST_ONLY_CROSS`).
+  A canceled order's event names why it ended (for example
+  `CANCEL_REASON_USER_REQUEST`), and so does the replaced event of the order a
+  replace ended (`CANCEL_REASON_REPLACED`). Both are empty otherwise.
+- `GetSubaccountOpts::include_balances` is removed: a sub-account read no
+  longer returns balances. Read them with the balances service for the
+  sub-account.
 
 ## 0.3.0
 
