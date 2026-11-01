@@ -1059,8 +1059,8 @@ pub enum ErrorCode {
     /// An item of the batch modify did not use the REPLACE_ONLY behavior, so the
     /// batch was refused.
     ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED = 229i32,
-    /// An item of the batch modify named no symbol, another symbol than the batch's
-    /// first item, or an order on another symbol, so the batch was refused.
+    /// An item of the batch modify named no symbol, or another symbol than the
+    /// batch's first item, so the batch was refused.
     ERROR_CODE_BATCH_SINGLE_SYMBOL_REQUIRED = 230i32,
     /// The account keeps its maximum number of recent modify or batch requests for
     /// duplicate detection. Retry once earlier ones expire.
@@ -1278,6 +1278,26 @@ pub enum ErrorCode {
     /// a replace keeps its order's place. Nothing changed; cancel a resting order
     /// in this market first.
     ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR = 306i32,
+    /// The order already carries every attached leg it may hold, so another
+    /// attached leg was refused.
+    ERROR_CODE_ATTACHED_LEGS_EXCEEDED = 86i32,
+    /// The trigger's fee asset was not valid.
+    ERROR_CODE_FEE_ASSET_INVALID = 87i32,
+    /// The trigger's maximum fee rate was not valid.
+    ERROR_CODE_FEE_CEILING_INVALID = 88i32,
+    /// The trigger set a field that must be left unset.
+    ERROR_CODE_UNSUPPORTED_FIELD_SET = 89i32,
+    /// The trigger could not fire again.
+    ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED = 90i32,
+    /// The trigger's condition flags were not valid.
+    ERROR_CODE_CONDITION_FLAGS_INVALID = 91i32,
+    /// The trigger set a condition parameter its condition does not take.
+    ERROR_CODE_CONDITION_PARAMETER_SET = 92i32,
+    /// The market had no room for another TWAP order.
+    ERROR_CODE_TWAP_CAPACITY_REACHED = 93i32,
+    /// The trigger's child order did not match the order the trigger requested,
+    /// so the trigger failed and the child order was canceled.
+    ERROR_CODE_CHILD_ORDER_INCONSISTENT = 94i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1835,6 +1855,33 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MaxOpenOrdersPerPair: Self = Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AttachedLegsExceeded: Self = Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_FEE_ASSET_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FeeAssetInvalid: Self = Self::ERROR_CODE_FEE_ASSET_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_FEE_CEILING_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FeeCeilingInvalid: Self = Self::ERROR_CODE_FEE_CEILING_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_UNSUPPORTED_FIELD_SET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UnsupportedFieldSet: Self = Self::ERROR_CODE_UNSUPPORTED_FIELD_SET;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerFireLimitReached: Self = Self::ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CONDITION_FLAGS_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ConditionFlagsInvalid: Self = Self::ERROR_CODE_CONDITION_FLAGS_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CONDITION_PARAMETER_SET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ConditionParameterSet: Self = Self::ERROR_CODE_CONDITION_PARAMETER_SET;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TWAP_CAPACITY_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TwapCapacityReached: Self = Self::ERROR_CODE_TWAP_CAPACITY_REACHED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ChildOrderInconsistent: Self = Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -2435,6 +2482,25 @@ impl ::buffa::Enumeration for ErrorCode {
             306i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR)
             }
+            86i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED)
+            }
+            87i32 => ::core::option::Option::Some(Self::ERROR_CODE_FEE_ASSET_INVALID),
+            88i32 => ::core::option::Option::Some(Self::ERROR_CODE_FEE_CEILING_INVALID),
+            89i32 => ::core::option::Option::Some(Self::ERROR_CODE_UNSUPPORTED_FIELD_SET),
+            90i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED)
+            }
+            91i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CONDITION_FLAGS_INVALID)
+            }
+            92i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CONDITION_PARAMETER_SET)
+            }
+            93i32 => ::core::option::Option::Some(Self::ERROR_CODE_TWAP_CAPACITY_REACHED),
+            94i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -2829,6 +2895,25 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR => {
                 "ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR"
+            }
+            Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED => {
+                "ERROR_CODE_ATTACHED_LEGS_EXCEEDED"
+            }
+            Self::ERROR_CODE_FEE_ASSET_INVALID => "ERROR_CODE_FEE_ASSET_INVALID",
+            Self::ERROR_CODE_FEE_CEILING_INVALID => "ERROR_CODE_FEE_CEILING_INVALID",
+            Self::ERROR_CODE_UNSUPPORTED_FIELD_SET => "ERROR_CODE_UNSUPPORTED_FIELD_SET",
+            Self::ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED => {
+                "ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED"
+            }
+            Self::ERROR_CODE_CONDITION_FLAGS_INVALID => {
+                "ERROR_CODE_CONDITION_FLAGS_INVALID"
+            }
+            Self::ERROR_CODE_CONDITION_PARAMETER_SET => {
+                "ERROR_CODE_CONDITION_PARAMETER_SET"
+            }
+            Self::ERROR_CODE_TWAP_CAPACITY_REACHED => "ERROR_CODE_TWAP_CAPACITY_REACHED",
+            Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT => {
+                "ERROR_CODE_CHILD_ORDER_INCONSISTENT"
             }
         }
     }
@@ -3489,6 +3574,33 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR)
             }
+            "ERROR_CODE_ATTACHED_LEGS_EXCEEDED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED)
+            }
+            "ERROR_CODE_FEE_ASSET_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_FEE_ASSET_INVALID)
+            }
+            "ERROR_CODE_FEE_CEILING_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_FEE_CEILING_INVALID)
+            }
+            "ERROR_CODE_UNSUPPORTED_FIELD_SET" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_UNSUPPORTED_FIELD_SET)
+            }
+            "ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED)
+            }
+            "ERROR_CODE_CONDITION_FLAGS_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CONDITION_FLAGS_INVALID)
+            }
+            "ERROR_CODE_CONDITION_PARAMETER_SET" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CONDITION_PARAMETER_SET)
+            }
+            "ERROR_CODE_TWAP_CAPACITY_REACHED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TWAP_CAPACITY_REACHED)
+            }
+            "ERROR_CODE_CHILD_ORDER_INCONSISTENT" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -3679,6 +3791,15 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN,
             Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
             Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR,
+            Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED,
+            Self::ERROR_CODE_FEE_ASSET_INVALID,
+            Self::ERROR_CODE_FEE_CEILING_INVALID,
+            Self::ERROR_CODE_UNSUPPORTED_FIELD_SET,
+            Self::ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED,
+            Self::ERROR_CODE_CONDITION_FLAGS_INVALID,
+            Self::ERROR_CODE_CONDITION_PARAMETER_SET,
+            Self::ERROR_CODE_TWAP_CAPACITY_REACHED,
+            Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT,
         ]
     }
 }
@@ -7501,7 +7622,9 @@ pub const __PREVIEW_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct CancelOrderRequest {
-    /// Optional symbol_id for routing; when omitted, resolved from order directory.
+    /// Optional trading symbol numeric identifier. When set, it must match the
+    /// order's symbol, or the order is reported unknown (ERROR_CODE_ORDER_UNKNOWN)
+    /// and nothing is canceled. When omitted, the order's own symbol is used.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -15532,7 +15655,8 @@ pub struct BatchReplaceOrdersRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Trading symbol shared by every replacement.
+    /// Trading symbol shared by every replacement. An item whose order is on
+    /// another symbol is refused alone as an unknown order.
     ///
     /// Field 2: `symbol_id`
     #[serde(
@@ -16067,7 +16191,9 @@ pub struct BatchCancelItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub client_order_id: ::buffa::alloc::string::String,
-    /// Optional symbol routing hint.
+    /// Optional trading symbol numeric identifier. When set, it must match the
+    /// order's symbol, or the item is refused as an unknown order. When omitted,
+    /// the order's own symbol is used.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -17245,6 +17371,337 @@ impl ::buffa::Enumeration for OrderStatus {
             Self::FILLED,
             Self::CANCELED,
             Self::REJECTED,
+        ]
+    }
+}
+/// CancelReason is why a CANCELED order ended. A cancel is no error: a
+/// refused order is REJECTED and names its refusal with an ErrorCode instead.
+/// Fills before the cancel stand, and the order's remaining reserved funds are
+/// released.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum CancelReason {
+    /// The order is not canceled.
+    CANCEL_REASON_UNSPECIFIED = 0i32,
+    /// A cancel the account sent: a cancel, a batch cancel or a cancel-all.
+    CANCEL_REASON_USER_REQUEST = 1i32,
+    /// The unfilled remainder of an immediate-or-cancel order.
+    CANCEL_REASON_IOC_REMAINDER = 2i32,
+    /// The unfilled remainder of a market order: the book ran out, or the next
+    /// price was past the order's protection price.
+    CANCEL_REASON_MARKET_REMAINDER = 3i32,
+    /// Self-trade prevention canceled this resting order when an order of the
+    /// same account would have matched it.
+    CANCEL_REASON_STP_EXPIRE_MAKER = 4i32,
+    /// Self-trade prevention canceled this incoming order instead of matching a
+    /// resting order of the same account.
+    CANCEL_REASON_STP_EXPIRE_TAKER = 5i32,
+    /// Self-trade prevention canceled both this order and the order of the same
+    /// account it would have matched.
+    CANCEL_REASON_STP_EXPIRE_BOTH = 6i32,
+    /// A replace ended this order and created its successor.
+    CANCEL_REASON_REPLACED = 7i32,
+    /// A good-till-date order reached its expiry time.
+    CANCEL_REASON_GTD_EXPIRED = 8i32,
+    /// An amend or replace set the order's total quantity at or below its filled
+    /// quantity, so the order ended at its filled quantity.
+    CANCEL_REASON_QTY_AT_OR_BELOW_FILLED = 9i32,
+    /// The market was disabled: the exchange canceled its resting orders.
+    CANCEL_REASON_PAIR_DRAIN = 10i32,
+    /// The market refused one of the order's attached take-profit, stop-loss or
+    /// trailing-stop legs, so the order's remainder and its other legs were
+    /// canceled.
+    CANCEL_REASON_ATTACHED_RISK_REFUSED = 11i32,
+    /// The account's cancel-all-after timer reached its deadline without a
+    /// heartbeat.
+    CANCEL_REASON_CANCEL_ALL_AFTER = 12i32,
+    /// Canceled by the exchange while it recovered the account. Place new orders
+    /// once the account trades again.
+    CANCEL_REASON_ACCOUNT_REPAIR = 13i32,
+    /// A TWAP slice its TWAP canceled at the next slice's due time; its unfilled
+    /// remainder moves to the TWAP's later slices.
+    CANCEL_REASON_TWAP_ROLLOVER = 14i32,
+    /// An order a trigger placed, such as a TWAP slice, a ladder level, a stop's
+    /// child or an attached leg's exit, canceled because its trigger ended or
+    /// another leg took over the exit.
+    CANCEL_REASON_STRATEGY_CANCEL = 15i32,
+    /// The exchange canceled the order for a reason it does not name.
+    CANCEL_REASON_SYSTEM = 16i32,
+}
+impl CancelReason {
+    ///Idiomatic alias for [`Self::CANCEL_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::CANCEL_REASON_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_USER_REQUEST`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UserRequest: Self = Self::CANCEL_REASON_USER_REQUEST;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_IOC_REMAINDER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const IocRemainder: Self = Self::CANCEL_REASON_IOC_REMAINDER;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_MARKET_REMAINDER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketRemainder: Self = Self::CANCEL_REASON_MARKET_REMAINDER;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_STP_EXPIRE_MAKER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StpExpireMaker: Self = Self::CANCEL_REASON_STP_EXPIRE_MAKER;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_STP_EXPIRE_TAKER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StpExpireTaker: Self = Self::CANCEL_REASON_STP_EXPIRE_TAKER;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_STP_EXPIRE_BOTH`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StpExpireBoth: Self = Self::CANCEL_REASON_STP_EXPIRE_BOTH;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_REPLACED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Replaced: Self = Self::CANCEL_REASON_REPLACED;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_GTD_EXPIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const GtdExpired: Self = Self::CANCEL_REASON_GTD_EXPIRED;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_QTY_AT_OR_BELOW_FILLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QtyAtOrBelowFilled: Self = Self::CANCEL_REASON_QTY_AT_OR_BELOW_FILLED;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_PAIR_DRAIN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PairDrain: Self = Self::CANCEL_REASON_PAIR_DRAIN;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_ATTACHED_RISK_REFUSED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AttachedRiskRefused: Self = Self::CANCEL_REASON_ATTACHED_RISK_REFUSED;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_CANCEL_ALL_AFTER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CancelAllAfter: Self = Self::CANCEL_REASON_CANCEL_ALL_AFTER;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_ACCOUNT_REPAIR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AccountRepair: Self = Self::CANCEL_REASON_ACCOUNT_REPAIR;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_TWAP_ROLLOVER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TwapRollover: Self = Self::CANCEL_REASON_TWAP_ROLLOVER;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_STRATEGY_CANCEL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StrategyCancel: Self = Self::CANCEL_REASON_STRATEGY_CANCEL;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_SYSTEM`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const System: Self = Self::CANCEL_REASON_SYSTEM;
+}
+impl ::core::default::Default for CancelReason {
+    fn default() -> Self {
+        Self::CANCEL_REASON_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for CancelReason {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for CancelReason {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = CancelReason;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(CancelReason)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<CancelReason, E> {
+                <CancelReason as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<CancelReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <CancelReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<CancelReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <CancelReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<CancelReason, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CancelReason {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for CancelReason {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::CANCEL_REASON_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::CANCEL_REASON_USER_REQUEST),
+            2i32 => ::core::option::Option::Some(Self::CANCEL_REASON_IOC_REMAINDER),
+            3i32 => ::core::option::Option::Some(Self::CANCEL_REASON_MARKET_REMAINDER),
+            4i32 => ::core::option::Option::Some(Self::CANCEL_REASON_STP_EXPIRE_MAKER),
+            5i32 => ::core::option::Option::Some(Self::CANCEL_REASON_STP_EXPIRE_TAKER),
+            6i32 => ::core::option::Option::Some(Self::CANCEL_REASON_STP_EXPIRE_BOTH),
+            7i32 => ::core::option::Option::Some(Self::CANCEL_REASON_REPLACED),
+            8i32 => ::core::option::Option::Some(Self::CANCEL_REASON_GTD_EXPIRED),
+            9i32 => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_QTY_AT_OR_BELOW_FILLED)
+            }
+            10i32 => ::core::option::Option::Some(Self::CANCEL_REASON_PAIR_DRAIN),
+            11i32 => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_ATTACHED_RISK_REFUSED)
+            }
+            12i32 => ::core::option::Option::Some(Self::CANCEL_REASON_CANCEL_ALL_AFTER),
+            13i32 => ::core::option::Option::Some(Self::CANCEL_REASON_ACCOUNT_REPAIR),
+            14i32 => ::core::option::Option::Some(Self::CANCEL_REASON_TWAP_ROLLOVER),
+            15i32 => ::core::option::Option::Some(Self::CANCEL_REASON_STRATEGY_CANCEL),
+            16i32 => ::core::option::Option::Some(Self::CANCEL_REASON_SYSTEM),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::CANCEL_REASON_UNSPECIFIED => "CANCEL_REASON_UNSPECIFIED",
+            Self::CANCEL_REASON_USER_REQUEST => "CANCEL_REASON_USER_REQUEST",
+            Self::CANCEL_REASON_IOC_REMAINDER => "CANCEL_REASON_IOC_REMAINDER",
+            Self::CANCEL_REASON_MARKET_REMAINDER => "CANCEL_REASON_MARKET_REMAINDER",
+            Self::CANCEL_REASON_STP_EXPIRE_MAKER => "CANCEL_REASON_STP_EXPIRE_MAKER",
+            Self::CANCEL_REASON_STP_EXPIRE_TAKER => "CANCEL_REASON_STP_EXPIRE_TAKER",
+            Self::CANCEL_REASON_STP_EXPIRE_BOTH => "CANCEL_REASON_STP_EXPIRE_BOTH",
+            Self::CANCEL_REASON_REPLACED => "CANCEL_REASON_REPLACED",
+            Self::CANCEL_REASON_GTD_EXPIRED => "CANCEL_REASON_GTD_EXPIRED",
+            Self::CANCEL_REASON_QTY_AT_OR_BELOW_FILLED => {
+                "CANCEL_REASON_QTY_AT_OR_BELOW_FILLED"
+            }
+            Self::CANCEL_REASON_PAIR_DRAIN => "CANCEL_REASON_PAIR_DRAIN",
+            Self::CANCEL_REASON_ATTACHED_RISK_REFUSED => {
+                "CANCEL_REASON_ATTACHED_RISK_REFUSED"
+            }
+            Self::CANCEL_REASON_CANCEL_ALL_AFTER => "CANCEL_REASON_CANCEL_ALL_AFTER",
+            Self::CANCEL_REASON_ACCOUNT_REPAIR => "CANCEL_REASON_ACCOUNT_REPAIR",
+            Self::CANCEL_REASON_TWAP_ROLLOVER => "CANCEL_REASON_TWAP_ROLLOVER",
+            Self::CANCEL_REASON_STRATEGY_CANCEL => "CANCEL_REASON_STRATEGY_CANCEL",
+            Self::CANCEL_REASON_SYSTEM => "CANCEL_REASON_SYSTEM",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "CANCEL_REASON_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_UNSPECIFIED)
+            }
+            "CANCEL_REASON_USER_REQUEST" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_USER_REQUEST)
+            }
+            "CANCEL_REASON_IOC_REMAINDER" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_IOC_REMAINDER)
+            }
+            "CANCEL_REASON_MARKET_REMAINDER" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_MARKET_REMAINDER)
+            }
+            "CANCEL_REASON_STP_EXPIRE_MAKER" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_STP_EXPIRE_MAKER)
+            }
+            "CANCEL_REASON_STP_EXPIRE_TAKER" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_STP_EXPIRE_TAKER)
+            }
+            "CANCEL_REASON_STP_EXPIRE_BOTH" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_STP_EXPIRE_BOTH)
+            }
+            "CANCEL_REASON_REPLACED" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_REPLACED)
+            }
+            "CANCEL_REASON_GTD_EXPIRED" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_GTD_EXPIRED)
+            }
+            "CANCEL_REASON_QTY_AT_OR_BELOW_FILLED" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_QTY_AT_OR_BELOW_FILLED)
+            }
+            "CANCEL_REASON_PAIR_DRAIN" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_PAIR_DRAIN)
+            }
+            "CANCEL_REASON_ATTACHED_RISK_REFUSED" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_ATTACHED_RISK_REFUSED)
+            }
+            "CANCEL_REASON_CANCEL_ALL_AFTER" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_CANCEL_ALL_AFTER)
+            }
+            "CANCEL_REASON_ACCOUNT_REPAIR" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_ACCOUNT_REPAIR)
+            }
+            "CANCEL_REASON_TWAP_ROLLOVER" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_TWAP_ROLLOVER)
+            }
+            "CANCEL_REASON_STRATEGY_CANCEL" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_STRATEGY_CANCEL)
+            }
+            "CANCEL_REASON_SYSTEM" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_SYSTEM)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::CANCEL_REASON_UNSPECIFIED,
+            Self::CANCEL_REASON_USER_REQUEST,
+            Self::CANCEL_REASON_IOC_REMAINDER,
+            Self::CANCEL_REASON_MARKET_REMAINDER,
+            Self::CANCEL_REASON_STP_EXPIRE_MAKER,
+            Self::CANCEL_REASON_STP_EXPIRE_TAKER,
+            Self::CANCEL_REASON_STP_EXPIRE_BOTH,
+            Self::CANCEL_REASON_REPLACED,
+            Self::CANCEL_REASON_GTD_EXPIRED,
+            Self::CANCEL_REASON_QTY_AT_OR_BELOW_FILLED,
+            Self::CANCEL_REASON_PAIR_DRAIN,
+            Self::CANCEL_REASON_ATTACHED_RISK_REFUSED,
+            Self::CANCEL_REASON_CANCEL_ALL_AFTER,
+            Self::CANCEL_REASON_ACCOUNT_REPAIR,
+            Self::CANCEL_REASON_TWAP_ROLLOVER,
+            Self::CANCEL_REASON_STRATEGY_CANCEL,
+            Self::CANCEL_REASON_SYSTEM,
         ]
     }
 }
@@ -19598,27 +20055,29 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub terminal_ts_ns: u64,
-    /// Terminal reason code for canceled/rejected orders. Zero for non-terminal orders.
+    /// For a REJECTED order, why it was refused: the same error code the Orders
+    /// API returns for the same refusal. Not set for every other status; JSON and
+    /// REST responses then omit it.
     ///
-    /// Field 18: `terminal_reason_code`
+    /// Field 34: `reject_reason`
     #[serde(
-        rename = "terminalReasonCode",
-        alias = "terminal_reason_code",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+        rename = "rejectReason",
+        alias = "reject_reason",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub terminal_reason_code: u32,
-    /// Stable string for terminal_reason_code (e.g. "POST_ONLY_CROSS", "USER_REQUEST").
-    /// Empty for non-terminal orders.
+    pub reject_reason: ::buffa::EnumValue<ErrorCode>,
+    /// For a CANCELED order, why it ended. Not set for every other status; JSON
+    /// and REST responses then omit it.
     ///
-    /// Field 19: `terminal_reason`
+    /// Field 35: `cancel_reason`
     #[serde(
-        rename = "terminalReason",
-        alias = "terminal_reason",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        rename = "cancelReason",
+        alias = "cancel_reason",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub terminal_reason: ::buffa::alloc::string::String,
+    pub cancel_reason: ::buffa::EnumValue<CancelReason>,
     /// Attached risk controls + runtime state on the parent order.
     /// Empty when no attached risk exists. Order reads include it only when the
     /// request asks for it (include_attached_risk, include_attached_risk_state):
@@ -19752,8 +20211,8 @@ impl ::core::fmt::Debug for Order {
             .field("price_ticks", &self.price_ticks)
             .field("created_ts_ns", &self.created_ts_ns)
             .field("terminal_ts_ns", &self.terminal_ts_ns)
-            .field("terminal_reason_code", &self.terminal_reason_code)
-            .field("terminal_reason", &self.terminal_reason)
+            .field("reject_reason", &self.reject_reason)
+            .field("cancel_reason", &self.cancel_reason)
             .field("attached_risk", &self.attached_risk)
             .field("origin", &self.origin)
             .field("market_client_ref_price_ticks", &self.market_client_ref_price_ticks)
@@ -19875,17 +20334,6 @@ impl ::buffa::Message for Order {
             size
                 += 2u32 + ::buffa::types::uint64_encoded_len(self.terminal_ts_ns) as u32;
         }
-        if self.terminal_reason_code != 0u32 {
-            size
-                += 2u32
-                    + ::buffa::types::uint32_encoded_len(self.terminal_reason_code)
-                        as u32;
-        }
-        if !self.terminal_reason.is_empty() {
-            size
-                += 2u32
-                    + ::buffa::types::string_encoded_len(&self.terminal_reason) as u32;
-        }
         if self.leaves_qty_scaled != 0i64 {
             size
                 += 2u32
@@ -19956,6 +20404,18 @@ impl ::buffa::Message for Order {
                 += 2u32
                     + ::buffa::types::int64_encoded_len(self.inherited_cum_qty_scaled)
                         as u32;
+        }
+        {
+            let val = self.reject_reason.to_i32();
+            if val != 0 {
+                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.cancel_reason.to_i32();
+            if val != 0 {
+                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -20033,12 +20493,6 @@ impl ::buffa::Message for Order {
         if self.terminal_ts_ns != 0u64 {
             ::buffa::types::put_uint64_field(17u32, self.terminal_ts_ns, buf);
         }
-        if self.terminal_reason_code != 0u32 {
-            ::buffa::types::put_uint32_field(18u32, self.terminal_reason_code, buf);
-        }
-        if !self.terminal_reason.is_empty() {
-            ::buffa::types::put_string_field(19u32, &self.terminal_reason, buf);
-        }
         if self.leaves_qty_scaled != 0i64 {
             ::buffa::types::put_int64_field(20u32, self.leaves_qty_scaled, buf);
         }
@@ -20082,6 +20536,18 @@ impl ::buffa::Message for Order {
         }
         if self.inherited_cum_qty_scaled != 0i64 {
             ::buffa::types::put_int64_field(33u32, self.inherited_cum_qty_scaled, buf);
+        }
+        {
+            let val = self.reject_reason.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(34u32, val, buf);
+            }
+        }
+        {
+            let val = self.cancel_reason.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(35u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -20218,20 +20684,6 @@ impl ::buffa::Message for Order {
                 )?;
                 self.terminal_ts_ns = ::buffa::types::decode_uint64(buf)?;
             }
-            18u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.terminal_reason_code = ::buffa::types::decode_uint32(buf)?;
-            }
-            19u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.terminal_reason, buf)?;
-            }
             20u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -20334,6 +20786,24 @@ impl ::buffa::Message for Order {
                 )?;
                 self.inherited_cum_qty_scaled = ::buffa::types::decode_int64(buf)?;
             }
+            34u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reject_reason = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            35u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.cancel_reason = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -20358,8 +20828,6 @@ impl ::buffa::Message for Order {
         self.price_ticks = 0i64;
         self.created_ts_ns = 0u64;
         self.terminal_ts_ns = 0u64;
-        self.terminal_reason_code = 0u32;
-        self.terminal_reason.clear();
         self.leaves_qty_scaled = 0i64;
         self.attached_risk = ::buffa::MessageField::none();
         self.origin = ::buffa::MessageField::none();
@@ -20372,6 +20840,8 @@ impl ::buffa::Message for Order {
         self.lineage = ::buffa::MessageField::none();
         self.expire_at = ::buffa::MessageField::none();
         self.inherited_cum_qty_scaled = 0i64;
+        self.reject_reason = ::buffa::EnumValue::from(0);
+        self.cancel_reason = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -29530,7 +30000,9 @@ pub mod __buffa {
         /// CancelOrderRequest is the binary (protobuf) request for canceling orders.
         #[derive(Clone, Debug, Default)]
         pub struct CancelOrderRequestView<'a> {
-            /// Optional symbol_id for routing; when omitted, resolved from order directory.
+            /// Optional trading symbol numeric identifier. When set, it must match the
+            /// order's symbol, or the order is reported unknown (ERROR_CODE_ORDER_UNKNOWN)
+            /// and nothing is canceled. When omitted, the order's own symbol is used.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -29878,7 +30350,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional symbol_id for routing; when omitted, resolved from order directory.
+            /// Optional trading symbol numeric identifier. When set, it must match the
+            /// order's symbol, or the order is reported unknown (ERROR_CODE_ORDER_UNKNOWN)
+            /// and nothing is canceled. When omitted, the order's own symbol is used.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -41142,7 +41616,8 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Trading symbol shared by every replacement.
+            /// Trading symbol shared by every replacement. An item whose order is on
+            /// another symbol is refused alone as an unknown order.
             ///
             /// Field 2: `symbol_id`
             pub symbol_id: u32,
@@ -41477,7 +41952,8 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Trading symbol shared by every replacement.
+            /// Trading symbol shared by every replacement. An item whose order is on
+            /// another symbol is refused alone as an unknown order.
             ///
             /// Field 2: `symbol_id`
             #[must_use]
@@ -42108,7 +42584,9 @@ pub mod __buffa {
             ///
             /// Field 2: `client_order_id`
             pub client_order_id: &'a str,
-            /// Optional symbol routing hint.
+            /// Optional trading symbol numeric identifier. When set, it must match the
+            /// order's symbol, or the item is refused as an unknown order. When omitted,
+            /// the order's own symbol is used.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -42394,7 +42872,9 @@ pub mod __buffa {
             pub fn client_order_id(&self) -> &'_ str {
                 self.0.reborrow().client_order_id
             }
-            /// Optional symbol routing hint.
+            /// Optional trading symbol numeric identifier. When set, it must match the
+            /// order's symbol, or the item is refused as an unknown order. When omitted,
+            /// the order's own symbol is used.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -46605,15 +47085,17 @@ pub mod __buffa {
             ///
             /// Field 17: `terminal_ts_ns`
             pub terminal_ts_ns: u64,
-            /// Terminal reason code for canceled/rejected orders. Zero for non-terminal orders.
+            /// For a REJECTED order, why it was refused: the same error code the Orders
+            /// API returns for the same refusal. Not set for every other status; JSON and
+            /// REST responses then omit it.
             ///
-            /// Field 18: `terminal_reason_code`
-            pub terminal_reason_code: u32,
-            /// Stable string for terminal_reason_code (e.g. "POST_ONLY_CROSS", "USER_REQUEST").
-            /// Empty for non-terminal orders.
+            /// Field 34: `reject_reason`
+            pub reject_reason: ::buffa::EnumValue<super::super::ErrorCode>,
+            /// For a CANCELED order, why it ended. Not set for every other status; JSON
+            /// and REST responses then omit it.
             ///
-            /// Field 19: `terminal_reason`
-            pub terminal_reason: &'a str,
+            /// Field 35: `cancel_reason`
+            pub cancel_reason: ::buffa::EnumValue<super::super::CancelReason>,
             /// Attached risk controls + runtime state on the parent order.
             /// Empty when no attached risk exists. Order reads include it only when the
             /// request asks for it (include_attached_risk, include_attached_risk_state):
@@ -46850,21 +47332,23 @@ pub mod __buffa {
                         )?;
                         view.terminal_ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
                     }
-                    18u32 => {
+                    34u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.terminal_reason_code = ::buffa::types::decode_uint32(
-                            &mut cur,
-                        )?;
+                        view.reject_reason = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
-                    19u32 => {
+                    35u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
+                            ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.terminal_reason = ::buffa::types::borrow_str(&mut cur)?;
+                        view.cancel_reason = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     21u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -47059,8 +47543,8 @@ pub mod __buffa {
                     price_ticks: self.price_ticks,
                     created_ts_ns: self.created_ts_ns,
                     terminal_ts_ns: self.terminal_ts_ns,
-                    terminal_reason_code: self.terminal_reason_code,
-                    terminal_reason: self.terminal_reason.to_string(),
+                    reject_reason: self.reject_reason,
+                    cancel_reason: self.cancel_reason,
                     attached_risk: match self.attached_risk.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -47202,19 +47686,6 @@ pub mod __buffa {
                             + ::buffa::types::uint64_encoded_len(self.terminal_ts_ns)
                                 as u32;
                 }
-                if self.terminal_reason_code != 0u32 {
-                    size
-                        += 2u32
-                            + ::buffa::types::uint32_encoded_len(
-                                self.terminal_reason_code,
-                            ) as u32;
-                }
-                if !self.terminal_reason.is_empty() {
-                    size
-                        += 2u32
-                            + ::buffa::types::string_encoded_len(&self.terminal_reason)
-                                as u32;
-                }
                 if self.leaves_qty_scaled != 0i64 {
                     size
                         += 2u32
@@ -47291,6 +47762,18 @@ pub mod __buffa {
                             + ::buffa::types::int64_encoded_len(
                                 self.inherited_cum_qty_scaled,
                             ) as u32;
+                }
+                {
+                    let val = self.reject_reason.to_i32();
+                    if val != 0 {
+                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.cancel_reason.to_i32();
+                    if val != 0 {
+                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -47369,16 +47852,6 @@ pub mod __buffa {
                 if self.terminal_ts_ns != 0u64 {
                     ::buffa::types::put_uint64_field(17u32, self.terminal_ts_ns, buf);
                 }
-                if self.terminal_reason_code != 0u32 {
-                    ::buffa::types::put_uint32_field(
-                        18u32,
-                        self.terminal_reason_code,
-                        buf,
-                    );
-                }
-                if !self.terminal_reason.is_empty() {
-                    ::buffa::types::put_string_field(19u32, &self.terminal_reason, buf);
-                }
                 if self.leaves_qty_scaled != 0i64 {
                     ::buffa::types::put_int64_field(20u32, self.leaves_qty_scaled, buf);
                 }
@@ -47450,6 +47923,18 @@ pub mod __buffa {
                         self.inherited_cum_qty_scaled,
                         buf,
                     );
+                }
+                {
+                    let val = self.reject_reason.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(34u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.cancel_reason.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(35u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -47584,17 +48069,15 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.terminal_ts_ns),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(
-                    &self.terminal_reason_code,
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.reject_reason,
                 ) {
-                    __map
-                        .serialize_entry(
-                            "terminalReasonCode",
-                            &::buffa::json_helpers::ProtoJson(&self.terminal_reason_code),
-                        )?;
+                    __map.serialize_entry("rejectReason", &self.reject_reason)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.terminal_reason) {
-                    __map.serialize_entry("terminalReason", self.terminal_reason)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.cancel_reason,
+                ) {
+                    __map.serialize_entry("cancelReason", &self.cancel_reason)?;
                 }
                 {
                     if let ::core::option::Option::Some(__v) = self
@@ -47904,20 +48387,24 @@ pub mod __buffa {
             pub fn terminal_ts_ns(&self) -> u64 {
                 self.0.reborrow().terminal_ts_ns
             }
-            /// Terminal reason code for canceled/rejected orders. Zero for non-terminal orders.
+            /// For a REJECTED order, why it was refused: the same error code the Orders
+            /// API returns for the same refusal. Not set for every other status; JSON and
+            /// REST responses then omit it.
             ///
-            /// Field 18: `terminal_reason_code`
+            /// Field 34: `reject_reason`
             #[must_use]
-            pub fn terminal_reason_code(&self) -> u32 {
-                self.0.reborrow().terminal_reason_code
+            pub fn reject_reason(&self) -> ::buffa::EnumValue<super::super::ErrorCode> {
+                self.0.reborrow().reject_reason
             }
-            /// Stable string for terminal_reason_code (e.g. "POST_ONLY_CROSS", "USER_REQUEST").
-            /// Empty for non-terminal orders.
+            /// For a CANCELED order, why it ended. Not set for every other status; JSON
+            /// and REST responses then omit it.
             ///
-            /// Field 19: `terminal_reason`
+            /// Field 35: `cancel_reason`
             #[must_use]
-            pub fn terminal_reason(&self) -> &'_ str {
-                self.0.reborrow().terminal_reason
+            pub fn cancel_reason(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::CancelReason> {
+                self.0.reborrow().cancel_reason
             }
             /// Attached risk controls + runtime state on the parent order.
             /// Empty when no attached risk exists. Order reads include it only when the

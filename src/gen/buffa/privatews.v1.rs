@@ -6867,17 +6867,30 @@ pub struct OrderEvent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub kind: ::buffa::EnumValue<order_event::Kind>,
-    /// For CANCELED, REJECTED and REPLACED: the reason code, as the order's
-    /// terminal_reason_code; 0 otherwise.
+    /// For REJECTED: why the order was refused, as the order's reject_reason and
+    /// the Orders API's error for the same refusal. Not set otherwise; the JSON
+    /// encoding then omits it.
     ///
-    /// Field 4: `reason_code`
+    /// Field 7: `reject_reason`
     #[serde(
-        rename = "reasonCode",
-        alias = "reason_code",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+        rename = "rejectReason",
+        alias = "reject_reason",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub reason_code: u32,
+    pub reject_reason: ::buffa::EnumValue<super::super::orders::v1::ErrorCode>,
+    /// For CANCELED, and for the REPLACED of the order a replace ended: why the
+    /// order ended, as the order's cancel_reason. Not set otherwise, including
+    /// the REPLACED that installs the successor; the JSON encoding then omits it.
+    ///
+    /// Field 8: `cancel_reason`
+    #[serde(
+        rename = "cancelReason",
+        alias = "cancel_reason",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub cancel_reason: ::buffa::EnumValue<super::super::orders::v1::CancelReason>,
     /// For REPLACED: the successor's public ID; 0 otherwise.
     ///
     /// Field 5: `replacement_order_id`
@@ -6906,7 +6919,8 @@ impl ::core::fmt::Debug for OrderEvent {
             .field("order_id", &self.order_id)
             .field("version", &self.version)
             .field("kind", &self.kind)
-            .field("reason_code", &self.reason_code)
+            .field("reject_reason", &self.reject_reason)
+            .field("cancel_reason", &self.cancel_reason)
             .field("replacement_order_id", &self.replacement_order_id)
             .field("fill", &self.fill)
             .finish()
@@ -6949,9 +6963,6 @@ impl ::buffa::Message for OrderEvent {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
-        if self.reason_code != 0u32 {
-            size += 1u32 + ::buffa::types::uint32_encoded_len(self.reason_code) as u32;
-        }
         if self.replacement_order_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
@@ -6962,6 +6973,18 @@ impl ::buffa::Message for OrderEvent {
             size
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
+        }
+        {
+            let val = self.reject_reason.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.cancel_reason.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -6985,15 +7008,24 @@ impl ::buffa::Message for OrderEvent {
                 ::buffa::types::put_int32_field(3u32, val, buf);
             }
         }
-        if self.reason_code != 0u32 {
-            ::buffa::types::put_uint32_field(4u32, self.reason_code, buf);
-        }
         if self.replacement_order_id != 0u64 {
             ::buffa::types::put_fixed64_field(5u32, self.replacement_order_id, buf);
         }
         if self.fill.is_set() {
             ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
             self.fill.write_to(__cache, buf);
+        }
+        {
+            let val = self.reject_reason.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
+        }
+        {
+            let val = self.cancel_reason.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7029,13 +7061,6 @@ impl ::buffa::Message for OrderEvent {
                 )?;
                 self.kind = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.reason_code = ::buffa::types::decode_uint32(buf)?;
-            }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -7054,6 +7079,24 @@ impl ::buffa::Message for OrderEvent {
                     ctx,
                 )?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reject_reason = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.cancel_reason = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7065,9 +7108,10 @@ impl ::buffa::Message for OrderEvent {
         self.order_id = 0u64;
         self.version = 0u32;
         self.kind = ::buffa::EnumValue::from(0);
-        self.reason_code = 0u32;
         self.replacement_order_id = 0u64;
         self.fill = ::buffa::MessageField::none();
+        self.reject_reason = ::buffa::EnumValue::from(0);
+        self.cancel_reason = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -18156,11 +18200,22 @@ pub mod __buffa {
             ///
             /// Field 3: `kind`
             pub kind: ::buffa::EnumValue<super::super::order_event::Kind>,
-            /// For CANCELED, REJECTED and REPLACED: the reason code, as the order's
-            /// terminal_reason_code; 0 otherwise.
+            /// For REJECTED: why the order was refused, as the order's reject_reason and
+            /// the Orders API's error for the same refusal. Not set otherwise; the JSON
+            /// encoding then omits it.
             ///
-            /// Field 4: `reason_code`
-            pub reason_code: u32,
+            /// Field 7: `reject_reason`
+            pub reject_reason: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::ErrorCode,
+            >,
+            /// For CANCELED, and for the REPLACED of the order a replace ended: why the
+            /// order ended, as the order's cancel_reason. Not set otherwise, including
+            /// the REPLACED that installs the successor; the JSON encoding then omits it.
+            ///
+            /// Field 8: `cancel_reason`
+            pub cancel_reason: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::CancelReason,
+            >,
             /// For REPLACED: the successor's public ID; 0 otherwise.
             ///
             /// Field 5: `replacement_order_id`
@@ -18227,12 +18282,23 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
-                    4u32 => {
+                    7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.reason_code = ::buffa::types::decode_uint32(&mut cur)?;
+                        view.reject_reason = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.cancel_reason = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -18294,7 +18360,8 @@ pub mod __buffa {
                     order_id: self.order_id,
                     version: self.version,
                     kind: self.kind,
-                    reason_code: self.reason_code,
+                    reject_reason: self.reject_reason,
+                    cancel_reason: self.cancel_reason,
                     replacement_order_id: self.replacement_order_id,
                     fill: match self.fill.as_option() {
                         Some(v) => {
@@ -18332,12 +18399,6 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
-                if self.reason_code != 0u32 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.reason_code)
-                                as u32;
-                }
                 if self.replacement_order_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
@@ -18348,6 +18409,18 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
+                }
+                {
+                    let val = self.reject_reason.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.cancel_reason.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -18372,9 +18445,6 @@ pub mod __buffa {
                         ::buffa::types::put_int32_field(3u32, val, buf);
                     }
                 }
-                if self.reason_code != 0u32 {
-                    ::buffa::types::put_uint32_field(4u32, self.reason_code, buf);
-                }
                 if self.replacement_order_id != 0u64 {
                     ::buffa::types::put_fixed64_field(
                         5u32,
@@ -18389,6 +18459,18 @@ pub mod __buffa {
                         buf,
                     );
                     self.fill.write_to(__cache, buf);
+                }
+                {
+                    let val = self.reject_reason.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(7u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.cancel_reason.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(8u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -18428,12 +18510,15 @@ pub mod __buffa {
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.kind) {
                     __map.serialize_entry("kind", &self.kind)?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.reason_code) {
-                    __map
-                        .serialize_entry(
-                            "reasonCode",
-                            &::buffa::json_helpers::ProtoJson(&self.reason_code),
-                        )?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.reject_reason,
+                ) {
+                    __map.serialize_entry("rejectReason", &self.reject_reason)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.cancel_reason,
+                ) {
+                    __map.serialize_entry("cancelReason", &self.cancel_reason)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(
                     &self.replacement_order_id,
@@ -18561,13 +18646,29 @@ pub mod __buffa {
             pub fn kind(&self) -> ::buffa::EnumValue<super::super::order_event::Kind> {
                 self.0.reborrow().kind
             }
-            /// For CANCELED, REJECTED and REPLACED: the reason code, as the order's
-            /// terminal_reason_code; 0 otherwise.
+            /// For REJECTED: why the order was refused, as the order's reject_reason and
+            /// the Orders API's error for the same refusal. Not set otherwise; the JSON
+            /// encoding then omits it.
             ///
-            /// Field 4: `reason_code`
+            /// Field 7: `reject_reason`
             #[must_use]
-            pub fn reason_code(&self) -> u32 {
-                self.0.reborrow().reason_code
+            pub fn reject_reason(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::ErrorCode> {
+                self.0.reborrow().reject_reason
+            }
+            /// For CANCELED, and for the REPLACED of the order a replace ended: why the
+            /// order ended, as the order's cancel_reason. Not set otherwise, including
+            /// the REPLACED that installs the successor; the JSON encoding then omits it.
+            ///
+            /// Field 8: `cancel_reason`
+            #[must_use]
+            pub fn cancel_reason(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::orders::v1::CancelReason,
+            > {
+                self.0.reborrow().cancel_reason
             }
             /// For REPLACED: the successor's public ID; 0 otherwise.
             ///

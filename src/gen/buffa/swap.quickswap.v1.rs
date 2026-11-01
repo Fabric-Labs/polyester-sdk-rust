@@ -516,9 +516,10 @@ pub enum DepositDisposition {
     RETURN_ONLY = 3i32,
     /// Held for review; it neither executes nor returns until released.
     ON_HOLD = 4i32,
-    /// Arrived after address_retires_at. It is handled only through
-    /// support-assisted recovery; recovery is not guaranteed. The broker
-    /// contacts Polyester broker support with the swap_id.
+    /// Observed on an address that was already retired (DEPOSIT_ADDRESS_RETIRED).
+    /// It never executes and is not returned automatically. It is handled only
+    /// through support-assisted recovery, and it is potentially unrecoverable.
+    /// The broker contacts Polyester broker support with the swap_id.
     MANUAL_RECOVERY = 5i32,
 }
 impl DepositDisposition {
@@ -750,7 +751,9 @@ pub enum QuickSwapReason {
     /// The address already accepted its one eligible deposit; this deposit is
     /// returned to return_address and never executes.
     DEPOSIT_ADDRESS_ALREADY_USED = 23i32,
-    /// The address was retired; this observed deposit is returned and never executes.
+    /// The address was retired when this deposit was observed. The deposit is
+    /// MANUAL_RECOVERY: it never executes, is not returned automatically, and is
+    /// potentially unrecoverable.
     DEPOSIT_ADDRESS_RETIRED = 24i32,
     /// The address had not been issued when this deposit was observed; it never executes.
     DEPOSIT_ADDRESS_NOT_ISSUED = 25i32,
@@ -4319,9 +4322,12 @@ pub struct DepositInstructions {
     /// End of the funding window, fixed when the address is issued (currently 7
     /// days after issued_at). A deposit can execute only if Polyester detects it
     /// before this time; detection time counts, not block time, and
-    /// confirmations may finish later. A deposit detected at or after this time,
-    /// even one broadcast earlier, is returned to return_address. Send deposits
-    /// well before this time. Never changes.
+    /// confirmations may finish later. A deposit detected at or after this time
+    /// never executes. A deposit observed on a retired address is
+    /// MANUAL_RECOVERY and is not returned automatically; other late deposits
+    /// are RETURN_ONLY. For an unfunded address, address_retires_at equals this
+    /// time, so there is no separate scheduled return period. Send deposits well
+    /// before this time. Never changes.
     ///
     /// Field 5: `funding_expires_at`
     #[serde(
@@ -6082,10 +6088,12 @@ pub struct QuickSwap {
     /// added later. Polling can stop at a terminal status. A terminal status
     /// never changes. Shortly after it, address_retires_at can still move later,
     /// and withdrawal details can be corrected as documented on Withdrawal;
-    /// another deposit reaching the address also shows as RETURN_ONLY. Returns
-    /// made directly for such deposits are not yet reported in
-    /// withdrawals; RETURN_ONLY does not confirm a completed return. Read again if the end
-    /// user reports such a deposit or needs the final retirement time.
+    /// another deposit reaching the address also shows as RETURN_ONLY, and
+    /// another deposit observed on an already retired address shows as
+    /// MANUAL_RECOVERY. Returns made directly for such deposits are not yet
+    /// reported in withdrawals; RETURN_ONLY does not confirm a completed return.
+    /// Read again if the end user reports such a deposit or needs the final
+    /// retirement time.
     ///
     /// Field 5: `is_terminal`
     #[serde(
@@ -23476,9 +23484,12 @@ pub mod __buffa {
             /// End of the funding window, fixed when the address is issued (currently 7
             /// days after issued_at). A deposit can execute only if Polyester detects it
             /// before this time; detection time counts, not block time, and
-            /// confirmations may finish later. A deposit detected at or after this time,
-            /// even one broadcast earlier, is returned to return_address. Send deposits
-            /// well before this time. Never changes.
+            /// confirmations may finish later. A deposit detected at or after this time
+            /// never executes. A deposit observed on a retired address is
+            /// MANUAL_RECOVERY and is not returned automatically; other late deposits
+            /// are RETURN_ONLY. For an unfunded address, address_retires_at equals this
+            /// time, so there is no separate scheduled return period. Send deposits well
+            /// before this time. Never changes.
             ///
             /// Field 5: `funding_expires_at`
             pub funding_expires_at: ::buffa::MessageFieldView<
@@ -24040,9 +24051,12 @@ pub mod __buffa {
             /// End of the funding window, fixed when the address is issued (currently 7
             /// days after issued_at). A deposit can execute only if Polyester detects it
             /// before this time; detection time counts, not block time, and
-            /// confirmations may finish later. A deposit detected at or after this time,
-            /// even one broadcast earlier, is returned to return_address. Send deposits
-            /// well before this time. Never changes.
+            /// confirmations may finish later. A deposit detected at or after this time
+            /// never executes. A deposit observed on a retired address is
+            /// MANUAL_RECOVERY and is not returned automatically; other late deposits
+            /// are RETURN_ONLY. For an unfunded address, address_retires_at equals this
+            /// time, so there is no separate scheduled return period. Send deposits well
+            /// before this time. Never changes.
             ///
             /// Field 5: `funding_expires_at`
             #[must_use]
@@ -26725,10 +26739,12 @@ pub mod __buffa {
             /// added later. Polling can stop at a terminal status. A terminal status
             /// never changes. Shortly after it, address_retires_at can still move later,
             /// and withdrawal details can be corrected as documented on Withdrawal;
-            /// another deposit reaching the address also shows as RETURN_ONLY. Returns
-            /// made directly for such deposits are not yet reported in
-            /// withdrawals; RETURN_ONLY does not confirm a completed return. Read again if the end
-            /// user reports such a deposit or needs the final retirement time.
+            /// another deposit reaching the address also shows as RETURN_ONLY, and
+            /// another deposit observed on an already retired address shows as
+            /// MANUAL_RECOVERY. Returns made directly for such deposits are not yet
+            /// reported in withdrawals; RETURN_ONLY does not confirm a completed return.
+            /// Read again if the end user reports such a deposit or needs the final
+            /// retirement time.
             ///
             /// Field 5: `is_terminal`
             pub is_terminal: bool,
@@ -28087,10 +28103,12 @@ pub mod __buffa {
             /// added later. Polling can stop at a terminal status. A terminal status
             /// never changes. Shortly after it, address_retires_at can still move later,
             /// and withdrawal details can be corrected as documented on Withdrawal;
-            /// another deposit reaching the address also shows as RETURN_ONLY. Returns
-            /// made directly for such deposits are not yet reported in
-            /// withdrawals; RETURN_ONLY does not confirm a completed return. Read again if the end
-            /// user reports such a deposit or needs the final retirement time.
+            /// another deposit reaching the address also shows as RETURN_ONLY, and
+            /// another deposit observed on an already retired address shows as
+            /// MANUAL_RECOVERY. Returns made directly for such deposits are not yet
+            /// reported in withdrawals; RETURN_ONLY does not confirm a completed return.
+            /// Read again if the end user reports such a deposit or needs the final
+            /// retirement time.
             ///
             /// Field 5: `is_terminal`
             #[must_use]

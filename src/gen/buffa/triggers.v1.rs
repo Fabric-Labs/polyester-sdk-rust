@@ -9448,6 +9448,8 @@ pub const __CANCEL_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 /// =============================================================================
 ///
 /// ModifyTriggerRequest applies a limited patch to an existing trigger.
+/// Supported for stop-loss, take-profit and trailing-stop triggers; ladder and
+/// TWAP triggers support only cancel and answer TRIGGER_NOT_MODIFIABLE.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -10382,7 +10384,9 @@ pub const __MODIFY_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     from_json: ::buffa::type_registry::any_from_json::<ModifyTriggerResponse>,
     is_wkt: false,
 };
-/// PauseTriggerRequest pauses an active trigger by ID.
+/// PauseTriggerRequest pauses an active trigger by ID. Supported for
+/// stop-loss, take-profit and trailing-stop triggers; ladder and TWAP triggers
+/// support only cancel and answer TRIGGER_NOT_MODIFIABLE.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -10764,7 +10768,9 @@ pub const __PAUSE_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
     from_json: ::buffa::type_registry::any_from_json::<PauseTriggerResponse>,
     is_wkt: false,
 };
-/// ResumeTriggerRequest resumes a paused trigger by ID.
+/// ResumeTriggerRequest resumes a paused trigger by ID. Supported for
+/// stop-loss, take-profit and trailing-stop triggers; ladder and TWAP triggers
+/// support only cancel and answer TRIGGER_NOT_MODIFIABLE.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -12434,6 +12440,23 @@ pub struct Trigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub completed_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Per-trigger state version: 1 for the trigger's first state, then higher
+    /// for every later published state change, whether a request or the market
+    /// caused it. A higher version is always newer, and two copies of a trigger
+    /// with the same version show the same state. GetTrigger, ListTriggers and
+    /// realtime trigger updates carry the same version for the same state. List
+    /// results can briefly lag realtime updates, and after a reconnect or a
+    /// service recovery a realtime update can repeat an earlier state, so keep
+    /// the copy of each trigger with the highest version and ignore any copy
+    /// whose version is not higher than the one you hold.
+    ///
+    /// Field 65: `version`
+    #[serde(
+        rename = "version",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub version: u32,
     #[serde(flatten)]
     pub terminal_reason: ::core::option::Option<__buffa::oneof::trigger::TerminalReason>,
     #[serde(flatten)]
@@ -12460,6 +12483,7 @@ impl ::core::fmt::Debug for Trigger {
             .field("updated_at", &self.updated_at)
             .field("armed_at", &self.armed_at)
             .field("completed_at", &self.completed_at)
+            .field("version", &self.version)
             .field("terminal_reason", &self.terminal_reason)
             .field("configuration", &self.configuration)
             .field("runtime_details", &self.runtime_details)
@@ -12624,6 +12648,9 @@ impl ::buffa::Message for Trigger {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.version != 0u32 {
+            size += 2u32 + ::buffa::types::uint32_encoded_len(self.version) as u32;
+        }
         if let ::core::option::Option::Some(ref v) = self.runtime_details {
             match v {
                 __buffa::oneof::trigger::RuntimeDetails::Stop(x) => {
@@ -12775,6 +12802,9 @@ impl ::buffa::Message for Trigger {
         if self.completed_at.is_set() {
             ::buffa::types::put_len_delimited_header(64u32, __cache.consume_next(), buf);
             self.completed_at.write_to(__cache, buf);
+        }
+        if self.version != 0u32 {
+            ::buffa::types::put_uint32_field(65u32, self.version, buf);
         }
         if let ::core::option::Option::Some(ref v) = self.runtime_details {
             match v {
@@ -13064,6 +13094,13 @@ impl ::buffa::Message for Trigger {
                     ctx,
                 )?;
             }
+            65u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.version = ::buffa::types::decode_uint32(buf)?;
+            }
             100u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -13169,6 +13206,7 @@ impl ::buffa::Message for Trigger {
         self.updated_at = ::buffa::MessageField::none();
         self.armed_at = ::buffa::MessageField::none();
         self.completed_at = ::buffa::MessageField::none();
+        self.version = 0u32;
         self.runtime_details = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -13228,6 +13266,7 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 let mut __f_completed_at: ::core::option::Option<
                     ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
                 > = None;
+                let mut __f_version: ::core::option::Option<u32> = None;
                 let mut __oneof_terminal_reason: ::core::option::Option<
                     __buffa::oneof::trigger::TerminalReason,
                 > = None;
@@ -13434,6 +13473,21 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                         >,
                                     >()?,
                             );
+                        }
+                        "version" => {
+                            __f_version = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u32;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u32, D::Error> {
+                                        ::buffa::json_helpers::uint32::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
                         }
                         "cancelReason" | "cancel_reason" => {
                             let v: ::core::option::Option<
@@ -13743,6 +13797,9 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 }
                 if let ::core::option::Option::Some(v) = __f_completed_at {
                     __r.completed_at = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_version {
+                    __r.version = v;
                 }
                 __r.terminal_reason = __oneof_terminal_reason;
                 __r.configuration = __oneof_configuration;
@@ -23683,6 +23740,8 @@ pub mod __buffa {
         /// =============================================================================
         ///
         /// ModifyTriggerRequest applies a limited patch to an existing trigger.
+        /// Supported for stop-loss, take-profit and trailing-stop triggers; ladder and
+        /// TWAP triggers support only cancel and answer TRIGGER_NOT_MODIFIABLE.
         #[derive(Clone, Debug, Default)]
         pub struct ModifyTriggerRequestView<'a> {
             /// Trigger ID to modify.
@@ -24766,7 +24825,9 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// PauseTriggerRequest pauses an active trigger by ID.
+        /// PauseTriggerRequest pauses an active trigger by ID. Supported for
+        /// stop-loss, take-profit and trailing-stop triggers; ladder and TWAP triggers
+        /// support only cancel and answer TRIGGER_NOT_MODIFIABLE.
         #[derive(Clone, Debug, Default)]
         pub struct PauseTriggerRequestView<'a> {
             /// Trigger ID to pause.
@@ -25484,7 +25545,9 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ResumeTriggerRequest resumes a paused trigger by ID.
+        /// ResumeTriggerRequest resumes a paused trigger by ID. Supported for
+        /// stop-loss, take-profit and trailing-stop triggers; ladder and TWAP triggers
+        /// support only cancel and answer TRIGGER_NOT_MODIFIABLE.
         #[derive(Clone, Debug, Default)]
         pub struct ResumeTriggerRequestView<'a> {
             /// Trigger ID to resume.
@@ -28272,6 +28335,18 @@ pub mod __buffa {
             pub completed_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Per-trigger state version: 1 for the trigger's first state, then higher
+            /// for every later published state change, whether a request or the market
+            /// caused it. A higher version is always newer, and two copies of a trigger
+            /// with the same version show the same state. GetTrigger, ListTriggers and
+            /// realtime trigger updates carry the same version for the same state. List
+            /// results can briefly lag realtime updates, and after a reconnect or a
+            /// service recovery a realtime update can repeat an earlier state, so keep
+            /// the copy of each trigger with the highest version and ignore any copy
+            /// whose version is not higher than the one you hold.
+            ///
+            /// Field 65: `version`
+            pub version: u32,
             pub terminal_reason: ::core::option::Option<
                 super::super::__buffa::view::oneof::trigger::TerminalReason,
             >,
@@ -28484,6 +28559,13 @@ pub mod __buffa {
                                 );
                             }
                         }
+                    }
+                    65u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.version = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -28854,6 +28936,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    version: self.version,
                     terminal_reason: self
                         .terminal_reason
                         .as_ref()
@@ -29133,6 +29216,11 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.version != 0u32 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint32_encoded_len(self.version) as u32;
+                }
                 if let ::core::option::Option::Some(ref v) = self.runtime_details {
                     match v {
                         super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
@@ -29328,6 +29416,9 @@ pub mod __buffa {
                     );
                     self.completed_at.write_to(__cache, buf);
                 }
+                if self.version != 0u32 {
+                    ::buffa::types::put_uint32_field(65u32, self.version, buf);
+                }
                 if let ::core::option::Option::Some(ref v) = self.runtime_details {
                     match v {
                         super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
@@ -29479,6 +29570,13 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("completedAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.version) {
+                    __map
+                        .serialize_entry(
+                            "version",
+                            &::buffa::json_helpers::ProtoJson(&self.version),
+                        )?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.terminal_reason {
                     match __ov {
@@ -29752,6 +29850,21 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().completed_at
+            }
+            /// Per-trigger state version: 1 for the trigger's first state, then higher
+            /// for every later published state change, whether a request or the market
+            /// caused it. A higher version is always newer, and two copies of a trigger
+            /// with the same version show the same state. GetTrigger, ListTriggers and
+            /// realtime trigger updates carry the same version for the same state. List
+            /// results can briefly lag realtime updates, and after a reconnect or a
+            /// service recovery a realtime update can repeat an earlier state, so keep
+            /// the copy of each trigger with the highest version and ignore any copy
+            /// whose version is not higher than the one you hold.
+            ///
+            /// Field 65: `version`
+            #[must_use]
+            pub fn version(&self) -> u32 {
+                self.0.reborrow().version
             }
             /// Oneof `terminal_reason`.
             #[must_use]

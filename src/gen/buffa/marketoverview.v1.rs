@@ -1101,7 +1101,8 @@ pub struct MarketOverview {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub volume_24h_usd_scaled: ::core::option::Option<i64>,
-    /// Listing timestamp in nanoseconds since epoch.
+    /// Listing timestamp in nanoseconds since epoch. 0 when the pair has no
+    /// listing time.
     ///
     /// Field 15: `listed_ts_ns`
     #[serde(
@@ -4921,7 +4922,8 @@ pub mod __buffa {
             ///
             /// Field 17: `volume_24h_usd_scaled`
             pub volume_24h_usd_scaled: ::core::option::Option<i64>,
-            /// Listing timestamp in nanoseconds since epoch.
+            /// Listing timestamp in nanoseconds since epoch. 0 when the pair has no
+            /// listing time.
             ///
             /// Field 15: `listed_ts_ns`
             pub listed_ts_ns: u64,
@@ -5642,7 +5644,8 @@ pub mod __buffa {
             pub fn volume_24h_usd_scaled(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().volume_24h_usd_scaled
             }
-            /// Listing timestamp in nanoseconds since epoch.
+            /// Listing timestamp in nanoseconds since epoch. 0 when the pair has no
+            /// listing time.
             ///
             /// Field 15: `listed_ts_ns`
             #[must_use]
