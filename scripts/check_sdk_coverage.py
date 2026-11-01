@@ -739,15 +739,6 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
         "any_services": ["chain.lifecycle.v1.LifecycleReadService"],
     },
     {
-        "id": "collab",
-        "label": "Polychart / layout / whiteboard",
-        "any_services": [
-            "polychart.v1.PolychartService",
-            "layout.v1.LayoutService",
-            "collab.v1.WhiteboardService",
-        ],
-    },
-    {
         "id": "realtime",
         "label": "Realtime account and market streams",
         "kind": "realtime",

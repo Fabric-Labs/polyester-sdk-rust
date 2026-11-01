@@ -3,8 +3,6 @@
 use crate::support::{call_optional, require_live_client};
 use polyester::proto::chain::guard::v1::GetGuardSignerStatusRequest;
 use polyester::proto::chain::lifecycle::v1::ListFlowsRequest;
-use polyester::proto::layout::v1::GetLayoutsRequest;
-use polyester::proto::polychart::v1::GetMarketLayersRequest;
 
 #[tokio::test]
 async fn heatmap_get_shallow() {
@@ -38,30 +36,6 @@ async fn guard_signer_status() {
         client
             .guard_signer
             .get_status(GetGuardSignerStatusRequest::default())
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn layout_get_layouts() {
-    let Some(client) = require_live_client() else {
-        return;
-    };
-    let _ = call_optional("layout.get_layouts", || {
-        client.layout.get_layouts(GetLayoutsRequest::default())
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn polychart_market_layers() {
-    let Some(client) = require_live_client() else {
-        return;
-    };
-    let _ = call_optional("polychart.get_market_layers", || {
-        client
-            .polychart
-            .get_market_layers(GetMarketLayersRequest::default())
     })
     .await;
 }

@@ -45,7 +45,6 @@ Proprietary license (not open source). API-key only; no browser login or JWT flo
 | Zipper deposit-withdraw config | Yes |
 | Chain analytics | Yes |
 | Lifecycle flows | Yes |
-| Polychart / layout / whiteboard | Yes |
 | Realtime account and market streams | Yes |
 | Reference catalogs + wait-for-ready | Yes |
 | Qty / price decimal + scaled-int inputs | Yes |
@@ -70,8 +69,8 @@ preserved and `new_tags` are appended. `AddressBookViewInvalidation` includes
 including an optional leading `@`.
 
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
-still applies. In particular, whiteboard/social-verification and some
-layout/polychart routes may require a JWT session or may not be mounted.
+still applies. In particular, social-verification routes may require a JWT
+session or may not be mounted.
 Private streams require an Account ID and the corresponding API-key permission.
 A successful Centrifugo subscribe call means the token exchange and realtime
 handshake completed. The order stream (`orders.subscribe`) returns at once and
