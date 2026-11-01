@@ -2755,6 +2755,8 @@ mod tests {
                 submitted_max_quote_debit_scaled: None,
                 attached_risk: None,
                 expire_at: None,
+                reject_reason: None,
+                cancel_reason: None,
                 lineage: None,
             }),
             trades: vec![],

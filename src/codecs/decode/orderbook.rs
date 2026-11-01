@@ -60,6 +60,7 @@ pub fn orderbook_from_proto(
         },
         bids: levels_from_proto(&msg.bids, symbol, quantity_scale)?,
         asks: levels_from_proto(&msg.asks, symbol, quantity_scale)?,
+        available: msg.available,
     })
 }
 
@@ -89,6 +90,40 @@ mod tests {
         assert_eq!(book.book_seq, "7");
         assert_eq!(book.bids[0].price.as_ref().unwrap().as_ticks(), 1_000_000);
         assert_eq!(book.asks[0].qty.as_ref().unwrap().as_scaled(), 25);
+        assert!(
+            !book.available,
+            "a response without `available` reads false"
+        );
+    }
+
+    #[test]
+    fn orderbook_maps_availability() {
+        let current = orderbook_from_proto(
+            &GetOrderBookResponse {
+                book_seq: 7,
+                available: true,
+                ..Default::default()
+            },
+            "ETH-USDT",
+            50,
+            8,
+        )
+        .unwrap();
+        assert!(current.available);
+
+        let building = orderbook_from_proto(
+            &GetOrderBookResponse {
+                book_seq: 7,
+                available: false,
+                ..Default::default()
+            },
+            "ETH-USDT",
+            50,
+            8,
+        )
+        .unwrap();
+        assert!(!building.available);
+        assert!(building.bids.is_empty() && building.asks.is_empty());
     }
 
     #[test]

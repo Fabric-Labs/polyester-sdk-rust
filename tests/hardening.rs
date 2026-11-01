@@ -887,6 +887,97 @@ async fn managed_orderbook_overflow_terminates_receiver_callback_task_and_socket
     assert_eq!(active.load(Ordering::SeqCst), 0);
 }
 
+/// Seeds a managed orderbook subscription from a snapshot whose book is not
+/// available, sends one delta at seq 2, and returns the first view at seq 2.
+async fn orderbook_view_after_unavailable_snapshot(
+    reset: bool,
+) -> polyester::models::OrderbookData {
+    use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta, PriceLevel};
+    use polyester::services::CreateSubscriptionOptions;
+
+    let publication = OrderBookDelta {
+        symbol_id: 1,
+        book_seq_start: 2,
+        book_seq_end: 2,
+        reset,
+        bids: vec![PriceLevel {
+            price_ticks: 2_000_000_000,
+            qty_scaled: 300,
+            ..Default::default()
+        }],
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let ws =
+        MockWsServer::spawn_centrifugo_publication_after_handshake(Arc::default(), publication)
+            .await;
+    let http = MockHttpServer::spawn(|request| {
+        if request.path == "/orderbook.v1.OrderbookService/GetOrderBook" {
+            connect_proto_ok(&GetOrderBookResponse {
+                symbol_id: 1,
+                book_seq: 1,
+                available: false,
+                ..Default::default()
+            })
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: ws.ws_url(),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+    let mut subscription = client
+        .orderbook
+        .create_subscription(CreateSubscriptionOptions {
+            symbol: "BTC-USDT".into(),
+            symbol_id: Some(1),
+            depth: Some(50),
+            bucket: None,
+        })
+        .await
+        .unwrap();
+    let view = loop {
+        let view = tokio::time::timeout(Duration::from_secs(5), subscription.updates().recv())
+            .await
+            .expect("orderbook update deadline")
+            .expect("orderbook stream open");
+        if view.book_seq == "2" {
+            break view;
+        }
+        assert!(!view.available, "the seed snapshot was not available");
+    };
+    subscription.close();
+    view
+}
+
+#[tokio::test]
+async fn l2_orderbook_subscription_becomes_available_only_after_a_reset() {
+    let after_reset = orderbook_view_after_unavailable_snapshot(true).await;
+    assert!(after_reset.available, "a reset replaces the whole book");
+    assert_eq!(after_reset.bids.len(), 1);
+
+    let after_delta = orderbook_view_after_unavailable_snapshot(false).await;
+    assert!(
+        !after_delta.available,
+        "an incremental delta on an unavailable book leaves it unavailable"
+    );
+}
+
 #[test]
 fn l2_contradictory_catalog_refreshes_fail_atomically_through_public_manager() {
     let client = Client::new(Config {

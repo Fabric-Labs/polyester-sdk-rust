@@ -837,6 +837,7 @@ impl OrderbookService {
             bids: BookSide::new(),
             asks: BookSide::new(),
             book_seq: 0,
+            available: false,
         }));
         let closed = Arc::new(AtomicBool::new(false));
         let last_error: Arc<Mutex<Option<crate::Error>>> = Arc::new(Mutex::new(None));
@@ -863,9 +864,9 @@ impl OrderbookService {
                 if closed.load(std::sync::atomic::Ordering::SeqCst) {
                     return;
                 }
-                let (bids, asks, book_seq) = {
+                let (bids, asks, book_seq, available) = {
                     let s = crate::realtime::lock_unpoisoned(&state);
-                    (s.bids.clone(), s.asks.clone(), s.book_seq)
+                    (s.bids.clone(), s.asks.clone(), s.book_seq, s.available)
                 };
                 let ticks = *crate::realtime::lock_unpoisoned(&bucket_ticks);
                 let data = match build_orderbook_data(
@@ -876,6 +877,7 @@ impl OrderbookService {
                     &asks,
                     ticks,
                     quantity_scale,
+                    available,
                 ) {
                     Ok(data) => data,
                     Err(err) => {
@@ -921,8 +923,14 @@ impl OrderbookService {
                         bids,
                         asks,
                         book_seq,
+                        available,
                     } = &mut *s;
                     let (new_seq, needs_refresh) = apply_delta(bids, asks, *book_seq, &delta);
+                    // An applied reset replaced the whole book, so it is current
+                    // even when the snapshot it was seeded from was not.
+                    if delta.reset && !needs_refresh && new_seq > *book_seq {
+                        *available = true;
+                    }
                     *book_seq = new_seq;
                     needs_refresh
                 };
@@ -978,6 +986,7 @@ impl OrderbookService {
                             s.bids = levels_from_orderbook_side(&snapshot.bids);
                             s.asks = levels_from_orderbook_side(&snapshot.asks);
                             s.book_seq = parsed_seq;
+                            s.available = snapshot.available;
                         }
                         let mut applied_all = true;
                         for delta in buffered {
@@ -1030,6 +1039,8 @@ struct BookState {
     bids: crate::orderbook::BookSide,
     asks: crate::orderbook::BookSide,
     book_seq: u64,
+    /// Whether the book is current; see [`OrderbookData::available`].
+    available: bool,
 }
 
 #[cfg(test)]
@@ -1168,6 +1179,7 @@ mod tests {
                             book_seq: "1".into(),
                             bids: vec![],
                             asks: vec![],
+                            available: true,
                         })
                     })
                 }),

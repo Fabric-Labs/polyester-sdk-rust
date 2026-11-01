@@ -199,6 +199,7 @@ fn side_to_levels(
 }
 
 /// Render the current in-memory book as [`OrderbookData`].
+#[allow(clippy::too_many_arguments)]
 pub fn build_orderbook_data(
     symbol: &str,
     depth: u32,
@@ -207,6 +208,7 @@ pub fn build_orderbook_data(
     asks: &BookSide,
     bucket_ticks: i64,
     quantity_scale: u32,
+    available: bool,
 ) -> Result<OrderbookData> {
     let limit = depth as usize;
     Ok(OrderbookData {
@@ -215,6 +217,7 @@ pub fn build_orderbook_data(
         book_seq: book_seq.to_string(),
         bids: side_to_levels(bids, "bids", limit, bucket_ticks, symbol, quantity_scale)?,
         asks: side_to_levels(asks, "asks", limit, bucket_ticks, symbol, quantity_scale)?,
+        available,
     })
 }
 
@@ -425,7 +428,7 @@ mod tests {
     fn build_orderbook_data_rejects_negative_levels() {
         let bids = BookSide::from([(-5, 1)]);
         let asks = BookSide::from([(200, 1)]);
-        assert!(build_orderbook_data("BTC-USDT", 2, 7, &bids, &asks, 0, 8).is_err());
+        assert!(build_orderbook_data("BTC-USDT", 2, 7, &bids, &asks, 0, 8, true).is_err());
     }
 
     #[test]
@@ -439,7 +442,7 @@ mod tests {
     fn build_orderbook_data_sorts_and_limits() {
         let bids = BookSide::from([(100, 1), (110, 2), (120, 3)]);
         let asks = BookSide::from([(200, 4), (210, 5)]);
-        let data = build_orderbook_data("BTC-USDT", 2, 7, &bids, &asks, 0, 8).unwrap();
+        let data = build_orderbook_data("BTC-USDT", 2, 7, &bids, &asks, 0, 8, true).unwrap();
         assert_eq!(data.book_seq, "7");
         assert_eq!(data.bids.len(), 2);
         assert_eq!(data.bids[0].price.as_ref().unwrap().as_ticks(), 120);

@@ -10,7 +10,7 @@ use super::{
     trigger_event_from_proto, trigger_from_proto, user_trade_from_proto,
     zipped_asset_supply_batch_from_proto,
 };
-use super::{decode_price_ticks, decode_qty_scaled};
+use super::{decode_price_ticks, decode_qty_scaled, order_cancel_reason, order_reject_reason};
 use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
 use crate::models::{
@@ -246,8 +246,8 @@ fn order_unit_event_from_proto(kind: &unit_event::Kind) -> OrderUnitEvent {
             order_id: format_uint64_id(event.order_id),
             version: event.version,
             kind: lowercase_enum_label(event.kind),
-            reject_reason: reason_label(event.reject_reason),
-            cancel_reason: reason_label(event.cancel_reason),
+            reject_reason: order_reject_reason(event.reject_reason),
+            cancel_reason: order_cancel_reason(event.cancel_reason),
             replacement_order_id: optional_public_id(event.replacement_order_id),
             fill: event.fill.as_option().map(|fill| OrderFill {
                 match_id: if fill.match_id == 0 {
@@ -277,16 +277,6 @@ fn order_unit_event_from_proto(kind: &unit_event::Kind) -> OrderUnitEvent {
 
 fn optional_public_id(id: u64) -> Option<String> {
     (id != 0).then(|| format_uint64_id(id))
-}
-
-fn reason_label<E: Enumeration>(value: buffa::EnumValue<E>) -> String {
-    if value.to_i32() == 0 {
-        return String::new();
-    }
-    value
-        .as_known()
-        .map(|known| known.proto_name().to_owned())
-        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
 fn lowercase_enum_label<E: Enumeration>(value: buffa::EnumValue<E>) -> String {
@@ -419,8 +409,8 @@ mod tests {
                     order_id: format_uint64_id(42),
                     version: 2,
                     kind: "filled".into(),
-                    reject_reason: String::new(),
-                    cancel_reason: String::new(),
+                    reject_reason: None,
+                    cancel_reason: None,
                     replacement_order_id: None,
                     fill: Some(OrderFill {
                         match_id: "900".into(),
@@ -498,13 +488,18 @@ mod tests {
                 event(1, order_event::Kind::REJECTED, |e| {
                     e.reject_reason = ErrorCode::ERROR_CODE_POST_ONLY_CROSS.into();
                 }),
+                event(7, order_event::Kind::REJECTED, |e| {
+                    e.reject_reason = buffa::EnumValue::from(997);
+                }),
                 event(2, order_event::Kind::CANCELED, |e| {
                     e.cancel_reason = CancelReason::CANCEL_REASON_USER_REQUEST.into();
                 }),
+                // The order a replace ended, then the successor it installed.
                 event(3, order_event::Kind::REPLACED, |e| {
                     e.cancel_reason = CancelReason::CANCEL_REASON_REPLACED.into();
                     e.replacement_order_id = 4;
                 }),
+                event(4, order_event::Kind::REPLACED, |_| {}),
                 event(5, order_event::Kind::ACCEPTED, |_| {}),
                 event(6, order_event::Kind::CANCELED, |e| {
                     e.cancel_reason = buffa::EnumValue::from(999);
@@ -513,7 +508,7 @@ mod tests {
             ..Default::default()
         };
         let decoded = orders_unit_from_proto(&unit).expect("decode");
-        let reasons: Vec<(String, String, String)> = decoded
+        let reasons: Vec<(String, Option<String>, Option<String>)> = decoded
             .events
             .iter()
             .map(|event| match event {
@@ -525,14 +520,24 @@ mod tests {
                 OrderUnitEvent::Outcome(_) => panic!("unexpected outcome"),
             })
             .collect();
-        let want = [
-            ("rejected", "ERROR_CODE_POST_ONLY_CROSS", ""),
-            ("canceled", "", "CANCEL_REASON_USER_REQUEST"),
-            ("replaced", "", "CANCEL_REASON_REPLACED"),
-            ("accepted", "", ""),
-            ("canceled", "", "UNKNOWN(999)"),
-        ]
-        .map(|(kind, reject, cancel)| (kind.to_owned(), reject.to_owned(), cancel.to_owned()));
+        let some = |value: &str| Some(value.to_owned());
+        let want = vec![
+            (
+                "rejected".to_owned(),
+                some("ERROR_CODE_POST_ONLY_CROSS"),
+                None,
+            ),
+            ("rejected".to_owned(), some("UNKNOWN_ERROR_CODE(997)"), None),
+            (
+                "canceled".to_owned(),
+                None,
+                some("CANCEL_REASON_USER_REQUEST"),
+            ),
+            ("replaced".to_owned(), None, some("CANCEL_REASON_REPLACED")),
+            ("replaced".to_owned(), None, None),
+            ("accepted".to_owned(), None, None),
+            ("canceled".to_owned(), None, some("UNKNOWN(999)")),
+        ];
         assert_eq!(reasons, want);
     }
 

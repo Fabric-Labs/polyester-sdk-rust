@@ -506,8 +506,8 @@ async fn delivers_units_with_orders_removals_and_events() {
             order_id: format_uint64(1),
             version: 2,
             kind: "canceled".into(),
-            reject_reason: String::new(),
-            cancel_reason: "CANCEL_REASON_USER_REQUEST".into(),
+            reject_reason: None,
+            cancel_reason: Some("CANCEL_REASON_USER_REQUEST".into()),
             replacement_order_id: None,
             fill: None,
         })]
