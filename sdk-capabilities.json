@@ -140,11 +140,6 @@
       "supported": true
     },
     {
-      "id": "collab",
-      "label": "Polychart / layout / whiteboard",
-      "supported": true
-    },
-    {
       "id": "realtime",
       "label": "Realtime account and market streams",
       "supported": true
