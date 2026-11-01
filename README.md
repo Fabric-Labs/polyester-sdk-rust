@@ -399,6 +399,16 @@ rejected with `ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID`, and
 `Error::existing_order_id()` (or `BatchCreateResultItem.existing_order_id`)
 names the order that holds it when the server knows it.
 
+An ended order says why. A `rejected` order carries `Order.reject_reason`,
+the order error code the Orders API returns for the same refusal and in the
+same form as `Error::Api`'s `code` (for example `ERROR_CODE_POST_ONLY_CROSS`).
+A `canceled` order carries `Order.cancel_reason`, a `CancelReason` proto name
+such as `CANCEL_REASON_USER_REQUEST`, `CANCEL_REASON_IOC_REMAINDER`,
+`CANCEL_REASON_STP_EXPIRE_MAKER`, `CANCEL_REASON_REPLACED` or
+`CANCEL_REASON_GTD_EXPIRED`. Both are `None` for every other status. A value
+this SDK does not know yet keeps its number: `UNKNOWN_ERROR_CODE(<n>)` and
+`UNKNOWN(<n>)`. Match on these codes, not on message text.
+
 Each spot pair publishes order limits, read with
 `market_data.get_spot_config()` (`SpotConfig.pair_order_limits`,
 `SpotConfig.max_open_orders_total`) or, after hydration,
@@ -539,6 +549,13 @@ Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
 (`fire_price_ticks` is optional on the wire). Terminal `cancel_reason` /
 `failure_reason` on `Trigger` and `TriggerEvent` decode the proto
 `terminal_reason` oneof (empty when unset; unspecified enum → `""`).
+
+`Trigger.version` is 1 for a trigger's first state and higher for every later
+state change. Reads and realtime trigger updates carry the same version for
+the same state; list results can briefly lag realtime updates, and a realtime
+update can repeat an earlier state after a reconnect. Keep the copy with the
+highest version and ignore a copy whose version is not higher than the one you
+hold. It is `None` from a server that predates trigger versions.
 
 ## Qty / price rules
 
@@ -776,6 +793,14 @@ if let Some(trade) = sub.recv_result().await? {
 }
 ```
 
+`orderbook.get` returns `OrderbookData`. Its `available` is true when the
+book is current, so an empty side means no liquidity. When it is false the
+book is being built or was invalidated: its levels are unknown, not empty, so
+fetch it again later instead of reading empty sides as no liquidity. It is the
+server's value as sent, never inferred from the levels; a managed order book
+subscription carries the value of its last snapshot. A server that predates
+the field reports false.
+
 `get_candles` and `get_candles_with` return rows newest-first by `ts_sec`.
 When incomplete rows are included, the current open candle is prepended.
 
@@ -848,7 +873,7 @@ when it cannot resume. Several `orders.subscribe` calls for one account share
 one server subscription.
 
 ```rust,no_run
-use polyester::models::PrivateOrdersEvent;
+use polyester::models::{OrderUnitEvent, PrivateOrdersEvent};
 use polyester::services::CreateSubscriptionOptions;
 
 let mut orders = client.orders.subscribe(None).await?;
@@ -859,6 +884,13 @@ while let Some(event) = orders.recv_result().await? {
         PrivateOrdersEvent::Unit(unit) => {
             for order in unit.orders {
                 println!("{} {} v{}", order.order_id, order.status, order.version);
+            }
+            for event in unit.events {
+                if let OrderUnitEvent::Order(event) = event {
+                    // `rejected`: reject_reason; `canceled`, and the `replaced`
+                    // event of the order a replace ended: cancel_reason.
+                    println!("{} {:?} {:?}", event.kind, event.reject_reason, event.cancel_reason);
+                }
             }
         }
         PrivateOrdersEvent::Error(error) => eprintln!("order stream: {error}"),

@@ -1,6 +1,8 @@
 //! Proto enum → SDK label helpers (Go `codecs/proto_helpers` parity).
 
-use crate::proto::orders::v1::{FeeAsset, OrderStatus, OrderType, Side, TimeInForce};
+use crate::proto::orders::v1::{
+    CancelReason, ErrorCode, FeeAsset, OrderStatus, OrderType, Side, TimeInForce,
+};
 use buffa::Enumeration;
 
 pub fn enum_proto_name<T: Enumeration>(value: &buffa::EnumValue<T>) -> String {
@@ -85,4 +87,23 @@ pub fn enum_value_fee_asset(value: buffa::EnumValue<FeeAsset>) -> String {
             FeeAsset::FeeAssetUnspecified => String::new(),
         })
         .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
+}
+
+/// An order's or order event's `reject_reason`: the `orders.v1.ErrorCode`
+/// proto name, formatted exactly like [`crate::Error::Api`]'s `code` for the
+/// same refusal (`UNKNOWN_ERROR_CODE(<number>)` for a code this SDK does not
+/// know). `None` when unset.
+pub fn order_reject_reason(value: buffa::EnumValue<ErrorCode>) -> Option<String> {
+    (value.to_i32() != 0).then(|| {
+        crate::errors::known_or_unknown_code(
+            value.as_known().map(|known| known.proto_name()),
+            value.to_i32(),
+        )
+    })
+}
+
+/// An order's or order event's `cancel_reason`: the `orders.v1.CancelReason`
+/// proto name, or `UNKNOWN(<number>)`. `None` when unset.
+pub fn order_cancel_reason(value: buffa::EnumValue<CancelReason>) -> Option<String> {
+    (value.to_i32() != 0).then(|| enum_proto_name(&value))
 }

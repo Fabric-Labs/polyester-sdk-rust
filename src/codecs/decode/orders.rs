@@ -2,7 +2,7 @@
 
 use super::enums::{
     enum_value_fee_asset, enum_value_order_status, enum_value_order_type, enum_value_side,
-    enum_value_time_in_force,
+    enum_value_time_in_force, order_cancel_reason, order_reject_reason,
 };
 use super::money::{
     decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled,
@@ -74,6 +74,8 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
             .flatten(),
         lineage: order_lineage_from_proto(msg.lineage.as_option()),
         expire_at: expire_at_rfc3339(msg.expire_at.as_option()),
+        reject_reason: order_reject_reason(msg.reject_reason),
+        cancel_reason: order_cancel_reason(msg.cancel_reason),
     })
 }
 
@@ -1047,6 +1049,65 @@ mod tests {
         msg2.version = 7;
         let order2 = order_from_proto(&msg2).unwrap();
         assert_eq!(order2.version, 7);
+    }
+
+    #[test]
+    fn order_from_proto_maps_reject_and_cancel_reasons() {
+        use crate::proto::orders::v1::{CancelReason, ErrorCode};
+
+        let order = |status: OrderStatus, edit: fn(&mut ProtoOrder)| {
+            let mut msg = ProtoOrder {
+                order_id: 1,
+                status: status.into(),
+                ..Default::default()
+            };
+            edit(&mut msg);
+            let order = order_from_proto(&msg).unwrap();
+            (order.reject_reason, order.cancel_reason)
+        };
+        let some = |value: &str| Some(value.to_owned());
+
+        assert_eq!(
+            order(OrderStatus::Rejected, |o| {
+                o.reject_reason = ErrorCode::ERROR_CODE_POST_ONLY_CROSS.into();
+            }),
+            (some("ERROR_CODE_POST_ONLY_CROSS"), None)
+        );
+        assert_eq!(
+            order(OrderStatus::Rejected, |o| {
+                o.reject_reason = ErrorCode::ERROR_CODE_ATTACHED_LEGS_EXCEEDED.into();
+            }),
+            (some("ERROR_CODE_ATTACHED_LEGS_EXCEEDED"), None)
+        );
+        assert_eq!(
+            order(OrderStatus::Canceled, |o| {
+                o.cancel_reason = CancelReason::CANCEL_REASON_STP_EXPIRE_MAKER.into();
+            }),
+            (None, some("CANCEL_REASON_STP_EXPIRE_MAKER"))
+        );
+        assert_eq!(
+            order(OrderStatus::Canceled, |o| {
+                o.cancel_reason = CancelReason::CANCEL_REASON_SYSTEM.into();
+            }),
+            (None, some("CANCEL_REASON_SYSTEM"))
+        );
+        // Unknown values keep their number; a reject reason is formatted like
+        // the matching `Error::Api` code so the two compare equal.
+        assert_eq!(
+            order(OrderStatus::Rejected, |o| {
+                o.reject_reason = buffa::EnumValue::from(999);
+            }),
+            (some("UNKNOWN_ERROR_CODE(999)"), None)
+        );
+        assert_eq!(
+            order(OrderStatus::Canceled, |o| {
+                o.cancel_reason = buffa::EnumValue::from(998);
+            }),
+            (None, some("UNKNOWN(998)"))
+        );
+        // Unset (and so every status before this contract) is `None`.
+        assert_eq!(order(OrderStatus::Working, |_| {}), (None, None));
+        assert_eq!(order(OrderStatus::Canceled, |_| {}), (None, None));
     }
 
     #[test]

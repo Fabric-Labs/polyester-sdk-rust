@@ -39,6 +39,17 @@ pub struct Order {
     pub lineage: Option<OrderLineage>,
     /// RFC3339 UTC expiry for GTD orders. `None` for every other TIF.
     pub expire_at: Option<String>,
+    /// Why a `rejected` order was refused: the order error code the Orders
+    /// API returns for the same refusal, formatted like
+    /// [`crate::Error::Api`]'s `code` (for example
+    /// `ERROR_CODE_POST_ONLY_CROSS`, or `UNKNOWN_ERROR_CODE(<number>)` for a
+    /// code this SDK does not know). `None` for every other status.
+    pub reject_reason: Option<String>,
+    /// Why a `canceled` order ended: an `orders.v1.CancelReason` proto name
+    /// (for example `CANCEL_REASON_USER_REQUEST`, `CANCEL_REASON_REPLACED` or
+    /// `CANCEL_REASON_GTD_EXPIRED`), or `UNKNOWN(<number>)` for a reason this
+    /// SDK does not know. `None` for every other status.
+    pub cancel_reason: Option<String>,
 }
 
 /// Stable replacement-chain identity. `id` is the first generation's public

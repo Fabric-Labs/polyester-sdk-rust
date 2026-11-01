@@ -572,7 +572,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
 
 /// Proto name of a known error code, or `UNKNOWN_ERROR_CODE(<n>)` for a code
 /// this SDK version does not know yet, so the server's code is never lost.
-fn known_or_unknown_code(known: Option<&str>, raw: i32) -> String {
+pub(crate) fn known_or_unknown_code(known: Option<&str>, raw: i32) -> String {
     known.map_or_else(|| format!("UNKNOWN_ERROR_CODE({raw})"), str::to_owned)
 }
 
@@ -738,6 +738,61 @@ mod tests {
             ConnectError::new(connect_code, "order error")
                 .with_detail(ErrorDetail::from_message("orders.v1.ErrorDetail", &detail)),
         )
+    }
+
+    #[test]
+    fn attached_leg_and_trigger_refusal_codes_are_definite_and_not_retryable() {
+        for (proto_code, connect_code) in [
+            (
+                OrderErrorCode::ERROR_CODE_ATTACHED_LEGS_EXCEEDED,
+                ErrorCode::FailedPrecondition,
+            ),
+            (
+                OrderErrorCode::ERROR_CODE_FEE_ASSET_INVALID,
+                ErrorCode::InvalidArgument,
+            ),
+            (
+                OrderErrorCode::ERROR_CODE_FEE_CEILING_INVALID,
+                ErrorCode::InvalidArgument,
+            ),
+            (
+                OrderErrorCode::ERROR_CODE_UNSUPPORTED_FIELD_SET,
+                ErrorCode::InvalidArgument,
+            ),
+            (
+                OrderErrorCode::ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED,
+                ErrorCode::FailedPrecondition,
+            ),
+            (
+                OrderErrorCode::ERROR_CODE_CONDITION_FLAGS_INVALID,
+                ErrorCode::InvalidArgument,
+            ),
+            (
+                OrderErrorCode::ERROR_CODE_CONDITION_PARAMETER_SET,
+                ErrorCode::InvalidArgument,
+            ),
+            // A full market is a refusal, not a rate limit to wait out.
+            (
+                OrderErrorCode::ERROR_CODE_TWAP_CAPACITY_REACHED,
+                ErrorCode::ResourceExhausted,
+            ),
+            (
+                OrderErrorCode::ERROR_CODE_CHILD_ORDER_INCONSISTENT,
+                ErrorCode::FailedPrecondition,
+            ),
+        ] {
+            let want = proto_code.proto_name();
+            let mapped = map_order(proto_code, connect_code);
+            match &mapped {
+                Error::Api { code, .. } => assert_eq!(code, want),
+                other => panic!("{want}: unexpected error {other:?}"),
+            }
+            assert!(!mapped.is_retryable(), "{want} must not be retryable");
+            assert!(
+                !mapped.mutation_outcome_unknown(),
+                "{want} has a known outcome"
+            );
+        }
     }
 
     #[test]

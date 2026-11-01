@@ -465,6 +465,7 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         cancel_reason,
         failure_reason,
         details,
+        version: (msg.version != 0).then_some(msg.version),
     }
 }
 
@@ -659,6 +660,31 @@ mod tests {
         assert_eq!(t.order_type, "market");
         assert_eq!(t.time_in_force, "ioc");
         assert_eq!(t.parent_order_id, Some(format_uint64_id(9001)));
+    }
+
+    #[test]
+    fn trigger_from_proto_maps_version() {
+        let versioned = |version: u32| {
+            trigger_from_proto(&ProtoTrigger {
+                trigger_id: 1,
+                version,
+                ..Default::default()
+            })
+            .version
+        };
+        assert_eq!(versioned(1), Some(1));
+        assert_eq!(versioned(42), Some(42));
+        // Servers before trigger versions omit the field.
+        assert_eq!(versioned(0), None);
+        let listed = triggers_list_from_proto(&ListTriggersResponse {
+            triggers: vec![ProtoTrigger {
+                trigger_id: 1,
+                version: 3,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        assert_eq!(listed.triggers[0].version, Some(3));
     }
 
     #[test]

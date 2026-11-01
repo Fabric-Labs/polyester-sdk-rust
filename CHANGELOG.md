@@ -5,15 +5,45 @@
 **Breaking changes**
 - `Client::whiteboard`, `Client::polychart` and `Client::layout` are removed,
   because those APIs are no longer part of the public API.
+- The order terminal reason fields are removed: the generated
+  `orders.v1.Order` no longer has `terminal_reason_code` or `terminal_reason`,
+  and the private order stream's `OrderEvent` no longer has `reason_code`.
+  Read the typed `reject_reason` and `cancel_reason` instead, and replace any
+  matching on `terminal_reason` text with them.
 - `OrderStreamEvent::reason_code` is replaced by `reject_reason` and
-  `cancel_reason`. A rejected order's event names its refusal with the order
-  error code the Orders API returns (for example `ERROR_CODE_POST_ONLY_CROSS`).
-  A canceled order's event names why it ended (for example
-  `CANCEL_REASON_USER_REQUEST`), and so does the replaced event of the order a
-  replace ended (`CANCEL_REASON_REPLACED`). Both are empty otherwise.
+  `cancel_reason`, both `Option<String>`. A rejected order's event names its
+  refusal with the order error code the Orders API returns (for example
+  `ERROR_CODE_POST_ONLY_CROSS`). A canceled order's event names why it ended
+  (for example `CANCEL_REASON_USER_REQUEST`), and so does the replaced event
+  of the order a replace ended (`CANCEL_REASON_REPLACED`). Both are `None`
+  otherwise.
 - `GetSubaccountOpts::include_balances` is removed: a sub-account read no
   longer returns balances. Read them with the balances service for the
   sub-account.
+- `orderbook::build_orderbook_data` takes the book's availability as a new
+  last argument.
+
+**Added**
+- `Order::reject_reason` and `Order::cancel_reason` on order reads and on the
+  orders of the private order stream's snapshots and units. A rejected order's
+  reject reason is formatted like `Error::Api`'s `code` for the same refusal;
+  a canceled order's cancel reason is a `CancelReason` proto name. Both are
+  `None` for every other status, and a value this SDK does not know keeps its
+  number (`UNKNOWN_ERROR_CODE(<n>)`, `UNKNOWN(<n>)`).
+- `OrderbookData::available`: false while the book is being built or after it
+  was invalidated, when its levels are unknown rather than empty. It is the
+  server's value as sent, never inferred from the levels; a managed order book
+  subscription carries the value of its last snapshot. A server that predates
+  the field reports false.
+- `Trigger::version`: 1 for the first state, higher for every later state
+  change. Keep the copy with the highest version.
+- Order error codes `ERROR_CODE_ATTACHED_LEGS_EXCEEDED`,
+  `ERROR_CODE_FEE_ASSET_INVALID`, `ERROR_CODE_FEE_CEILING_INVALID`,
+  `ERROR_CODE_UNSUPPORTED_FIELD_SET`, `ERROR_CODE_TRIGGER_FIRE_LIMIT_REACHED`,
+  `ERROR_CODE_CONDITION_FLAGS_INVALID`, `ERROR_CODE_CONDITION_PARAMETER_SET`,
+  `ERROR_CODE_TWAP_CAPACITY_REACHED` and `ERROR_CODE_CHILD_ORDER_INCONSISTENT`
+  surface as `Error::Api` codes. Their outcome is known: they are not
+  retryable and `mutation_outcome_unknown()` is false.
 
 ## 0.3.0
 

@@ -233,4 +233,15 @@ pub struct OrderbookData {
     pub book_seq: String,
     pub bids: Vec<OrderbookLevel>,
     pub asks: Vec<OrderbookLevel>,
+    /// True when the book is current: `bids` and `asks` are its levels, and
+    /// an empty side means no liquidity. False while the server is building
+    /// the book or after it was invalidated: its levels are unknown, not
+    /// empty, so fetch the snapshot again later instead of treating empty
+    /// sides as no liquidity.
+    ///
+    /// This is the server's value as sent, never inferred from the levels. A
+    /// live [`crate::orderbook::Subscription`] view carries the value of the
+    /// last snapshot it fetched. A server that predates this field always
+    /// reports false.
+    pub available: bool,
 }

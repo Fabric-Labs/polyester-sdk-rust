@@ -207,6 +207,12 @@ pub struct Trigger {
     /// Proto `terminal_reason.failure_reason`. Empty when unset or unspecified.
     pub failure_reason: String,
     pub details: Option<TriggerDetails>,
+    /// State version: 1 for the trigger's first state, higher for every later
+    /// state change. Reads and realtime updates carry the same version for
+    /// the same state; keep the copy with the highest version and ignore one
+    /// whose version is not higher than the one you hold. `None` from a
+    /// server that predates trigger versions.
+    pub version: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
