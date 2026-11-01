@@ -246,7 +246,8 @@ fn order_unit_event_from_proto(kind: &unit_event::Kind) -> OrderUnitEvent {
             order_id: format_uint64_id(event.order_id),
             version: event.version,
             kind: lowercase_enum_label(event.kind),
-            reason_code: event.reason_code,
+            reject_reason: reason_label(event.reject_reason),
+            cancel_reason: reason_label(event.cancel_reason),
             replacement_order_id: optional_public_id(event.replacement_order_id),
             fill: event.fill.as_option().map(|fill| OrderFill {
                 match_id: if fill.match_id == 0 {
@@ -276,6 +277,16 @@ fn order_unit_event_from_proto(kind: &unit_event::Kind) -> OrderUnitEvent {
 
 fn optional_public_id(id: u64) -> Option<String> {
     (id != 0).then(|| format_uint64_id(id))
+}
+
+fn reason_label<E: Enumeration>(value: buffa::EnumValue<E>) -> String {
+    if value.to_i32() == 0 {
+        return String::new();
+    }
+    value
+        .as_known()
+        .map(|known| known.proto_name().to_owned())
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
 fn lowercase_enum_label<E: Enumeration>(value: buffa::EnumValue<E>) -> String {
@@ -408,7 +419,8 @@ mod tests {
                     order_id: format_uint64_id(42),
                     version: 2,
                     kind: "filled".into(),
-                    reason_code: 0,
+                    reject_reason: String::new(),
+                    cancel_reason: String::new(),
                     replacement_order_id: None,
                     fill: Some(OrderFill {
                         match_id: "900".into(),
@@ -462,6 +474,66 @@ mod tests {
         assert_eq!(policy.policy_id, format_uint64_id(7));
         assert_eq!(policy.name, "trader");
         assert_eq!(policy.revision, 3);
+    }
+
+    #[test]
+    fn order_events_carry_reject_and_cancel_reasons() {
+        use crate::proto::orders::v1::{CancelReason, ErrorCode};
+        use crate::proto::privatews::v1::{OrderEvent, UnitEvent, order_event};
+
+        let event = |order_id: u64, kind: order_event::Kind, edit: fn(&mut OrderEvent)| {
+            let mut event = OrderEvent {
+                order_id,
+                kind: kind.into(),
+                ..Default::default()
+            };
+            edit(&mut event);
+            UnitEvent {
+                kind: Some(event.into()),
+                ..Default::default()
+            }
+        };
+        let unit = ProtoUnit {
+            events: vec![
+                event(1, order_event::Kind::REJECTED, |e| {
+                    e.reject_reason = ErrorCode::ERROR_CODE_POST_ONLY_CROSS.into();
+                }),
+                event(2, order_event::Kind::CANCELED, |e| {
+                    e.cancel_reason = CancelReason::CANCEL_REASON_USER_REQUEST.into();
+                }),
+                event(3, order_event::Kind::REPLACED, |e| {
+                    e.cancel_reason = CancelReason::CANCEL_REASON_REPLACED.into();
+                    e.replacement_order_id = 4;
+                }),
+                event(5, order_event::Kind::ACCEPTED, |_| {}),
+                event(6, order_event::Kind::CANCELED, |e| {
+                    e.cancel_reason = buffa::EnumValue::from(999);
+                }),
+            ],
+            ..Default::default()
+        };
+        let decoded = orders_unit_from_proto(&unit).expect("decode");
+        let reasons: Vec<(String, String, String)> = decoded
+            .events
+            .iter()
+            .map(|event| match event {
+                OrderUnitEvent::Order(order) => (
+                    order.kind.clone(),
+                    order.reject_reason.clone(),
+                    order.cancel_reason.clone(),
+                ),
+                OrderUnitEvent::Outcome(_) => panic!("unexpected outcome"),
+            })
+            .collect();
+        let want = [
+            ("rejected", "ERROR_CODE_POST_ONLY_CROSS", ""),
+            ("canceled", "", "CANCEL_REASON_USER_REQUEST"),
+            ("replaced", "", "CANCEL_REASON_REPLACED"),
+            ("accepted", "", ""),
+            ("canceled", "", "UNKNOWN(999)"),
+        ]
+        .map(|(kind, reject, cancel)| (kind.to_owned(), reject.to_owned(), cancel.to_owned()));
+        assert_eq!(reasons, want);
     }
 
     #[test]

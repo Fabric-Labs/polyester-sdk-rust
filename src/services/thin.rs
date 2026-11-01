@@ -327,7 +327,6 @@ pub struct GetSubaccountOpts {
     pub include_members: bool,
     pub include_invites: bool,
     pub include_policy: bool,
-    pub include_balances: bool,
     pub invites_direction: String,
 }
 
@@ -394,7 +393,6 @@ impl SubAccountsService {
             include_members: opts.include_members,
             include_invites: opts.include_invites,
             include_policy: opts.include_policy,
-            include_balances: opts.include_balances,
             invites_direction: invites_direction.into(),
             ..Default::default()
         };

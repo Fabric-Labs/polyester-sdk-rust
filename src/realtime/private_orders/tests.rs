@@ -487,7 +487,8 @@ async fn delivers_units_with_orders_removals_and_events() {
                 order_id: 1,
                 version: 2,
                 kind: order_event::Kind::CANCELED.into(),
-                reason_code: 7,
+                cancel_reason: crate::proto::orders::v1::CancelReason::CANCEL_REASON_USER_REQUEST
+                    .into(),
                 ..Default::default()
             }
             .into(),
@@ -505,7 +506,8 @@ async fn delivers_units_with_orders_removals_and_events() {
             order_id: format_uint64(1),
             version: 2,
             kind: "canceled".into(),
-            reason_code: 7,
+            reject_reason: String::new(),
+            cancel_reason: "CANCEL_REASON_USER_REQUEST".into(),
             replacement_order_id: None,
             fill: None,
         })]
