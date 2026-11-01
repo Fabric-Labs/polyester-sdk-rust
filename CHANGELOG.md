@@ -31,9 +31,10 @@
   `None` for every other status, and a value this SDK does not know keeps its
   number (`UNKNOWN_ERROR_CODE(<n>)`, `UNKNOWN(<n>)`).
 - `OrderbookData::available`: false while the book is being built or after it
-  was invalidated, when its levels are unknown rather than empty. A managed
-  order book subscription keeps the seed snapshot's availability until a reset
-  delta replaces the book.
+  was invalidated, when its levels are unknown rather than empty. It is the
+  server's value as sent, never inferred from the levels; a managed order book
+  subscription carries the value of its last snapshot. A server that predates
+  the field reports false.
 - `Trigger::version`: 1 for the first state, higher for every later state
   change. Keep the copy with the highest version.
 - Order error codes `ERROR_CODE_ATTACHED_LEGS_EXCEEDED`,

@@ -796,9 +796,10 @@ if let Some(trade) = sub.recv_result().await? {
 `orderbook.get` returns `OrderbookData`. Its `available` is true when the
 book is current, so an empty side means no liquidity. When it is false the
 book is being built or was invalidated: its levels are unknown, not empty, so
-fetch it again later instead of reading empty sides as no liquidity. A managed
-order book subscription carries the availability of the snapshot it started
-from until a reset delta replaces the book.
+fetch it again later instead of reading empty sides as no liquidity. It is the
+server's value as sent, never inferred from the levels; a managed order book
+subscription carries the value of its last snapshot. A server that predates
+the field reports false.
 
 `get_candles` and `get_candles_with` return rows newest-first by `ts_sec`.
 When incomplete rows are included, the current open candle is prepended.

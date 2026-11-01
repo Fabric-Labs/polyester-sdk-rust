@@ -239,9 +239,9 @@ pub struct OrderbookData {
     /// empty, so fetch the snapshot again later instead of treating empty
     /// sides as no liquidity.
     ///
-    /// A live [`crate::orderbook::Subscription`] view carries the
-    /// availability of the snapshot it was seeded from until a reset delta
-    /// replaces the book, which makes it current. A server that predates
-    /// this field always reports false.
+    /// This is the server's value as sent, never inferred from the levels. A
+    /// live [`crate::orderbook::Subscription`] view carries the value of the
+    /// last snapshot it fetched. A server that predates this field always
+    /// reports false.
     pub available: bool,
 }

@@ -923,14 +923,9 @@ impl OrderbookService {
                         bids,
                         asks,
                         book_seq,
-                        available,
+                        ..
                     } = &mut *s;
                     let (new_seq, needs_refresh) = apply_delta(bids, asks, *book_seq, &delta);
-                    // An applied reset replaced the whole book, so it is current
-                    // even when the snapshot it was seeded from was not.
-                    if delta.reset && !needs_refresh && new_seq > *book_seq {
-                        *available = true;
-                    }
                     *book_seq = new_seq;
                     needs_refresh
                 };
