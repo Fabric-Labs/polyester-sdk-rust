@@ -232,6 +232,8 @@ fn decode_trailing_stop(
         activation_price: policy
             .filter(|policy| policy.activation_price_ticks > 0)
             .and_then(|policy| decode_price_ticks(policy.activation_price_ticks, None)),
+        // Order reads do not return the buy-back limit price yet.
+        limit_price: None,
         trigger_price_source: policy
             .and_then(|policy| risk_trigger_price_source(policy.trigger_price_source)),
         // The child is an implicit market execution.

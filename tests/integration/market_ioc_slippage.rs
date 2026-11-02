@@ -95,23 +95,13 @@ async fn market_preview_params(
             return None;
         }
     };
-    Some(PreviewOrderParams {
-        symbol: symbol.to_owned(),
-        side: CreateSide::Buy,
-        order_type: CreateOrderType::Market,
-        quantity,
-        max_quote_debit_scaled: None,
-        price: None,
-        time_in_force: Some(CreateTimeInForce::Ioc),
-        client_order_id: None,
-        subaccount_id: None,
-        post_only: None,
-        market_client_ref_price,
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: slippage,
-        attached_risk: None,
-        expire_at: None,
+    Some({
+        let mut p = PreviewOrderParams::new(symbol, CreateSide::Buy, CreateOrderType::Market);
+        p.quantity = quantity;
+        p.time_in_force = Some(CreateTimeInForce::Ioc);
+        p.market_client_ref_price = market_client_ref_price;
+        p.market_max_slippage = slippage;
+        p
     })
 }
 
@@ -186,23 +176,14 @@ async fn create_market_ioc_with_slippage_bps() {
         return;
     };
     let client_order_id = unique_client_order_id("mkt-slip");
-    let params = CreateOrderParams {
-        symbol: symbol.clone(),
-        side: preview.side,
-        order_type: preview.order_type,
-        quantity: preview.quantity,
-        max_quote_debit_scaled: None,
-        price: None,
-        time_in_force: preview.time_in_force,
-        client_order_id: Some(client_order_id.clone()),
-        subaccount_id: None,
-        post_only: None,
-        market_client_ref_price: preview.market_client_ref_price,
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: Some(MaxSlippage::Bps(25)),
-        attached_risk: None,
-        expire_at: None,
+    let params = {
+        let mut p = CreateOrderParams::new(symbol.clone(), preview.side, preview.order_type);
+        p.quantity = preview.quantity;
+        p.time_in_force = preview.time_in_force;
+        p.client_order_id = Some(client_order_id.clone());
+        p.market_client_ref_price = preview.market_client_ref_price;
+        p.market_max_slippage = Some(MaxSlippage::Bps(25));
+        p
     };
     let created = match client.orders.create(params).await {
         Ok(c) => c,

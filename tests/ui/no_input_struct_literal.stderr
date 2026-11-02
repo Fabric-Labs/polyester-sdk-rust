@@ -1,0 +1,12 @@
+error[E0639]: cannot create non-exhaustive struct using struct expression
+  --> tests/ui/no_input_struct_literal.rs:7:17
+   |
+ 7 |       let _stop = TrailingStop {
+   |  _________________^
+ 8 | |         distance: Some(TrailingDistance::Bps(100)),
+ 9 | |         activation_price: None,
+10 | |         limit_price: None,
+...  |
+14 | |         state: None,
+15 | |     };
+   | |_____^

@@ -622,7 +622,7 @@ impl OrdersService {
         });
         if let Some(risk) = params.attached_risk.as_ref() {
             *intent.attached_risk.get_or_insert_default() =
-                self.encode_attached_risk(risk, Some(&params.symbol))?;
+                self.encode_attached_risk(risk, Some(&params.symbol), Some(params.side))?;
         }
         Ok(intent)
     }
@@ -701,6 +701,7 @@ impl OrdersService {
         &self,
         stop: &TrailingStop,
         symbol: Option<&str>,
+        parent_side: Option<CreateSide>,
     ) -> Result<TrailingStopPolicy> {
         // `order_type` is not on the trailing-stop policy wire; the child is an
         // implicit market execution.
@@ -715,6 +716,35 @@ impl OrdersService {
         };
         if let Some(activation) = stop.activation_price.as_ref() {
             proto.activation_price_ticks = self.resolve_constraint_price(activation, symbol)?;
+        }
+        // The trailing stop of a sell order buys back and declares the most its
+        // exit pays; the trailing stop of a buy order sells and declares none.
+        match (parent_side, stop.limit_price.as_ref()) {
+            (Some(CreateSide::Buy), Some(_)) => {
+                return Err(Error::validation(
+                    "attached trailing_stop limit_price is only valid when the parent order sells (its buy-back maximum price)",
+                ));
+            }
+            (Some(CreateSide::Sell), None) => {
+                return Err(Error::validation(
+                    "an attached trailing_stop of a sell order requires limit_price: the maximum price its buy-back pays",
+                ));
+            }
+            _ => {}
+        }
+        if let Some(limit) = stop.limit_price.as_ref() {
+            let ticks = self.resolve_constraint_price(limit, symbol)?;
+            if ticks <= 0 {
+                return Err(Error::validation(
+                    "attached trailing_stop limit_price must be positive",
+                ));
+            }
+            if ticks < proto.activation_price_ticks {
+                return Err(Error::validation(
+                    "attached trailing_stop limit_price must be at least its activation_price",
+                ));
+            }
+            proto.limit_price_ticks = ticks;
         }
         proto.trailing_distance = Some(match stop.distance.ok_or_else(|| {
             Error::validation(
@@ -753,10 +783,13 @@ impl OrdersService {
         Ok(proto)
     }
 
+    /// `parent_side` is the parent order's side when the request carries it;
+    /// a modify does not, and the server then checks the side rule.
     fn encode_attached_risk(
         &self,
         risk: &AttachedRisk,
         symbol: Option<&str>,
+        parent_side: Option<CreateSide>,
     ) -> Result<RiskPolicy> {
         if risk.stop_loss.is_some() && risk.trailing_stop.is_some() {
             return Err(Error::validation(
@@ -789,7 +822,7 @@ impl OrdersService {
             )));
         } else if let Some(ts) = risk.trailing_stop.as_ref() {
             proto.stop_leg = Some(risk_policy::StopLeg::TrailingStop(Box::new(
-                self.encode_trailing_stop(ts, symbol)?,
+                self.encode_trailing_stop(ts, symbol, parent_side)?,
             )));
         }
         Ok(proto)
@@ -865,7 +898,7 @@ impl OrdersService {
         }
         if let Some(risk) = params.new_attached_risk.as_ref() {
             *req.new_attached_risk.get_or_insert_default() =
-                self.encode_attached_risk(risk, Some(&params.symbol))?;
+                self.encode_attached_risk(risk, Some(&params.symbol), None)?;
         }
         if let Some(behavior) = params.behavior.as_deref() {
             req.behavior = Self::modify_behavior(behavior)?.into();
@@ -1082,7 +1115,7 @@ impl OrdersService {
             }
             if let Some(risk) = item.new_attached_risk.as_ref() {
                 *proto.new_attached_risk.get_or_insert_default() =
-                    self.encode_attached_risk(risk, Some(symbol))?;
+                    self.encode_attached_risk(risk, Some(symbol), None)?;
             }
             if let Some(ncid) = optional_client_order_id(item.new_client_order_id.as_deref())? {
                 proto.new_client_order_id = ncid;
@@ -1321,28 +1354,14 @@ impl OrdersService {
         price: Option<Price>,
         client_order_id: Option<&str>,
     ) -> CreateOrderParams {
-        let client_order_id = client_order_id
+        let mut params = CreateOrderParams::new(symbol, side, order_type);
+        params.quantity = Some(quantity);
+        params.price = price;
+        params.client_order_id = client_order_id
             .map(str::trim)
             .filter(|s| !s.is_empty())
             .map(|s| s.to_owned());
-        CreateOrderParams {
-            symbol: symbol.into(),
-            side,
-            order_type,
-            quantity: Some(quantity),
-            max_quote_debit_scaled: None,
-            price,
-            time_in_force: None,
-            client_order_id,
-            subaccount_id: None,
-            post_only: None,
-            market_client_ref_price: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
-        }
+        params
     }
 
     /// Resolve the catalog quantity scale for a same-symbol batch replace.
@@ -1970,6 +1989,7 @@ mod tests {
             trailing_stop: Some(TrailingStop {
                 distance: Some(TrailingDistance::Ticks(0)),
                 activation_price: None,
+                limit_price: None,
                 trigger_price_source: None,
                 order_type: None,
                 max_slippage: None,
@@ -1991,6 +2011,7 @@ mod tests {
             trailing_stop: Some(TrailingStop {
                 distance: Some(TrailingDistance::Bps(25)),
                 activation_price: None,
+                limit_price: None,
                 trigger_price_source: None,
                 order_type: None,
                 max_slippage: Some(MaxSlippage::Ticks(0)),
@@ -2009,6 +2030,7 @@ mod tests {
             trailing_stop: Some(TrailingStop {
                 distance: Some(TrailingDistance::Bps(25)),
                 activation_price: None,
+                limit_price: None,
                 trigger_price_source: Some(TriggerPriceSourceKind::IndexPrice),
                 order_type: None,
                 max_slippage: None,
@@ -2031,6 +2053,7 @@ mod tests {
             trailing_stop: Some(TrailingStop {
                 distance: Some(TrailingDistance::Bps(25)),
                 activation_price: None,
+                limit_price: None,
                 trigger_price_source: None,
                 order_type: Some(CreateOrderType::Limit),
                 max_slippage: None,
@@ -2043,6 +2066,172 @@ mod tests {
             .encode_create_params(&with_order_type)
             .unwrap_err();
         assert!(err.to_string().contains("always market"));
+    }
+
+    #[allow(deprecated)]
+    fn buy_back_trailing(activation: Option<i64>, limit: Option<i64>) -> AttachedRisk {
+        use crate::models::{TrailingDistance, TrailingStop};
+        AttachedRisk {
+            trailing_stop: Some(TrailingStop {
+                distance: Some(TrailingDistance::Bps(100)),
+                activation_price: activation
+                    .map(|ticks| Price::from_ticks(ticks, Some("BTC-USDT".into())).unwrap()),
+                limit_price: limit
+                    .map(|ticks| Price::from_ticks(ticks, Some("BTC-USDT".into())).unwrap()),
+                trigger_price_source: None,
+                order_type: None,
+                max_slippage: None,
+                state: None,
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn trailing_limit_ticks(risk: &RiskPolicy) -> i64 {
+        match risk.stop_leg.as_ref() {
+            Some(risk_policy::StopLeg::TrailingStop(trailing)) => trailing.limit_price_ticks,
+            other => panic!("expected a trailing-stop leg, got {other:?}"),
+        }
+    }
+
+    fn sell_order(risk: AttachedRisk) -> CreateOrderParams {
+        let mut params = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        params.side = CreateSide::Sell;
+        params.attached_risk = Some(risk);
+        params
+    }
+
+    #[test]
+    fn attached_trailing_stop_on_a_sell_order_sends_its_buy_back_limit_price() {
+        let client = client();
+        let params = sell_order(buy_back_trailing(
+            Some(49_000_000_000_000),
+            Some(51_000_000_000_000),
+        ));
+        let wire = client.orders.encode_create_params(&params).unwrap();
+        let risk = wire
+            .order
+            .as_option()
+            .unwrap()
+            .attached_risk
+            .as_option()
+            .unwrap();
+        assert_eq!(trailing_limit_ticks(risk), 51_000_000_000_000);
+
+        // A limit equal to the activation price is the boundary that passes.
+        let params = sell_order(buy_back_trailing(
+            Some(51_000_000_000_000),
+            Some(51_000_000_000_000),
+        ));
+        assert!(client.orders.encode_create_params(&params).is_ok());
+
+        // Batch create items share the create path.
+        let items = [sell_order(buy_back_trailing(None, None))];
+        let err = client
+            .orders
+            .order_intent_from_params(&items[0])
+            .unwrap_err();
+        assert!(err.to_string().contains("requires limit_price"), "{err}");
+    }
+
+    #[test]
+    fn attached_trailing_stop_buy_back_limit_follows_the_parent_side() {
+        let client = client();
+
+        let err = client
+            .orders
+            .encode_create_params(&sell_order(buy_back_trailing(None, None)))
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("attached trailing_stop of a sell order requires limit_price"),
+            "{err}"
+        );
+
+        let mut buy = sell_order(buy_back_trailing(None, Some(51_000_000_000_000)));
+        buy.side = CreateSide::Buy;
+        let err = client.orders.encode_create_params(&buy).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("limit_price is only valid when the parent order sells"),
+            "{err}"
+        );
+
+        let mut buy = sell_order(buy_back_trailing(None, None));
+        buy.side = CreateSide::Buy;
+        let wire = client.orders.encode_create_params(&buy).unwrap();
+        let risk = wire
+            .order
+            .as_option()
+            .unwrap()
+            .attached_risk
+            .as_option()
+            .unwrap();
+        assert_eq!(trailing_limit_ticks(risk), 0);
+    }
+
+    #[test]
+    fn attached_trailing_stop_buy_back_limit_must_be_positive_and_cover_activation() {
+        let client = client();
+
+        let err = client
+            .orders
+            .encode_create_params(&sell_order(buy_back_trailing(None, Some(0))))
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("attached trailing_stop limit_price must be positive"),
+            "{err}"
+        );
+
+        let err = client
+            .orders
+            .encode_create_params(&sell_order(buy_back_trailing(
+                Some(52_000_000_000_000),
+                Some(51_000_000_000_000),
+            )))
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("limit_price must be at least its activation_price"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn modify_sends_the_attached_trailing_stop_buy_back_limit_without_a_side() {
+        let client = client();
+        let mut params = modify_params(None, None);
+        params.new_attached_risk = Some(buy_back_trailing(None, Some(51_000_000_000_000)));
+        let wire = client.orders.encode_modify_params(params).unwrap();
+        assert_eq!(
+            trailing_limit_ticks(wire.new_attached_risk.as_option().unwrap()),
+            51_000_000_000_000
+        );
+
+        // The side rule needs the order's side, which the server checks; the
+        // price rules hold on every path.
+        let mut params = modify_params(None, None);
+        params.new_attached_risk = Some(buy_back_trailing(
+            Some(52_000_000_000_000),
+            Some(51_000_000_000_000),
+        ));
+        let err = client.orders.encode_modify_params(params).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("limit_price must be at least its activation_price"),
+            "{err}"
+        );
     }
 
     #[test]
@@ -2101,14 +2290,18 @@ mod tests {
             .unwrap(),
             Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
         );
-        // An attached trailing stop takes at most 9999 bps on either side.
+        // An attached trailing stop takes at most 9999 bps on either side. A
+        // sell order's trailing stop buys back and declares its maximum price.
         for side in [CreateSide::Buy, CreateSide::Sell] {
             attached.side = side;
+            let limit_price = (side == CreateSide::Sell)
+                .then(|| Price::from_ticks(51_000_000_000, Some("BTC-USDT".into())).unwrap());
             for bps in [1, 9_999] {
                 attached.attached_risk = Some(AttachedRisk {
                     trailing_stop: Some(TrailingStop {
                         distance: Some(TrailingDistance::Bps(25)),
                         activation_price: None,
+                        limit_price: limit_price.clone(),
                         trigger_price_source: None,
                         order_type: None,
                         max_slippage: Some(MaxSlippage::Bps(bps)),
@@ -2126,6 +2319,7 @@ mod tests {
                     trailing_stop: Some(TrailingStop {
                         distance: Some(TrailingDistance::Bps(25)),
                         activation_price: None,
+                        limit_price: limit_price.clone(),
                         trigger_price_source: None,
                         order_type: None,
                         max_slippage: Some(MaxSlippage::Bps(bps)),
@@ -2164,6 +2358,7 @@ mod tests {
                 trailing_stop: Some(TrailingStop {
                     distance: Some(TrailingDistance::Bps(25)),
                     activation_price: None,
+                    limit_price: None,
                     trigger_price_source: Some(source),
                     order_type: None,
                     max_slippage: None,
@@ -2201,6 +2396,7 @@ mod tests {
                 trailing_stop: Some(TrailingStop {
                     distance: Some(TrailingDistance::Bps(bps)),
                     activation_price: None,
+                    limit_price: None,
                     trigger_price_source: None,
                     order_type: None,
                     max_slippage: None,
@@ -2218,6 +2414,7 @@ mod tests {
                 trailing_stop: Some(TrailingStop {
                     distance: Some(TrailingDistance::Bps(bps)),
                     activation_price: None,
+                    limit_price: None,
                     trigger_price_source: None,
                     order_type: None,
                     max_slippage: None,
@@ -2327,6 +2524,7 @@ mod tests {
         let trailing = TrailingStop {
             distance: Some(TrailingDistance::Bps(25)),
             activation_price: None,
+            limit_price: None,
             trigger_price_source: None,
             order_type: None,
             max_slippage: None,

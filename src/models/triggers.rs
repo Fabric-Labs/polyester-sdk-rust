@@ -14,6 +14,10 @@ pub enum CreateTriggerType {
 }
 
 /// Typed create-trigger params.
+///
+/// Fields may be added in minor releases, so code outside this crate builds it
+/// with a constructor and sets fields afterwards instead of a struct literal.
+#[non_exhaustive]
 #[derive(Debug, Clone)]
 pub struct CreateTriggerParams {
     pub symbol: String,
@@ -63,6 +67,47 @@ pub struct CreateTriggerParams {
 /// Omitted `activation_price` / `max_slippage_*` preserve the current values.
 /// Send an explicit zero (`Price::from_ticks(0)` or `Some(0)`) to clear an
 /// existing activation price or maximum-slippage cap.
+impl CreateTriggerParams {
+    /// Params with only the required fields set; assign the type's optional
+    /// fields (`trigger_price`, `limit_price`, trailing distance, TWAP or
+    /// ladder settings, …) afterwards.
+    pub fn new(
+        symbol: impl Into<String>,
+        trigger_type: CreateTriggerType,
+        side: CreateSide,
+        order_type: CreateOrderType,
+        qty: Quantity,
+    ) -> Self {
+        Self {
+            symbol: symbol.into(),
+            trigger_type,
+            side,
+            order_type,
+            qty,
+            trigger_price: None,
+            limit_price: None,
+            trigger_price_source: None,
+            time_in_force: None,
+            subaccount_id: None,
+            client_trigger_id: String::new(),
+            post_only: false,
+            activation_price: None,
+            trailing_distance_ticks: None,
+            trailing_distance_bps: None,
+            max_slippage_ticks: None,
+            max_slippage_bps: None,
+            twap_duration_ms: None,
+            twap_slice_interval_ms: None,
+            ladder_price_min: None,
+            ladder_price_max: None,
+            ladder_levels: None,
+            ladder_distribution: None,
+            fee_asset: None,
+            self_trade_prevention_mode: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ModifyTriggerParams {
     pub trigger_id: String,

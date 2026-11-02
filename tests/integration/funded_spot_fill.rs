@@ -124,25 +124,16 @@ async fn spot_fill() {
     let maker_cid = unique_client_order_id("maker-fill");
     let taker_cid = unique_client_order_id("taker-fill");
 
-    let maker_params = CreateOrderParams {
-        symbol: symbol.clone(),
-        side: CreateSide::Sell,
-        order_type: CreateOrderType::Limit,
-        quantity: Some(
-            Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None).expect("qty"),
-        ),
-        max_quote_debit_scaled: None,
-        price: Some(Price::from_decimal_str(&price, Some(symbol.clone())).expect("price")),
-        time_in_force: Some(CreateTimeInForce::Gtc),
-        client_order_id: Some(maker_cid.clone()),
-        subaccount_id: None,
-        post_only: Some(true),
-        market_client_ref_price: None,
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: None,
-        attached_risk: None,
-        expire_at: None,
+    let maker_params = {
+        let mut p =
+            CreateOrderParams::new(symbol.clone(), CreateSide::Sell, CreateOrderType::Limit);
+        p.quantity =
+            Some(Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None).expect("qty"));
+        p.price = Some(Price::from_decimal_str(&price, Some(symbol.clone())).expect("price"));
+        p.time_in_force = Some(CreateTimeInForce::Gtc);
+        p.client_order_id = Some(maker_cid.clone());
+        p.post_only = Some(true);
+        p
     };
     match maker.orders.create(maker_params).await {
         Ok(c) => {
@@ -156,25 +147,15 @@ async fn spot_fill() {
         Err(err) => panic!("maker create: {err}"),
     }
 
-    let taker_params = CreateOrderParams {
-        symbol: symbol.clone(),
-        side: CreateSide::Buy,
-        order_type: CreateOrderType::Limit,
-        quantity: Some(
-            Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None).expect("qty"),
-        ),
-        max_quote_debit_scaled: None,
-        price: Some(Price::from_decimal_str(&price, Some(symbol.clone())).expect("price")),
-        time_in_force: Some(CreateTimeInForce::Gtc),
-        client_order_id: Some(taker_cid.clone()),
-        subaccount_id: None,
-        post_only: Some(false),
-        market_client_ref_price: None,
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: None,
-        attached_risk: None,
-        expire_at: None,
+    let taker_params = {
+        let mut p = CreateOrderParams::new(symbol.clone(), CreateSide::Buy, CreateOrderType::Limit);
+        p.quantity =
+            Some(Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None).expect("qty"));
+        p.price = Some(Price::from_decimal_str(&price, Some(symbol.clone())).expect("price"));
+        p.time_in_force = Some(CreateTimeInForce::Gtc);
+        p.client_order_id = Some(taker_cid.clone());
+        p.post_only = Some(false);
+        p
     };
     match client.orders.create(taker_params).await {
         Ok(c) => {

@@ -50,23 +50,19 @@ async fn market_buy_mutation() {
         .expect("catalog scale");
     let client_order_id = unique_client_order_id("mkt-buy");
 
-    let params = CreateOrderParams {
-        symbol: symbol.clone(),
-        side: CreateSide::Buy,
-        order_type: CreateOrderType::Market,
-        quantity: match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
+    let params = {
+        let mut p =
+            CreateOrderParams::new(symbol.clone(), CreateSide::Buy, CreateOrderType::Market);
+        p.quantity = match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
             Ok(q) => Some(q),
             Err(err) => {
                 eprintln!("skip: qty: {err}");
                 return;
             }
-        },
-        price: None,
-        time_in_force: Some(CreateTimeInForce::Ioc),
-        client_order_id: Some(client_order_id.clone()),
-        subaccount_id: None,
-        post_only: None,
-        market_client_ref_price: Some(
+        };
+        p.time_in_force = Some(CreateTimeInForce::Ioc);
+        p.client_order_id = Some(client_order_id.clone());
+        p.market_client_ref_price = Some(
             match Price::from_decimal_str(&ref_price, Some(symbol.clone())) {
                 Ok(p) => p,
                 Err(err) => {
@@ -74,13 +70,8 @@ async fn market_buy_mutation() {
                     return;
                 }
             },
-        ),
-        max_quote_debit_scaled: None,
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: None,
-        attached_risk: None,
-        expire_at: None,
+        );
+        p
     };
 
     let created = match client.orders.create(params).await {
@@ -158,23 +149,19 @@ async fn market_sell_mutation() {
         .expect("catalog scale");
     let client_order_id = unique_client_order_id("mkt-sell");
 
-    let params = CreateOrderParams {
-        symbol: symbol.clone(),
-        side: CreateSide::Sell,
-        order_type: CreateOrderType::Market,
-        quantity: match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
+    let params = {
+        let mut p =
+            CreateOrderParams::new(symbol.clone(), CreateSide::Sell, CreateOrderType::Market);
+        p.quantity = match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
             Ok(q) => Some(q),
             Err(err) => {
                 eprintln!("skip: qty: {err}");
                 return;
             }
-        },
-        price: None,
-        time_in_force: Some(CreateTimeInForce::Ioc),
-        client_order_id: Some(client_order_id.clone()),
-        subaccount_id: None,
-        post_only: None,
-        market_client_ref_price: Some(
+        };
+        p.time_in_force = Some(CreateTimeInForce::Ioc);
+        p.client_order_id = Some(client_order_id.clone());
+        p.market_client_ref_price = Some(
             match Price::from_decimal_str(&ref_price, Some(symbol.clone())) {
                 Ok(p) => p,
                 Err(err) => {
@@ -182,13 +169,8 @@ async fn market_sell_mutation() {
                     return;
                 }
             },
-        ),
-        max_quote_debit_scaled: None,
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: None,
-        attached_risk: None,
-        expire_at: None,
+        );
+        p
     };
 
     let created = match client.orders.create(params).await {

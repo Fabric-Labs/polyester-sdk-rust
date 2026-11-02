@@ -134,25 +134,17 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
     let base_reserved_before = reserved_balance_raw(&balances_before.balances, base_id);
 
     if let Some(maker) = maker.as_ref() {
-        let maker_params = CreateOrderParams {
-            symbol: symbol.clone(),
-            side: CreateSide::Sell,
-            order_type: CreateOrderType::Limit,
-            quantity: Some(
+        let maker_params = {
+            let mut p =
+                CreateOrderParams::new(symbol.clone(), CreateSide::Sell, CreateOrderType::Limit);
+            p.quantity = Some(
                 Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None).expect("qty"),
-            ),
-            max_quote_debit_scaled: None,
-            price: Some(Price::from_decimal_str(&price, Some(symbol.clone())).expect("price")),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: Some(maker_cid.clone()),
-            subaccount_id: None,
-            post_only: Some(true),
-            market_client_ref_price: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+            );
+            p.price = Some(Price::from_decimal_str(&price, Some(symbol.clone())).expect("price"));
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p.client_order_id = Some(maker_cid.clone());
+            p.post_only = Some(true);
+            p
         };
         if let Err(err) = maker.orders.create(maker_params).await {
             if is_internal_order_error(&err) || crate::support::devnet_unavailable(&err) {
@@ -163,27 +155,17 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
         }
     }
 
-    let buy_params = CreateOrderParams {
-        symbol: symbol.clone(),
-        side: CreateSide::Buy,
-        order_type: CreateOrderType::Market,
-        quantity: Some(
-            Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None).expect("qty"),
-        ),
-        max_quote_debit_scaled: None,
-        price: None,
-        time_in_force: Some(CreateTimeInForce::Ioc),
-        client_order_id: Some(buy_cid.clone()),
-        subaccount_id: None,
-        post_only: None,
-        market_client_ref_price: Some(
+    let buy_params = {
+        let mut p =
+            CreateOrderParams::new(symbol.clone(), CreateSide::Buy, CreateOrderType::Market);
+        p.quantity =
+            Some(Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None).expect("qty"));
+        p.time_in_force = Some(CreateTimeInForce::Ioc);
+        p.client_order_id = Some(buy_cid.clone());
+        p.market_client_ref_price = Some(
             Price::from_decimal_str(&buy_ref_price, Some(symbol.clone())).expect("buy ref price"),
-        ),
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: None,
-        attached_risk: None,
-        expire_at: None,
+        );
+        p
     };
     match client.orders.create(buy_params).await {
         Ok(_) => {}
@@ -263,11 +245,10 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
     if let Some(maker) = maker.as_ref() {
         let maker_buy_price = resolve_post_only_buy_limit_price(maker, &symbol, Some(&pair)).await;
         let maker_buy_cid = unique_client_order_id("rt-maker-buy");
-        let maker_buy = CreateOrderParams {
-            symbol: symbol.clone(),
-            side: CreateSide::Buy,
-            order_type: CreateOrderType::Limit,
-            quantity: Some(
+        let maker_buy = {
+            let mut p =
+                CreateOrderParams::new(symbol.clone(), CreateSide::Buy, CreateOrderType::Limit);
+            p.quantity = Some(
                 Quantity::from_scaled(
                     net_received,
                     Some(scale),
@@ -276,21 +257,14 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
                     None,
                 )
                 .expect("filled qty"),
-            ),
-            max_quote_debit_scaled: None,
-            price: Some(
+            );
+            p.price = Some(
                 Price::from_decimal_str(&maker_buy_price, Some(symbol.clone())).expect("price"),
-            ),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: Some(maker_buy_cid.clone()),
-            subaccount_id: None,
-            post_only: Some(true),
-            market_client_ref_price: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+            );
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p.client_order_id = Some(maker_buy_cid.clone());
+            p.post_only = Some(true);
+            p
         };
         if let Err(err) = maker.orders.create(maker_buy).await {
             cancel_test_order(&client, &symbol, &buy_cid, "taker buy").await;
@@ -307,11 +281,10 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
     // Carry the exact net base received into cleanup SELL. A BUY configured to
     // pay fees from the received asset cannot safely sell its gross cum_qty.
     let sell_ref_price = market_ref_price(&client, &symbol, "sell", Some(&pair)).await;
-    let sell_params = CreateOrderParams {
-        symbol: symbol.clone(),
-        side: CreateSide::Sell,
-        order_type: CreateOrderType::Market,
-        quantity: Some(
+    let sell_params = {
+        let mut p =
+            CreateOrderParams::new(symbol.clone(), CreateSide::Sell, CreateOrderType::Market);
+        p.quantity = Some(
             Quantity::from_scaled(
                 net_received,
                 Some(scale),
@@ -320,21 +293,13 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
                 None,
             )
             .expect("sell qty"),
-        ),
-        max_quote_debit_scaled: None,
-        price: None,
-        time_in_force: Some(CreateTimeInForce::Ioc),
-        client_order_id: Some(sell_cid.clone()),
-        subaccount_id: None,
-        post_only: None,
-        market_client_ref_price: Some(
+        );
+        p.time_in_force = Some(CreateTimeInForce::Ioc);
+        p.client_order_id = Some(sell_cid.clone());
+        p.market_client_ref_price = Some(
             Price::from_decimal_str(&sell_ref_price, Some(symbol.clone())).expect("sell ref price"),
-        ),
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: None,
-        attached_risk: None,
-        expire_at: None,
+        );
+        p
     };
     match client.orders.create(sell_params).await {
         Ok(_) => {}

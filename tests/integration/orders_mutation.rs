@@ -51,18 +51,16 @@ async fn order_round_trip_mutation() {
         .expect("catalog scale");
     let client_order_id = unique_client_order_id("e2e");
 
-    let mut params = CreateOrderParams {
-        symbol: symbol.clone(),
-        side: CreateSide::Buy,
-        order_type: CreateOrderType::Limit,
-        quantity: match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
+    let mut params = {
+        let mut p = CreateOrderParams::new(symbol.clone(), CreateSide::Buy, CreateOrderType::Limit);
+        p.quantity = match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
             Ok(q) => Some(q),
             Err(err) => {
                 eprintln!("skip: qty: {err}");
                 return;
             }
-        },
-        price: Some(
+        };
+        p.price = Some(
             match Price::from_decimal_str(&price, Some(symbol.clone())) {
                 Ok(p) => p,
                 Err(err) => {
@@ -70,18 +68,11 @@ async fn order_round_trip_mutation() {
                     return;
                 }
             },
-        ),
-        time_in_force: Some(CreateTimeInForce::Gtc),
-        client_order_id: Some(client_order_id.clone()),
-        subaccount_id: None,
-        post_only: Some(true),
-        market_client_ref_price: None,
-        max_quote_debit_scaled: None,
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: None,
-        attached_risk: None,
-        expire_at: None,
+        );
+        p.time_in_force = Some(CreateTimeInForce::Gtc);
+        p.client_order_id = Some(client_order_id.clone());
+        p.post_only = Some(true);
+        p
     };
     let _ = &mut params;
 
@@ -230,18 +221,17 @@ async fn order_modify_advances_lineage() {
 
     let created = match client
         .orders
-        .create(CreateOrderParams {
-            symbol: symbol.clone(),
-            side: CreateSide::Buy,
-            order_type: CreateOrderType::Limit,
-            quantity: match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
+        .create({
+            let mut p =
+                CreateOrderParams::new(symbol.clone(), CreateSide::Buy, CreateOrderType::Limit);
+            p.quantity = match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
                 Ok(q) => Some(q),
                 Err(err) => {
                     eprintln!("skip: qty: {err}");
                     return;
                 }
-            },
-            price: Some(
+            };
+            p.price = Some(
                 match Price::from_decimal_str(&price, Some(symbol.clone())) {
                     Ok(p) => p,
                     Err(err) => {
@@ -249,18 +239,11 @@ async fn order_modify_advances_lineage() {
                         return;
                     }
                 },
-            ),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: Some(original_cid.clone()),
-            subaccount_id: None,
-            post_only: Some(true),
-            market_client_ref_price: None,
-            max_quote_debit_scaled: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+            );
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p.client_order_id = Some(original_cid.clone());
+            p.post_only = Some(true);
+            p
         })
         .await
     {
@@ -462,18 +445,16 @@ async fn gtd_limit_order_round_trip() {
         .base_quantity_scale_for_symbol(&symbol)
         .expect("catalog scale");
     let client_order_id = unique_client_order_id("gtd");
-    let params = CreateOrderParams {
-        symbol: symbol.clone(),
-        side: CreateSide::Buy,
-        order_type: CreateOrderType::Limit,
-        quantity: match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
+    let params = {
+        let mut p = CreateOrderParams::new(symbol.clone(), CreateSide::Buy, CreateOrderType::Limit);
+        p.quantity = match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
             Ok(q) => Some(q),
             Err(err) => {
                 eprintln!("skip: qty: {err}");
                 return;
             }
-        },
-        price: Some(
+        };
+        p.price = Some(
             match Price::from_decimal_str(&price, Some(symbol.clone())) {
                 Ok(p) => p,
                 Err(err) => {
@@ -481,18 +462,12 @@ async fn gtd_limit_order_round_trip() {
                     return;
                 }
             },
-        ),
-        time_in_force: Some(CreateTimeInForce::Gtd),
-        client_order_id: Some(client_order_id.clone()),
-        subaccount_id: None,
-        post_only: Some(true),
-        market_client_ref_price: None,
-        max_quote_debit_scaled: None,
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: None,
-        attached_risk: None,
-        expire_at: Some(SystemTime::now() + Duration::from_secs(3600)),
+        );
+        p.time_in_force = Some(CreateTimeInForce::Gtd);
+        p.client_order_id = Some(client_order_id.clone());
+        p.post_only = Some(true);
+        p.expire_at = Some(SystemTime::now() + Duration::from_secs(3600));
+        p
     };
 
     let created = match client.orders.create(params).await {

@@ -250,23 +250,13 @@ async fn order_create_and_preview_send_q9_limit_price_and_catalog_scaled_quantit
 
     client
         .orders
-        .create(CreateOrderParams {
-            symbol: "ETH-USDT".into(),
-            side: CreateSide::Buy,
-            order_type: CreateOrderType::Limit,
-            quantity: Some(eth_qty("0.002315")),
-            max_quote_debit_scaled: None,
-            price: Some(eth_price("2420")),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: Some("q9-create".into()),
-            subaccount_id: None,
-            post_only: None,
-            market_client_ref_price: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+        .create({
+            let mut p = CreateOrderParams::new("ETH-USDT", CreateSide::Buy, CreateOrderType::Limit);
+            p.quantity = Some(eth_qty("0.002315"));
+            p.price = Some(eth_price("2420"));
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p.client_order_id = Some("q9-create".into());
+            p
         })
         .await
         .unwrap();
@@ -281,23 +271,13 @@ async fn order_create_and_preview_send_q9_limit_price_and_catalog_scaled_quantit
     // Preview carries the same intent; its response is not under test.
     let _ = client
         .orders
-        .preview(PreviewOrderParams {
-            symbol: "ETH-USDT".into(),
-            side: CreateSide::Buy,
-            order_type: CreateOrderType::Limit,
-            quantity: Some(eth_qty("0.002315")),
-            max_quote_debit_scaled: None,
-            price: Some(eth_price("2420")),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: None,
-            subaccount_id: None,
-            post_only: None,
-            market_client_ref_price: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+        .preview({
+            let mut p =
+                PreviewOrderParams::new("ETH-USDT", CreateSide::Buy, CreateOrderType::Limit);
+            p.quantity = Some(eth_qty("0.002315"));
+            p.price = Some(eth_price("2420"));
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p
         })
         .await;
     let preview: PreviewOrderRequest =
@@ -333,33 +313,18 @@ async fn order_modify_sends_q9_new_price() {
 #[tokio::test]
 async fn attached_risk_sends_q9_trigger_and_activation_prices() {
     let (client, captured_requests, _server) = fixture_client(|_| HttpScript::NotFound).await;
-    let params = |risk: AttachedRisk| CreateOrderParams {
-        symbol: "BTC-USDT".into(),
-        side: CreateSide::Buy,
-        order_type: CreateOrderType::Limit,
-        quantity: Some(
-            Quantity::from_decimal_str("0.01", 8, Some("BTC-USDT".into()), Some(1)).unwrap(),
-        ),
-        max_quote_debit_scaled: None,
-        price: Some(Price::from_decimal_str("83589", Some("BTC-USDT".into())).unwrap()),
-        time_in_force: Some(CreateTimeInForce::Gtc),
-        client_order_id: Some("q9-risk".into()),
-        subaccount_id: None,
-        post_only: None,
-        market_client_ref_price: None,
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: None,
-        attached_risk: Some(risk),
-        expire_at: None,
+    let params = |risk: AttachedRisk| {
+        let mut p = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+        p.quantity =
+            Some(Quantity::from_decimal_str("0.01", 8, Some("BTC-USDT".into()), Some(1)).unwrap());
+        p.price = Some(Price::from_decimal_str("83589", Some("BTC-USDT".into())).unwrap());
+        p.time_in_force = Some(CreateTimeInForce::Gtc);
+        p.client_order_id = Some("q9-risk".into());
+        p.attached_risk = Some(risk);
+        p
     };
-    let leg = |raw: &str| RiskLeg {
-        trigger_price: Some(Price::from_decimal_str(raw, Some("BTC-USDT".into())).unwrap()),
-        trigger_price_source: None,
-        order_type: None,
-        limit_price: None,
-        state: None,
-    };
+    let leg =
+        |raw: &str| RiskLeg::market(Price::from_decimal_str(raw, Some("BTC-USDT".into())).unwrap());
 
     let _ = client
         .orders
@@ -391,16 +356,11 @@ async fn attached_risk_sends_q9_trigger_and_activation_prices() {
         .create(params(AttachedRisk {
             take_profit: None,
             stop_loss: None,
-            trailing_stop: Some(TrailingStop {
-                distance: Some(TrailingDistance::Bps(100)),
-                activation_price: Some(
+            trailing_stop: Some(
+                TrailingStop::new(TrailingDistance::Bps(100)).with_activation_price(
                     Price::from_decimal_str("85000.25", Some("BTC-USDT".into())).unwrap(),
                 ),
-                trigger_price_source: None,
-                order_type: None,
-                max_slippage: None,
-                state: None,
-            }),
+            ),
             oco: false,
         }))
         .await;
@@ -416,38 +376,57 @@ async fn attached_risk_sends_q9_trigger_and_activation_prices() {
     match risk.stop_leg.as_ref() {
         Some(risk_policy::StopLeg::TrailingStop(trailing)) => {
             assert_eq!(trailing.activation_price_ticks, 85_000_250_000_000);
+            assert_eq!(trailing.limit_price_ticks, 0);
+        }
+        other => panic!("expected a trailing-stop leg, got {other:?}"),
+    }
+
+    // A sell order's trailing stop buys back at most at its limit price.
+    let mut sell = params(AttachedRisk {
+        take_profit: None,
+        stop_loss: None,
+        trailing_stop: Some(
+            TrailingStop::new(TrailingDistance::Bps(100))
+                .with_activation_price(
+                    Price::from_decimal_str("85000.25", Some("BTC-USDT".into())).unwrap(),
+                )
+                .with_limit_price(
+                    Price::from_decimal_str("85500.125", Some("BTC-USDT".into())).unwrap(),
+                ),
+        ),
+        oco: false,
+    });
+    sell.side = CreateSide::Sell;
+    let _ = client.orders.create(sell).await;
+    let create: CreateOrderRequest =
+        captured(&captured_requests, "/orders.v1.OrdersService/CreateOrder");
+    let risk = create
+        .order
+        .as_option()
+        .unwrap()
+        .attached_risk
+        .as_option()
+        .unwrap();
+    match risk.stop_leg.as_ref() {
+        Some(risk_policy::StopLeg::TrailingStop(trailing)) => {
+            assert_eq!(trailing.activation_price_ticks, 85_000_250_000_000);
+            assert_eq!(trailing.limit_price_ticks, 85_500_125_000_000);
         }
         other => panic!("expected a trailing-stop leg, got {other:?}"),
     }
 }
 
 fn trigger_params(trigger_type: CreateTriggerType) -> CreateTriggerParams {
-    CreateTriggerParams {
-        symbol: "ETH-USDT".into(),
-        trigger_type,
-        side: CreateSide::Sell,
-        order_type: CreateOrderType::Market,
-        qty: eth_qty("0.002315"),
-        trigger_price: None,
-        limit_price: None,
-        trigger_price_source: None,
-        time_in_force: None,
-        subaccount_id: None,
-        client_trigger_id: "q9-trigger".into(),
-        post_only: false,
-        activation_price: None,
-        trailing_distance_ticks: None,
-        trailing_distance_bps: None,
-        max_slippage_ticks: None,
-        max_slippage_bps: None,
-        twap_duration_ms: None,
-        twap_slice_interval_ms: None,
-        ladder_price_min: None,
-        ladder_price_max: None,
-        ladder_levels: None,
-        ladder_distribution: None,
-        fee_asset: None,
-        self_trade_prevention_mode: None,
+    {
+        let mut p = CreateTriggerParams::new(
+            "ETH-USDT",
+            trigger_type,
+            CreateSide::Sell,
+            CreateOrderType::Market,
+            eth_qty("0.002315"),
+        );
+        p.client_trigger_id = "q9-trigger".into();
+        p
     }
 }
 
@@ -458,9 +437,10 @@ async fn trigger_create_sends_q9_trigger_and_activation_prices() {
 
     let _ = client
         .triggers
-        .create(CreateTriggerParams {
-            trigger_price: Some(eth_price("2420")),
-            ..trigger_params(CreateTriggerType::StopLoss)
+        .create({
+            let mut p = trigger_params(CreateTriggerType::StopLoss);
+            p.trigger_price = Some(eth_price("2420"));
+            p
         })
         .await;
     let create: CreateTriggerRequest = captured(&captured_requests, PATH);
@@ -475,10 +455,11 @@ async fn trigger_create_sends_q9_trigger_and_activation_prices() {
 
     let _ = client
         .triggers
-        .create(CreateTriggerParams {
-            activation_price: Some(eth_price("2500.5")),
-            trailing_distance_bps: Some(50),
-            ..trigger_params(CreateTriggerType::TrailingStop)
+        .create({
+            let mut p = trigger_params(CreateTriggerType::TrailingStop);
+            p.activation_price = Some(eth_price("2500.5"));
+            p.trailing_distance_bps = Some(50);
+            p
         })
         .await;
     let create: CreateTriggerRequest = captured(&captured_requests, PATH);

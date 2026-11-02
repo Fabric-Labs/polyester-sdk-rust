@@ -284,6 +284,10 @@ pub enum TriggerPriceSourceKind {
 }
 
 /// Take-profit or stop-loss leg (trigger + optional LIMIT child).
+///
+/// Fields may be added in minor releases, so code outside this crate builds it
+/// with a constructor and sets fields afterwards instead of a struct literal.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RiskLeg {
     /// Trigger price when policy data was requested and supplied. State-only
@@ -318,12 +322,21 @@ pub enum MaxSlippage {
 /// Distance and optional max slippage must be positive. The child is always a
 /// market-IOC execution; supplying [`order_type`](Self::order_type) is
 /// rejected.
+///
+/// Fields may be added in minor releases, so code outside this crate builds it
+/// with a constructor and sets fields afterwards instead of a struct literal.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrailingStop {
     /// Trailing distance when policy data was requested and supplied.
     /// State-only order reads leave this absent.
     pub distance: Option<TrailingDistance>,
     pub activation_price: Option<Price>,
+    /// Maximum price of a trailing stop that buys back, the most its exit pays
+    /// per unit. Required when the parent order sells, so the trailing stop
+    /// buys, and must be at least `activation_price` when that is set; must be
+    /// `None` when the parent order buys. Order reads do not return it yet.
+    pub limit_price: Option<Price>,
     /// Price the trailing stop watches (activation, peak or trough, and
     /// fire); `None` watches the last trade price.
     pub trigger_price_source: Option<TriggerPriceSourceKind>,
@@ -337,6 +350,77 @@ pub struct TrailingStop {
     /// Runtime linkage/state returned when attached-risk state is requested.
     /// This field is ignored when the leg is used in an order write.
     pub state: Option<AttachedRiskLegState>,
+}
+
+impl RiskLeg {
+    /// A leg whose child is a market IOC order once `trigger_price` is crossed.
+    pub fn market(trigger_price: Price) -> Self {
+        Self {
+            trigger_price: Some(trigger_price),
+            trigger_price_source: None,
+            order_type: Some(CreateOrderType::Market),
+            limit_price: None,
+            state: None,
+        }
+    }
+
+    /// A leg whose child is a GTC limit order at `limit_price` once
+    /// `trigger_price` is crossed.
+    pub fn limit(trigger_price: Price, limit_price: Price) -> Self {
+        Self {
+            trigger_price: Some(trigger_price),
+            trigger_price_source: None,
+            order_type: Some(CreateOrderType::Limit),
+            limit_price: Some(limit_price),
+            state: None,
+        }
+    }
+
+    /// Watch `source` instead of the last trade price.
+    pub fn with_trigger_price_source(mut self, source: TriggerPriceSourceKind) -> Self {
+        self.trigger_price_source = Some(source);
+        self
+    }
+}
+
+impl TrailingStop {
+    /// A trailing stop `distance` behind the peak (or trough) price.
+    #[allow(deprecated)]
+    pub fn new(distance: TrailingDistance) -> Self {
+        Self {
+            distance: Some(distance),
+            activation_price: None,
+            limit_price: None,
+            trigger_price_source: None,
+            order_type: None,
+            max_slippage: None,
+            state: None,
+        }
+    }
+
+    /// Start trailing only once `price` is reached.
+    pub fn with_activation_price(mut self, price: Price) -> Self {
+        self.activation_price = Some(price);
+        self
+    }
+
+    /// The most a buy-back pays per unit; required when the parent order sells.
+    pub fn with_limit_price(mut self, price: Price) -> Self {
+        self.limit_price = Some(price);
+        self
+    }
+
+    /// Watch and trail `source` instead of the last trade price.
+    pub fn with_trigger_price_source(mut self, source: TriggerPriceSourceKind) -> Self {
+        self.trigger_price_source = Some(source);
+        self
+    }
+
+    /// Cap the market child's slippage.
+    pub fn with_max_slippage(mut self, slippage: MaxSlippage) -> Self {
+        self.max_slippage = Some(slippage);
+        self
+    }
 }
 
 /// Runtime lifecycle and child linkage for one attached-risk leg.
@@ -619,6 +703,11 @@ pub struct CancelAllOpts {
     pub request_id: Option<String>,
 }
 
+/// Order inputs accepted by [`crate::services::OrdersService::create`].
+///
+/// Fields may be added in minor releases, so code outside this crate builds it
+/// with a constructor and sets fields afterwards instead of a struct literal.
+#[non_exhaustive]
 #[derive(Debug, Clone)]
 pub struct CreateOrderParams {
     pub symbol: String,
@@ -655,6 +744,32 @@ pub struct CreateOrderParams {
     pub expire_at: Option<std::time::SystemTime>,
 }
 
+impl CreateOrderParams {
+    /// Params with only the required fields set; assign the optional fields
+    /// (`quantity` or `max_quote_debit_scaled`, `price`, `time_in_force`, …)
+    /// afterwards.
+    pub fn new(symbol: impl Into<String>, side: CreateSide, order_type: CreateOrderType) -> Self {
+        Self {
+            symbol: symbol.into(),
+            side,
+            order_type,
+            quantity: None,
+            max_quote_debit_scaled: None,
+            price: None,
+            time_in_force: None,
+            client_order_id: None,
+            subaccount_id: None,
+            post_only: None,
+            market_client_ref_price: None,
+            fee_asset: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
+            attached_risk: None,
+            expire_at: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FeeAsset {
     Quote,
@@ -673,6 +788,10 @@ pub type OrderFeeSource = FeeAsset;
 /// Preview uses the same [`OrderIntent`](crate::proto::orders::v1::OrderIntent)
 /// contract as create. The host performs an admissibility check only: no hold is
 /// placed, and `client_order_id` is accepted but not claimed.
+///
+/// Fields may be added in minor releases, so code outside this crate builds it
+/// with a constructor and sets fields afterwards instead of a struct literal.
+#[non_exhaustive]
 #[derive(Debug, Clone)]
 pub struct PreviewOrderParams {
     pub symbol: String,
@@ -703,6 +822,32 @@ pub struct PreviewOrderParams {
 }
 
 /// One actionable field-level validation failure from preview/create rejection.
+impl PreviewOrderParams {
+    /// Params with only the required fields set; assign the optional fields
+    /// (`quantity` or `max_quote_debit_scaled`, `price`, `time_in_force`, …)
+    /// afterwards.
+    pub fn new(symbol: impl Into<String>, side: CreateSide, order_type: CreateOrderType) -> Self {
+        Self {
+            symbol: symbol.into(),
+            side,
+            order_type,
+            quantity: None,
+            max_quote_debit_scaled: None,
+            price: None,
+            time_in_force: None,
+            client_order_id: None,
+            subaccount_id: None,
+            post_only: None,
+            market_client_ref_price: None,
+            fee_asset: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
+            attached_risk: None,
+            expire_at: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderFieldViolation {
     pub field_path: String,
