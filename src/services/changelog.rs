@@ -21,8 +21,13 @@ use crate::transport::SharedTransport;
 use buffa::Enumeration;
 use buffa_types::google::protobuf::Timestamp;
 use futures_util::stream::{self, Stream, TryStreamExt};
+use std::collections::HashSet;
 use std::future::Future;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Page size of the `*_since` helpers: the server maximum, so a long history
+/// costs as few rate-limited requests as possible.
+const SINCE_PAGE_SIZE: u32 = 500;
 
 /// Options for [`ChangelogService::list_posts`] and [`ChangelogService::posts`].
 #[derive(Debug, Clone, Default)]
@@ -170,6 +175,7 @@ impl ChangelogService {
         self.changes(ListChangelogChangesOptions {
             categories: vec![CHANGELOG_CATEGORY_BREAKING_CHANGE.to_owned()],
             start_time: Some(since),
+            limit: Some(SINCE_PAGE_SIZE),
             ..Default::default()
         })
         .try_collect()
@@ -185,6 +191,7 @@ impl ChangelogService {
         self.changes(ListChangelogChangesOptions {
             action_required: Some(true),
             start_time: Some(since),
+            limit: Some(SINCE_PAGE_SIZE),
             ..Default::default()
         })
         .try_collect()
@@ -192,8 +199,9 @@ impl ChangelogService {
     }
 }
 
-/// Flatten token-paged results into one item stream. A repeated page token
-/// fails the stream instead of looping forever.
+/// Flatten token-paged results into one item stream. A next page token this
+/// stream already requested, including the caller's starting token, would
+/// cycle forever, so it fails the stream with a response-contract error.
 fn paginate<T, F, Fut>(
     first_token: Option<String>,
     fetch: F,
@@ -204,20 +212,28 @@ where
     Fut: Future<Output = Result<(Vec<T>, String)>> + Send + 'static,
 {
     let fetch = std::sync::Arc::new(fetch);
-    stream::try_unfold(Some(first_token.unwrap_or_default()), move |token| {
+    let start = (Some(first_token.unwrap_or_default()), HashSet::new());
+    stream::try_unfold(start, move |(token, mut requested)| {
         let fetch = fetch.clone();
         async move {
             let Some(token) = token else {
                 return Ok(None);
             };
-            let (items, next) = fetch(token.clone()).await?;
-            if !next.is_empty() && next == token {
-                return Err(Error::transport(
-                    "changelog pagination returned the same page token twice",
+            if !token.is_empty() {
+                requested.insert(token.clone());
+            }
+            let (items, next) = fetch(token).await?;
+            if requested.contains(&next) {
+                return Err(Error::response_contract(
+                    "changelog pagination",
+                    "next_page_token repeats an earlier page_token",
                 ));
             }
             let next = (!next.is_empty()).then_some(next);
-            Ok(Some((stream::iter(items.into_iter().map(Ok)), next)))
+            Ok(Some((
+                stream::iter(items.into_iter().map(Ok)),
+                (next, requested),
+            )))
         }
     })
     .try_flatten()

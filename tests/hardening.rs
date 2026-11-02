@@ -4262,8 +4262,61 @@ async fn l2_changelog_posts_stream_fails_on_a_repeated_page_token() {
         .try_collect::<Vec<_>>()
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("same page token"), "{err}");
+    assert!(
+        matches!(err, polyester::Error::ResponseContract { .. }),
+        "{err}"
+    );
     assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn l2_changelog_posts_stream_fails_on_a_page_token_cycle() {
+    use futures_util::TryStreamExt;
+    use polyester::proto::changelog::v1::{ListPostsRequest, ListPostsResponse, PostSummary};
+    use std::sync::Mutex;
+
+    // (starting token, next tokens the server returns in order, tokens the
+    // SDK must send before it stops)
+    let cases: [(Option<&str>, &[&str], &[&str]); 3] = [
+        // "" -> A -> B -> A: A recurs after two pages.
+        (None, &["A", "B", "A"], &["", "A", "B"]),
+        // "" -> A -> B -> C -> B.
+        (None, &["A", "B", "C", "B"], &["", "A", "B", "C"]),
+        // The caller's starting token counts: S -> A -> S.
+        (Some("S"), &["A", "S"], &["S", "A"]),
+    ];
+    for (start, cycle, expected) in cases {
+        let sent = Arc::new(Mutex::new(Vec::<String>::new()));
+        let sent_handler = sent.clone();
+        let cycle: Vec<String> = cycle.iter().map(|t| (*t).to_owned()).collect();
+        let server = MockHttpServer::spawn(move |request| {
+            let req = ListPostsRequest::decode_from_slice(&request.body).unwrap();
+            let mut sent = sent_handler.lock().unwrap();
+            sent.push(req.page_token.clone());
+            let next = cycle[(sent.len() - 1) % cycle.len()].clone();
+            connect_proto_ok(&ListPostsResponse {
+                posts: vec![PostSummary::default()],
+                next_page_token: next,
+                ..Default::default()
+            })
+        })
+        .await;
+        let client = public_changelog_client(&server);
+        let err = client
+            .changelog
+            .posts(polyester::services::ListChangelogPostsOptions {
+                page_token: start.map(str::to_owned),
+                ..Default::default()
+            })
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, polyester::Error::ResponseContract { .. }),
+            "{err}"
+        );
+        assert_eq!(*sent.lock().unwrap(), expected, "start {start:?}");
+    }
 }
 
 #[tokio::test]
@@ -4334,6 +4387,9 @@ async fn l2_changelog_since_helpers_page_filters_and_tolerate_unknown_enums() {
 
     let seen = seen.lock().unwrap();
     assert_eq!(seen.len(), 4);
+    for req in seen.iter() {
+        assert_eq!(req.limit, 500);
+    }
     for req in &seen[..2] {
         assert_eq!(
             req.categories,
