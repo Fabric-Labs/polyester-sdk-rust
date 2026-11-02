@@ -118,23 +118,15 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
     let _ = hydrate_spot_and_zipper(&maker).await;
     if let Err(err) = maker
         .orders
-        .create(CreateOrderParams {
-            symbol: symbol.clone(),
-            side: CreateSide::Sell,
-            order_type: CreateOrderType::Limit,
-            quantity: Some(maker_qty),
-            price: Some(create_price.clone()),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: Some(maker_cid.clone()),
-            subaccount_id: None,
-            post_only: Some(true),
-            market_client_ref_price: None,
-            max_quote_debit_scaled: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+        .create({
+            let mut p =
+                CreateOrderParams::new(symbol.clone(), CreateSide::Sell, CreateOrderType::Limit);
+            p.quantity = Some(maker_qty);
+            p.price = Some(create_price.clone());
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p.client_order_id = Some(maker_cid.clone());
+            p.post_only = Some(true);
+            p
         })
         .await
     {
@@ -159,23 +151,15 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
 
     let created = match client
         .orders
-        .create(CreateOrderParams {
-            symbol: symbol.clone(),
-            side: CreateSide::Buy,
-            order_type: CreateOrderType::Limit,
-            quantity: Some(taker_qty),
-            price: Some(create_price),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: Some(original_cid.clone()),
-            subaccount_id: None,
-            post_only: Some(false),
-            market_client_ref_price: None,
-            max_quote_debit_scaled: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+        .create({
+            let mut p =
+                CreateOrderParams::new(symbol.clone(), CreateSide::Buy, CreateOrderType::Limit);
+            p.quantity = Some(taker_qty);
+            p.price = Some(create_price);
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p.client_order_id = Some(original_cid.clone());
+            p.post_only = Some(false);
+            p
         })
         .await
     {

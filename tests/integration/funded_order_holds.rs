@@ -56,18 +56,16 @@ async fn order_hold_visible_while_open() {
         .expect("catalog scale");
     let client_order_id = unique_client_order_id("hold");
 
-    let params = CreateOrderParams {
-        symbol: symbol.clone(),
-        side: CreateSide::Buy,
-        order_type: CreateOrderType::Limit,
-        quantity: match Quantity::from_decimal_str(&qty_str, scale, Some(symbol.clone()), None) {
+    let params = {
+        let mut p = CreateOrderParams::new(symbol.clone(), CreateSide::Buy, CreateOrderType::Limit);
+        p.quantity = match Quantity::from_decimal_str(&qty_str, scale, Some(symbol.clone()), None) {
             Ok(q) => Some(q),
             Err(err) => {
                 eprintln!("skip: qty: {err}");
                 return;
             }
-        },
-        price: Some(
+        };
+        p.price = Some(
             match Price::from_decimal_str(&price_str, Some(symbol.clone())) {
                 Ok(p) => p,
                 Err(err) => {
@@ -75,18 +73,11 @@ async fn order_hold_visible_while_open() {
                     return;
                 }
             },
-        ),
-        time_in_force: Some(CreateTimeInForce::Gtc),
-        client_order_id: Some(client_order_id.clone()),
-        subaccount_id: None,
-        post_only: Some(true),
-        market_client_ref_price: None,
-        max_quote_debit_scaled: None,
-        fee_asset: None,
-        self_trade_prevention: None,
-        market_max_slippage: None,
-        attached_risk: None,
-        expire_at: None,
+        );
+        p.time_in_force = Some(CreateTimeInForce::Gtc);
+        p.client_order_id = Some(client_order_id.clone());
+        p.post_only = Some(true);
+        p
     };
 
     let created = match client.orders.create(params).await {

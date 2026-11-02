@@ -395,11 +395,9 @@ async fn digit_only_public_subaccount_id_uses_canonical_base58_on_order_wire() {
         .unwrap();
     client
         .orders
-        .create(CreateOrderParams {
-            symbol: "BTC-USDT".into(),
-            side: CreateSide::Buy,
-            order_type: CreateOrderType::Limit,
-            quantity: Some(
+        .create({
+            let mut p = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+            p.quantity = Some(
                 Quantity::from_scaled(
                     1,
                     Some(8),
@@ -408,19 +406,11 @@ async fn digit_only_public_subaccount_id_uses_canonical_base58_on_order_wire() {
                     Some(1),
                 )
                 .unwrap(),
-            ),
-            max_quote_debit_scaled: None,
-            price: Some(Price::from_ticks(1, Some("BTC-USDT".into())).unwrap()),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: Some("scope-wire".into()),
-            subaccount_id: None,
-            post_only: None,
-            market_client_ref_price: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+            );
+            p.price = Some(Price::from_ticks(1, Some("BTC-USDT".into())).unwrap());
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p.client_order_id = Some("scope-wire".into());
+            p
         })
         .await
         .unwrap();
@@ -494,23 +484,14 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
     let price = Price::from_ticks(1, Some("BTC-USDT".into())).unwrap();
     let order_error = client
         .orders
-        .create(CreateOrderParams {
-            symbol: "BTC-USDT".into(),
-            side: CreateSide::Buy,
-            order_type: CreateOrderType::Limit,
-            quantity: Some(quantity.clone()),
-            max_quote_debit_scaled: None,
-            price: Some(price.clone()),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: Some("fault-order".into()),
-            subaccount_id: Some(4),
-            post_only: None,
-            market_client_ref_price: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+        .create({
+            let mut p = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+            p.quantity = Some(quantity.clone());
+            p.price = Some(price.clone());
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p.client_order_id = Some("fault-order".into());
+            p.subaccount_id = Some(4);
+            p
         })
         .await
         .unwrap_err();
@@ -518,32 +499,18 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
 
     let trigger_error = client
         .triggers
-        .create(CreateTriggerParams {
-            symbol: "BTC-USDT".into(),
-            trigger_type: CreateTriggerType::StopLoss,
-            side: CreateSide::Sell,
-            order_type: CreateOrderType::Market,
-            qty: quantity,
-            trigger_price: Some(price),
-            limit_price: None,
-            trigger_price_source: None,
-            time_in_force: None,
-            subaccount_id: Some(4),
-            client_trigger_id: "fault-trigger".into(),
-            post_only: false,
-            activation_price: None,
-            trailing_distance_ticks: None,
-            trailing_distance_bps: None,
-            max_slippage_ticks: None,
-            max_slippage_bps: None,
-            twap_duration_ms: None,
-            twap_slice_interval_ms: None,
-            ladder_price_min: None,
-            ladder_price_max: None,
-            ladder_levels: None,
-            ladder_distribution: None,
-            fee_asset: None,
-            self_trade_prevention_mode: None,
+        .create({
+            let mut p = CreateTriggerParams::new(
+                "BTC-USDT",
+                CreateTriggerType::StopLoss,
+                CreateSide::Sell,
+                CreateOrderType::Market,
+                quantity,
+            );
+            p.trigger_price = Some(price);
+            p.subaccount_id = Some(4);
+            p.client_trigger_id = "fault-trigger".into();
+            p
         })
         .await
         .unwrap_err();
@@ -640,23 +607,13 @@ async fn l2_invalid_client_order_and_trigger_ids_fail_closed_without_hitting_con
 
     let order_err = client
         .orders
-        .create(CreateOrderParams {
-            symbol: "BTC-USDT".into(),
-            side: CreateSide::Buy,
-            order_type: CreateOrderType::Limit,
-            quantity: Some(quantity.clone()),
-            max_quote_debit_scaled: None,
-            price: Some(price.clone()),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: Some("bad id!".into()),
-            subaccount_id: None,
-            post_only: None,
-            market_client_ref_price: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+        .create({
+            let mut p = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+            p.quantity = Some(quantity.clone());
+            p.price = Some(price.clone());
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p.client_order_id = Some("bad id!".into());
+            p
         })
         .await
         .expect_err("invalid client_order_id must fail locally");
@@ -667,32 +624,17 @@ async fn l2_invalid_client_order_and_trigger_ids_fail_closed_without_hitting_con
 
     let trigger_err = client
         .triggers
-        .create(CreateTriggerParams {
-            symbol: "BTC-USDT".into(),
-            trigger_type: CreateTriggerType::StopLoss,
-            side: CreateSide::Sell,
-            order_type: CreateOrderType::Market,
-            qty: quantity,
-            trigger_price: Some(price),
-            limit_price: None,
-            trigger_price_source: None,
-            time_in_force: None,
-            subaccount_id: None,
-            client_trigger_id: "x".repeat(37),
-            post_only: false,
-            activation_price: None,
-            trailing_distance_ticks: None,
-            trailing_distance_bps: None,
-            max_slippage_ticks: None,
-            max_slippage_bps: None,
-            twap_duration_ms: None,
-            twap_slice_interval_ms: None,
-            ladder_price_min: None,
-            ladder_price_max: None,
-            ladder_levels: None,
-            ladder_distribution: None,
-            fee_asset: None,
-            self_trade_prevention_mode: None,
+        .create({
+            let mut p = CreateTriggerParams::new(
+                "BTC-USDT",
+                CreateTriggerType::StopLoss,
+                CreateSide::Sell,
+                CreateOrderType::Market,
+                quantity,
+            );
+            p.trigger_price = Some(price);
+            p.client_trigger_id = "x".repeat(37);
+            p
         })
         .await
         .expect_err("oversized client_trigger_id must fail locally");

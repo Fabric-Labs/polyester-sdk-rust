@@ -1354,28 +1354,14 @@ impl OrdersService {
         price: Option<Price>,
         client_order_id: Option<&str>,
     ) -> CreateOrderParams {
-        let client_order_id = client_order_id
+        let mut params = CreateOrderParams::new(symbol, side, order_type);
+        params.quantity = Some(quantity);
+        params.price = price;
+        params.client_order_id = client_order_id
             .map(str::trim)
             .filter(|s| !s.is_empty())
             .map(|s| s.to_owned());
-        CreateOrderParams {
-            symbol: symbol.into(),
-            side,
-            order_type,
-            quantity: Some(quantity),
-            max_quote_debit_scaled: None,
-            price,
-            time_in_force: None,
-            client_order_id,
-            subaccount_id: None,
-            post_only: None,
-            market_client_ref_price: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
-        }
+        params
     }
 
     /// Resolve the catalog quantity scale for a same-symbol batch replace.

@@ -300,32 +300,21 @@ async fn create_ladder_decodes_executed_fields() {
         }
     };
 
-    let params = CreateTriggerParams {
-        symbol: symbol.clone(),
-        trigger_type: CreateTriggerType::Ladder,
-        side: CreateSide::Buy,
-        order_type: CreateOrderType::Limit,
-        qty: total_qty,
-        trigger_price: None,
-        limit_price: Some(max_price.clone()),
-        trigger_price_source: None,
-        time_in_force: None,
-        subaccount_id: None,
-        client_trigger_id: unique_client_order_id("trg-ladder-exec"),
-        post_only: false,
-        activation_price: None,
-        trailing_distance_ticks: None,
-        trailing_distance_bps: None,
-        max_slippage_ticks: None,
-        max_slippage_bps: None,
-        twap_duration_ms: None,
-        twap_slice_interval_ms: None,
-        ladder_price_min: Some(min_price),
-        ladder_price_max: Some(max_price),
-        ladder_levels: Some(2),
-        ladder_distribution: Some("linear".into()),
-        fee_asset: None,
-        self_trade_prevention_mode: None,
+    let params = {
+        let mut p = CreateTriggerParams::new(
+            symbol.clone(),
+            CreateTriggerType::Ladder,
+            CreateSide::Buy,
+            CreateOrderType::Limit,
+            total_qty,
+        );
+        p.limit_price = Some(max_price.clone());
+        p.client_trigger_id = unique_client_order_id("trg-ladder-exec");
+        p.ladder_price_min = Some(min_price);
+        p.ladder_price_max = Some(max_price);
+        p.ladder_levels = Some(2);
+        p.ladder_distribution = Some("linear".into());
+        p
     };
     match client.triggers.create(params).await {
         Ok(created) => {
@@ -434,32 +423,20 @@ async fn twap_market_ioc_accepts_slippage() {
         (None, Some(25_i32), "trg-twap-bps"),
         (Some(1_i64), None, "trg-twap-ticks"),
     ] {
-        let params = CreateTriggerParams {
-            symbol: symbol.clone(),
-            trigger_type: CreateTriggerType::Twap,
-            side: CreateSide::Buy,
-            order_type: CreateOrderType::Market,
-            qty: qty.clone(),
-            trigger_price: None,
-            limit_price: None,
-            trigger_price_source: None,
-            time_in_force: None,
-            subaccount_id: None,
-            client_trigger_id: unique_client_order_id(prefix),
-            post_only: false,
-            activation_price: None,
-            trailing_distance_ticks: None,
-            trailing_distance_bps: None,
-            max_slippage_ticks: ticks,
-            max_slippage_bps: bps,
-            twap_duration_ms: Some(600_000),
-            twap_slice_interval_ms: Some(300_000),
-            ladder_price_min: None,
-            ladder_price_max: None,
-            ladder_levels: None,
-            ladder_distribution: None,
-            fee_asset: None,
-            self_trade_prevention_mode: None,
+        let params = {
+            let mut p = CreateTriggerParams::new(
+                symbol.clone(),
+                CreateTriggerType::Twap,
+                CreateSide::Buy,
+                CreateOrderType::Market,
+                qty.clone(),
+            );
+            p.client_trigger_id = unique_client_order_id(prefix);
+            p.max_slippage_ticks = ticks;
+            p.max_slippage_bps = bps;
+            p.twap_duration_ms = Some(600_000);
+            p.twap_slice_interval_ms = Some(300_000);
+            p
         };
         match client.triggers.create(params).await {
             Ok(created) => {

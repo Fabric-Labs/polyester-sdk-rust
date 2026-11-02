@@ -1,17 +1,17 @@
 error[E0308]: mismatched types
- --> tests/ui/no_bare_i64_as_quote_budget.rs:9:38
+ --> tests/ui/no_bare_i64_as_quote_budget.rs:5:42
   |
-9 |         max_quote_debit_scaled: Some(5_000_000_i64),
-  |                                 ---- ^^^^^^^^^^^^^ expected `Quantity`, found `i64`
-  |                                 |
-  |                                 arguments to this enum variant are incorrect
+5 |     params.max_quote_debit_scaled = Some(5_000_000_i64);
+  |                                     ---- ^^^^^^^^^^^^^ expected `Quantity`, found `i64`
+  |                                     |
+  |                                     arguments to this enum variant are incorrect
   |
 help: the type constructed contains `i64` due to the type of the argument passed
- --> tests/ui/no_bare_i64_as_quote_budget.rs:9:33
+ --> tests/ui/no_bare_i64_as_quote_budget.rs:5:37
   |
-9 |         max_quote_debit_scaled: Some(5_000_000_i64),
-  |                                 ^^^^^-------------^
-  |                                      |
-  |                                      this argument influences the type of `Some`
+5 |     params.max_quote_debit_scaled = Some(5_000_000_i64);
+  |                                     ^^^^^-------------^
+  |                                          |
+  |                                          this argument influences the type of `Some`
 note: tuple variant defined here
  --> $RUST/core/src/option.rs

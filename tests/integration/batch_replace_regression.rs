@@ -121,30 +121,22 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
     let mut client_order_ids = Vec::with_capacity(BATCH_SIZE);
     for i in 0..BATCH_SIZE {
         let cid = unique_client_order_id(&format!("br-{i}"));
-        let params = CreateOrderParams {
-            symbol: symbol.clone(),
-            side: CreateSide::Buy,
-            order_type: CreateOrderType::Limit,
-            quantity: match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
+        let params = {
+            let mut p =
+                CreateOrderParams::new(symbol.clone(), CreateSide::Buy, CreateOrderType::Limit);
+            p.quantity = match Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None) {
                 Ok(q) => Some(q),
                 Err(err) => {
                     eprintln!("skip: qty: {err}");
                     let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
                     return;
                 }
-            },
-            price: Some(Price::from_decimal_str(&price, Some(symbol.clone())).expect("price")),
-            time_in_force: Some(CreateTimeInForce::Gtc),
-            client_order_id: Some(cid.clone()),
-            subaccount_id: None,
-            post_only: Some(true),
-            market_client_ref_price: None,
-            max_quote_debit_scaled: None,
-            fee_asset: None,
-            self_trade_prevention: None,
-            market_max_slippage: None,
-            attached_risk: None,
-            expire_at: None,
+            };
+            p.price = Some(Price::from_decimal_str(&price, Some(symbol.clone())).expect("price"));
+            p.time_in_force = Some(CreateTimeInForce::Gtc);
+            p.client_order_id = Some(cid.clone());
+            p.post_only = Some(true);
+            p
         };
         match client.orders.create(params).await {
             Ok(_) => match wait_for_open_order(&client, &cid, Duration::from_secs(15)).await {

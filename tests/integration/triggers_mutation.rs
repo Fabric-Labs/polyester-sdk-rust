@@ -67,32 +67,18 @@ async fn trigger_pause_resume_cancel() {
         }
     };
 
-    let params = CreateTriggerParams {
-        symbol: symbol.clone(),
-        trigger_type: CreateTriggerType::StopLoss,
-        side: CreateSide::Buy,
-        order_type: CreateOrderType::Limit,
-        qty,
-        trigger_price: Some(trigger_price),
-        limit_price: Some(limit_price),
-        trigger_price_source: None,
-        time_in_force: None,
-        subaccount_id: None,
-        client_trigger_id: client_trigger_id.clone(),
-        post_only: false,
-        activation_price: None,
-        trailing_distance_ticks: None,
-        trailing_distance_bps: None,
-        max_slippage_ticks: None,
-        max_slippage_bps: None,
-        twap_duration_ms: None,
-        twap_slice_interval_ms: None,
-        ladder_price_min: None,
-        ladder_price_max: None,
-        ladder_levels: None,
-        ladder_distribution: None,
-        fee_asset: None,
-        self_trade_prevention_mode: None,
+    let params = {
+        let mut p = CreateTriggerParams::new(
+            symbol.clone(),
+            CreateTriggerType::StopLoss,
+            CreateSide::Buy,
+            CreateOrderType::Limit,
+            qty,
+        );
+        p.trigger_price = Some(trigger_price);
+        p.limit_price = Some(limit_price);
+        p.client_trigger_id = client_trigger_id.clone();
+        p
     };
 
     let created = match client.triggers.create(params).await {
