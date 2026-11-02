@@ -1,32 +1,48 @@
 # Changelog
 
-## 0.5.1
+## 0.6.0
 
-Package version: `0.5.1`. Git tag: `v0.5.1`. Released 2026-11-02.
+Package version: `0.6.0`. Git tag: `v0.6.0`. Released 2026-11-02.
 
 **What a trading bot gains.** A sell order can carry an attached trailing stop
 again. That trailing stop buys back, and the server now requires the most its
 exit pays; 0.5.0 could not send it, so every sell order with an attached
-trailing stop was rejected. Set `TrailingStop::limit_price`.
+trailing stop was rejected. Set it with `TrailingStop::with_limit_price`.
+
+This is a minor release because input structs changed shape. The order and
+trigger inputs that grow optional fields are now `#[non_exhaustive]` with
+constructors, so future optional fields arrive in compatible releases. The Go
+and Python SDKs ship the same fix as 0.5.1, without breaking changes.
 
 An environment requires the limit price once it runs the 0.5.0 contract:
 devnet first, then testnet after its next upgrade.
 
 **Breaking changes**
-- `TrailingStop` has a new public field, `limit_price: Option<Price>`. Code
-  that builds a `TrailingStop` with a struct literal must add `limit_price:
-  None` (or the buy-back price for a sell order).
+- `CreateOrderParams`, `PreviewOrderParams`, `CreateTriggerParams`, `RiskLeg`
+  and `TrailingStop` are `#[non_exhaustive]`: code outside the crate can no
+  longer build them with a struct literal. Use `CreateOrderParams::new(symbol,
+  side, order_type)`, `PreviewOrderParams::new(symbol, side, order_type)`,
+  `CreateTriggerParams::new(symbol, trigger_type, side, order_type, qty)`,
+  `RiskLeg::market(trigger_price)` / `RiskLeg::limit(trigger_price,
+  limit_price)` or `TrailingStop::new(distance)`, then set optional fields
+  (`params.price = Some(..)`) or chain the leg setters
+  (`.with_activation_price(..)`, `.with_limit_price(..)`,
+  `.with_trigger_price_source(..)`, `.with_max_slippage(..)`).
+  `OrdersService::create_params` is unchanged. Inputs that derive `Default`
+  (`AttachedRisk` and the list and read options) are unchanged: keep
+  `..Default::default()`.
+- `TrailingStop` has a new public field, `limit_price: Option<Price>`.
 - Creating a sell order whose attached trailing stop has no `limit_price` now
   fails locally with `Error::Validation`; the server rejected it already.
 
 ### Fixed
-- Attached trailing stops send `TrailingStop::limit_price` as the trailing
-  stop's maximum buy-back price. On order create, preview and batch create, a
-  sell order's trailing stop requires it and a buy order's trailing stop
-  rejects it. On every path it must be positive and at least
-  `activation_price` when that is set. A modify or batch replace does not
-  carry the order's side, so the server checks the side rule there. Order
-  reads do not return the limit price yet.
+- Attached trailing stops send `TrailingStop::limit_price` (or
+  `TrailingStop::with_limit_price`) as the trailing stop's maximum buy-back
+  price. On order create, preview and batch create, a sell order's trailing
+  stop requires it and a buy order's trailing stop rejects it. On every path
+  it must be positive and at least `activation_price` when that is set. A
+  modify or batch replace does not carry the order's side, so the server
+  checks the side rule there. Order reads do not return the limit price yet.
 
 ## 0.5.0
 
