@@ -12058,7 +12058,8 @@ pub struct Subaccount {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub id: u64,
-    /// Role of the current caller on this sub-account.
+    /// Role of the current caller on this sub-account. SUBACCOUNT_ROLE_UNSPECIFIED
+    /// when removed is true.
     ///
     /// Field 2: `role`
     #[serde(
@@ -12181,8 +12182,8 @@ pub struct Subaccount {
     pub smart_account_salt_nonce: ::core::option::Option<u32>,
     /// Time in UTC when this sub-account's configuration was last changed. For the
     /// same sub-account, later is fresher, equal is an idempotent replay, and
-    /// earlier is stale. Equal timestamps with different configuration indicate
-    /// an invariant failure.
+    /// earlier is stale. Equal timestamps with different configuration, other
+    /// than role and removed, indicate an invariant failure.
     ///
     /// Field 14: `updated_at`
     #[serde(
@@ -12200,6 +12201,26 @@ pub struct Subaccount {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub revision: u64,
+    /// True when the caller no longer has access to this sub-account, for
+    /// example after its owner removed the caller as a member: remove the
+    /// sub-account from the caller's list. Only real-time updates set it;
+    /// responses list only sub-accounts the caller can access. A change of the
+    /// caller's role or access does not change revision or updated_at, so
+    /// real-time updates deliver such changes in order and each one applies as
+    /// it arrives. Ending access also ends the caller's subscriptions to this
+    /// sub-account's real-time channels, and can, rarely, also end a
+    /// subscription made after access was granted again. When the server ends a
+    /// subscription to one of this sub-account's channels while the latest
+    /// update lists this sub-account with a role and removed false, subscribe
+    /// again: access is checked again on subscribe.
+    ///
+    /// Field 16: `removed`
+    #[serde(
+        rename = "removed",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub removed: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -12225,6 +12246,7 @@ impl ::core::fmt::Debug for Subaccount {
             .field("smart_account_salt_nonce", &self.smart_account_salt_nonce)
             .field("updated_at", &self.updated_at)
             .field("revision", &self.revision)
+            .field("removed", &self.removed)
             .finish()
     }
 }
@@ -12329,6 +12351,9 @@ impl ::buffa::Message for Subaccount {
         if self.revision != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
         }
+        if self.removed {
+            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -12394,6 +12419,9 @@ impl ::buffa::Message for Subaccount {
         }
         if self.revision != 0u64 {
             ::buffa::types::put_uint64_field(15u32, self.revision, buf);
+        }
+        if self.removed {
+            ::buffa::types::put_bool_field(16u32, self.removed, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -12524,6 +12552,13 @@ impl ::buffa::Message for Subaccount {
                 )?;
                 self.revision = ::buffa::types::decode_uint64(buf)?;
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.removed = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -12547,6 +12582,7 @@ impl ::buffa::Message for Subaccount {
         self.smart_account_salt_nonce = ::core::option::Option::None;
         self.updated_at = ::buffa::MessageField::none();
         self.revision = 0u64;
+        self.removed = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -36846,6 +36882,9 @@ pub enum AuthErrorCode {
     AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED = 45i32,
     /// The request could not be completed right now and changed nothing. Retry the same request.
     AUTH_TEMPORARILY_UNAVAILABLE = 46i32,
+    /// The account owns this sub-account. An owner cannot be invited to it, and member role
+    /// changes and member removal do not apply to the owner.
+    AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED = 47i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -36986,6 +37025,9 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_TEMPORARILY_UNAVAILABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthTemporarilyUnavailable: Self = Self::AUTH_TEMPORARILY_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthSubaccountOwnerRoleLocked: Self = Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -37145,6 +37187,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
                 ::core::option::Option::Some(Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED)
             }
             46i32 => ::core::option::Option::Some(Self::AUTH_TEMPORARILY_UNAVAILABLE),
+            47i32 => {
+                ::core::option::Option::Some(Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -37213,6 +37258,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
                 "AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED"
             }
             Self::AUTH_TEMPORARILY_UNAVAILABLE => "AUTH_TEMPORARILY_UNAVAILABLE",
+            Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED => {
+                "AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -37355,6 +37403,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_TEMPORARILY_UNAVAILABLE" => {
                 ::core::option::Option::Some(Self::AUTH_TEMPORARILY_UNAVAILABLE)
             }
+            "AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED" => {
+                ::core::option::Option::Some(Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -37406,6 +37457,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_SUBACCOUNT_CHALLENGE_INVALID,
             Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED,
             Self::AUTH_TEMPORARILY_UNAVAILABLE,
+            Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED,
         ]
     }
 }
@@ -62607,7 +62659,8 @@ pub mod __buffa {
             ///
             /// Field 1: `id`
             pub id: u64,
-            /// Role of the current caller on this sub-account.
+            /// Role of the current caller on this sub-account. SUBACCOUNT_ROLE_UNSPECIFIED
+            /// when removed is true.
             ///
             /// Field 2: `role`
             pub role: ::buffa::EnumValue<super::super::SubaccountRole>,
@@ -62663,8 +62716,8 @@ pub mod __buffa {
             pub smart_account_salt_nonce: ::core::option::Option<u32>,
             /// Time in UTC when this sub-account's configuration was last changed. For the
             /// same sub-account, later is fresher, equal is an idempotent replay, and
-            /// earlier is stale. Equal timestamps with different configuration indicate
-            /// an invariant failure.
+            /// earlier is stale. Equal timestamps with different configuration, other
+            /// than role and removed, indicate an invariant failure.
             ///
             /// Field 14: `updated_at`
             pub updated_at: ::buffa::MessageFieldView<
@@ -62674,6 +62727,21 @@ pub mod __buffa {
             ///
             /// Field 15: `revision`
             pub revision: u64,
+            /// True when the caller no longer has access to this sub-account, for
+            /// example after its owner removed the caller as a member: remove the
+            /// sub-account from the caller's list. Only real-time updates set it;
+            /// responses list only sub-accounts the caller can access. A change of the
+            /// caller's role or access does not change revision or updated_at, so
+            /// real-time updates deliver such changes in order and each one applies as
+            /// it arrives. Ending access also ends the caller's subscriptions to this
+            /// sub-account's real-time channels, and can, rarely, also end a
+            /// subscription made after access was granted again. When the server ends a
+            /// subscription to one of this sub-account's channels while the latest
+            /// update lists this sub-account with a role and removed false, subscribe
+            /// again: access is checked again on subscribe.
+            ///
+            /// Field 16: `removed`
+            pub removed: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SubaccountView<'a> {
@@ -62842,6 +62910,13 @@ pub mod __buffa {
                         )?;
                         view.revision = ::buffa::types::decode_uint64(&mut cur)?;
                     }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.removed = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -62889,6 +62964,7 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     revision: self.revision,
+                    removed: self.removed,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -62977,6 +63053,9 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::uint64_encoded_len(self.revision) as u32;
                 }
+                if self.removed {
+                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -63055,6 +63134,9 @@ pub mod __buffa {
                 }
                 if self.revision != 0u64 {
                     ::buffa::types::put_uint64_field(15u32, self.revision, buf);
+                }
+                if self.removed {
+                    ::buffa::types::put_bool_field(16u32, self.removed, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -63158,6 +63240,9 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.revision),
                         )?;
                 }
+                if self.removed {
+                    __map.serialize_entry("removed", &self.removed)?;
+                }
                 __map.end()
             }
         }
@@ -63256,7 +63341,8 @@ pub mod __buffa {
             pub fn id(&self) -> u64 {
                 self.0.reborrow().id
             }
-            /// Role of the current caller on this sub-account.
+            /// Role of the current caller on this sub-account. SUBACCOUNT_ROLE_UNSPECIFIED
+            /// when removed is true.
             ///
             /// Field 2: `role`
             #[must_use]
@@ -63348,8 +63434,8 @@ pub mod __buffa {
             }
             /// Time in UTC when this sub-account's configuration was last changed. For the
             /// same sub-account, later is fresher, equal is an idempotent replay, and
-            /// earlier is stale. Equal timestamps with different configuration indicate
-            /// an invariant failure.
+            /// earlier is stale. Equal timestamps with different configuration, other
+            /// than role and removed, indicate an invariant failure.
             ///
             /// Field 14: `updated_at`
             #[must_use]
@@ -63366,6 +63452,24 @@ pub mod __buffa {
             #[must_use]
             pub fn revision(&self) -> u64 {
                 self.0.reborrow().revision
+            }
+            /// True when the caller no longer has access to this sub-account, for
+            /// example after its owner removed the caller as a member: remove the
+            /// sub-account from the caller's list. Only real-time updates set it;
+            /// responses list only sub-accounts the caller can access. A change of the
+            /// caller's role or access does not change revision or updated_at, so
+            /// real-time updates deliver such changes in order and each one applies as
+            /// it arrives. Ending access also ends the caller's subscriptions to this
+            /// sub-account's real-time channels, and can, rarely, also end a
+            /// subscription made after access was granted again. When the server ends a
+            /// subscription to one of this sub-account's channels while the latest
+            /// update lists this sub-account with a role and removed false, subscribe
+            /// again: access is checked again on subscribe.
+            ///
+            /// Field 16: `removed`
+            #[must_use]
+            pub fn removed(&self) -> bool {
+                self.0.reborrow().removed
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SubaccountView<'static>>>

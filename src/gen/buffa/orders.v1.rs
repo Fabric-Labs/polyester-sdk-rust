@@ -1056,8 +1056,8 @@ pub enum ErrorCode {
     ERROR_CODE_ORDER_PLACEMENT_PENDING = 227i32,
     /// The modify behavior is not a known behavior.
     ERROR_CODE_INVALID_MODIFY_BEHAVIOR = 228i32,
-    /// An item of the batch modify did not use the REPLACE_ONLY behavior, so the
-    /// batch was refused.
+    /// No longer returned: each BatchReplaceOrders item follows ModifyOrder's
+    /// default amend-or-replace rule. The value stays reserved.
     ERROR_CODE_BATCH_REPLACE_ONLY_REQUIRED = 229i32,
     /// An item of the batch modify named no symbol, or another symbol than the
     /// batch's first item, so the batch was refused.
@@ -1272,6 +1272,10 @@ pub enum ErrorCode {
     /// it may have been created; read the triggers for its client trigger ID
     /// before retrying.
     ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN = 304i32,
+    /// The request names a listed trading pair other than the trigger's own, so
+    /// it was refused. Nothing changed; name the trigger's own pair, or omit the
+    /// symbol. A pair that is not listed is ERROR_CODE_UNKNOWN_SYMBOL.
+    ERROR_CODE_TRIGGER_SYMBOL_MISMATCH = 305i32,
     /// The account has reached its maximum number of resting orders in this
     /// market. Good-till-cancelled and good-till-date orders count until they
     /// end; immediate-or-cancel, fill-or-kill and market orders never count, and
@@ -1279,7 +1283,8 @@ pub enum ErrorCode {
     /// in this market first.
     ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR = 306i32,
     /// The order already carries every attached leg it may hold, so another
-    /// attached leg was refused.
+    /// attached leg was refused. Legs being cancelled count until they end:
+    /// retry once they have ended.
     ERROR_CODE_ATTACHED_LEGS_EXCEEDED = 86i32,
     /// The trigger's fee asset was not valid.
     ERROR_CODE_FEE_ASSET_INVALID = 87i32,
@@ -1852,6 +1857,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TriggerCreateOutcomeUnknown: Self = Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_SYMBOL_MISMATCH`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerSymbolMismatch: Self = Self::ERROR_CODE_TRIGGER_SYMBOL_MISMATCH;
     ///Idiomatic alias for [`Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MaxOpenOrdersPerPair: Self = Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR;
@@ -2479,6 +2487,9 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
                 )
             }
+            305i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_SYMBOL_MISMATCH)
+            }
             306i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR)
             }
@@ -2892,6 +2903,9 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN => {
                 "ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN"
+            }
+            Self::ERROR_CODE_TRIGGER_SYMBOL_MISMATCH => {
+                "ERROR_CODE_TRIGGER_SYMBOL_MISMATCH"
             }
             Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR => {
                 "ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR"
@@ -3571,6 +3585,9 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
                 )
             }
+            "ERROR_CODE_TRIGGER_SYMBOL_MISMATCH" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_TRIGGER_SYMBOL_MISMATCH)
+            }
             "ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR)
             }
@@ -3790,6 +3807,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
             Self::ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN,
             Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
+            Self::ERROR_CODE_TRIGGER_SYMBOL_MISMATCH,
             Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR,
             Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED,
             Self::ERROR_CODE_FEE_ASSET_INVALID,
@@ -4440,7 +4458,7 @@ impl ::buffa::Enumeration for ModifyActionTaken {
 pub enum BatchReplaceAdmissionStatus {
     /// Admission status is unavailable.
     BATCH_REPLACE_ADMISSION_STATUS_UNSPECIFIED = 0i32,
-    /// Every requested operation was admitted, including cancel-only outcomes.
+    /// Every requested operation was admitted, amended items included.
     BATCH_REPLACE_ADMISSION_STATUS_ADMITTED = 1i32,
     /// Some requested replacements were admitted and others were rejected.
     BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED = 2i32,
@@ -4640,7 +4658,8 @@ impl ::buffa::Enumeration for BatchReplaceAdmissionStatus {
 pub enum BatchReplaceItemAdmissionStatus {
     /// Item admission status is unavailable.
     BATCH_REPLACE_ITEM_ADMISSION_STATUS_UNSPECIFIED = 0i32,
-    /// The operation was admitted and handed to execution. Check action_taken for cancel-only outcomes.
+    /// The operation was admitted and handed to execution. action_taken tells whether
+    /// the order was amended under its own order ID or replaced by a successor.
     BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED = 1i32,
     /// The replacement was rejected before execution handoff.
     BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED = 2i32,
@@ -9694,6 +9713,21 @@ pub struct TrailingStopPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub trigger_price_source: ::buffa::EnumValue<TriggerPriceSource>,
+    /// Maximum price of a trailing stop that buys back, in quote units scaled by
+    /// 1e9: the most its exit pays per unit, at which the quote it may spend is
+    /// reserved with the exit's fee. Required when the parent order sells, so
+    /// the trailing stop buys; must be unset when the parent order buys. A rise
+    /// that fires above it still fires, and the exit fills only at or below it.
+    /// Changing it with ModifyOrder replaces the leg.
+    ///
+    /// Field 4: `limit_price_ticks`
+    #[serde(
+        rename = "limitPriceTicks",
+        alias = "limit_price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub limit_price_ticks: i64,
     #[serde(flatten)]
     pub trailing_distance: ::core::option::Option<
         __buffa::oneof::trailing_stop_policy::TrailingDistance,
@@ -9711,6 +9745,7 @@ impl ::core::fmt::Debug for TrailingStopPolicy {
         f.debug_struct("TrailingStopPolicy")
             .field("activation_price_ticks", &self.activation_price_ticks)
             .field("trigger_price_source", &self.trigger_price_source)
+            .field("limit_price_ticks", &self.limit_price_ticks)
             .field("trailing_distance", &self.trailing_distance)
             .field("max_slippage", &self.max_slippage)
             .finish()
@@ -9761,6 +9796,11 @@ impl ::buffa::Message for TrailingStopPolicy {
                     + ::buffa::types::int64_encoded_len(self.activation_price_ticks)
                         as u32;
         }
+        if self.limit_price_ticks != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.limit_price_ticks) as u32;
+        }
         if let ::core::option::Option::Some(ref v) = self.max_slippage {
             match v {
                 __buffa::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
@@ -9805,6 +9845,9 @@ impl ::buffa::Message for TrailingStopPolicy {
         }
         if self.activation_price_ticks != 0i64 {
             ::buffa::types::put_int64_field(3u32, self.activation_price_ticks, buf);
+        }
+        if self.limit_price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(4u32, self.limit_price_ticks, buf);
         }
         if let ::core::option::Option::Some(ref v) = self.max_slippage {
             match v {
@@ -9866,6 +9909,13 @@ impl ::buffa::Message for TrailingStopPolicy {
                 )?;
                 self.activation_price_ticks = ::buffa::types::decode_int64(buf)?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit_price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
             6u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -9907,6 +9957,7 @@ impl ::buffa::Message for TrailingStopPolicy {
     fn clear(&mut self) {
         self.trailing_distance = ::core::option::Option::None;
         self.activation_price_ticks = 0i64;
+        self.limit_price_ticks = 0i64;
         self.max_slippage = ::core::option::Option::None;
         self.trigger_price_source = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
@@ -9940,6 +9991,7 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                 let mut __f_trigger_price_source: ::core::option::Option<
                     ::buffa::EnumValue<TriggerPriceSource>,
                 > = None;
+                let mut __f_limit_price_ticks: ::core::option::Option<i64> = None;
                 let mut __oneof_trailing_distance: ::core::option::Option<
                     __buffa::oneof::trailing_stop_policy::TrailingDistance,
                 > = None;
@@ -9976,6 +10028,21 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "limitPriceTicks" | "limit_price_ticks" => {
+                            __f_limit_price_ticks = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = i64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<i64, D::Error> {
+                                        ::buffa::json_helpers::int64::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -10113,6 +10180,9 @@ impl<'de> serde::Deserialize<'de> for TrailingStopPolicy {
                 if let ::core::option::Option::Some(v) = __f_trigger_price_source {
                     __r.trigger_price_source = v;
                 }
+                if let ::core::option::Option::Some(v) = __f_limit_price_ticks {
+                    __r.limit_price_ticks = v;
+                }
                 __r.trailing_distance = __oneof_trailing_distance;
                 __r.max_slippage = __oneof_max_slippage;
                 Ok(__r)
@@ -10174,6 +10244,18 @@ pub mod trailing_stop_policy {
 /// fill, the legs are canceled with
 /// TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL. If no exit ran and the
 /// parent's whole fill is below one step, the legs fail.
+///
+/// The legs reserve what their exits would sell or spend, once for both legs:
+/// the base a sell exit sells, as each parent fill settles, and the quote a
+/// buy-back may spend at its legs' highest maximum price. A buy-back is
+/// reserved from the order's creation for the part of that cost the sale
+/// itself may not return, so an order whose balance cannot cover it is
+/// rejected with ERROR_CODE_INSUFFICIENT_FUNDS. The reserve shows in the
+/// balance's reserved amount, and an exit uses it when it is submitted. While
+/// the legs protect a position, orders and withdrawals that would use the
+/// reserved funds are rejected with ERROR_CODE_INSUFFICIENT_FUNDS: reduce or
+/// cancel the legs first. What the legs no longer need is released as they
+/// change and in full when they end.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -11987,7 +12069,8 @@ pub struct DeadManSwitchScope {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub symbol_id: u32,
-    /// Order side that is canceled. SIDE_UNSPECIFIED or omitted means both sides.
+    /// Order side that is canceled. Not set means both sides; JSON and REST
+    /// responses then omit it.
     ///
     /// Field 3: `side`
     #[serde(
@@ -14847,7 +14930,14 @@ pub const __MODIFY_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     from_json: ::buffa::type_registry::any_from_json::<ModifyOrderResponse>,
     is_wkt: false,
 };
-/// BatchReplaceOrderItem identifies one replacement inside a quote-refresh batch.
+/// BatchReplaceOrderItem identifies one order to modify inside a quote-refresh
+/// batch. Each item follows ModifyOrder's default AMEND_OR_REPLACE rule: an item
+/// that keeps the order's price (new_price_ticks unset or equal to it), does not
+/// raise its total quantity and keeps its client order ID amends the order in
+/// place, under the same order ID and with its queue priority kept. A new
+/// price, a larger total quantity or a new client order ID replaces it with a
+/// successor order under a new order ID, with its queue priority reset. To
+/// force a replacement, use ModifyOrder with REPLACE_ONLY.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -14882,7 +14972,8 @@ pub struct BatchReplaceOrderItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub new_attached_risk: ::buffa::MessageField<RiskPolicy>,
-    /// Optional new client order id when replace path is taken.
+    /// Optional client order ID for the successor. A value other than the order's
+    /// client order ID makes the item a replacement.
     ///
     /// Field 6: `new_client_order_id`
     #[serde(
@@ -15343,7 +15434,8 @@ pub struct BatchReplaceAdmissionItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub old_order_id: u64,
-    /// Assigned successor order ID. Unset for cancel-only outcomes and rejected items.
+    /// Assigned successor order ID, for a REPLACED item only. Unset for an AMENDED
+    /// item, whose order keeps old_order_id, and for rejected items.
     ///
     /// Field 4: `replacement_order_id`
     #[serde(
@@ -15353,7 +15445,7 @@ pub struct BatchReplaceAdmissionItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub replacement_order_id: u64,
-    /// Client order ID assigned to the successor when available.
+    /// Client order ID assigned to the successor, for a REPLACED item only.
     ///
     /// Field 5: `client_order_id`
     #[serde(
@@ -15380,9 +15472,12 @@ pub struct BatchReplaceAdmissionItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub error: ::buffa::MessageField<ErrorDetail>,
-    /// REPLACED admits a successor. AMENDED cancels the original order's remaining quantity
-    /// without a successor; keep tracking old_order_id until its terminal state is confirmed.
-    /// Unspecified for rejected items.
+    /// REPLACED admits a successor under replacement_order_id, with queue priority
+    /// reset. AMENDED keeps the order under old_order_id with no successor: the
+    /// order is amended in place and keeps its queue priority, or, when the new
+    /// total quantity is at or below its filled quantity, ends at its filled
+    /// quantity. Keep tracking old_order_id for an AMENDED item. Not set for
+    /// rejected items; JSON and REST responses then omit it.
     ///
     /// Field 8: `action_taken`
     #[serde(
@@ -15638,7 +15733,8 @@ pub const __BATCH_REPLACE_ADMISSION_ITEM_JSON_ANY: ::buffa::type_registry::JsonA
     from_json: ::buffa::type_registry::any_from_json::<BatchReplaceAdmissionItem>,
     is_wkt: false,
 };
-/// BatchReplaceOrdersRequest replaces same-symbol orders as one quote refresh.
+/// BatchReplaceOrdersRequest modifies same-symbol orders as one quote refresh:
+/// each item is amended in place or replaced as ModifyOrder decides by default.
 /// Identical retries replay the admission result for 60 seconds from acceptance;
 /// a different payload under the same key conflicts. Use a fresh key for a new batch.
 #[derive(Clone, PartialEq, Default)]
@@ -17711,13 +17807,13 @@ impl ::buffa::Enumeration for CancelReason {
 pub enum BatchReplacePhase {
     /// Phase is unavailable.
     BATCH_REPLACE_PHASE_UNSPECIFIED = 0i32,
-    /// The operation was admitted and handed to execution, including cancel-only outcomes.
+    /// The operation was admitted and handed to execution, amended items included.
     BATCH_REPLACE_PHASE_ADMITTED = 1i32,
-    /// The successor order is active.
+    /// The successor order, or the amended order, is active.
     BATCH_REPLACE_PHASE_WORKING = 2i32,
     /// The replacement was rejected.
     BATCH_REPLACE_PHASE_REJECTED = 3i32,
-    /// The successor, or original order for a cancel-only outcome, reached a terminal state.
+    /// The successor, or the amended order, reached a terminal state.
     BATCH_REPLACE_PHASE_TERMINAL = 4i32,
 }
 impl BatchReplacePhase {
@@ -18254,7 +18350,8 @@ pub struct OrderOrigin {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub scope: ::buffa::EnumValue<OrderOriginScope>,
-    /// Trigger strategy that created this order, or unspecified for direct orders.
+    /// Trigger strategy that created this order. Not set for direct orders; JSON
+    /// and REST responses then omit it.
     ///
     /// Field 2: `trigger_type`
     #[serde(
@@ -25048,7 +25145,7 @@ pub struct BatchReplaceStatusItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub old_order_id: u64,
-    /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
+    /// Assigned successor order ID. Zero for an amended item or rejection before assignment.
     ///
     /// Field 4: `replacement_order_id`
     #[serde(
@@ -25058,7 +25155,7 @@ pub struct BatchReplaceStatusItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub replacement_order_id: u64,
-    /// Current successor status, or original order status for a cancel-only outcome, when available.
+    /// Current successor status, or the amended order's status, when available.
     ///
     /// Field 5: `order_status`
     #[serde(
@@ -25087,8 +25184,8 @@ pub struct BatchReplaceStatusItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub updated_ts_ns: u64,
-    /// REPLACED admits a successor. AMENDED is cancel-only: no successor exists and
-    /// order_status describes old_order_id. Unspecified for rejected items.
+    /// REPLACED admits a successor. AMENDED keeps the order under old_order_id with
+    /// no successor, and order_status describes it. Unspecified for rejected items.
     ///
     /// Field 8: `action_taken`
     #[serde(
@@ -33349,6 +33446,15 @@ pub mod __buffa {
             pub trigger_price_source: ::buffa::EnumValue<
                 super::super::TriggerPriceSource,
             >,
+            /// Maximum price of a trailing stop that buys back, in quote units scaled by
+            /// 1e9: the most its exit pays per unit, at which the quote it may spend is
+            /// reserved with the exit's fee. Required when the parent order sells, so
+            /// the trailing stop buys; must be unset when the parent order buys. A rise
+            /// that fires above it still fires, and the exit fills only at or below it.
+            /// Changing it with ModifyOrder replaces the leg.
+            ///
+            /// Field 4: `limit_price_ticks`
+            pub limit_price_ticks: i64,
             pub trailing_distance: ::core::option::Option<
                 super::super::__buffa::view::oneof::trailing_stop_policy::TrailingDistance,
             >,
@@ -33405,6 +33511,13 @@ pub mod __buffa {
                         view.trigger_price_source = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -33481,6 +33594,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::TrailingStopPolicy {
                     activation_price_ticks: self.activation_price_ticks,
                     trigger_price_source: self.trigger_price_source,
+                    limit_price_ticks: self.limit_price_ticks,
                     trailing_distance: self
                         .trailing_distance
                         .as_ref()
@@ -33554,6 +33668,12 @@ pub mod __buffa {
                                 self.activation_price_ticks,
                             ) as u32;
                 }
+                if self.limit_price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.limit_price_ticks)
+                                as u32;
+                }
                 if let ::core::option::Option::Some(ref v) = self.max_slippage {
                     match v {
                         super::super::__buffa::view::oneof::trailing_stop_policy::MaxSlippage::MaxSlippageTicks(
@@ -33605,6 +33725,9 @@ pub mod __buffa {
                         self.activation_price_ticks,
                         buf,
                     );
+                }
+                if self.limit_price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(4u32, self.limit_price_ticks, buf);
                 }
                 if let ::core::option::Option::Some(ref v) = self.max_slippage {
                     match v {
@@ -33665,6 +33788,15 @@ pub mod __buffa {
                         .serialize_entry(
                             "triggerPriceSource",
                             &self.trigger_price_source,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.limit_price_ticks,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "limitPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.limit_price_ticks),
                         )?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.trailing_distance {
@@ -33832,6 +33964,18 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::TriggerPriceSource> {
                 self.0.reborrow().trigger_price_source
             }
+            /// Maximum price of a trailing stop that buys back, in quote units scaled by
+            /// 1e9: the most its exit pays per unit, at which the quote it may spend is
+            /// reserved with the exit's fee. Required when the parent order sells, so
+            /// the trailing stop buys; must be unset when the parent order buys. A rise
+            /// that fires above it still fires, and the exit fills only at or below it.
+            /// Changing it with ModifyOrder replaces the leg.
+            ///
+            /// Field 4: `limit_price_ticks`
+            #[must_use]
+            pub fn limit_price_ticks(&self) -> i64 {
+                self.0.reborrow().limit_price_ticks
+            }
             /// Oneof `trailing_distance`.
             #[must_use]
             pub fn trailing_distance(
@@ -33902,6 +34046,18 @@ pub mod __buffa {
         /// fill, the legs are canceled with
         /// TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL. If no exit ran and the
         /// parent's whole fill is below one step, the legs fail.
+        ///
+        /// The legs reserve what their exits would sell or spend, once for both legs:
+        /// the base a sell exit sells, as each parent fill settles, and the quote a
+        /// buy-back may spend at its legs' highest maximum price. A buy-back is
+        /// reserved from the order's creation for the part of that cost the sale
+        /// itself may not return, so an order whose balance cannot cover it is
+        /// rejected with ERROR_CODE_INSUFFICIENT_FUNDS. The reserve shows in the
+        /// balance's reserved amount, and an exit uses it when it is submitted. While
+        /// the legs protect a position, orders and withdrawals that would use the
+        /// reserved funds are rejected with ERROR_CODE_INSUFFICIENT_FUNDS: reduce or
+        /// cancel the legs first. What the legs no longer need is released as they
+        /// change and in full when they end.
         #[derive(Clone, Debug, Default)]
         pub struct RiskPolicyView<'a> {
             /// Optional take-profit configuration.
@@ -36302,7 +36458,8 @@ pub mod __buffa {
             ///
             /// Field 2: `symbol_id`
             pub symbol_id: u32,
-            /// Order side that is canceled. SIDE_UNSPECIFIED or omitted means both sides.
+            /// Order side that is canceled. Not set means both sides; JSON and REST
+            /// responses then omit it.
             ///
             /// Field 3: `side`
             pub side: ::buffa::EnumValue<super::super::Side>,
@@ -36593,7 +36750,8 @@ pub mod __buffa {
             pub fn symbol_id(&self) -> u32 {
                 self.0.reborrow().symbol_id
             }
-            /// Order side that is canceled. SIDE_UNSPECIFIED or omitted means both sides.
+            /// Order side that is canceled. Not set means both sides; JSON and REST
+            /// responses then omit it.
             ///
             /// Field 3: `side`
             #[must_use]
@@ -40512,7 +40670,14 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// BatchReplaceOrderItem identifies one replacement inside a quote-refresh batch.
+        /// BatchReplaceOrderItem identifies one order to modify inside a quote-refresh
+        /// batch. Each item follows ModifyOrder's default AMEND_OR_REPLACE rule: an item
+        /// that keeps the order's price (new_price_ticks unset or equal to it), does not
+        /// raise its total quantity and keeps its client order ID amends the order in
+        /// place, under the same order ID and with its queue priority kept. A new
+        /// price, a larger total quantity or a new client order ID replaces it with a
+        /// successor order under a new order ID, with its queue priority reset. To
+        /// force a replacement, use ModifyOrder with REPLACE_ONLY.
         #[derive(Clone, Debug, Default)]
         pub struct BatchReplaceOrderItemView<'a> {
             /// New limit price in quote units scaled by 1e9.
@@ -40530,7 +40695,8 @@ pub mod __buffa {
             pub new_attached_risk: ::buffa::MessageFieldView<
                 super::super::__buffa::view::RiskPolicyView<'a>,
             >,
-            /// Optional new client order id when replace path is taken.
+            /// Optional client order ID for the successor. A value other than the order's
+            /// client order ID makes the item a replacement.
             ///
             /// Field 6: `new_client_order_id`
             pub new_client_order_id: &'a str,
@@ -40984,7 +41150,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().new_attached_risk
             }
-            /// Optional new client order id when replace path is taken.
+            /// Optional client order ID for the successor. A value other than the order's
+            /// client order ID makes the item a replacement.
             ///
             /// Field 6: `new_client_order_id`
             #[must_use]
@@ -41054,11 +41221,12 @@ pub mod __buffa {
             ///
             /// Field 3: `old_order_id`
             pub old_order_id: u64,
-            /// Assigned successor order ID. Unset for cancel-only outcomes and rejected items.
+            /// Assigned successor order ID, for a REPLACED item only. Unset for an AMENDED
+            /// item, whose order keeps old_order_id, and for rejected items.
             ///
             /// Field 4: `replacement_order_id`
             pub replacement_order_id: u64,
-            /// Client order ID assigned to the successor when available.
+            /// Client order ID assigned to the successor, for a REPLACED item only.
             ///
             /// Field 5: `client_order_id`
             pub client_order_id: &'a str,
@@ -41072,9 +41240,12 @@ pub mod __buffa {
             pub error: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ErrorDetailView<'a>,
             >,
-            /// REPLACED admits a successor. AMENDED cancels the original order's remaining quantity
-            /// without a successor; keep tracking old_order_id until its terminal state is confirmed.
-            /// Unspecified for rejected items.
+            /// REPLACED admits a successor under replacement_order_id, with queue priority
+            /// reset. AMENDED keeps the order under old_order_id with no successor: the
+            /// order is amended in place and keeps its queue priority, or, when the new
+            /// total quantity is at or below its filled quantity, ends at its filled
+            /// quantity. Keep tracking old_order_id for an AMENDED item. Not set for
+            /// rejected items; JSON and REST responses then omit it.
             ///
             /// Field 8: `action_taken`
             pub action_taken: ::buffa::EnumValue<super::super::ModifyActionTaken>,
@@ -41527,14 +41698,15 @@ pub mod __buffa {
             pub fn old_order_id(&self) -> u64 {
                 self.0.reborrow().old_order_id
             }
-            /// Assigned successor order ID. Unset for cancel-only outcomes and rejected items.
+            /// Assigned successor order ID, for a REPLACED item only. Unset for an AMENDED
+            /// item, whose order keeps old_order_id, and for rejected items.
             ///
             /// Field 4: `replacement_order_id`
             #[must_use]
             pub fn replacement_order_id(&self) -> u64 {
                 self.0.reborrow().replacement_order_id
             }
-            /// Client order ID assigned to the successor when available.
+            /// Client order ID assigned to the successor, for a REPLACED item only.
             ///
             /// Field 5: `client_order_id`
             #[must_use]
@@ -41559,9 +41731,12 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().error
             }
-            /// REPLACED admits a successor. AMENDED cancels the original order's remaining quantity
-            /// without a successor; keep tracking old_order_id until its terminal state is confirmed.
-            /// Unspecified for rejected items.
+            /// REPLACED admits a successor under replacement_order_id, with queue priority
+            /// reset. AMENDED keeps the order under old_order_id with no successor: the
+            /// order is amended in place and keeps its queue priority, or, when the new
+            /// total quantity is at or below its filled quantity, ends at its filled
+            /// quantity. Keep tracking old_order_id for an AMENDED item. Not set for
+            /// rejected items; JSON and REST responses then omit it.
             ///
             /// Field 8: `action_taken`
             #[must_use]
@@ -41607,7 +41782,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// BatchReplaceOrdersRequest replaces same-symbol orders as one quote refresh.
+        /// BatchReplaceOrdersRequest modifies same-symbol orders as one quote refresh:
+        /// each item is amended in place or replaced as ModifyOrder decides by default.
         /// Identical retries replay the admission result for 60 seconds from acceptance;
         /// a different payload under the same key conflicts. Use a fresh key for a new batch.
         #[derive(Clone, Debug, Default)]
@@ -44217,7 +44393,8 @@ pub mod __buffa {
             ///
             /// Field 1: `scope`
             pub scope: ::buffa::EnumValue<super::super::OrderOriginScope>,
-            /// Trigger strategy that created this order, or unspecified for direct orders.
+            /// Trigger strategy that created this order. Not set for direct orders; JSON
+            /// and REST responses then omit it.
             ///
             /// Field 2: `trigger_type`
             pub trigger_type: ::buffa::EnumValue<super::super::OrderTriggerType>,
@@ -44563,7 +44740,8 @@ pub mod __buffa {
             pub fn scope(&self) -> ::buffa::EnumValue<super::super::OrderOriginScope> {
                 self.0.reborrow().scope
             }
-            /// Trigger strategy that created this order, or unspecified for direct orders.
+            /// Trigger strategy that created this order. Not set for direct orders; JSON
+            /// and REST responses then omit it.
             ///
             /// Field 2: `trigger_type`
             #[must_use]
@@ -54530,11 +54708,11 @@ pub mod __buffa {
             ///
             /// Field 3: `old_order_id`
             pub old_order_id: u64,
-            /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
+            /// Assigned successor order ID. Zero for an amended item or rejection before assignment.
             ///
             /// Field 4: `replacement_order_id`
             pub replacement_order_id: u64,
-            /// Current successor status, or original order status for a cancel-only outcome, when available.
+            /// Current successor status, or the amended order's status, when available.
             ///
             /// Field 5: `order_status`
             pub order_status: ::buffa::EnumValue<super::super::OrderStatus>,
@@ -54546,8 +54724,8 @@ pub mod __buffa {
             ///
             /// Field 7: `updated_ts_ns`
             pub updated_ts_ns: u64,
-            /// REPLACED admits a successor. AMENDED is cancel-only: no successor exists and
-            /// order_status describes old_order_id. Unspecified for rejected items.
+            /// REPLACED admits a successor. AMENDED keeps the order under old_order_id with
+            /// no successor, and order_status describes it. Unspecified for rejected items.
             ///
             /// Field 8: `action_taken`
             pub action_taken: ::buffa::EnumValue<super::super::ModifyActionTaken>,
@@ -54969,14 +55147,14 @@ pub mod __buffa {
             pub fn old_order_id(&self) -> u64 {
                 self.0.reborrow().old_order_id
             }
-            /// Assigned successor order ID. Zero for cancel-only outcomes or rejection before assignment.
+            /// Assigned successor order ID. Zero for an amended item or rejection before assignment.
             ///
             /// Field 4: `replacement_order_id`
             #[must_use]
             pub fn replacement_order_id(&self) -> u64 {
                 self.0.reborrow().replacement_order_id
             }
-            /// Current successor status, or original order status for a cancel-only outcome, when available.
+            /// Current successor status, or the amended order's status, when available.
             ///
             /// Field 5: `order_status`
             #[must_use]
@@ -54997,8 +55175,8 @@ pub mod __buffa {
             pub fn updated_ts_ns(&self) -> u64 {
                 self.0.reborrow().updated_ts_ns
             }
-            /// REPLACED admits a successor. AMENDED is cancel-only: no successor exists and
-            /// order_status describes old_order_id. Unspecified for rejected items.
+            /// REPLACED admits a successor. AMENDED keeps the order under old_order_id with
+            /// no successor, and order_status describes it. Unspecified for rejected items.
             ///
             /// Field 8: `action_taken`
             #[must_use]

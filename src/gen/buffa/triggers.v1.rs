@@ -193,16 +193,22 @@ pub enum TriggerStatus {
     STATUS_ARMED = 2i32,
     /// Trigger is actively executing (for example, TWAP slices in progress).
     STATUS_RUNNING = 3i32,
-    /// Trigger completed successfully. A ladder completes only when every child
-    /// order filled; a ladder whose child orders were canceled or rejected ends
-    /// canceled or failed instead.
+    /// Trigger completed. A ladder completes once none of its child orders
+    /// remains open and at least one of them was placed on the book, however
+    /// each placed child order then ended: filled, canceled, or canceled by
+    /// self-trade prevention. Some of its child orders may have been rejected.
+    /// Completed does not mean the ladder filled: its executed quantity and
+    /// executed levels state what filled, and each child order's own status
+    /// states how it ended.
     STATUS_COMPLETED = 4i32,
     /// Trigger was canceled. The cancel reason states why, for example a user
-    /// request, another attached leg's exit closing its parent's position,
-    /// self-trade prevention, or, for a ladder, the cancellation of its child
-    /// orders.
+    /// request or another attached leg's exit closing its parent's position. A
+    /// ladder is canceled only when the ladder itself is canceled; canceling
+    /// its child orders does not cancel it.
     STATUS_CANCELED = 5i32,
     /// Trigger failed (for example, reservation failure, child order rejection).
+    /// A ladder fails when every child order was rejected before it was placed
+    /// on the book; the failure reason is the first rejected child order's.
     STATUS_FAILED = 6i32,
     /// Trigger is paused (user-initiated, can be resumed).
     STATUS_PAUSED = 7i32,
@@ -395,8 +401,16 @@ pub enum TriggerEventType {
     EVENT_UPDATED = 3i32,
     /// Trigger became terminal after its next child order could not be admitted.
     EVENT_FAILED = 4i32,
-    /// A standalone trailing trigger's activation condition was satisfied and tracking began.
+    /// A trailing stop's activation condition was satisfied and tracking began,
+    /// for a standalone or an attached trailing stop.
     EVENT_ACTIVATED = 5i32,
+    /// An attached take-profit, stop-loss or trailing stop started protecting
+    /// its parent order's filled quantity, once, when the parent's first fill
+    /// made it live (or at its resume, when it was paused before that fill).
+    /// Later fills that resize it, and later pauses and resumes, do not repeat
+    /// it. An attached trailing stop still reports EVENT_ACTIVATED when it
+    /// starts tracking.
+    EVENT_ARMED = 6i32,
 }
 impl TriggerEventType {
     ///Idiomatic alias for [`Self::EVENT_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -417,6 +431,9 @@ impl TriggerEventType {
     ///Idiomatic alias for [`Self::EVENT_ACTIVATED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const EventActivated: Self = Self::EVENT_ACTIVATED;
+    ///Idiomatic alias for [`Self::EVENT_ARMED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const EventArmed: Self = Self::EVENT_ARMED;
 }
 impl ::core::default::Default for TriggerEventType {
     fn default() -> Self {
@@ -520,6 +537,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             3i32 => ::core::option::Option::Some(Self::EVENT_UPDATED),
             4i32 => ::core::option::Option::Some(Self::EVENT_FAILED),
             5i32 => ::core::option::Option::Some(Self::EVENT_ACTIVATED),
+            6i32 => ::core::option::Option::Some(Self::EVENT_ARMED),
             _ => ::core::option::Option::None,
         }
     }
@@ -534,6 +552,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             Self::EVENT_UPDATED => "EVENT_UPDATED",
             Self::EVENT_FAILED => "EVENT_FAILED",
             Self::EVENT_ACTIVATED => "EVENT_ACTIVATED",
+            Self::EVENT_ARMED => "EVENT_ARMED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -544,6 +563,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             "EVENT_UPDATED" => ::core::option::Option::Some(Self::EVENT_UPDATED),
             "EVENT_FAILED" => ::core::option::Option::Some(Self::EVENT_FAILED),
             "EVENT_ACTIVATED" => ::core::option::Option::Some(Self::EVENT_ACTIVATED),
+            "EVENT_ARMED" => ::core::option::Option::Some(Self::EVENT_ARMED),
             _ => ::core::option::Option::None,
         }
     }
@@ -555,6 +575,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             Self::EVENT_UPDATED,
             Self::EVENT_FAILED,
             Self::EVENT_ACTIVATED,
+            Self::EVENT_ARMED,
         ]
     }
 }
@@ -571,9 +592,7 @@ pub enum TriggerCancelReason {
     TRIGGER_CANCEL_REASON_OCO = 2i32,
     /// The parent order ended without a fill, so its attached trigger was canceled.
     TRIGGER_CANCEL_REASON_PARENT_CANCELED_NO_FILL = 3i32,
-    /// Self-trade prevention canceled the trigger's child orders. For a ladder,
-    /// no child order was canceled by the user, and the first child order to be
-    /// canceled was canceled by self-trade prevention.
+    /// Self-trade prevention canceled the trigger's child orders.
     TRIGGER_CANCEL_REASON_SELF_TRADE_PREVENTION = 4i32,
     /// Ended by the exchange while it recovered your account. The account's
     /// open orders on the market were canceled at the same time; place new
@@ -8153,8 +8172,11 @@ pub struct TriggerEvent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub child_order_id: u64,
-    /// Price that caused a conditional trigger to fire, in quote units scaled by
-    /// 1e9. Absent for time-scheduled triggers such as TWAP.
+    /// Price that fired the trigger: for a stop-loss or take-profit, the price
+    /// that crossed its trigger price; for a trailing stop, its trailing trigger
+    /// threshold when it fired; for a ladder, the level's price. A market child
+    /// order's slippage cap is measured from it. In quote units scaled by 1e9.
+    /// Absent for time-scheduled triggers such as TWAP.
     ///
     /// Field 13: `fire_price_ticks`
     #[serde(
@@ -9475,10 +9497,11 @@ pub struct ModifyTriggerRequest {
     )]
     pub subaccount_id: ::core::option::Option<u64>,
     /// Optional trading symbol numeric identifier. Zero or omitted means the
-    /// trigger's own pair. When set, it must be the trigger's pair: another pair
-    /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
-    /// unchanged. An API key limited to specific markets must name the trigger's
-    /// pair.
+    /// trigger's own pair. When set, it must be the trigger's pair: another
+    /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
+    /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
+    /// trigger unchanged. An API key limited to specific markets must name the
+    /// trigger's pair.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -10796,10 +10819,11 @@ pub struct ResumeTriggerRequest {
     )]
     pub subaccount_id: ::core::option::Option<u64>,
     /// Optional trading symbol numeric identifier. Zero or omitted means the
-    /// trigger's own pair. When set, it must be the trigger's pair: another pair
-    /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
-    /// unchanged. An API key limited to specific markets must name the trigger's
-    /// pair.
+    /// trigger's own pair. When set, it must be the trigger's pair: another
+    /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
+    /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
+    /// trigger unchanged. An API key limited to specific markets must name the
+    /// trigger's pair.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -21752,8 +21776,11 @@ pub mod __buffa {
             ///
             /// Field 12: `child_order_id`
             pub child_order_id: u64,
-            /// Price that caused a conditional trigger to fire, in quote units scaled by
-            /// 1e9. Absent for time-scheduled triggers such as TWAP.
+            /// Price that fired the trigger: for a stop-loss or take-profit, the price
+            /// that crossed its trigger price; for a trailing stop, its trailing trigger
+            /// threshold when it fired; for a ladder, the level's price. A market child
+            /// order's slippage cap is measured from it. In quote units scaled by 1e9.
+            /// Absent for time-scheduled triggers such as TWAP.
             ///
             /// Field 13: `fire_price_ticks`
             pub fire_price_ticks: ::core::option::Option<i64>,
@@ -22318,8 +22345,11 @@ pub mod __buffa {
             pub fn child_order_id(&self) -> u64 {
                 self.0.reborrow().child_order_id
             }
-            /// Price that caused a conditional trigger to fire, in quote units scaled by
-            /// 1e9. Absent for time-scheduled triggers such as TWAP.
+            /// Price that fired the trigger: for a stop-loss or take-profit, the price
+            /// that crossed its trigger price; for a trailing stop, its trailing trigger
+            /// threshold when it fired; for a ladder, the level's price. A market child
+            /// order's slippage cap is measured from it. In quote units scaled by 1e9.
+            /// Absent for time-scheduled triggers such as TWAP.
             ///
             /// Field 13: `fire_price_ticks`
             #[must_use]
@@ -23753,10 +23783,11 @@ pub mod __buffa {
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
             /// Optional trading symbol numeric identifier. Zero or omitted means the
-            /// trigger's own pair. When set, it must be the trigger's pair: another pair
-            /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
-            /// unchanged. An API key limited to specific markets must name the trigger's
-            /// pair.
+            /// trigger's own pair. When set, it must be the trigger's pair: another
+            /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
+            /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
+            /// trigger unchanged. An API key limited to specific markets must name the
+            /// trigger's pair.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -24322,10 +24353,11 @@ pub mod __buffa {
                 self.0.reborrow().subaccount_id
             }
             /// Optional trading symbol numeric identifier. Zero or omitted means the
-            /// trigger's own pair. When set, it must be the trigger's pair: another pair
-            /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
-            /// unchanged. An API key limited to specific markets must name the trigger's
-            /// pair.
+            /// trigger's own pair. When set, it must be the trigger's pair: another
+            /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
+            /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
+            /// trigger unchanged. An API key limited to specific markets must name the
+            /// trigger's pair.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -25559,10 +25591,11 @@ pub mod __buffa {
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
             /// Optional trading symbol numeric identifier. Zero or omitted means the
-            /// trigger's own pair. When set, it must be the trigger's pair: another pair
-            /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
-            /// unchanged. An API key limited to specific markets must name the trigger's
-            /// pair.
+            /// trigger's own pair. When set, it must be the trigger's pair: another
+            /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
+            /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
+            /// trigger unchanged. An API key limited to specific markets must name the
+            /// trigger's pair.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -25852,10 +25885,11 @@ pub mod __buffa {
                 self.0.reborrow().subaccount_id
             }
             /// Optional trading symbol numeric identifier. Zero or omitted means the
-            /// trigger's own pair. When set, it must be the trigger's pair: another pair
-            /// is rejected with ERROR_CODE_UNKNOWN_SYMBOL and leaves the trigger
-            /// unchanged. An API key limited to specific markets must name the trigger's
-            /// pair.
+            /// trigger's own pair. When set, it must be the trigger's pair: another
+            /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
+            /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
+            /// trigger unchanged. An API key limited to specific markets must name the
+            /// trigger's pair.
             ///
             /// Field 3: `symbol_id`
             #[must_use]

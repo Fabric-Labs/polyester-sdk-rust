@@ -350,6 +350,10 @@ pub enum SwapReason {
     /// A fill netted less than the accepted minimum rate. The Swap failed closed:
     /// the amounts show exactly what was traded and received.
     MINIMUM_NOT_MET = 8i32,
+    /// The order bought the market's maximum order quantity and stopped there;
+    /// the rest of the amount stays on the account, unspent. The market's depth
+    /// or maximum changed after the quote, which never quotes past it.
+    MAX_ORDER_QUANTITY = 9i32,
 }
 impl SwapReason {
     ///Idiomatic alias for [`Self::REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -379,6 +383,9 @@ impl SwapReason {
     ///Idiomatic alias for [`Self::MINIMUM_NOT_MET`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MinimumNotMet: Self = Self::MINIMUM_NOT_MET;
+    ///Idiomatic alias for [`Self::MAX_ORDER_QUANTITY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MaxOrderQuantity: Self = Self::MAX_ORDER_QUANTITY;
 }
 impl ::core::default::Default for SwapReason {
     fn default() -> Self {
@@ -483,6 +490,7 @@ impl ::buffa::Enumeration for SwapReason {
             6i32 => ::core::option::Option::Some(Self::ORDER_REJECTED),
             7i32 => ::core::option::Option::Some(Self::EXPIRED),
             8i32 => ::core::option::Option::Some(Self::MINIMUM_NOT_MET),
+            9i32 => ::core::option::Option::Some(Self::MAX_ORDER_QUANTITY),
             _ => ::core::option::Option::None,
         }
     }
@@ -500,6 +508,7 @@ impl ::buffa::Enumeration for SwapReason {
             Self::ORDER_REJECTED => "ORDER_REJECTED",
             Self::EXPIRED => "EXPIRED",
             Self::MINIMUM_NOT_MET => "MINIMUM_NOT_MET",
+            Self::MAX_ORDER_QUANTITY => "MAX_ORDER_QUANTITY",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -521,6 +530,9 @@ impl ::buffa::Enumeration for SwapReason {
             "ORDER_REJECTED" => ::core::option::Option::Some(Self::ORDER_REJECTED),
             "EXPIRED" => ::core::option::Option::Some(Self::EXPIRED),
             "MINIMUM_NOT_MET" => ::core::option::Option::Some(Self::MINIMUM_NOT_MET),
+            "MAX_ORDER_QUANTITY" => {
+                ::core::option::Option::Some(Self::MAX_ORDER_QUANTITY)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -535,6 +547,7 @@ impl ::buffa::Enumeration for SwapReason {
             Self::ORDER_REJECTED,
             Self::EXPIRED,
             Self::MINIMUM_NOT_MET,
+            Self::MAX_ORDER_QUANTITY,
         ]
     }
 }
@@ -1676,7 +1689,10 @@ pub struct SwapQuote {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub legs: ::buffa::alloc::vec::Vec<SwapQuoteLeg>,
-    /// Estimated destination amount after fees, in 18-decimal units.
+    /// Estimated destination amount after fees, in 18-decimal units, at current
+    /// order-book depth. A buy spends the whole source amount at the prices
+    /// available up to its price limit; what the book cannot fill within the
+    /// limit stays in the account.
     ///
     /// Field 3: `expected_amount_out_e18`
     #[serde(
@@ -4028,8 +4044,10 @@ pub struct ErrorDetail {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub min_amount_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
-    /// AMOUNT_OUT_OF_RANGE only: the largest amount current depth absorbs, in
-    /// 18-decimal units of the source asset.
+    /// AMOUNT_OUT_OF_RANGE only: the largest amount current depth absorbs in one
+    /// order within the market's maximum order quantity, in 18-decimal units of
+    /// the source asset. A buy above it would buy more than the maximum order
+    /// quantity, so it is refused rather than partly executed.
     ///
     /// Field 4: `max_amount_e18`
     #[serde(
@@ -5236,7 +5254,10 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::SwapQuoteLegView<'a>,
             >,
-            /// Estimated destination amount after fees, in 18-decimal units.
+            /// Estimated destination amount after fees, in 18-decimal units, at current
+            /// order-book depth. A buy spends the whole source amount at the prices
+            /// available up to its price limit; what the book cannot fill within the
+            /// limit stays in the account.
             ///
             /// Field 3: `expected_amount_out_e18`
             pub expected_amount_out_e18: ::buffa::MessageFieldView<
@@ -5806,7 +5827,10 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().legs
             }
-            /// Estimated destination amount after fees, in 18-decimal units.
+            /// Estimated destination amount after fees, in 18-decimal units, at current
+            /// order-book depth. A buy spends the whole source amount at the prices
+            /// available up to its price limit; what the book cannot fill within the
+            /// limit stays in the account.
             ///
             /// Field 3: `expected_amount_out_e18`
             #[must_use]
@@ -9793,8 +9817,10 @@ pub mod __buffa {
                     'a,
                 >,
             >,
-            /// AMOUNT_OUT_OF_RANGE only: the largest amount current depth absorbs, in
-            /// 18-decimal units of the source asset.
+            /// AMOUNT_OUT_OF_RANGE only: the largest amount current depth absorbs in one
+            /// order within the market's maximum order quantity, in 18-decimal units of
+            /// the source asset. A buy above it would buy more than the maximum order
+            /// quantity, so it is refused rather than partly executed.
             ///
             /// Field 4: `max_amount_e18`
             pub max_amount_e18: ::buffa::MessageFieldView<
@@ -10192,8 +10218,10 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().min_amount_e18
             }
-            /// AMOUNT_OUT_OF_RANGE only: the largest amount current depth absorbs, in
-            /// 18-decimal units of the source asset.
+            /// AMOUNT_OUT_OF_RANGE only: the largest amount current depth absorbs in one
+            /// order within the market's maximum order quantity, in 18-decimal units of
+            /// the source asset. A buy above it would buy more than the maximum order
+            /// quantity, so it is refused rather than partly executed.
             ///
             /// Field 4: `max_amount_e18`
             #[must_use]

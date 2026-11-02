@@ -247,7 +247,7 @@ pub enum CheckpointField {
     FUNDING_BALANCES = 14i32,
     /// Transfers in and out between this account and other accounts.
     TRANSFERS = 15i32,
-    /// Season inflow, outflow, final value and season result.
+    /// Season inflow, outflow, opening value, final value and season result.
     SEASON_RESULT = 16i32,
 }
 impl CheckpointField {
@@ -3874,8 +3874,24 @@ pub struct Checkpoint {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub final_value_usd: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Season result: final_value_usd minus net_inflow_usd, encoded as a base-10
-    /// decimal string that may be negative. Omitted when either is omitted.
+    /// USD value of the funding balances restored to the account when the
+    /// season opened, valued at the end of the season like final_value_usd,
+    /// over assets that count toward account value; assets excluded from value
+    /// add nothing. Encoded as a non-negative base-10 decimal string without
+    /// separators or a currency symbol; "0" when the season opened with no
+    /// balances. Omitted when a restored balance had no USD value.
+    ///
+    /// Field 56: `opening_value_usd`
+    #[serde(
+        rename = "openingValueUsd",
+        alias = "opening_value_usd",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub opening_value_usd: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Season result: final_value_usd minus opening_value_usd minus
+    /// net_inflow_usd, encoded as a base-10 decimal string that may be negative.
+    /// Price moves on restored holdings are not counted as result. Omitted when
+    /// any of them is omitted.
     ///
     /// Field 53: `season_result_usd`
     #[serde(
@@ -3962,6 +3978,7 @@ impl ::core::fmt::Debug for Checkpoint {
             .field("outflow_usd", &self.outflow_usd)
             .field("net_inflow_usd", &self.net_inflow_usd)
             .field("final_value_usd", &self.final_value_usd)
+            .field("opening_value_usd", &self.opening_value_usd)
             .field("season_result_usd", &self.season_result_usd)
             .field("subaccounts", &self.subaccounts)
             .field("incomplete", &self.incomplete)
@@ -4038,6 +4055,16 @@ impl Checkpoint {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.final_value_usd = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::opening_value_usd`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_opening_value_usd(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.opening_value_usd = Some(value.into());
         self
     }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
@@ -4366,6 +4393,9 @@ impl ::buffa::Message for Checkpoint {
             size
                 += 2u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
         }
+        if let Some(ref v) = self.opening_value_usd {
+            size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -4570,6 +4600,9 @@ impl ::buffa::Message for Checkpoint {
             for v in &self.incomplete {
                 ::buffa::types::encode_int32(v.to_i32(), buf);
             }
+        }
+        if let Some(ref v) = self.opening_value_usd {
+            ::buffa::types::put_string_field(56u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5102,6 +5135,18 @@ impl ::buffa::Message for Checkpoint {
                     );
                 }
             }
+            56u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .opening_value_usd
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5165,6 +5210,7 @@ impl ::buffa::Message for Checkpoint {
         self.season_result_usd = ::core::option::Option::None;
         self.subaccounts = 0u64;
         self.incomplete.clear();
+        self.opening_value_usd = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -11112,8 +11158,19 @@ pub mod __buffa {
             ///
             /// Field 52: `final_value_usd`
             pub final_value_usd: ::core::option::Option<&'a str>,
-            /// Season result: final_value_usd minus net_inflow_usd, encoded as a base-10
-            /// decimal string that may be negative. Omitted when either is omitted.
+            /// USD value of the funding balances restored to the account when the
+            /// season opened, valued at the end of the season like final_value_usd,
+            /// over assets that count toward account value; assets excluded from value
+            /// add nothing. Encoded as a non-negative base-10 decimal string without
+            /// separators or a currency symbol; "0" when the season opened with no
+            /// balances. Omitted when a restored balance had no USD value.
+            ///
+            /// Field 56: `opening_value_usd`
+            pub opening_value_usd: ::core::option::Option<&'a str>,
+            /// Season result: final_value_usd minus opening_value_usd minus
+            /// net_inflow_usd, encoded as a base-10 decimal string that may be negative.
+            /// Price moves on restored holdings are not counted as result. Omitted when
+            /// any of them is omitted.
             ///
             /// Field 53: `season_result_usd`
             pub season_result_usd: ::core::option::Option<&'a str>,
@@ -11686,6 +11743,15 @@ pub mod __buffa {
                             ::buffa::types::borrow_str(&mut cur)?,
                         );
                     }
+                    56u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.opening_value_usd = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
                     53u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -12084,6 +12150,7 @@ pub mod __buffa {
                     outflow_usd: self.outflow_usd.map(|s| s.to_string()),
                     net_inflow_usd: self.net_inflow_usd.map(|s| s.to_string()),
                     final_value_usd: self.final_value_usd.map(|s| s.to_string()),
+                    opening_value_usd: self.opening_value_usd.map(|s| s.to_string()),
                     season_result_usd: self.season_result_usd.map(|s| s.to_string()),
                     subaccounts: self.subaccounts,
                     incomplete: self.incomplete.to_vec(),
@@ -12447,6 +12514,9 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(payload as u64) as u32
                             + payload;
                 }
+                if let Some(ref v) = self.opening_value_usd {
+                    size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -12756,6 +12826,9 @@ pub mod __buffa {
                     for v in &self.incomplete {
                         ::buffa::types::encode_int32(v.to_i32(), buf);
                     }
+                }
+                if let Some(ref v) = self.opening_value_usd {
+                    ::buffa::types::put_string_field(56u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -13090,6 +13163,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.final_value_usd {
                     __map.serialize_entry("finalValueUsd", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.opening_value_usd {
+                    __map.serialize_entry("openingValueUsd", __v)?;
                 }
                 if let ::core::option::Option::Some(__v) = self.season_result_usd {
                     __map.serialize_entry("seasonResultUsd", __v)?;
@@ -13694,8 +13770,22 @@ pub mod __buffa {
             pub fn final_value_usd(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().final_value_usd
             }
-            /// Season result: final_value_usd minus net_inflow_usd, encoded as a base-10
-            /// decimal string that may be negative. Omitted when either is omitted.
+            /// USD value of the funding balances restored to the account when the
+            /// season opened, valued at the end of the season like final_value_usd,
+            /// over assets that count toward account value; assets excluded from value
+            /// add nothing. Encoded as a non-negative base-10 decimal string without
+            /// separators or a currency symbol; "0" when the season opened with no
+            /// balances. Omitted when a restored balance had no USD value.
+            ///
+            /// Field 56: `opening_value_usd`
+            #[must_use]
+            pub fn opening_value_usd(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().opening_value_usd
+            }
+            /// Season result: final_value_usd minus opening_value_usd minus
+            /// net_inflow_usd, encoded as a base-10 decimal string that may be negative.
+            /// Price moves on restored holdings are not counted as result. Omitted when
+            /// any of them is omitted.
             ///
             /// Field 53: `season_result_usd`
             #[must_use]
