@@ -1,8 +1,41 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
+
+Package version: `0.4.0`. Git tag: `v0.4.0`. Released 2026-11-02.
+
+**What a trading bot gains.** An order now says why it ended, in the same
+words everywhere. A rejected order's `reject_reason` is the error code the
+Orders API returns for the same refusal, and a canceled order's
+`cancel_reason` says why it was canceled, on order reads and on the private
+order stream alike. Before, the numeric reason used the matching engine's own
+numbering, which clashed with the API's error codes. `OrderbookData::available`
+tells a bot when a book's levels are unknown rather than empty, so it does not
+quote into a book that is being rebuilt. `Trigger::version` picks out the
+newest copy of a trigger, and nine new error codes are final refusals: the
+request did not apply, so do not resend it unchanged.
+
+This release works on devnet now, and on testnet after testnet's next upgrade.
+
+**Reason labels in this SDK.** Both reasons are full proto enum names.
+`reject_reason` is the `orders.v1.ErrorCode` name, the same string as
+`Error::Api`'s `code`, for example `ERROR_CODE_POST_ONLY_CROSS`.
+`cancel_reason` is the `orders.v1.CancelReason` name, for example
+`CANCEL_REASON_USER_REQUEST`. The Go and Python SDKs format these labels
+differently.
 
 **Breaking changes**
+- `Client::whiteboard`, `Client::polychart` and `Client::layout` are removed.
+- The generated `orders.v1.Order` loses `terminal_reason_code` and
+  `terminal_reason`, and the private order stream's `OrderEvent` loses
+  `reason_code`. Read `reject_reason` and `cancel_reason` instead.
+- `OrderStreamEvent::reason_code` is replaced by `reject_reason` and
+  `cancel_reason`, both `Option<String>`.
+- `GetSubaccountOpts::include_balances` is removed.
+- `orderbook::build_orderbook_data` takes the book's availability as a new
+  last argument.
+
+### Breaking
 - `Client::whiteboard`, `Client::polychart` and `Client::layout` are removed,
   because those APIs are no longer part of the public API.
 - The order terminal reason fields are removed: the generated
@@ -23,7 +56,7 @@
 - `orderbook::build_orderbook_data` takes the book's availability as a new
   last argument.
 
-**Added**
+### Added
 - `Order::reject_reason` and `Order::cancel_reason` on order reads and on the
   orders of the private order stream's snapshots and units. A rejected order's
   reject reason is formatted like `Error::Api`'s `code` for the same refusal;
