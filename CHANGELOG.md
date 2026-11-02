@@ -1,6 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
+
+Package version: `0.5.0`. Git tag: `v0.5.0`. Released 2026-11-02.
+
+**What a trading bot gains.** An attached take-profit, stop-loss or trailing
+stop now says when it starts protecting the position: its trigger events
+include `armed`, once, when the parent order's first fill makes the leg live.
+A bot can wait for it instead of polling the leg's status. Three new error
+codes are final refusals: the request did not apply, so do not resend it
+unchanged.
+
+An environment reports `armed` events and the new codes once it runs this
+contract: devnet first, then testnet after its next upgrade.
+
+**Breaking changes**
+- None in the SDK API.
 
 ### Added
 - Trigger events decode the new `armed` event type: an attached take-profit,
@@ -9,6 +24,32 @@
   resumes). It is not terminal. `trigger_event_type_from_label` accepts
   `"armed"` for the event filter. Attached trailing stops still report
   `activated` when they start tracking.
+- Error codes `AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED` (the sub-account's owner
+  cannot be invited, re-roled or removed),
+  `ERROR_CODE_TRIGGER_SYMBOL_MISMATCH` (modify, pause or resume named a listed
+  pair other than the trigger's own; name the trigger's pair or omit it) and
+  the balance reads' `ERROR_CODE_INVALID_SUBACCOUNT_ID` (a zero or malformed
+  sub-account ID).
+- Generated messages add `Subaccount.removed` (real-time sub-account updates
+  only: the caller lost access, so drop the sub-account),
+  `TrailingStopPolicy.limit_price_ticks`, `Checkpoint.opening_value_usd`,
+  `ListMyRewardAwardsResponse.awards_may_change` and the Swap reason
+  `MAX_ORDER_QUANTITY`, and the trade WebSocket protobufs follow binary schema
+  34.
+
+### Server behaviour on this contract
+- Batch replace amends an order in place, keeping its order ID and queue
+  priority, when an item keeps the price, does not raise the total quantity
+  and keeps the client order ID. Otherwise it replaces the order under a new
+  order ID.
+- An attached trailing stop on a selling order buys back, and the server now
+  requires its maximum buy-back price. This SDK's
+  `AttachedRisk::trailing_stop` does not send that price yet, so place a
+  selling order with only take-profit and stop-loss legs until a later release
+  adds it. A buying order's attached trailing stop is unchanged.
+- Ladder outcomes: a ladder is completed once no child order remains open and
+  at least one reached the book; it is failed only when every child order was
+  rejected before reaching the book.
 
 ## 0.4.0
 
