@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Trigger events decode the new `armed` event type: an attached take-profit,
+  stop-loss or trailing-stop leg reports it once, when its parent order's
+  first fill makes the leg live (or when a leg paused before that fill
+  resumes). It is not terminal. `trigger_event_type_from_label` accepts
+  `"armed"` for the event filter. Attached trailing stops still report
+  `activated` when they start tracking.
+
 ## 0.4.0
 
 Package version: `0.4.0`. Git tag: `v0.4.0`. Released 2026-11-02.

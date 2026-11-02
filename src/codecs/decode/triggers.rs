@@ -548,6 +548,7 @@ fn trigger_event_type_label(value: buffa::EnumValue<TriggerEventType>) -> String
         Some(TriggerEventType::EventUpdated) => "updated".to_owned(),
         Some(TriggerEventType::EventFailed) => "failed".to_owned(),
         Some(TriggerEventType::EventActivated) => "activated".to_owned(),
+        Some(TriggerEventType::EventArmed) => "armed".to_owned(),
         Some(TriggerEventType::EventUnspecified) => String::new(),
         None => format!("UNKNOWN({})", value.to_i32()),
     }
@@ -572,8 +573,9 @@ pub fn trigger_event_type_from_label(label: &str) -> Result<TriggerEventType, St
         "updated" => Ok(TriggerEventType::EventUpdated),
         "failed" => Ok(TriggerEventType::EventFailed),
         "activated" => Ok(TriggerEventType::EventActivated),
+        "armed" => Ok(TriggerEventType::EventArmed),
         other => Err(format!(
-            "invalid trigger event type {other:?}; expected one of: fired, canceled, updated, failed, activated"
+            "invalid trigger event type {other:?}; expected one of: fired, canceled, updated, failed, activated, armed"
         )),
     }
 }
@@ -1219,6 +1221,10 @@ mod tests {
             trigger_event_type_from_label("activated").unwrap(),
             TriggerEventType::EventActivated
         );
+        assert_eq!(
+            trigger_event_type_from_label("armed").unwrap(),
+            TriggerEventType::EventArmed
+        );
         assert!(trigger_event_type_from_label("nope").is_err());
     }
 
@@ -1232,6 +1238,18 @@ mod tests {
         })
         .unwrap();
         assert_eq!(event.event_type, "activated");
+    }
+
+    #[test]
+    fn trigger_event_decodes_attached_leg_armed() {
+        let event = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 5,
+            trigger_type: TriggerType::TakeProfit.into(),
+            event_type: TriggerEventType::EventArmed.into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(event.event_type, "armed");
     }
 
     #[test]

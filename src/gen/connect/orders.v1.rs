@@ -557,7 +557,8 @@ pub trait OrdersService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Replaces same-symbol orders and returns after authoritative admission.
+    /// Amends or replaces same-symbol orders and returns after authoritative
+    /// admission.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

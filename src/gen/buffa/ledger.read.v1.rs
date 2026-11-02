@@ -541,6 +541,8 @@ pub enum ErrorCode {
     ERROR_CODE_WALLET_NOT_FOUND = 9i32,
     /// Upstream dependency error (e.g., transfers store, wallet resolver).
     ERROR_CODE_UPSTREAM_ERROR = 10i32,
+    /// subaccount_id is zero or not an encoded public subaccount identifier.
+    ERROR_CODE_INVALID_SUBACCOUNT_ID = 11i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -576,6 +578,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UPSTREAM_ERROR`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const UpstreamError: Self = Self::ERROR_CODE_UPSTREAM_ERROR;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_SUBACCOUNT_ID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidSubaccountId: Self = Self::ERROR_CODE_INVALID_SUBACCOUNT_ID;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -686,6 +691,7 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             9i32 => ::core::option::Option::Some(Self::ERROR_CODE_WALLET_NOT_FOUND),
             10i32 => ::core::option::Option::Some(Self::ERROR_CODE_UPSTREAM_ERROR),
+            11i32 => ::core::option::Option::Some(Self::ERROR_CODE_INVALID_SUBACCOUNT_ID),
             _ => ::core::option::Option::None,
         }
     }
@@ -707,6 +713,7 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_WALLET_NOT_FOUND => "ERROR_CODE_WALLET_NOT_FOUND",
             Self::ERROR_CODE_UPSTREAM_ERROR => "ERROR_CODE_UPSTREAM_ERROR",
+            Self::ERROR_CODE_INVALID_SUBACCOUNT_ID => "ERROR_CODE_INVALID_SUBACCOUNT_ID",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -746,6 +753,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_UPSTREAM_ERROR" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_UPSTREAM_ERROR)
             }
+            "ERROR_CODE_INVALID_SUBACCOUNT_ID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_SUBACCOUNT_ID)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -762,6 +772,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_WALLET_RESOLUTION_UNAVAILABLE,
             Self::ERROR_CODE_WALLET_NOT_FOUND,
             Self::ERROR_CODE_UPSTREAM_ERROR,
+            Self::ERROR_CODE_INVALID_SUBACCOUNT_ID,
         ]
     }
 }

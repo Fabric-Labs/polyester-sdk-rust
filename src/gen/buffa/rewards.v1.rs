@@ -1278,6 +1278,16 @@ pub struct ListMyRewardAwardsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub next_page_token: ::buffa::alloc::string::String,
+    /// True while a campaign can still publish new awards, or while one of this account's awards is awaiting a destination, ready for payout, or failed and may be retried. When false, repeated polling cannot return new awards or award changes until a new campaign is created; check again on the next page load or focus.
+    ///
+    /// Field 3: `awards_may_change`
+    #[serde(
+        rename = "awardsMayChange",
+        alias = "awards_may_change",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub awards_may_change: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1287,6 +1297,7 @@ impl ::core::fmt::Debug for ListMyRewardAwardsResponse {
         f.debug_struct("ListMyRewardAwardsResponse")
             .field("awards", &self.awards)
             .field("next_page_token", &self.next_page_token)
+            .field("awards_may_change", &self.awards_may_change)
             .finish()
     }
 }
@@ -1328,6 +1339,9 @@ impl ::buffa::Message for ListMyRewardAwardsResponse {
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
         }
+        if self.awards_may_change {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1344,6 +1358,9 @@ impl ::buffa::Message for ListMyRewardAwardsResponse {
         }
         if !self.next_page_token.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+        }
+        if self.awards_may_change {
+            ::buffa::types::put_bool_field(3u32, self.awards_may_change, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1374,6 +1391,13 @@ impl ::buffa::Message for ListMyRewardAwardsResponse {
                 )?;
                 ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.awards_may_change = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1384,6 +1408,7 @@ impl ::buffa::Message for ListMyRewardAwardsResponse {
     fn clear(&mut self) {
         self.awards.clear();
         self.next_page_token.clear();
+        self.awards_may_change = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3168,6 +3193,10 @@ pub mod __buffa {
             ///
             /// Field 2: `next_page_token`
             pub next_page_token: &'a str,
+            /// True while a campaign can still publish new awards, or while one of this account's awards is awaiting a destination, ready for payout, or failed and may be retried. When false, repeated polling cannot return new awards or award changes until a new campaign is created; check again on the next page load or focus.
+            ///
+            /// Field 3: `awards_may_change`
+            pub awards_may_change: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListMyRewardAwardsResponseView<'a> {
@@ -3207,6 +3236,13 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.awards_may_change = ::buffa::types::decode_bool(&mut cur)?;
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -3258,6 +3294,7 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     next_page_token: self.next_page_token.to_string(),
+                    awards_may_change: self.awards_may_change,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -3286,6 +3323,9 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.next_page_token)
                                 as u32;
                 }
+                if self.awards_may_change {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -3307,6 +3347,9 @@ pub mod __buffa {
                 }
                 if !self.next_page_token.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+                }
+                if self.awards_may_change {
+                    ::buffa::types::put_bool_field(3u32, self.awards_may_change, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -3334,6 +3377,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
                     __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                if self.awards_may_change {
+                    __map.serialize_entry("awardsMayChange", &self.awards_may_change)?;
                 }
                 __map.end()
             }
@@ -3453,6 +3499,13 @@ pub mod __buffa {
             #[must_use]
             pub fn next_page_token(&self) -> &'_ str {
                 self.0.reborrow().next_page_token
+            }
+            /// True while a campaign can still publish new awards, or while one of this account's awards is awaiting a destination, ready for payout, or failed and may be retried. When false, repeated polling cannot return new awards or award changes until a new campaign is created; check again on the next page load or focus.
+            ///
+            /// Field 3: `awards_may_change`
+            #[must_use]
+            pub fn awards_may_change(&self) -> bool {
+                self.0.reborrow().awards_may_change
             }
         }
         impl ::core::convert::From<
