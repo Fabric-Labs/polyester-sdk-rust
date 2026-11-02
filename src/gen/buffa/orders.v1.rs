@@ -17523,6 +17523,10 @@ pub enum CancelReason {
     CANCEL_REASON_STRATEGY_CANCEL = 15i32,
     /// The exchange canceled the order for a reason it does not name.
     CANCEL_REASON_SYSTEM = 16i32,
+    /// The market was halted: the exchange canceled every open order of the
+    /// market. Fills before the cancel stand. The market refuses new orders until
+    /// it trades again.
+    CANCEL_REASON_MARKET_HALTED = 17i32,
 }
 impl CancelReason {
     ///Idiomatic alias for [`Self::CANCEL_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -17576,6 +17580,9 @@ impl CancelReason {
     ///Idiomatic alias for [`Self::CANCEL_REASON_SYSTEM`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const System: Self = Self::CANCEL_REASON_SYSTEM;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_MARKET_HALTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketHalted: Self = Self::CANCEL_REASON_MARKET_HALTED;
 }
 impl ::core::default::Default for CancelReason {
     fn default() -> Self {
@@ -17692,6 +17699,7 @@ impl ::buffa::Enumeration for CancelReason {
             14i32 => ::core::option::Option::Some(Self::CANCEL_REASON_TWAP_ROLLOVER),
             15i32 => ::core::option::Option::Some(Self::CANCEL_REASON_STRATEGY_CANCEL),
             16i32 => ::core::option::Option::Some(Self::CANCEL_REASON_SYSTEM),
+            17i32 => ::core::option::Option::Some(Self::CANCEL_REASON_MARKET_HALTED),
             _ => ::core::option::Option::None,
         }
     }
@@ -17721,6 +17729,7 @@ impl ::buffa::Enumeration for CancelReason {
             Self::CANCEL_REASON_TWAP_ROLLOVER => "CANCEL_REASON_TWAP_ROLLOVER",
             Self::CANCEL_REASON_STRATEGY_CANCEL => "CANCEL_REASON_STRATEGY_CANCEL",
             Self::CANCEL_REASON_SYSTEM => "CANCEL_REASON_SYSTEM",
+            Self::CANCEL_REASON_MARKET_HALTED => "CANCEL_REASON_MARKET_HALTED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -17776,6 +17785,9 @@ impl ::buffa::Enumeration for CancelReason {
             "CANCEL_REASON_SYSTEM" => {
                 ::core::option::Option::Some(Self::CANCEL_REASON_SYSTEM)
             }
+            "CANCEL_REASON_MARKET_HALTED" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_MARKET_HALTED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -17798,6 +17810,7 @@ impl ::buffa::Enumeration for CancelReason {
             Self::CANCEL_REASON_TWAP_ROLLOVER,
             Self::CANCEL_REASON_STRATEGY_CANCEL,
             Self::CANCEL_REASON_SYSTEM,
+            Self::CANCEL_REASON_MARKET_HALTED,
         ]
     }
 }

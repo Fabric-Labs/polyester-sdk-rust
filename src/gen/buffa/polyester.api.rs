@@ -404,6 +404,18 @@ Proto enum type: `.polyester.api.AuthenticationMethod`. Cast via `EnumValue::fro
                 super::super::AuthenticationMethod,
             >,
         };
+        ///Extension `docs_group` on `.google.protobuf.ServiceOptions` (field 50001).
+        pub const DOCS_GROUP: ::buffa::Extension<
+            ::buffa::extension::codecs::StringCodec,
+        > = ::buffa::Extension::new(50001u32, "google.protobuf.ServiceOptions");
+        #[doc(hidden)]
+        pub const __DOCS_GROUP_JSON_EXT: ::buffa::type_registry::JsonExtEntry = ::buffa::type_registry::JsonExtEntry {
+            number: 50001u32,
+            full_name: "polyester.api.docs_group",
+            extendee: "google.protobuf.ServiceOptions",
+            to_json: ::buffa::extension_registry::helpers::string_to_json,
+            from_json: ::buffa::extension_registry::helpers::string_from_json,
+        };
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -411,6 +423,7 @@ Proto enum type: `.polyester.api.AuthenticationMethod`. Cast via `EnumValue::fro
         reg.register_json_ext(super::__buffa::ext::__HIDDEN_JSON_EXT);
         reg.register_json_ext(super::__buffa::ext::__MFA_REQUIREMENT_JSON_EXT);
         reg.register_json_ext(super::__buffa::ext::__AUTHENTICATION_METHODS_JSON_EXT);
+        reg.register_json_ext(super::__buffa::ext::__DOCS_GROUP_JSON_EXT);
     }
 }
 #[doc(inline)]
@@ -421,5 +434,7 @@ pub use self::__buffa::ext::HIDDEN;
 pub use self::__buffa::ext::MFA_REQUIREMENT;
 #[doc(inline)]
 pub use self::__buffa::ext::AUTHENTICATION_METHODS;
+#[doc(inline)]
+pub use self::__buffa::ext::DOCS_GROUP;
 #[doc(inline)]
 pub use self::__buffa::register_types;

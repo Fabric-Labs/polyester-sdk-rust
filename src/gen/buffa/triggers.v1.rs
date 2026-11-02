@@ -611,6 +611,11 @@ pub enum TriggerCancelReason {
     /// The market was disabled: the exchange ended the order's attached
     /// take-profit or stop-loss and canceled the order and its working exit.
     TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG = 12i32,
+    /// The market was halted: the exchange ended every open trigger of the
+    /// market, attached take-profit and stop-loss included, and released its
+    /// reserved funds. The market's open orders were canceled at the same time.
+    /// The market refuses new triggers until it trades again.
+    TRIGGER_CANCEL_REASON_MARKET_HALTED = 13i32,
     /// The terminal state did not contain a cancellation reason.
     TRIGGER_CANCEL_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure canceled the trigger.
@@ -647,6 +652,9 @@ impl TriggerCancelReason {
     ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const PairDrainAttachedLeg: Self = Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_MARKET_HALTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketHalted: Self = Self::TRIGGER_CANCEL_REASON_MARKET_HALTED;
     ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE;
@@ -787,6 +795,9 @@ impl ::buffa::Enumeration for TriggerCancelReason {
                     Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG,
                 )
             }
+            13i32 => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_MARKET_HALTED)
+            }
             998i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
@@ -830,6 +841,9 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             }
             Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG => {
                 "TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG"
+            }
+            Self::TRIGGER_CANCEL_REASON_MARKET_HALTED => {
+                "TRIGGER_CANCEL_REASON_MARKET_HALTED"
             }
             Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE"
@@ -881,6 +895,9 @@ impl ::buffa::Enumeration for TriggerCancelReason {
                     Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG,
                 )
             }
+            "TRIGGER_CANCEL_REASON_MARKET_HALTED" => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_MARKET_HALTED)
+            }
             "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
@@ -904,6 +921,7 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_TWAP,
             Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER,
             Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG,
+            Self::TRIGGER_CANCEL_REASON_MARKET_HALTED,
             Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR,
         ]
