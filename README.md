@@ -5,7 +5,7 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** `0.5.0` (git tag `v0.5.0`). Pre-1.0: minor releases may break the API.
+**Status:** `0.5.1` (git tag `v0.5.1`). Pre-1.0: minor releases may break the API.
 The Go, Python and Rust SDKs share one SemVer version and are released together.
 Proprietary license (not open source). API-key only; no browser login or JWT flows.
 
@@ -84,7 +84,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.5.0"
+polyester-sdk = "0.5.1"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -94,7 +94,7 @@ To pin a git tag instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.5.0" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.5.1" }
 ```
 
 For development from a git checkout:
@@ -366,6 +366,14 @@ reads as an IOC limit child (`order_type` `limit`, `time_in_force` `ioc`) with
 its maximum price as `limit_price`; a SELL one (and an attached BUY leg) reads
 as a market IOC child with any cap in `max_slippage`. The trailing details
 carry the trough (BUY) or peak (SELL) price.
+
+An attached trailing stop on a SELL order buys back, so it requires
+`TrailingStop.limit_price`: the most its exit pays per unit, at least its
+`activation_price` when that is set. An attached trailing stop on a BUY order
+sells and takes no `limit_price`. Order creates check both locally with
+`Error::Validation`; a modify, which does not carry the order's side, checks
+the limit's price rules and leaves the side rule to the server. Order reads do
+not return the limit price yet; keep the value you sent.
 
 Stop-loss, take-profit and trailing-stop triggers, and attached take-profit,
 stop-loss and trailing-stop legs, can watch the index price instead of the

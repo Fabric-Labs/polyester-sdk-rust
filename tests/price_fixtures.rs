@@ -396,6 +396,7 @@ async fn attached_risk_sends_q9_trigger_and_activation_prices() {
                 activation_price: Some(
                     Price::from_decimal_str("85000.25", Some("BTC-USDT".into())).unwrap(),
                 ),
+                limit_price: None,
                 trigger_price_source: None,
                 order_type: None,
                 max_slippage: None,
@@ -416,6 +417,45 @@ async fn attached_risk_sends_q9_trigger_and_activation_prices() {
     match risk.stop_leg.as_ref() {
         Some(risk_policy::StopLeg::TrailingStop(trailing)) => {
             assert_eq!(trailing.activation_price_ticks, 85_000_250_000_000);
+            assert_eq!(trailing.limit_price_ticks, 0);
+        }
+        other => panic!("expected a trailing-stop leg, got {other:?}"),
+    }
+
+    // A sell order's trailing stop buys back at most at its limit price.
+    let mut sell = params(AttachedRisk {
+        take_profit: None,
+        stop_loss: None,
+        trailing_stop: Some(TrailingStop {
+            distance: Some(TrailingDistance::Bps(100)),
+            activation_price: Some(
+                Price::from_decimal_str("85000.25", Some("BTC-USDT".into())).unwrap(),
+            ),
+            limit_price: Some(
+                Price::from_decimal_str("85500.125", Some("BTC-USDT".into())).unwrap(),
+            ),
+            trigger_price_source: None,
+            order_type: None,
+            max_slippage: None,
+            state: None,
+        }),
+        oco: false,
+    });
+    sell.side = CreateSide::Sell;
+    let _ = client.orders.create(sell).await;
+    let create: CreateOrderRequest =
+        captured(&captured_requests, "/orders.v1.OrdersService/CreateOrder");
+    let risk = create
+        .order
+        .as_option()
+        .unwrap()
+        .attached_risk
+        .as_option()
+        .unwrap();
+    match risk.stop_leg.as_ref() {
+        Some(risk_policy::StopLeg::TrailingStop(trailing)) => {
+            assert_eq!(trailing.activation_price_ticks, 85_000_250_000_000);
+            assert_eq!(trailing.limit_price_ticks, 85_500_125_000_000);
         }
         other => panic!("expected a trailing-stop leg, got {other:?}"),
     }

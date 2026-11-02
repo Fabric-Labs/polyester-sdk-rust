@@ -324,6 +324,11 @@ pub struct TrailingStop {
     /// State-only order reads leave this absent.
     pub distance: Option<TrailingDistance>,
     pub activation_price: Option<Price>,
+    /// Maximum price of a trailing stop that buys back, the most its exit pays
+    /// per unit. Required when the parent order sells, so the trailing stop
+    /// buys, and must be at least `activation_price` when that is set; must be
+    /// `None` when the parent order buys. Order reads do not return it yet.
+    pub limit_price: Option<Price>,
     /// Price the trailing stop watches (activation, peak or trough, and
     /// fire); `None` watches the last trade price.
     pub trigger_price_source: Option<TriggerPriceSourceKind>,
