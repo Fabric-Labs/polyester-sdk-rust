@@ -3,6 +3,7 @@
 mod api_keys;
 mod auth;
 mod balances;
+mod changelog;
 mod correlation_id;
 mod deposit_withdraw;
 mod market_data;
@@ -16,6 +17,7 @@ mod unary;
 pub use api_keys::ApiKeysService;
 pub use auth::AuthService;
 pub use balances::BalancesService;
+pub use changelog::{ChangelogService, ListChangelogChangesOptions, ListChangelogPostsOptions};
 pub use deposit_withdraw::{
     DepositService, PreparedTradingWithdraw, WithdrawService, ZipperService,
     new_trading_withdraw_idempotency_key, new_trading_withdraw_nonce,

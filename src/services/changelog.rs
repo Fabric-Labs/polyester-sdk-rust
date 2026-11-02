@@ -1,0 +1,364 @@
+//! Public, read-only product changelog (`changelog.v1.ChangelogService`).
+//!
+//! No credentials are needed: every call works on a client without an API
+//! key. The API host decides which environment's changelog is returned.
+
+use super::{ServiceContext, unary};
+use crate::codecs::decode::{
+    changelog_changes_page_from_proto, changelog_post_from_proto, changelog_posts_page_from_proto,
+};
+use crate::connect::changelog::v1::ChangelogServiceClient;
+use crate::errors::{Error, Result};
+use crate::models::{
+    CHANGELOG_CATEGORY_BREAKING_CHANGE, ChangelogChangeEntry, ChangelogChangesPage, ChangelogPost,
+    ChangelogPostSummary, ChangelogPostsPage,
+};
+use crate::proto::changelog::v1::{
+    Audience, ChangeCategory, GetPostRequest, ListChangesRequest, ListPostsRequest, SortDirection,
+    Surface,
+};
+use crate::transport::SharedTransport;
+use buffa::Enumeration;
+use buffa_types::google::protobuf::Timestamp;
+use futures_util::stream::{self, Stream, TryStreamExt};
+use std::collections::HashSet;
+use std::future::Future;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Page size of the `*_since` helpers: the server maximum, so a long history
+/// costs as few rate-limited requests as possible.
+const SINCE_PAGE_SIZE: u32 = 500;
+
+/// Options for [`ChangelogService::list_posts`] and [`ChangelogService::posts`].
+#[derive(Debug, Clone, Default)]
+pub struct ListChangelogPostsOptions {
+    /// Page size; `None` uses the server default of 20 (maximum 100).
+    pub limit: Option<u32>,
+    /// Continue from a previous page's `next_page_token`.
+    pub page_token: Option<String>,
+}
+
+/// Filters for [`ChangelogService::list_changes`] and
+/// [`ChangelogService::changes`]. Values within one filter combine with OR;
+/// different filters combine with AND. Empty filters send nothing.
+#[derive(Debug, Clone, Default)]
+pub struct ListChangelogChangesOptions {
+    /// `CHANGELOG_CATEGORY_*` labels.
+    pub categories: Vec<String>,
+    /// Keep only changes whose `action_required` matches.
+    pub action_required: Option<bool>,
+    /// `CHANGELOG_SURFACE_*` labels.
+    pub surfaces: Vec<String>,
+    /// `CHANGELOG_AUDIENCE_*` labels. Changes addressed to all users always
+    /// match.
+    pub audiences: Vec<String>,
+    /// Inclusive lower bound on post publication time.
+    pub start_time: Option<SystemTime>,
+    /// Exclusive upper bound on post publication time; must be after
+    /// `start_time` when both are set.
+    pub end_time: Option<SystemTime>,
+    /// Restrict the result to one post.
+    pub post_slug: Option<String>,
+    /// `"desc"` (newest post first, the default) or `"asc"`. Changes keep
+    /// publication order inside each post.
+    pub sort: Option<String>,
+    /// Page size; `None` uses the server default of 100 (maximum 500).
+    pub limit: Option<u32>,
+    /// Continue from a previous page's `next_page_token`. Reuse it only with
+    /// the same filters, time bounds and sort.
+    pub page_token: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct ChangelogService {
+    ctx: ServiceContext,
+}
+
+impl ChangelogService {
+    pub fn new(ctx: ServiceContext) -> Self {
+        Self { ctx }
+    }
+
+    fn client(&self) -> ChangelogServiceClient<SharedTransport> {
+        ChangelogServiceClient::new(
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
+        )
+    }
+
+    /// One page of post summaries, newest first.
+    pub async fn list_posts(&self, opts: ListChangelogPostsOptions) -> Result<ChangelogPostsPage> {
+        let req = ListPostsRequest {
+            limit: opts.limit.unwrap_or(0),
+            page_token: opts.page_token.unwrap_or_default(),
+            ..Default::default()
+        };
+        // "/changelog.v1.ChangelogService/ListPosts"
+        let resp = unary::await_public(self.client().list_posts(req))
+            .await?
+            .into_owned();
+        Ok(changelog_posts_page_from_proto(&resp))
+    }
+
+    /// One full post by slug (`YYYY-MM-DD`, or `YYYY-MM-DD-2` for a later post
+    /// that day). An unknown slug is an [`Error::Api`] with code `NotFound`.
+    pub async fn get_post(&self, slug: &str) -> Result<ChangelogPost> {
+        let req = GetPostRequest {
+            slug: slug.to_owned(),
+            ..Default::default()
+        };
+        // "/changelog.v1.ChangelogService/GetPost"
+        let resp = unary::await_public(self.client().get_post(req))
+            .await?
+            .into_owned();
+        changelog_post_from_proto(&resp)
+    }
+
+    /// One page of individual changes across posts.
+    pub async fn list_changes(
+        &self,
+        opts: ListChangelogChangesOptions,
+    ) -> Result<ChangelogChangesPage> {
+        let req = list_changes_request(opts)?;
+        // "/changelog.v1.ChangelogService/ListChanges"
+        let resp = unary::await_public(self.client().list_changes(req))
+            .await?
+            .into_owned();
+        Ok(changelog_changes_page_from_proto(&resp))
+    }
+
+    /// Every post summary from `opts.page_token` on, newest first, fetching
+    /// pages as the stream is polled.
+    pub fn posts(
+        &self,
+        opts: ListChangelogPostsOptions,
+    ) -> impl Stream<Item = Result<ChangelogPostSummary>> + Send + 'static {
+        let svc = self.clone();
+        paginate(opts.page_token.clone(), move |page_token| {
+            let svc = svc.clone();
+            let opts = ListChangelogPostsOptions {
+                limit: opts.limit,
+                page_token: Some(page_token),
+            };
+            async move {
+                let page = svc.list_posts(opts).await?;
+                Ok((page.posts, page.next_page_token))
+            }
+        })
+    }
+
+    /// Every change matching `opts` from `opts.page_token` on, fetching pages
+    /// as the stream is polled.
+    pub fn changes(
+        &self,
+        opts: ListChangelogChangesOptions,
+    ) -> impl Stream<Item = Result<ChangelogChangeEntry>> + Send + 'static {
+        let svc = self.clone();
+        paginate(opts.page_token.clone(), move |page_token| {
+            let svc = svc.clone();
+            let opts = ListChangelogChangesOptions {
+                page_token: Some(page_token),
+                ..opts.clone()
+            };
+            async move {
+                let page = svc.list_changes(opts).await?;
+                Ok((page.changes, page.next_page_token))
+            }
+        })
+    }
+
+    /// All breaking changes published at or after `since`, newest post first.
+    pub async fn breaking_changes_since(
+        &self,
+        since: SystemTime,
+    ) -> Result<Vec<ChangelogChangeEntry>> {
+        self.changes(ListChangelogChangesOptions {
+            categories: vec![CHANGELOG_CATEGORY_BREAKING_CHANGE.to_owned()],
+            start_time: Some(since),
+            limit: Some(SINCE_PAGE_SIZE),
+            ..Default::default()
+        })
+        .try_collect()
+        .await
+    }
+
+    /// All changes that require action, published at or after `since`, newest
+    /// post first.
+    pub async fn action_required_since(
+        &self,
+        since: SystemTime,
+    ) -> Result<Vec<ChangelogChangeEntry>> {
+        self.changes(ListChangelogChangesOptions {
+            action_required: Some(true),
+            start_time: Some(since),
+            limit: Some(SINCE_PAGE_SIZE),
+            ..Default::default()
+        })
+        .try_collect()
+        .await
+    }
+}
+
+/// Flatten token-paged results into one item stream. A next page token this
+/// stream already requested, including the caller's starting token, would
+/// cycle forever, so it fails the stream with a response-contract error.
+fn paginate<T, F, Fut>(
+    first_token: Option<String>,
+    fetch: F,
+) -> impl Stream<Item = Result<T>> + Send + 'static
+where
+    T: Send + 'static,
+    F: Fn(String) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Result<(Vec<T>, String)>> + Send + 'static,
+{
+    let fetch = std::sync::Arc::new(fetch);
+    let start = (Some(first_token.unwrap_or_default()), HashSet::new());
+    stream::try_unfold(start, move |(token, mut requested)| {
+        let fetch = fetch.clone();
+        async move {
+            let Some(token) = token else {
+                return Ok(None);
+            };
+            if !token.is_empty() {
+                requested.insert(token.clone());
+            }
+            let (items, next) = fetch(token).await?;
+            if requested.contains(&next) {
+                return Err(Error::response_contract(
+                    "changelog pagination",
+                    "next_page_token repeats an earlier page_token",
+                ));
+            }
+            let next = (!next.is_empty()).then_some(next);
+            Ok(Some((
+                stream::iter(items.into_iter().map(Ok)),
+                (next, requested),
+            )))
+        }
+    })
+    .try_flatten()
+}
+
+fn list_changes_request(opts: ListChangelogChangesOptions) -> Result<ListChangesRequest> {
+    Ok(ListChangesRequest {
+        categories: labels_to_enums::<ChangeCategory>(&opts.categories, "categories")?,
+        action_required: opts.action_required,
+        surfaces: labels_to_enums::<Surface>(&opts.surfaces, "surfaces")?,
+        audiences: labels_to_enums::<Audience>(&opts.audiences, "audiences")?,
+        start_time: timestamp_field(opts.start_time, "start_time")?,
+        end_time: timestamp_field(opts.end_time, "end_time")?,
+        post_slug: opts.post_slug.unwrap_or_default(),
+        sort: sort_direction(opts.sort.as_deref())?.into(),
+        limit: opts.limit.unwrap_or(0),
+        page_token: opts.page_token.unwrap_or_default(),
+        ..Default::default()
+    })
+}
+
+/// Map lowercase labels (`breaking_change`, `api`, ...) to known enum values.
+/// The unspecified value and unknown labels are rejected.
+fn labels_to_enums<T: Enumeration>(
+    labels: &[String],
+    field: &str,
+) -> Result<Vec<buffa::EnumValue<T>>> {
+    labels
+        .iter()
+        .map(|label| {
+            T::from_proto_name(&label.trim().to_ascii_uppercase())
+                .filter(|value| value.to_i32() != 0)
+                .map(buffa::EnumValue::from)
+                .ok_or_else(|| {
+                    Error::validation(format!("list_changes {field}: unknown label {label:?}"))
+                })
+        })
+        .collect()
+}
+
+fn sort_direction(sort: Option<&str>) -> Result<SortDirection> {
+    match sort.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
+        None | Some("") => Ok(SortDirection::SORT_DIRECTION_UNSPECIFIED),
+        Some("desc") => Ok(SortDirection::SORT_DESC),
+        Some("asc") => Ok(SortDirection::SORT_ASC),
+        Some(other) => Err(Error::validation(format!(
+            "list_changes sort must be \"asc\" or \"desc\", got {other:?}"
+        ))),
+    }
+}
+
+fn timestamp_field(
+    time: Option<SystemTime>,
+    field: &str,
+) -> Result<buffa::MessageField<Timestamp>> {
+    let Some(time) = time else {
+        return Ok(buffa::MessageField::none());
+    };
+    let since_epoch = time
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| Error::validation(format!("list_changes {field} is before 1970")))?;
+    Ok(Timestamp {
+        seconds: since_epoch.as_secs() as i64,
+        nanos: since_epoch.subsec_nanos() as i32,
+        ..Default::default()
+    }
+    .into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn list_changes_request_maps_labels_and_times() {
+        let req = list_changes_request(ListChangelogChangesOptions {
+            categories: vec!["breaking_change".into(), "BUG_FIX".into()],
+            surfaces: vec!["api".into()],
+            audiences: vec!["market_makers".into()],
+            action_required: Some(true),
+            start_time: Some(UNIX_EPOCH + Duration::new(1_767_225_600, 5)),
+            sort: Some("asc".into()),
+            limit: Some(50),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            req.categories,
+            vec![
+                buffa::EnumValue::from(ChangeCategory::BREAKING_CHANGE),
+                buffa::EnumValue::from(ChangeCategory::BUG_FIX)
+            ]
+        );
+        assert_eq!(req.surfaces, vec![buffa::EnumValue::from(Surface::API)]);
+        assert_eq!(
+            req.audiences,
+            vec![buffa::EnumValue::from(Audience::MARKET_MAKERS)]
+        );
+        assert_eq!(req.action_required, Some(true));
+        let start = req.start_time.as_option().unwrap();
+        assert_eq!((start.seconds, start.nanos), (1_767_225_600, 5));
+        assert!(req.end_time.as_option().is_none());
+        assert_eq!(req.sort, SortDirection::SORT_ASC);
+        assert_eq!(req.limit, 50);
+    }
+
+    #[test]
+    fn list_changes_request_rejects_unknown_labels() {
+        for opts in [
+            ListChangelogChangesOptions {
+                categories: vec!["security".into()],
+                ..Default::default()
+            },
+            ListChangelogChangesOptions {
+                surfaces: vec!["surface_unspecified".into()],
+                ..Default::default()
+            },
+            ListChangelogChangesOptions {
+                sort: Some("newest".into()),
+                ..Default::default()
+            },
+        ] {
+            let err = list_changes_request(opts).unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{err:?}");
+        }
+    }
+}

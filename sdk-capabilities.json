@@ -85,6 +85,11 @@
       "supported": true
     },
     {
+      "id": "changelog",
+      "label": "Product changelog (posts + changes)",
+      "supported": true
+    },
+    {
       "id": "balances",
       "label": "Balances, holds, equity history",
       "supported": true

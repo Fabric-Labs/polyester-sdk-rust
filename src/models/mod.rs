@@ -3,6 +3,7 @@
 mod address_book;
 mod auth;
 mod balances;
+mod changelog;
 mod common;
 mod fees;
 mod guard_signer;
@@ -21,6 +22,7 @@ mod zipper;
 pub use address_book::*;
 pub use auth::*;
 pub use balances::*;
+pub use changelog::*;
 pub use common::*;
 pub use fees::*;
 pub use guard_signer::*;

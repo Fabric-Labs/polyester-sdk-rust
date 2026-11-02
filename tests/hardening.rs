@@ -4159,3 +4159,277 @@ async fn l2_encoded_failed_responses_keep_their_classification() {
         "{err:?}"
     );
 }
+
+const CHANGELOG_LIST_POSTS_PATH: &str = "/changelog.v1.ChangelogService/ListPosts";
+const CHANGELOG_GET_POST_PATH: &str = "/changelog.v1.ChangelogService/GetPost";
+const CHANGELOG_LIST_CHANGES_PATH: &str = "/changelog.v1.ChangelogService/ListChanges";
+
+/// A client with no API key: the changelog is public.
+fn public_changelog_client(server: &MockHttpServer) -> Client {
+    Client::new(Config {
+        api_url: server.base_url(),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap()
+}
+
+#[tokio::test]
+async fn l2_changelog_posts_stream_follows_page_tokens_without_credentials() {
+    use futures_util::TryStreamExt;
+    use polyester::proto::changelog::v1::{ListPostsRequest, ListPostsResponse, PostSummary};
+    use std::sync::Mutex;
+
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let seen_handler = seen.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path != CHANGELOG_LIST_POSTS_PATH {
+            return hardening_support::HttpScript::NotFound;
+        }
+        let req = ListPostsRequest::decode_from_slice(&request.body).unwrap();
+        seen_handler
+            .lock()
+            .unwrap()
+            .push((req.page_token.clone(), req.limit));
+        let post = |slug: &str| PostSummary {
+            slug: slug.into(),
+            breaking_change_count: 1,
+            ..Default::default()
+        };
+        let (posts, next) = match req.page_token.as_str() {
+            "" => (vec![post("2026-11-02-2"), post("2026-11-02")], "p2"),
+            "p2" => (vec![post("2026-10-28")], ""),
+            other => panic!("unexpected page token {other}"),
+        };
+        connect_proto_ok(&ListPostsResponse {
+            posts,
+            next_page_token: next.into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = public_changelog_client(&server);
+
+    let first = client
+        .changelog
+        .list_posts(polyester::services::ListChangelogPostsOptions {
+            limit: Some(2),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(first.posts.len(), 2);
+    assert_eq!(first.next_page_token, "p2");
+
+    let all: Vec<_> = client
+        .changelog
+        .posts(polyester::services::ListChangelogPostsOptions {
+            limit: Some(2),
+            ..Default::default()
+        })
+        .try_collect()
+        .await
+        .unwrap();
+    let slugs: Vec<_> = all.iter().map(|p| p.slug.as_str()).collect();
+    assert_eq!(slugs, ["2026-11-02-2", "2026-11-02", "2026-10-28"]);
+    assert_eq!(all[0].breaking_change_count, 1);
+    assert_eq!(
+        *seen.lock().unwrap(),
+        [(String::new(), 2), (String::new(), 2), ("p2".to_owned(), 2)]
+    );
+}
+
+#[tokio::test]
+async fn l2_changelog_posts_stream_fails_on_a_repeated_page_token() {
+    use futures_util::TryStreamExt;
+    use polyester::proto::changelog::v1::{ListPostsResponse, PostSummary};
+
+    let server = MockHttpServer::spawn(|_| {
+        connect_proto_ok(&ListPostsResponse {
+            posts: vec![PostSummary::default()],
+            next_page_token: "same".into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = public_changelog_client(&server);
+    let err = client
+        .changelog
+        .posts(polyester::services::ListChangelogPostsOptions {
+            page_token: Some("same".into()),
+            ..Default::default()
+        })
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(err, polyester::Error::ResponseContract { .. }),
+        "{err}"
+    );
+    assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn l2_changelog_posts_stream_fails_on_a_page_token_cycle() {
+    use futures_util::TryStreamExt;
+    use polyester::proto::changelog::v1::{ListPostsRequest, ListPostsResponse, PostSummary};
+    use std::sync::Mutex;
+
+    // (starting token, next tokens the server returns in order, tokens the
+    // SDK must send before it stops)
+    let cases: [(Option<&str>, &[&str], &[&str]); 3] = [
+        // "" -> A -> B -> A: A recurs after two pages.
+        (None, &["A", "B", "A"], &["", "A", "B"]),
+        // "" -> A -> B -> C -> B.
+        (None, &["A", "B", "C", "B"], &["", "A", "B", "C"]),
+        // The caller's starting token counts: S -> A -> S.
+        (Some("S"), &["A", "S"], &["S", "A"]),
+    ];
+    for (start, cycle, expected) in cases {
+        let sent = Arc::new(Mutex::new(Vec::<String>::new()));
+        let sent_handler = sent.clone();
+        let cycle: Vec<String> = cycle.iter().map(|t| (*t).to_owned()).collect();
+        let server = MockHttpServer::spawn(move |request| {
+            let req = ListPostsRequest::decode_from_slice(&request.body).unwrap();
+            let mut sent = sent_handler.lock().unwrap();
+            sent.push(req.page_token.clone());
+            let next = cycle[(sent.len() - 1) % cycle.len()].clone();
+            connect_proto_ok(&ListPostsResponse {
+                posts: vec![PostSummary::default()],
+                next_page_token: next,
+                ..Default::default()
+            })
+        })
+        .await;
+        let client = public_changelog_client(&server);
+        let err = client
+            .changelog
+            .posts(polyester::services::ListChangelogPostsOptions {
+                page_token: start.map(str::to_owned),
+                ..Default::default()
+            })
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, polyester::Error::ResponseContract { .. }),
+            "{err}"
+        );
+        assert_eq!(*sent.lock().unwrap(), expected, "start {start:?}");
+    }
+}
+
+#[tokio::test]
+async fn l2_changelog_since_helpers_page_filters_and_tolerate_unknown_enums() {
+    use buffa::EnumValue;
+    use polyester::proto::changelog::v1::{
+        Audience, Change, ChangeCategory, ChangeEntry, ListChangesRequest, ListChangesResponse,
+        Surface,
+    };
+    use std::sync::Mutex;
+    use std::time::UNIX_EPOCH;
+
+    let seen = Arc::new(Mutex::new(Vec::<ListChangesRequest>::new()));
+    let seen_handler = seen.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path != CHANGELOG_LIST_CHANGES_PATH {
+            return hardening_support::HttpScript::NotFound;
+        }
+        let req = ListChangesRequest::decode_from_slice(&request.body).unwrap();
+        let page_token = req.page_token.clone();
+        seen_handler.lock().unwrap().push(req);
+        let entry = |id: u64, category: EnumValue<ChangeCategory>| ChangeEntry {
+            change: Change {
+                id,
+                title: format!("change {id}"),
+                category,
+                action_required: true,
+                audiences: vec![Audience::DEVELOPERS.into(), EnumValue::Unknown(77)],
+                surfaces: vec![EnumValue::Unknown(88), Surface::API.into()],
+                ..Default::default()
+            }
+            .into(),
+            post_slug: "2026-11-02".into(),
+            section_heading: "API".into(),
+            ..Default::default()
+        };
+        let (changes, next) = match page_token.as_str() {
+            "" => (vec![entry(1, ChangeCategory::BREAKING_CHANGE.into())], "c2"),
+            "c2" => (vec![entry(58, EnumValue::Unknown(9))], ""),
+            other => panic!("unexpected page token {other}"),
+        };
+        connect_proto_ok(&ListChangesResponse {
+            changes,
+            next_page_token: next.into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = public_changelog_client(&server);
+    let since = UNIX_EPOCH + Duration::from_secs(1_767_225_600);
+
+    let breaking = client
+        .changelog
+        .breaking_changes_since(since)
+        .await
+        .unwrap();
+    assert_eq!(breaking.len(), 2);
+    assert_eq!(breaking[0].change.id, "2");
+    assert_eq!(breaking[0].change.category, "breaking_change");
+    assert_eq!(breaking[0].change.audiences, ["developers", "unknown(77)"]);
+    assert_eq!(breaking[0].change.surfaces, ["unknown(88)", "api"]);
+    assert_eq!(breaking[0].section_heading, "API");
+    assert_eq!(breaking[1].change.id, "21");
+    assert_eq!(breaking[1].change.category, "unknown(9)");
+
+    let action = client.changelog.action_required_since(since).await.unwrap();
+    assert_eq!(action.len(), 2);
+
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 4);
+    for req in seen.iter() {
+        assert_eq!(req.limit, 500);
+    }
+    for req in &seen[..2] {
+        assert_eq!(
+            req.categories,
+            [EnumValue::from(ChangeCategory::BREAKING_CHANGE)]
+        );
+        assert_eq!(req.action_required, None);
+        assert_eq!(req.start_time.as_option().unwrap().seconds, 1_767_225_600);
+    }
+    for req in &seen[2..] {
+        assert!(req.categories.is_empty());
+        assert_eq!(req.action_required, Some(true));
+        assert_eq!(req.start_time.as_option().unwrap().seconds, 1_767_225_600);
+    }
+    assert_eq!(seen[1].page_token, "c2");
+    assert_eq!(seen[3].page_token, "c2");
+}
+
+#[tokio::test]
+async fn l2_changelog_get_post_unknown_slug_maps_to_not_found() {
+    use polyester::proto::changelog::v1::GetPostRequest;
+
+    let server = MockHttpServer::spawn(|request| {
+        if request.path != CHANGELOG_GET_POST_PATH {
+            return hardening_support::HttpScript::NotFound;
+        }
+        let req = GetPostRequest::decode_from_slice(&request.body).unwrap();
+        assert_eq!(req.slug, "2020-01-01");
+        hardening_support::HttpScript::Json {
+            status: 404,
+            body: br#"{"code":"not_found","message":"changelog post not found"}"#.to_vec(),
+        }
+    })
+    .await;
+    let client = public_changelog_client(&server);
+    let err = client.changelog.get_post("2020-01-01").await.unwrap_err();
+    match err {
+        Error::Api { code, message, .. } => {
+            assert_eq!(code, "NotFound");
+            assert!(message.contains("changelog post not found"), "{message}");
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+}

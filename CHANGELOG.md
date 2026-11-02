@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+**New: public product changelog (`client.changelog`).** Read the changelog of
+the environment you call without an API key. It is available on
+devnet now and on testnet with its next release.
+- `list_posts`, `get_post` and `list_changes` wrap
+  `changelog.v1.ChangelogService`; `posts` and `changes` stream every page.
+- `breaking_changes_since(t)` and `action_required_since(t)` collect the
+  matching changes published since `t`.
+- Typed models `ChangelogPostSummary`, `ChangelogPost`, `ChangelogSection`,
+  `ChangelogChange` and `ChangelogChangeEntry`. Enums are lowercase labels and
+  unknown values read as `unknown(<n>)`; change ids are base58.
+- The generated module tree now compiles `changelog.v1`.
+
 ## 0.6.0
 
 Package version: `0.6.0`. Git tag: `v0.6.0`. Released 2026-11-02.
