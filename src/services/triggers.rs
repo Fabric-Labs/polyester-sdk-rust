@@ -67,12 +67,20 @@ impl TriggersService {
         )
     }
 
+    /// List triggers.
+    ///
+    /// Retries `unavailable` (HTTP 503) with the same request: right after a
+    /// trigger change the server answers it until the change is readable,
+    /// rather than return the trigger's previous state. The retry starts at
+    /// 25 ms, doubles up to 500 ms and gives up after about 2 s, returning
+    /// the last error.
     pub async fn list(&self, req: ListTriggersRequest) -> Result<TriggersList> {
         let client = self.client();
-        let resp = unary::await_auth(
+        let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,
             "/triggers.v1.TriggersService/ListTriggers",
             req,
+            unary::TRIGGER_READ_RETRY,
             |req, opts| client.list_triggers_with_options(req, opts),
         )
         .await?
@@ -111,12 +119,18 @@ impl TriggersService {
         self.list(req).await
     }
 
+    /// Read one trigger.
+    ///
+    /// Once a create, modify, pause or resume has answered, this returns the
+    /// trigger as changed: it retries `unavailable` (HTTP 503) with the same
+    /// request, as [`Self::list`] does, and never falls back to a cached copy.
     pub async fn get(&self, req: GetTriggerRequest) -> Result<Option<Trigger>> {
         let client = self.client();
-        let resp = unary::await_auth(
+        let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,
             "/triggers.v1.TriggersService/GetTrigger",
             req,
+            unary::TRIGGER_READ_RETRY,
             |req, opts| client.get_trigger_with_options(req, opts),
         )
         .await?

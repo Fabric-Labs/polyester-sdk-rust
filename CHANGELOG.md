@@ -14,6 +14,36 @@ devnet now and on testnet with its next release.
   unknown values read as `unknown(<n>)`; change ids are base58.
 - The generated module tree now compiles `changelog.v1`.
 
+**Batch replace refusals, trigger read-your-writes, owner role lock.**
+- `orders.wait_batch_replace(batch_request_id, subaccount_id, timeout)` polls
+  `get_batch_replace_status` with a short backoff until no item is
+  `admitted`, polling through the `not_found` and `unavailable` answers of the
+  first seconds after admission. It stops at the 60-second status window (or
+  an earlier `timeout`) with `Error::Transport`: reconcile through the orders
+  then.
+- `BatchReplaceStatusItem::error_code()` turns an item's `code`
+  (`POST_ONLY_CROSS`) into the orders error code (`ERROR_CODE_POST_ONLY_CROSS`),
+  keeping a code this SDK does not know unchanged;
+  `errors::order_codes::from_status_code` does the same for any string.
+- Fixed: `get_batch_replace_status` failed with `Error::ResponseContract` for
+  an item admitted and then refused when applied (phase `rejected`, still
+  counted in `accepted_count`). It now decodes; an item rejected at admission
+  must still read `rejected`.
+- A status item with no successor, every `rejected` item included, has an
+  empty `replacement_order_id` (was `"0"`). The admission's planned
+  `replacement_order_id` is not proof of an order.
+- `triggers.get` and `triggers.list` (and `get_by_id`, `list_with`) retry
+  `unavailable` / HTTP 503 with the same request: 25 ms, doubling, at most
+  500 ms, giving up after about 2 s. The server answers it right after a
+  trigger change until the change is readable.
+- `errors::auth_codes::SUBACCOUNT_OWNER_ROLE_LOCKED` and
+  `Error::is_subaccount_owner_role_locked()`: a member call targeting the
+  sub-account's owner. A REST 412 problem with that code now maps to the same
+  `Error::Api` as the ConnectRPC `failed_precondition` answer.
+- Docs: batch replace items amend in place or replace, as the trading
+  WebSocket schema now states; market-halt cancel reasons on orders
+  (`CANCEL_REASON_MARKET_HALTED`) and triggers (`market_halted`).
+
 ## 0.6.0
 
 Package version: `0.6.0`. Git tag: `v0.6.0`. Released 2026-11-02.

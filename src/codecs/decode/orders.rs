@@ -884,30 +884,38 @@ pub fn batch_replace_status_from_proto(
             )
         })?;
         match phase {
-            "admitted" => admitted += 1,
             "rejected" => rejected += 1,
             // Working and terminal entries were admitted successfully before
             // their post-admission state transition.
-            "working" | "terminal" => admitted += 1,
+            "admitted" | "working" | "terminal" => admitted += 1,
             _ => unreachable!("known batch replace phase"),
         }
         let updated_ts_ns =
             TsNs::from_wire(item.updated_ts_ns, "BatchReplaceStatusItem.updated_ts_ns")?.get();
+        // A rejected item has no successor; 0 means none.
+        let replacement_order_id = if phase == "rejected" || item.replacement_order_id == 0 {
+            String::new()
+        } else {
+            format_uint64_id(item.replacement_order_id)
+        };
         items.push(BatchReplaceStatusItem {
             item_index: item.item_index,
             phase: phase.to_owned(),
             old_order_id: format_uint64_id(item.old_order_id),
-            replacement_order_id: format_uint64_id(item.replacement_order_id),
+            replacement_order_id,
             action_taken: modify_action_name(item.action_taken),
             order_status: enum_value_order_status(item.order_status).to_owned(),
             code: item.code.clone(),
             updated_ts_ns,
         });
     }
-    if admitted != msg.accepted_count
-        || rejected != msg.rejected_count
-        || admitted
-            .checked_add(rejected)
+    // The counts describe admission. An item admitted and then refused when
+    // applied reads rejected but still counts as accepted, so every item
+    // rejected at admission reads rejected, and more items may.
+    if rejected < msg.rejected_count
+        || msg
+            .accepted_count
+            .checked_add(msg.rejected_count)
             .and_then(|count| usize::try_from(count).ok())
             != Some(items.len())
     {
@@ -1092,6 +1100,20 @@ mod tests {
                 o.cancel_reason = CancelReason::CANCEL_REASON_SYSTEM.into();
             }),
             (None, some("CANCEL_REASON_SYSTEM"))
+        );
+        // A market halt cancels every open order of the market (17), and
+        // refuses after admission an order that reaches it (reject 56).
+        assert_eq!(
+            order(OrderStatus::Canceled, |o| {
+                o.cancel_reason = CancelReason::CANCEL_REASON_MARKET_HALTED.into();
+            }),
+            (None, some("CANCEL_REASON_MARKET_HALTED"))
+        );
+        assert_eq!(
+            order(OrderStatus::Rejected, |o| {
+                o.reject_reason = ErrorCode::ERROR_CODE_MARKET_HALTED.into();
+            }),
+            (some("ERROR_CODE_MARKET_HALTED"), None)
         );
         // Unknown values keep their number; a reject reason is formatted like
         // the matching `Error::Api` code so the two compare equal.
@@ -2516,7 +2538,7 @@ mod tests {
                     ..Default::default()
                 },
             ],
-            accepted_count: 2,
+            accepted_count: 3,
             rejected_count: 0,
             ..Default::default()
         };
@@ -2525,6 +2547,62 @@ mod tests {
         assert!(matches!(err, Error::ResponseContract { .. }));
         assert!(err.mutation_outcome_unknown());
         assert!(err.to_string().contains("response counts"));
+    }
+
+    #[test]
+    fn batch_replace_status_decodes_a_refusal_after_admission() {
+        use crate::proto::orders::v1::{
+            BatchReplaceAdmissionStatus, BatchReplacePhase,
+            BatchReplaceStatusItem as ProtoStatusItem, GetBatchReplaceStatusResponse,
+        };
+
+        // Admitted, then refused when applied: the item reads REJECTED with
+        // the refusal's code, while the admission counts still count it as
+        // accepted.
+        let status = batch_replace_status_from_proto(&GetBatchReplaceStatusResponse {
+            batch_request_id: 9,
+            admission_status: BatchReplaceAdmissionStatus::Admitted.into(),
+            items: vec![ProtoStatusItem {
+                item_index: 0,
+                phase: BatchReplacePhase::Rejected.into(),
+                old_order_id: 1,
+                code: "POST_ONLY_CROSS".into(),
+                updated_ts_ns: 1_793_594_333_241_957_468,
+                ..Default::default()
+            }],
+            accepted_count: 1,
+            rejected_count: 0,
+            ..Default::default()
+        })
+        .expect("a refusal after admission is a valid status");
+        let item = &status.items[0];
+        assert_eq!(item.phase, "rejected");
+        assert_eq!(item.code, "POST_ONLY_CROSS");
+        assert_eq!(
+            item.error_code().as_deref(),
+            Some("ERROR_CODE_POST_ONLY_CROSS")
+        );
+        // The planned successor never became an order.
+        assert_eq!(item.replacement_order_id, "");
+        assert_eq!(item.old_order_id, format_uint64_id(1));
+        assert!(status.is_settled());
+
+        // An item rejected at admission must still read rejected.
+        let missing_rejection = GetBatchReplaceStatusResponse {
+            batch_request_id: 9,
+            admission_status: BatchReplaceAdmissionStatus::Rejected.into(),
+            items: vec![ProtoStatusItem {
+                item_index: 0,
+                phase: BatchReplacePhase::Working.into(),
+                ..Default::default()
+            }],
+            accepted_count: 0,
+            rejected_count: 1,
+            ..Default::default()
+        };
+        let err = batch_replace_status_from_proto(&missing_rejection)
+            .expect_err("an admission rejection cannot read working");
+        assert!(matches!(err, Error::ResponseContract { .. }));
     }
 
     #[test]

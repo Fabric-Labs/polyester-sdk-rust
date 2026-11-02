@@ -4433,3 +4433,288 @@ async fn l2_changelog_get_post_unknown_slug_maps_to_not_found() {
         other => panic!("unexpected error: {other:?}"),
     }
 }
+
+// REST answers a member call that targets the sub-account's owner with a
+// 412 problem; it maps like the ConnectRPC `failed_precondition` answer.
+#[tokio::test]
+async fn l2_rest_owner_role_lock_maps_to_the_typed_error() {
+    let err = auth_me_error(|| {
+        json_body(
+            412,
+            "application/problem+json",
+            r#"{"status":412,"code":"AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED","title":"Subaccount Owner Role Locked"}"#,
+        )
+    })
+    .await;
+    assert!(err.is_subaccount_owner_role_locked(), "{err:?}");
+    assert_eq!(
+        err.auth_error_code(),
+        Some(polyester::errors::auth_codes::SUBACCOUNT_OWNER_ROLE_LOCKED)
+    );
+    assert!(!err.is_retryable(), "{err:?}");
+}
+
+const GET_TRIGGER_PATH: &str = "/triggers.v1.TriggersService/GetTrigger";
+const LIST_TRIGGERS_PATH: &str = "/triggers.v1.TriggersService/ListTriggers";
+const BATCH_STATUS_PATH: &str = "/orders.v1.OrdersReadService/GetBatchReplaceStatus";
+
+fn catching_up(rest: bool) -> hardening_support::HttpScript {
+    if rest {
+        json_body(
+            503,
+            "application/problem+json",
+            r#"{"status":503,"code":"UNAVAILABLE","detail":"Triggers are catching up with recent activity; retry the request."}"#,
+        )
+    } else {
+        json_body(
+            503,
+            "application/json",
+            r#"{"code":"unavailable","message":"Triggers are catching up with recent activity; retry the request."}"#,
+        )
+    }
+}
+
+// After a trigger change, trigger reads answer `unavailable` until the change
+// is readable. The SDK retries them with the same request.
+#[tokio::test]
+async fn l2_trigger_reads_retry_unavailable_with_the_same_request() {
+    use polyester::proto::triggers::v1::{
+        GetTriggerRequest, GetTriggerResponse, ListTriggersRequest, ListTriggersResponse, Trigger,
+    };
+
+    for rest in [false, true] {
+        let bodies = Arc::new(std::sync::Mutex::new(Vec::<(String, Vec<u8>)>::new()));
+        let seen = bodies.clone();
+        let http = MockHttpServer::spawn(move |request| {
+            let mut seen = seen.lock().unwrap();
+            seen.push((request.path.clone(), request.body.clone()));
+            let attempts = seen.iter().filter(|(p, _)| *p == request.path).count();
+            if attempts == 1 {
+                return catching_up(rest);
+            }
+            match request.path.as_str() {
+                GET_TRIGGER_PATH => connect_proto_ok(&GetTriggerResponse {
+                    trigger: Trigger {
+                        trigger_id: 77,
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }),
+                LIST_TRIGGERS_PATH => connect_proto_ok(&ListTriggersResponse {
+                    triggers: vec![Trigger {
+                        trigger_id: 77,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }),
+                _ => hardening_support::HttpScript::NotFound,
+            }
+        })
+        .await;
+        let client = api_key_client(&http);
+        let trigger = client
+            .triggers
+            .get(GetTriggerRequest {
+                trigger_id: 77,
+                ..Default::default()
+            })
+            .await
+            .expect("the retry succeeds")
+            .expect("trigger");
+        assert_eq!(trigger.trigger_id, polyester::codecs::format_uint64_id(77));
+        let list = client
+            .triggers
+            .list(ListTriggersRequest {
+                limit: 5,
+                ..Default::default()
+            })
+            .await
+            .expect("the retried list succeeds");
+        assert_eq!(list.triggers.len(), 1);
+
+        let seen = bodies.lock().unwrap();
+        for path in [GET_TRIGGER_PATH, LIST_TRIGGERS_PATH] {
+            let attempts: Vec<_> = seen.iter().filter(|(p, _)| p == path).collect();
+            assert_eq!(attempts.len(), 2, "{path} rest={rest}");
+            assert!(
+                attempts.iter().all(|(_, body)| *body == attempts[0].1),
+                "{path}: every retry sends the same request"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn l2_trigger_reads_give_up_after_about_two_seconds() {
+    use polyester::proto::triggers::v1::GetTriggerRequest;
+
+    let http = MockHttpServer::spawn(|_| catching_up(false)).await;
+    let client = api_key_client(&http);
+    let started = Instant::now();
+    let err = client
+        .triggers
+        .get(GetTriggerRequest {
+            trigger_id: 77,
+            ..Default::default()
+        })
+        .await
+        .expect_err("still unavailable");
+    let elapsed = started.elapsed();
+    assert!(
+        matches!(err, Error::Server(_)) && err.is_retryable(),
+        "{err:?}"
+    );
+    // 25, 50, 100, 200, 400, 500, 500 ms of backoff: at most eight attempts
+    // (fewer when a slow host stretches the requests). No retry starts
+    // past the 2 s budget, and the last delay is at most 500 ms, so it stops
+    // between 1.5 s and 2 s plus one request.
+    let attempts = http.requests.load(Ordering::SeqCst);
+    assert!((2..=8).contains(&attempts), "{attempts} attempts");
+    assert!(
+        elapsed >= Duration::from_millis(1_500) && elapsed < Duration::from_secs(10),
+        "{elapsed:?}"
+    );
+}
+
+#[tokio::test]
+async fn l2_trigger_reads_do_not_retry_other_errors() {
+    use polyester::proto::triggers::v1::GetTriggerRequest;
+
+    let http = MockHttpServer::spawn(|_| {
+        json_body(
+            500,
+            "application/json",
+            r#"{"code":"internal","message":"boom"}"#,
+        )
+    })
+    .await;
+    let err = api_key_client(&http)
+        .triggers
+        .get(GetTriggerRequest {
+            trigger_id: 77,
+            ..Default::default()
+        })
+        .await
+        .expect_err("internal");
+    assert!(matches!(err, Error::Server(_)), "{err:?}");
+    assert_eq!(http.requests.load(Ordering::SeqCst), 1);
+}
+
+fn batch_status(
+    phase: polyester::proto::orders::v1::BatchReplacePhase,
+    code: &str,
+) -> hardening_support::HttpScript {
+    use polyester::proto::orders::v1::{
+        BatchReplaceAdmissionStatus, BatchReplaceStatusItem, GetBatchReplaceStatusResponse,
+    };
+    let accepted_ts_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64;
+    connect_proto_ok(&GetBatchReplaceStatusResponse {
+        batch_request_id: 4242,
+        admission_status: BatchReplaceAdmissionStatus::Admitted.into(),
+        items: vec![BatchReplaceStatusItem {
+            item_index: 0,
+            phase: phase.into(),
+            old_order_id: 11,
+            code: code.into(),
+            ..Default::default()
+        }],
+        accepted_count: 1,
+        rejected_count: 0,
+        accepted_ts_ns,
+        ..Default::default()
+    })
+}
+
+// An admitted item refused when applied leaves `admitted` for `rejected`
+// with its code; wait_batch_replace polls until then.
+#[tokio::test]
+async fn l2_wait_batch_replace_polls_until_no_item_is_admitted() {
+    use polyester::proto::orders::v1::BatchReplacePhase;
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    let http = MockHttpServer::spawn(move |request| {
+        assert_eq!(request.path, BATCH_STATUS_PATH);
+        match counter.fetch_add(1, Ordering::SeqCst) {
+            // Right after admission the status is not readable yet.
+            0 => json_body(
+                404,
+                "application/json",
+                r#"{"code":"not_found","message":"batch replace status not found"}"#,
+            ),
+            1 => batch_status(BatchReplacePhase::Admitted, ""),
+            2 => catching_up(false),
+            _ => batch_status(BatchReplacePhase::Rejected, "POST_ONLY_CROSS"),
+        }
+    })
+    .await;
+    let status = api_key_client(&http)
+        .orders
+        .wait_batch_replace(&polyester::codecs::format_uint64_id(4242), None, None)
+        .await
+        .expect("settled");
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
+    let item = &status.items[0];
+    assert_eq!(item.phase, "rejected");
+    assert_eq!(
+        item.error_code().as_deref(),
+        Some("ERROR_CODE_POST_ONLY_CROSS")
+    );
+    assert_eq!(item.replacement_order_id, "");
+}
+
+#[tokio::test]
+async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
+    use polyester::proto::orders::v1::BatchReplacePhase;
+
+    let http = MockHttpServer::spawn(|_| batch_status(BatchReplacePhase::Admitted, "")).await;
+    let err = api_key_client(&http)
+        .orders
+        .wait_batch_replace("1", None, Some(Duration::from_millis(300)))
+        .await
+        .expect_err("still admitted");
+    assert!(
+        matches!(&err, Error::Transport(message) if message.contains("reconcile")),
+        "{err:?}"
+    );
+
+    // A status that never appears ends at the deadline too.
+    let http = MockHttpServer::spawn(|_| {
+        json_body(
+            404,
+            "application/json",
+            r#"{"code":"not_found","message":"batch replace status not found"}"#,
+        )
+    })
+    .await;
+    let err = api_key_client(&http)
+        .orders
+        .wait_batch_replace("1", None, Some(Duration::from_millis(300)))
+        .await
+        .expect_err("never found");
+    assert!(
+        matches!(&err, Error::Transport(message) if message.contains("reconcile")),
+        "{err:?}"
+    );
+
+    // Other errors return at once.
+    let http = MockHttpServer::spawn(|_| {
+        json_body(
+            403,
+            "application/json",
+            r#"{"code":"permission_denied","message":"no"}"#,
+        )
+    })
+    .await;
+    let err = api_key_client(&http)
+        .orders
+        .wait_batch_replace("1", None, None)
+        .await
+        .expect_err("denied");
+    assert!(!matches!(err, Error::Transport(_)), "{err:?}");
+    assert_eq!(http.requests.load(Ordering::SeqCst), 1);
+}
