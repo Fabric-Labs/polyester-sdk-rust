@@ -630,12 +630,25 @@ symbol: leave it out to target the trigger's own market. An API key limited to
 some markets must name the market. A trailing stop's runtime details expose
 `trigger_price`, its current threshold, once it is armed.
 
+`triggers.get` / `get_by_id` and `triggers.list` / `list_with` read your own
+writes: once a create, modify, pause or resume has answered, they return the
+trigger as changed. Until the change is readable the server answers
+`unavailable` (HTTP 503), and these reads retry it with the same request: 25 ms,
+doubling, at most 500 ms, giving up after about 2 s with `Error::Server`. Read a
+trigger back after a change with them; don't fall back to a cached copy.
+
 `ListOpenOrdersOpts.trigger_id` / `ListOrderHistoryOpts.trigger_id` filter
 child orders created by a standalone trigger (TWAP/ladder slices).
 Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
 (`fire_price_ticks` is optional on the wire). Terminal `cancel_reason` /
 `failure_reason` on `Trigger` and `TriggerEvent` decode the proto
 `terminal_reason` oneof (empty when unset; unspecified enum → `""`).
+When the exchange halts a market it ends the market's open triggers with
+`cancel_reason` `market_halted` and cancels its open orders with
+`Order.cancel_reason` `CANCEL_REASON_MARKET_HALTED`. A trigger the halted
+market refused after admission currently reads `failure_reason`
+`UNKNOWN_TRIGGER_FAILURE_REASON(212)` until the server reports
+`market_halted`.
 
 `Trigger.version` is 1 for a trigger's first state and higher for every later
 state change. Reads and realtime trigger updates carry the same version for
@@ -756,6 +769,13 @@ timestamp. If it persists, fix the local clock. Other gateway rejections (`SIGNA
 `KEY_DISABLED`, `IP_NOT_ALLOWED`, ...) are `Error::ApiKeyRejected { status, code }` and are not
 retryable. `Error::auth_error_code()` returns the code of either.
 
+A sub-account member call that targets the sub-account's owner (inviting the owner, accepting
+an invite for the owner, changing the owner's role or removing the owner) is refused with
+`AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED`: ConnectRPC `failed_precondition`, REST HTTP 412. Both map to
+`Error::Api` with that code; `Error::is_subaccount_owner_role_locked()` is true for it, and it is
+not retryable. Show "The owner's role can't be changed", and don't offer role changes, removal or
+invites for the member whose role is `OWNER`.
+
 `Error::NotImplemented` means the server does not offer the call (Connect `unimplemented` or HTTP
 501); `Error::RouteNotFound` is the narrower bare HTTP 404. `Error::is_not_implemented()` is true
 for both, and neither is retryable.
@@ -783,15 +803,34 @@ rule as `client_order_id` on create). Convenience helpers that do not accept `re
 (for example `cancel_all`) are one-shot oriented - use the `*_with` / explicit-argument form when
 you need retry-safe identity.
 
-Batch replace returns admission, not execution finality. After admission,
-predecessor IDs may be stale: use `replacement_order_id` from each result.
-Reuse the same `request_id` when retrying a logical batch, then poll
-`get_batch_replace_status`. Its item phases are `admitted`, `working`,
-`rejected`, and `terminal`; `is_batch_replace_settled()` means every item has
-left admission processing (`working` is live, not terminal execution). Each
-admission and status item carries `action_taken`: `replaced` when a successor
-took over, or `amended` for a cancel-only outcome with no successor, in which
-case keep tracking `old_order_id` until it is terminal.
+Batch replace returns admission, not execution finality. Each item amends its
+order in place, under the same order ID and with its queue priority kept, when
+it keeps the price, does not raise the total quantity and keeps the client
+order ID. A new price, a larger total quantity or a new client order ID
+replaces the order with a successor under a new order ID, with its queue
+priority reset. A new total quantity at or below the filled quantity ends the
+order at its filled quantity, with no successor. Each admission and status
+item carries `action_taken`: `replaced` when a successor took over, or
+`amended` when the order kept `old_order_id`.
+
+An admitted item can still be refused when it is applied, for example a
+post-only order moved to a price that would cross. The admission's planned
+`replacement_order_id` is therefore not proof of an order: only the batch
+status or order reads confirm one. Reuse the same `request_id` when retrying a
+logical batch, then call `orders.wait_batch_replace(batch_request_id, None,
+None)`. It polls `get_batch_replace_status` with a short backoff until no item
+is `admitted` (each is `working`, `rejected` or `terminal`) and returns that
+status. `working` is live, not terminal execution. A status reads `not_found`
+for a few seconds after admission; the helper keeps polling through it. A
+refused item reads `rejected` with `code`, the refusal without its
+`ERROR_CODE_` prefix (`POST_ONLY_CROSS`); `item.error_code()` gives the full
+code an `Error::Api` from a single modify carries (`ERROR_CODE_POST_ONLY_CROSS`),
+and keeps a code this SDK does not know unchanged. The order keeps its previous
+price and quantity under `old_order_id`, and the item has no
+`replacement_order_id`. The server keeps a batch's status for 60 seconds: the
+helper stops at the end of that window (or an earlier `timeout`) with
+`Error::Transport`, because after it the status proves nothing; reconcile
+through the orders themselves.
 
 ```rust,no_run
 use polyester::models::{CreateOrderParams, ModifyOrderParams};

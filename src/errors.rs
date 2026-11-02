@@ -107,6 +107,11 @@ pub mod auth_codes {
     pub const INTERNAL_ERROR: &str = "AUTH_INTERNAL_ERROR";
     /// The account request changed nothing; send the same request again.
     pub const TEMPORARILY_UNAVAILABLE: &str = "AUTH_TEMPORARILY_UNAVAILABLE";
+    /// The member call targeted the sub-account's owner: an owner cannot be
+    /// invited to its own sub-account, and its role can be neither changed
+    /// nor removed. The request changed nothing; see
+    /// [`super::Error::is_subaccount_owner_role_locked`].
+    pub const SUBACCOUNT_OWNER_ROLE_LOCKED: &str = "AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED";
     /// API-gateway rejection of an API-key request whose timestamp is outside
     /// the allowed skew window; see [`super::Error::TimestampSkew`].
     pub const TIMESTAMP_SKEW: &str = "TIMESTAMP_SKEW";
@@ -145,6 +150,29 @@ pub mod order_codes {
             .filter(|name| name.ends_with("_OUTCOME_UNKNOWN"))
             .collect()
     });
+
+    /// An orders error code given without its `ERROR_CODE_` prefix, as
+    /// `GetBatchReplaceStatus` items carry it, as the full code an
+    /// [`super::Error::Api`] carries. A code this SDK version does not know
+    /// is kept unchanged. `None` for an empty code.
+    pub fn from_status_code(code: &str) -> Option<String> {
+        if code.is_empty() {
+            return None;
+        }
+        let prefixed = format!("ERROR_CODE_{code}");
+        let known = |name: &str| {
+            ErrorCode::values()
+                .iter()
+                .any(|value| value.proto_name() == name)
+        };
+        Some(if known(code) {
+            code.to_owned()
+        } else if known(&prefixed) {
+            prefixed
+        } else {
+            code.to_owned()
+        })
+    }
 }
 
 /// [`Error::Api`] metadata key holding [`Error::existing_order_id`].
@@ -303,6 +331,19 @@ impl Error {
     /// True when the final active MFA factor cannot be removed.
     pub fn is_mfa_last_factor_required(&self) -> bool {
         self.auth_error_code() == Some(auth_codes::MFA_LAST_FACTOR_REQUIRED)
+    }
+
+    /// True when a sub-account member call targeted the sub-account's owner
+    /// ([`auth_codes::SUBACCOUNT_OWNER_ROLE_LOCKED`]): inviting the owner,
+    /// accepting an invite for the owner, changing the owner's role or
+    /// removing the owner. The owner's role can't be changed; the request
+    /// changed nothing and is not retryable.
+    ///
+    /// ConnectRPC answers it as `failed_precondition` with an
+    /// `auth.v1.AuthErrorDetail`, REST as HTTP 412 with the same code. Both
+    /// map to [`Error::Api`] with this code.
+    pub fn is_subaccount_owner_role_locked(&self) -> bool {
+        self.auth_error_code() == Some(auth_codes::SUBACCOUNT_OWNER_ROLE_LOCKED)
     }
 }
 
@@ -602,6 +643,52 @@ mod tests {
             }
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn map_connect_error_types_the_subaccount_owner_role_lock() {
+        let detail = AuthErrorDetail {
+            code: EnumValue::Known(AuthErrorCode::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED),
+            ..Default::default()
+        };
+        let err = map_connect_error(
+            ConnectError::new(ErrorCode::FailedPrecondition, "owner role locked").with_detail(
+                ErrorDetail::from_message("auth.v1.AuthErrorDetail", &detail),
+            ),
+        );
+        assert!(
+            matches!(&err, Error::Api { code, .. } if code == auth_codes::SUBACCOUNT_OWNER_ROLE_LOCKED),
+            "{err:?}"
+        );
+        assert!(err.is_subaccount_owner_role_locked());
+        assert!(!err.is_retryable());
+        assert!(!err.mutation_outcome_unknown());
+
+        let other = map_auth(AuthErrorCode::AUTH_INVALID_REQUEST, "bad");
+        assert!(!other.is_subaccount_owner_role_locked());
+    }
+
+    #[test]
+    fn batch_replace_status_codes_map_to_order_error_codes() {
+        let map = order_codes::from_status_code;
+        assert_eq!(
+            map("POST_ONLY_CROSS").as_deref(),
+            Some("ERROR_CODE_POST_ONLY_CROSS")
+        );
+        assert_eq!(
+            map("PRICE_LEVELS_EXHAUSTED").as_deref(),
+            Some("ERROR_CODE_PRICE_LEVELS_EXHAUSTED")
+        );
+        // Already prefixed, or unknown to this SDK version: kept as given.
+        assert_eq!(
+            map("ERROR_CODE_POST_ONLY_CROSS").as_deref(),
+            Some("ERROR_CODE_POST_ONLY_CROSS")
+        );
+        assert_eq!(
+            map("SOME_FUTURE_REFUSAL").as_deref(),
+            Some("SOME_FUTURE_REFUSAL")
+        );
+        assert_eq!(map(""), None);
     }
 
     #[test]

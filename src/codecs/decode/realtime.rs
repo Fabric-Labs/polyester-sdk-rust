@@ -504,6 +504,9 @@ mod tests {
                 event(6, order_event::Kind::CANCELED, |e| {
                     e.cancel_reason = buffa::EnumValue::from(999);
                 }),
+                event(8, order_event::Kind::CANCELED, |e| {
+                    e.cancel_reason = CancelReason::CANCEL_REASON_MARKET_HALTED.into();
+                }),
             ],
             ..Default::default()
         };
@@ -537,6 +540,11 @@ mod tests {
             ("replaced".to_owned(), None, None),
             ("accepted".to_owned(), None, None),
             ("canceled".to_owned(), None, some("UNKNOWN(999)")),
+            (
+                "canceled".to_owned(),
+                None,
+                some("CANCEL_REASON_MARKET_HALTED"),
+            ),
         ];
         assert_eq!(reasons, want);
     }

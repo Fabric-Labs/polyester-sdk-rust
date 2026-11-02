@@ -90,6 +90,24 @@ fn validate_bps_at_most(field: &str, value: i32, max: i32) -> Result<()> {
     Ok(())
 }
 
+/// When a batch's status window ends, as a local instant: `window` after
+/// `accepted_ts_ns` (Unix nanoseconds), or `window` after `fallback` when the
+/// admission time is unknown.
+fn status_window_end(
+    accepted_ts_ns: u64,
+    window: Duration,
+    fallback: tokio::time::Instant,
+) -> tokio::time::Instant {
+    if accepted_ts_ns == 0 {
+        return fallback + window;
+    }
+    let ends = UNIX_EPOCH + Duration::from_nanos(accepted_ts_ns) + window;
+    let left = ends
+        .duration_since(SystemTime::now())
+        .unwrap_or(Duration::ZERO);
+    tokio::time::Instant::now() + left
+}
+
 #[derive(Clone)]
 pub struct OrdersService {
     ctx: ServiceContext,
@@ -1065,10 +1083,22 @@ impl OrdersService {
         batch_cancel_from_proto(&resp)
     }
 
-    /// Replace multiple same-symbol orders and return their admission receipt.
+    /// Modify multiple same-symbol orders and return their admission receipt.
     ///
-    /// Poll [`Self::get_batch_replace_status`] using the returned
-    /// `batch_request_id` for recoverable execution finality.
+    /// Each item amends its order in place, under the same order ID and with
+    /// its queue priority kept, when it keeps the price, does not raise the
+    /// total quantity and keeps the client order ID. A new price, a larger
+    /// total quantity or a new client order ID replaces the order with a
+    /// successor under a new order ID. A new total quantity at or below the
+    /// filled quantity ends the order at its filled quantity, with no
+    /// successor.
+    ///
+    /// The receipt answers admission only. An admitted item can still be
+    /// refused when applied, for example a post-only price that would cross,
+    /// so its planned `replacement_order_id` is not proof of an order. Wait
+    /// with [`Self::wait_batch_replace`], or poll
+    /// [`Self::get_batch_replace_status`], using the returned
+    /// `batch_request_id`.
     pub async fn batch_replace(
         &self,
         items: Vec<BatchReplaceItem>,
@@ -1142,6 +1172,10 @@ impl OrdersService {
     }
 
     /// Get durable execution status for an admitted batch replacement.
+    ///
+    /// The server keeps it for 60 seconds from admission. An item refused
+    /// after admission reads `rejected` with its code; see
+    /// [`crate::models::BatchReplaceStatusItem::error_code`].
     pub async fn get_batch_replace_status(
         &self,
         batch_request_id: &str,
@@ -1162,6 +1196,87 @@ impl OrdersService {
         .await?
         .into_owned();
         batch_replace_status_from_proto(&resp)
+    }
+
+    /// Poll [`Self::get_batch_replace_status`] until no item is `admitted`:
+    /// each is `working`, `rejected` or `terminal`. Returns that status.
+    ///
+    /// A rejected item names its refusal in `code` and
+    /// [`crate::models::BatchReplaceStatusItem::error_code`]; its order keeps
+    /// its previous price and quantity under `old_order_id`, and it has no
+    /// successor.
+    ///
+    /// Polls with a short backoff (50 ms, doubling, at most 500 ms). The
+    /// status can read `not_found` for a few seconds after admission, so
+    /// `not_found` and `unavailable` are polled again. Stops when the
+    /// 60-second status window since admission ends, or after `timeout` when
+    /// that comes first, with an [`Error::Transport`]: then the status proves
+    /// nothing, so reconcile through the orders themselves ([`Self::get`] with
+    /// `old_order_id`). Other errors return at once.
+    pub async fn wait_batch_replace(
+        &self,
+        batch_request_id: &str,
+        subaccount_id: Option<u64>,
+        timeout: Option<Duration>,
+    ) -> Result<BatchReplaceStatusResult> {
+        const STATUS_WINDOW: Duration = Duration::from_secs(60);
+        const FIRST_DELAY: Duration = Duration::from_millis(50);
+        const MAX_DELAY: Duration = Duration::from_millis(500);
+
+        let req = GetBatchReplaceStatusRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            batch_request_id: id_to_u64(batch_request_id, "batch_request_id")?,
+            ..Default::default()
+        };
+        let start = tokio::time::Instant::now();
+        let mut deadline = start + timeout.map_or(STATUS_WINDOW, |t| t.min(STATUS_WINDOW));
+        let timed_out = || {
+            Error::transport(format!(
+                "batch replace {batch_request_id} did not settle within its status window; \
+                 reconcile through the orders themselves"
+            ))
+        };
+        let client = self.read_client();
+        let mut delay = FIRST_DELAY;
+        loop {
+            let attempt = tokio::time::timeout_at(
+                deadline,
+                unary::try_auth(
+                    &self.ctx.factory,
+                    "/orders.v1.OrdersReadService/GetBatchReplaceStatus",
+                    req.clone(),
+                    |req, opts| client.get_batch_replace_status_with_options(req, opts),
+                ),
+            )
+            .await
+            .map_err(|_| timed_out())??;
+            match attempt {
+                Ok(resp) => {
+                    let status = batch_replace_status_from_proto(&resp.into_owned())?;
+                    if status.is_settled() {
+                        return Ok(status);
+                    }
+                    deadline = deadline.min(status_window_end(
+                        status.accepted_ts_ns,
+                        STATUS_WINDOW,
+                        start,
+                    ));
+                }
+                // Not readable yet: the status appears shortly after admission.
+                Err(err)
+                    if matches!(
+                        err.code,
+                        connectrpc::ErrorCode::Unavailable | connectrpc::ErrorCode::NotFound
+                    ) => {}
+                Err(err) => return Err(crate::transport::Factory::map_error(err)),
+            }
+            let now = tokio::time::Instant::now();
+            if now + delay >= deadline {
+                return Err(timed_out());
+            }
+            tokio::time::sleep(delay).await;
+            delay = (delay * 2).min(MAX_DELAY);
+        }
     }
 
     /// Schedules cancel-all-after for the account scope.

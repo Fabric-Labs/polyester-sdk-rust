@@ -269,16 +269,27 @@ fn classify_failed_response(
     #[derive(Deserialize)]
     struct Body {
         code: Option<String>,
+        title: Option<String>,
+        detail: Option<String>,
     }
-    let code = is_json
+    let parsed = is_json
         .then(|| serde_json::from_slice::<Body>(body).ok())
-        .flatten()
-        .and_then(|body| body.code)
+        .flatten();
+    let code = parsed
+        .as_ref()
+        .and_then(|body| body.code.clone())
         .filter(|code| !code.is_empty());
     if let Some(code) = code {
         // Connect error codes are lowercase names such as `unimplemented`.
         if code.parse::<ErrorCode>().is_ok() {
             return None;
+        }
+        if code == crate::errors::auth_codes::SUBACCOUNT_OWNER_ROLE_LOCKED {
+            let message = parsed
+                .and_then(|body| body.detail.or(body.title))
+                .filter(|message| !message.is_empty())
+                .unwrap_or_else(|| code.clone());
+            return Some(owner_role_locked(status, message));
         }
         if let Some(err) = gateway_rejection(status, code) {
             return Some(err);
@@ -324,6 +335,24 @@ fn gateway_rejection(status: StatusCode, code: String) -> Option<ConnectError> {
         status,
         GATEWAY_REJECTION_TYPE,
     ))
+}
+
+/// The Connect error ConnectRPC answers for a sub-account owner role lock
+/// (`failed_precondition` with an `auth.v1.AuthErrorDetail`), built from the
+/// REST problem body (HTTP 412) so both shapes map to the same SDK error.
+fn owner_role_locked(status: StatusCode, message: String) -> ConnectError {
+    use crate::proto::auth::v1::{AuthErrorCode, AuthErrorDetail};
+    let detail = AuthErrorDetail {
+        code: AuthErrorCode::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED.into(),
+        message: message.clone(),
+        ..Default::default()
+    };
+    ConnectError::new(ErrorCode::FailedPrecondition, message)
+        .with_http_status(status)
+        .with_detail(ErrorDetail::from_message(
+            "auth.v1.AuthErrorDetail",
+            &detail,
+        ))
 }
 
 fn sdk_marked_error(
@@ -532,6 +561,23 @@ mod tests {
         assert_eq!(denied.code, ErrorCode::PermissionDenied);
         // A JSON body is only read for its code when it is JSON.
         assert!(classify(401, false, r#"{"code":"TIMESTAMP_SKEW"}"#).is_none());
+
+        // REST answers a sub-account owner role lock as a 412 problem; it
+        // maps like the ConnectRPC answer.
+        let locked = classify(
+            412,
+            true,
+            r#"{"status":412,"code":"AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED","title":"Subaccount Owner Role Locked"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            (locked.code, locked.http_status().as_u16()),
+            (ErrorCode::FailedPrecondition, 412)
+        );
+        let mapped = crate::errors::map_connect_error(locked);
+        assert!(mapped.is_subaccount_owner_role_locked(), "{mapped:?}");
+        assert_eq!(mapped.to_string(), "Subaccount Owner Role Locked");
+        assert!(!mapped.is_retryable());
     }
 
     #[test]

@@ -1096,6 +1096,10 @@ mod tests {
                 TriggerCancelReason::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG,
                 "pair_drain_attached_leg",
             ),
+            (
+                TriggerCancelReason::TRIGGER_CANCEL_REASON_MARKET_HALTED,
+                "market_halted",
+            ),
         ];
         for (reason, want) in cancels {
             let trigger = trigger_from_proto(&ProtoTrigger {
@@ -1175,6 +1179,29 @@ mod tests {
         assert_eq!(
             unknown.failure_reason,
             "UNKNOWN_TRIGGER_FAILURE_REASON(321)"
+        );
+
+        // A trigger a halted market refused after admission currently reads
+        // the unnamed failure reason 212; it decodes, on reads and events.
+        let halted = trigger_from_proto(&ProtoTrigger {
+            trigger_id: 8,
+            terminal_reason: Some(trigger::TerminalReason::FailureReason(
+                buffa::EnumValue::Unknown(212),
+            )),
+            ..Default::default()
+        });
+        assert_eq!(halted.failure_reason, "UNKNOWN_TRIGGER_FAILURE_REASON(212)");
+        let halted_event = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 8,
+            terminal_reason: Some(trigger_event::TerminalReason::FailureReason(
+                buffa::EnumValue::Unknown(212),
+            )),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            halted_event.failure_reason,
+            "UNKNOWN_TRIGGER_FAILURE_REASON(212)"
         );
     }
 

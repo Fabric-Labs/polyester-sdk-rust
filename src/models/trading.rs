@@ -530,10 +530,17 @@ pub struct BatchReplaceAdmissionItem {
     pub status: String,
     pub old_order_id: String,
     pub client_order_id: String,
+    /// The successor's planned order ID. It is not proof of an order: the
+    /// item can still be refused when applied, and then this ID never
+    /// becomes an order. Only [`BatchReplaceStatusItem`] or order reads
+    /// confirm a successor.
     pub replacement_order_id: String,
-    /// `replaced` when a successor order took over, or `amended` for a
-    /// cancel-only outcome with no successor: keep tracking `old_order_id`
-    /// until it is terminal. Empty for a rejected item.
+    /// `replaced` when a successor order takes over under
+    /// `replacement_order_id`, with its queue priority reset. `amended` when
+    /// the order keeps `old_order_id`: amended in place with its queue
+    /// priority kept, or ended at its filled quantity when the new total
+    /// quantity is at or below it. Keep tracking `old_order_id`. Empty for a
+    /// rejected item.
     pub action_taken: String,
     pub code: String,
     pub rate_limit: Option<super::RateLimitDetail>,
@@ -552,12 +559,21 @@ pub struct BatchReplaceOrdersResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchReplaceStatusItem {
     pub item_index: u32,
+    /// `admitted`, `working`, `rejected` or `terminal`. An item admitted and
+    /// then refused when applied, such as a post-only price that would
+    /// cross, reads `rejected` with its `code`: the order keeps its previous
+    /// price and quantity under `old_order_id`.
     pub phase: String,
     pub old_order_id: String,
+    /// The successor order, or empty when there is none: always empty for a
+    /// rejected item.
     pub replacement_order_id: String,
-    /// `replaced` or `amended` (cancel-only, no successor); empty until known.
+    /// `replaced` or `amended`, as on [`BatchReplaceAdmissionItem`]; empty
+    /// until known and for a rejected item.
     pub action_taken: String,
     pub order_status: String,
+    /// The refusal's error code without its `ERROR_CODE_` prefix, such as
+    /// `POST_ONLY_CROSS`; see [`Self::error_code`].
     pub code: String,
     pub updated_ts_ns: u64,
 }
@@ -571,6 +587,17 @@ pub struct BatchReplaceStatusResult {
     pub rejected_count: u32,
     pub accepted_ts_ns: u64,
     pub updated_ts_ns: u64,
+}
+
+impl BatchReplaceStatusItem {
+    /// The refusal's code as an orders error code, the same string an
+    /// [`crate::Error::Api`] from a single modify carries: `code` with the
+    /// `ERROR_CODE_` prefix, such as `ERROR_CODE_POST_ONLY_CROSS`. A code this
+    /// SDK version does not know is returned unchanged. `None` when the item
+    /// has no code.
+    pub fn error_code(&self) -> Option<String> {
+        crate::errors::order_codes::from_status_code(&self.code)
+    }
 }
 
 impl BatchReplaceStatusResult {
