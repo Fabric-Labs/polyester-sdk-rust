@@ -9,11 +9,11 @@ use crate::environment::{
 use crate::errors::{Error, Result};
 use crate::services::{
     AddressBookService, ApiKeysService, AuthService, BalancesService, ChainAnalyticsService,
-    DepositService, FeeService, GuardSignerService, HeatmapService, InternalTransfersService,
-    LifecycleService, MarketDataService, MarketOverviewService, OrderbookService, OrdersService,
-    PoliciesService, RateLimitService, ServiceContext, SocialVerificationService,
-    SubAccountsService, TradesService, TransfersService, TriggersService, VipService,
-    WithdrawService, ZipperService,
+    ChangelogService, DepositService, FeeService, GuardSignerService, HeatmapService,
+    InternalTransfersService, LifecycleService, MarketDataService, MarketOverviewService,
+    OrderbookService, OrdersService, PoliciesService, RateLimitService, ServiceContext,
+    SocialVerificationService, SubAccountsService, TradesService, TransfersService,
+    TriggersService, VipService, WithdrawService, ZipperService,
 };
 use crate::transport::{
     Config as TransportConfig, DEFAULT_API_URL, DEFAULT_WS_URL, Factory, WireFormat,
@@ -117,6 +117,8 @@ pub struct Client {
     pub vip: VipService,
     pub fees: FeeService,
     pub rate_limits: RateLimitService,
+    /// Public product changelog; needs no credentials.
+    pub changelog: ChangelogService,
     pub withdraw: WithdrawService,
     catalog_ready: Arc<OnceCell<Result<()>>>,
     catalog_hydrate_lock: Arc<tokio::sync::Mutex<()>>,
@@ -220,6 +222,7 @@ impl Client {
             vip: VipService::new(ctx.clone()),
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
+            changelog: ChangelogService::new(ctx.clone()),
             withdraw: WithdrawService::new(ctx),
             catalog_ready,
             catalog_hydrate_lock,
@@ -320,6 +323,7 @@ impl Client {
             vip: VipService::new(ctx.clone()),
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
+            changelog: ChangelogService::new(ctx.clone()),
             withdraw: WithdrawService::new(ctx),
             catalog_ready,
             catalog_hydrate_lock,
@@ -584,6 +588,7 @@ mod tests {
             &client.vip,
             &client.fees,
             &client.rate_limits,
+            &client.changelog,
         );
     }
 

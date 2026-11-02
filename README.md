@@ -35,6 +35,7 @@ Proprietary license (not open source). API-key only; no browser login or JWT flo
 | VIP tiers + status | Yes |
 | Spot fee rates | Yes |
 | Trading rate limits | Yes |
+| Product changelog (posts + changes) | Yes |
 | Balances, holds, equity history | Yes |
 | Orders (create, cancel, modify, batch, cancel-all) | Yes |
 | User trades | Yes |
@@ -537,6 +538,56 @@ let fees = client.fees.get_spot_fee_rates(None, vec![]).await?;
 let catalog = client.rate_limits.get_rate_limit_config().await?;
 let limits = client.rate_limits.get_trading_rate_limits(None).await?;
 ```
+
+## Product changelog
+
+`client.changelog` reads the product changelog published for the environment
+the API host serves. It is public and read-only: it needs no API key, and
+requests are rate-limited per client address. Responses are newest post first.
+
+- `list_posts(opts)` returns one page of post summaries with change counts;
+  `posts(opts)` is a stream over every page.
+- `get_post(slug)` returns one post with its sections and changes. A slug is the
+  post's coverage cutoff date, `YYYY-MM-DD`; a later post on the same day gets
+  `-2`, `-3`. An unknown slug is `Error::Api` with code `NotFound`.
+- `list_changes(opts)` returns one page of individual changes across posts,
+  filtered by category, surface, audience, `action_required`, publication time
+  (`start_time` inclusive, `end_time` exclusive) or post; `changes(opts)` is a
+  stream over every page. Values within one filter combine with OR.
+- `breaking_changes_since(t)` and `action_required_since(t)` collect every
+  matching change published at or after `t`.
+
+Category, audience and surface are lowercase labels (`breaking_change`, `api`,
+`market_makers`, ...; see the `CHANGELOG_*` constants in `polyester::models`).
+A value newer than this SDK reads as `unknown(<n>)`. `ChangelogChange::id` is
+the change's public base58 id. The service returns `Unavailable`
+(`Error::Server`) while it is starting.
+
+```rust,no_run
+use futures_util::TryStreamExt;
+use polyester::services::{ListChangelogChangesOptions, ListChangelogPostsOptions};
+use std::time::{Duration, UNIX_EPOCH};
+
+let posts: Vec<_> = client
+    .changelog
+    .posts(ListChangelogPostsOptions::default())
+    .try_collect()
+    .await?;
+let newest = client.changelog.get_post(&posts[0].slug).await?;
+
+let since = UNIX_EPOCH + Duration::from_secs(1_767_225_600); // 2026-01-01
+let breaking = client.changelog.breaking_changes_since(since).await?;
+let api_changes = client
+    .changelog
+    .list_changes(ListChangelogChangesOptions {
+        surfaces: vec!["api".into()],
+        start_time: Some(since),
+        ..Default::default()
+    })
+    .await?;
+```
+
+`examples/changelog.rs` runs these calls against devnet.
 
 ## Triggers
 
