@@ -5056,3 +5056,90 @@ async fn l2_json_wire_reads_unknown_trigger_enum_names() {
     assert_eq!(refused.fire_refusal_reason, "account_repairing");
     assert_eq!(refused.fire_price.as_ref().unwrap().format(), "104");
 }
+
+// GetSubaccount returns the sub-account's balances, in the shape of the
+// balances list, only when `include_balances` asks for them.
+#[tokio::test]
+async fn l2_subaccount_get_requests_and_parses_balances_only_when_asked() {
+    use polyester::proto::auth::v1::{GetSubaccountRequest, GetSubaccountResponse, Subaccount};
+    use polyester::proto::ledger::read::v1::{
+        AssetBalance as ProtoAssetBalance, GetBalancesResponse,
+    };
+    use polyester::proto::polyester::r#type::v1::U128;
+    use polyester::services::GetSubaccountOpts;
+
+    const ONE_POINT_FIVE_E18: u64 = 1_500_000_000_000_000_000;
+    let seen = Arc::new(std::sync::Mutex::new(Vec::<bool>::new()));
+    let sink = seen.clone();
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path != "/auth.v1.SubaccountViewService/GetSubaccount" {
+            return hardening_support::HttpScript::NotFound;
+        }
+        let request = GetSubaccountRequest::decode_from_slice(&req.body).expect("request decodes");
+        sink.lock().unwrap().push(request.include_balances);
+        let mut response = GetSubaccountResponse {
+            subaccount: Subaccount {
+                id: 42,
+                label: "desk".into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        if request.include_balances {
+            response.balances = GetBalancesResponse {
+                balances: vec![ProtoAssetBalance {
+                    asset_id: 1,
+                    trading: U128 {
+                        hi: 0,
+                        lo: ONE_POINT_FIVE_E18,
+                        ..Default::default()
+                    }
+                    .into(),
+                    available: U128 {
+                        hi: 0,
+                        lo: ONE_POINT_FIVE_E18,
+                        ..Default::default()
+                    }
+                    .into(),
+                    trading_revision: 3,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+            .into();
+        }
+        connect_proto_ok(&response)
+    })
+    .await;
+    let client = api_key_client(&http);
+
+    let with = client
+        .sub_accounts
+        .get(
+            42,
+            GetSubaccountOpts {
+                include_balances: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("get with balances");
+    let balances = with.balances.expect("balances were requested");
+    assert_eq!(balances.balances.len(), 1);
+    let row = &balances.balances[0];
+    assert_eq!(row.asset_id, 1);
+    assert_eq!(format_ledger_u128(&row.trading, 18).unwrap(), "1.5");
+    assert_eq!(format_ledger_u128(&row.available, 18).unwrap(), "1.5");
+    assert_eq!((row.funding.as_str(), row.reserved.as_str()), ("0", "0"));
+    assert_eq!((row.trading_revision, row.funding_revision), (3, 0));
+    assert_eq!(with.subaccount.unwrap().label, "desk");
+
+    let without = client
+        .sub_accounts
+        .get(42, GetSubaccountOpts::default())
+        .await
+        .expect("get without balances");
+    assert!(without.balances.is_none());
+    assert_eq!(*seen.lock().unwrap(), [true, false]);
+}

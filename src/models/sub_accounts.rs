@@ -21,6 +21,10 @@ pub struct SubAccountsList {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct GetSubaccountResult {
     pub subaccount: Option<SubAccount>,
+    /// The sub-account's current balances, one row per asset as the
+    /// balances list returns them. `Some` only when the read asked for them
+    /// with [`crate::services::GetSubaccountOpts::include_balances`].
+    pub balances: Option<crate::models::BalancesList>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

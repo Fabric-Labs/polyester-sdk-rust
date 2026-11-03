@@ -1,6 +1,6 @@
 //! Trigger response decoders.
 
-use super::enums::enum_value_side;
+use super::enums::{enum_value_self_trade_prevention_mode, enum_value_side};
 use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::TsNs;
 use crate::codecs::scalars::format_uint64_id;
@@ -10,7 +10,7 @@ use crate::models::{
     TriggersList,
 };
 use crate::proto::orders::v1::{
-    FeeAsset, SelfTradePreventionMode, Side as TrailingSide, TriggerDirection, TriggerPriceSource,
+    FeeAsset, Side as TrailingSide, TriggerDirection, TriggerPriceSource,
 };
 use crate::proto::triggers::v1::{
     CancelTriggerResponse, ConditionalTrigger, CreateTriggerResponse, GetTriggerResponse,
@@ -84,16 +84,6 @@ fn fee_asset_label(value: buffa::EnumValue<FeeAsset>) -> String {
     match value.as_known() {
         Some(FeeAsset::Quote) => "quote".to_owned(),
         Some(FeeAsset::Base) => "base".to_owned(),
-        Some(_) => String::new(),
-        None => format!("UNKNOWN({})", value.to_i32()),
-    }
-}
-
-fn stp_mode_label(value: buffa::EnumValue<SelfTradePreventionMode>) -> String {
-    match value.as_known() {
-        Some(SelfTradePreventionMode::ExpireTaker) => "expire_taker".to_owned(),
-        Some(SelfTradePreventionMode::ExpireMaker) => "expire_maker".to_owned(),
-        Some(SelfTradePreventionMode::ExpireBoth) => "expire_both".to_owned(),
         Some(_) => String::new(),
         None => format!("UNKNOWN({})", value.to_i32()),
     }
@@ -453,7 +443,9 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         qty: decode_qty_scaled(msg.qty_scaled, None, None, symbol_id_opt),
         limit_price: proj.limit_price,
         fee_asset: fee_asset_label(msg.fee_asset),
-        self_trade_prevention_mode: stp_mode_label(msg.self_trade_prevention_mode),
+        self_trade_prevention_mode: enum_value_self_trade_prevention_mode(
+            msg.self_trade_prevention_mode,
+        ),
         post_only: proj.post_only,
         trigger_price,
         max_slippage: proj.max_slippage,
@@ -1133,6 +1125,12 @@ mod tests {
                 TriggerFailureReason::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
                 "trigger_would_trigger_immediately",
             ),
+            // A trigger a halted market refuses ends `failed` with the named
+            // reason 8, on the trigger and on its `failed` event.
+            (
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_MARKET_HALTED,
+                "market_halted",
+            ),
         ];
         for (reason, want) in failures {
             let trigger = trigger_from_proto(&ProtoTrigger {
@@ -1188,8 +1186,8 @@ mod tests {
             "UNKNOWN_TRIGGER_FAILURE_REASON(321)"
         );
 
-        // A trigger a halted market refused after admission currently reads
-        // the unnamed failure reason 212; it decodes, on reads and events.
+        // A halt now reads `market_halted` (8), never the unnamed 212. A value
+        // this SDK does not name, 212 included, still decodes with its number.
         let halted = trigger_from_proto(&ProtoTrigger {
             trigger_id: 8,
             terminal_reason: Some(trigger::TerminalReason::FailureReason(
@@ -1300,6 +1298,10 @@ mod tests {
                 "min_notional".to_owned(),
             ),
             (
+                TriggerFailureReason::SelfTradePrevented.into(),
+                "self_trade_prevented".to_owned(),
+            ),
+            (
                 buffa::EnumValue::Unknown(321),
                 "UNKNOWN_TRIGGER_FAILURE_REASON(321)".to_owned(),
             ),
@@ -1336,6 +1338,31 @@ mod tests {
         })
         .unwrap();
         assert_eq!(failed.failure_reason, "account_repairing");
+    }
+
+    #[test]
+    fn self_trade_prevented_is_a_refused_fire_that_names_its_child_order() {
+        // Self-trade prevention expired the attached exit's order: the leg
+        // stays live, and `child_seq` names the order that was placed and
+        // expired. It is no terminal reason.
+        let event = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 6,
+            trigger_type: TriggerType::StopLoss.into(),
+            event_type: TriggerEventType::EventFireRefused.into(),
+            child_seq: 2,
+            child_order_id: 77,
+            fire_price_ticks: Some(104_000_000_000),
+            fire_refusal_reason: Some(
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED.into(),
+            ),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(event.event_type, "fire_refused");
+        assert_eq!(event.fire_refusal_reason, "self_trade_prevented");
+        assert_eq!(event.child_seq, 2);
+        assert_eq!(event.child_order_id, format_uint64_id(77));
+        assert!(event.cancel_reason.is_empty() && event.failure_reason.is_empty());
     }
 
     #[test]

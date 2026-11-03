@@ -3014,6 +3014,58 @@ mod tests {
         assert!(err.to_string().contains("scale mismatch"));
     }
 
+    // A buy sized by a quote amount may carry attached exits; the server
+    // checks the legs against the pair's minimums. Nothing refuses it before
+    // sending.
+    #[test]
+    fn quote_budget_buy_sends_attached_risk() {
+        use crate::models::{AttachedRisk, RiskLeg, TrailingDistance, TrailingStop};
+
+        let client = client();
+        let price = |ticks| Price::from_ticks(ticks, Some("BTC-USDT".into())).unwrap();
+        let mut params =
+            CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Market);
+        params.max_quote_debit_scaled = Some(
+            Quantity::from_quote_scaled(50_000_000, 6, Some("BTC-USDT".into()), Some(7)).unwrap(),
+        );
+        params.market_max_slippage = Some(MaxSlippage::Bps(200));
+        params.attached_risk = Some(AttachedRisk {
+            take_profit: Some(RiskLeg::market(price(80_000_000_000_000))),
+            stop_loss: Some(RiskLeg::market(price(74_000_000_000_000))),
+            trailing_stop: None,
+            oco: true,
+        });
+        let wire = client.orders.encode_create_params(&params).unwrap();
+        let intent = wire.order.as_option().unwrap();
+        assert!(matches!(
+            intent.sizing,
+            Some(order_intent::Sizing::MaxQuoteDebitScaled(50_000_000))
+        ));
+        let risk = intent.attached_risk.as_option().unwrap();
+        assert!(risk.oco && risk.take_profit.is_set());
+        assert!(matches!(
+            risk.stop_leg,
+            Some(risk_policy::StopLeg::StopLoss(_))
+        ));
+
+        // A quote-sized limit IOC buy with a trailing stop, in a batch.
+        params.order_type = CreateOrderType::Limit;
+        params.time_in_force = Some(CreateTimeInForce::Ioc);
+        params.market_max_slippage = None;
+        params.price = Some(price(77_000_000_000_000));
+        params.attached_risk = Some(AttachedRisk {
+            take_profit: None,
+            stop_loss: None,
+            trailing_stop: Some(TrailingStop::new(TrailingDistance::Bps(100))),
+            oco: false,
+        });
+        let intent = client.orders.order_intent_from_params(&params).unwrap();
+        assert!(matches!(
+            intent.attached_risk.as_option().unwrap().stop_leg,
+            Some(risk_policy::StopLeg::TrailingStop(_))
+        ));
+    }
+
     #[test]
     fn batch_size_guard_rejects_empty_and_more_than_twenty() {
         assert!(OrdersService::validate_batch_size("batch_create", 1).is_ok());
@@ -3196,6 +3248,7 @@ mod tests {
                 version: 1,
                 post_only: false,
                 fee_asset: "quote".into(),
+                self_trade_prevention_mode: String::new(),
                 submitted_max_quote_debit_scaled: None,
                 attached_risk: None,
                 expire_at: None,

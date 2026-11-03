@@ -1,8 +1,9 @@
 //! Orders read/mutation decoders.
 
 use super::enums::{
-    enum_value_fee_asset, enum_value_order_status, enum_value_order_type, enum_value_side,
-    enum_value_time_in_force, order_cancel_reason, order_reject_reason,
+    enum_value_fee_asset, enum_value_order_status, enum_value_order_type,
+    enum_value_self_trade_prevention_mode, enum_value_side, enum_value_time_in_force,
+    order_cancel_reason, order_reject_reason,
 };
 use super::money::{
     decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled,
@@ -72,6 +73,9 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
         version: msg.version,
         post_only: msg.post_only,
         fee_asset: enum_value_fee_asset(msg.fee_asset),
+        self_trade_prevention_mode: enum_value_self_trade_prevention_mode(
+            msg.self_trade_prevention_mode,
+        ),
         submitted_max_quote_debit_scaled: msg.submitted_max_quote_debit_scaled,
         attached_risk: msg
             .attached_risk
@@ -1312,6 +1316,21 @@ mod tests {
             }),
             (some("ERROR_CODE_MARKET_HALTED"), None)
         );
+        // An attached exit that fires while its order still rests cancels the
+        // order's unfilled rest first (18). 307 names a self-trade prevention
+        // block of an attached exit; no request is answered with it.
+        assert_eq!(
+            order(OrderStatus::Canceled, |o| {
+                o.cancel_reason = CancelReason::CANCEL_REASON_ATTACHED_EXIT_FIRED.into();
+            }),
+            (None, some("CANCEL_REASON_ATTACHED_EXIT_FIRED"))
+        );
+        assert_eq!(
+            order(OrderStatus::Rejected, |o| {
+                o.reject_reason = ErrorCode::ERROR_CODE_SELF_TRADE_PREVENTED.into();
+            }),
+            (some("ERROR_CODE_SELF_TRADE_PREVENTED"), None)
+        );
         // Unknown values keep their number; a reject reason is formatted like
         // the matching `Error::Api` code so the two compare equal.
         assert_eq!(
@@ -1329,6 +1348,39 @@ mod tests {
         // Unset (and so every status before this contract) is `None`.
         assert_eq!(order(OrderStatus::Working, |_| {}), (None, None));
         assert_eq!(order(OrderStatus::Canceled, |_| {}), (None, None));
+    }
+
+    #[test]
+    fn order_from_proto_maps_self_trade_prevention_mode() {
+        use crate::proto::orders::v1::SelfTradePreventionMode;
+
+        let mode = |value: buffa::EnumValue<SelfTradePreventionMode>| {
+            order_from_proto(&ProtoOrder {
+                order_id: 1,
+                self_trade_prevention_mode: value,
+                ..Default::default()
+            })
+            .unwrap()
+            .self_trade_prevention_mode
+        };
+        assert_eq!(
+            mode(SelfTradePreventionMode::ExpireTaker.into()),
+            "expire_taker"
+        );
+        assert_eq!(
+            mode(SelfTradePreventionMode::ExpireMaker.into()),
+            "expire_maker"
+        );
+        assert_eq!(
+            mode(SelfTradePreventionMode::ExpireBoth.into()),
+            "expire_both"
+        );
+        assert_eq!(
+            mode(SelfTradePreventionMode::SelfTradePreventionModeUnspecified.into()),
+            ""
+        );
+        // A mode newer than this SDK keeps its number instead of failing.
+        assert_eq!(mode(buffa::EnumValue::from(212)), "UNKNOWN(212)");
     }
 
     #[test]
