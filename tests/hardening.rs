@@ -4971,3 +4971,40 @@ async fn l2_stop_all_trading_cancels_live_triggers_before_the_orders() {
     let cancel_all = CancelAllOrdersRequest::decode_from_slice(&calls[5].1).unwrap();
     assert_eq!(cancel_all.request_id, "stop-all-1");
 }
+
+// A JSON-wire response naming an enum value newer than this SDK reads it as
+// unknown instead of rejecting the whole response (changelog sections and
+// change surfaces gain product areas over time).
+#[tokio::test]
+async fn l2_json_wire_reads_unknown_enum_names_instead_of_failing() {
+    let http = MockHttpServer::spawn(|request| match request.path.as_str() {
+        "/changelog.v1.ChangelogService/GetPost" => json_body(
+            200,
+            "application/json",
+            r#"{"post":{"summary":{"slug":"2026-11-04","changeCount":2},"sections":[
+                {"heading":"Market data","surface":"MARKET_DATA","changes":[{"id":"1","surfaces":["MARKET_DATA","FUTURE_SURFACE"]}]},
+                {"heading":"Future","surface":"FUTURE_SURFACE","changes":[{"id":"2","category":"FUTURE_CATEGORY","surfaces":["FUTURE_SURFACE"]}]}]}}"#,
+        ),
+        _ => hardening_support::HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        hydrate_catalogs: false,
+        wire_format: polyester::transport::WireFormat::Json,
+        ..Default::default()
+    })
+    .expect("client");
+    let post = client
+        .changelog
+        .get_post("2026-11-04")
+        .await
+        .expect("an unknown enum name must not reject the response");
+    assert_eq!(post.sections.len(), 2);
+    assert_eq!(post.sections[0].surface, "market_data");
+    assert_eq!(post.sections[0].changes[0].surfaces, vec!["market_data"]);
+    // A name this SDK does not know reads as unset: no product-area label.
+    assert_eq!(post.sections[1].surface, "");
+    assert!(post.sections[1].changes[0].surfaces.is_empty());
+    assert_eq!(post.sections[1].changes[0].category, "");
+}

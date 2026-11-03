@@ -90,7 +90,7 @@ pub struct OrderFeeTotal {
 
 impl OrderFeeTotal {
     /// The net fee as an exact decimal in units of the order's fee asset.
-    /// `None` only when the amount does not fit a [`Decimal`].
+    /// `None` only when the amount needs more digits than a [`Decimal`] holds.
     pub fn amount(&self) -> Option<Decimal> {
         scaled_decimal(&self.amount_e18, 18)
     }
@@ -99,16 +99,29 @@ impl OrderFeeTotal {
 /// `value / 10^scale` for an unsigned integer string, exactly; `None` when it
 /// does not fit a [`Decimal`].
 fn scaled_decimal(value: &str, scale: u32) -> Option<Decimal> {
-    let value = value.parse::<i128>().ok()?;
-    Decimal::try_from_i128_with_scale(value, scale)
-        .ok()
-        .map(|d| d.normalize())
+    exact_decimal(value.parse::<i128>().ok()?, scale)
+}
+
+/// `value / 10^scale` as a [`Decimal`] with every digit, trailing zeros
+/// dropped; `None` when it needs more digits than a `Decimal` holds. Never
+/// rounded.
+fn exact_decimal(mut value: i128, mut scale: u32) -> Option<Decimal> {
+    while scale > 0 && value % 10 == 0 {
+        value /= 10;
+        scale -= 1;
+    }
+    Decimal::try_from_i128_with_scale(value, scale).ok()
+}
+
+/// `value`, scaled by `10^from`, rescaled to `10^to` (`to >= from`).
+fn rescale(value: i128, from: u32, to: u32) -> Option<i128> {
+    value.checked_mul(10_i128.checked_pow(to.checked_sub(from)?)?)
 }
 
 impl Order {
     /// Exact average execution price in quote units per base unit, from
     /// `avg_price_e18`; zero while the order has no fills. `None` only when
-    /// the value does not fit a [`Decimal`].
+    /// the value needs more digits than a [`Decimal`] holds; never rounded.
     pub fn avg_price(&self) -> Option<Decimal> {
         scaled_decimal(&self.avg_price_e18, 18)
     }
@@ -116,7 +129,7 @@ impl Order {
     /// Exact quote amount of the fills, before fees, in quote units: the
     /// REST `cumQuote`. `base_quantity_scale` is the pair's (from
     /// `GetSpotConfig`); zero while the order has no fills. `None` only when
-    /// the value does not fit a [`Decimal`].
+    /// the value needs more digits than a [`Decimal`] holds; never rounded.
     pub fn cum_quote(&self, base_quantity_scale: u32) -> Option<Decimal> {
         scaled_decimal(&self.cum_notional, 9 + base_quantity_scale)
     }
@@ -129,35 +142,50 @@ impl Order {
     /// `cum_qty`), when the read carries no fee total, and for a fee asset
     /// this SDK does not know.
     pub fn quote_used(&self, base_quantity_scale: u32) -> Option<Decimal> {
+        let (used, scale) = self.quote_used_scaled(base_quantity_scale)?;
+        exact_decimal(used, scale)
+    }
+
+    /// [`Self::quote_used`] as an integer and its decimal scale, computed
+    /// exactly: the notional and the fee at their common scale.
+    fn quote_used_scaled(&self, base_quantity_scale: u32) -> Option<(i128, u32)> {
+        const FEE_SCALE: u32 = 18;
         let fee = self.fee_total.as_ref()?;
         let covered = fee.qty.as_ref().map(Quantity::as_scaled);
         if covered != Some(self.cum_qty.as_ref().map_or(0, Quantity::as_scaled)) {
             return None;
         }
-        let quote = self.cum_quote(base_quantity_scale)?;
-        match self.fee_asset.as_str() {
-            "base" => Some(quote),
-            "quote" if fee.is_rebate => quote.checked_sub(fee.amount()?),
-            "quote" => quote.checked_add(fee.amount()?),
-            _ => None,
-        }
+        let notional_scale = 9_u32.checked_add(base_quantity_scale)?;
+        let scale = notional_scale.max(FEE_SCALE);
+        let notional = rescale(self.cum_notional.parse().ok()?, notional_scale, scale)?;
+        let amount = rescale(fee.amount_e18.parse().ok()?, FEE_SCALE, scale)?;
+        let used = match self.fee_asset.as_str() {
+            "base" => notional,
+            "quote" if fee.is_rebate => notional.checked_sub(amount)?,
+            "quote" => notional.checked_add(amount)?,
+            _ => return None,
+        };
+        Some((used, scale))
     }
 
     /// What a buy sized by a quote amount did not use, in quote units:
     /// `submitted_max_quote_debit_scaled` (at the pair's
     /// `quote_quantity_scale`) less [`Self::quote_used`]. `None` for an order
     /// not sized by a quote amount and whenever `quote_used` is `None`.
+    ///
+    /// Like `quote_used` and `cum_quote`, the result is exact: `None` when it
+    /// needs more digits than a [`Decimal`] holds, never a rounded value.
     pub fn quote_unspent(
         &self,
         base_quantity_scale: u32,
         quote_quantity_scale: u32,
     ) -> Option<Decimal> {
-        let submitted = self.submitted_max_quote_debit_scaled?;
-        let submitted =
-            Decimal::try_from_i128_with_scale(i128::from(submitted), quote_quantity_scale).ok()?;
-        submitted
-            .checked_sub(self.quote_used(base_quantity_scale)?)
-            .map(|d| d.normalize())
+        let submitted = i128::from(self.submitted_max_quote_debit_scaled?);
+        let (used, used_scale) = self.quote_used_scaled(base_quantity_scale)?;
+        let scale = used_scale.max(quote_quantity_scale);
+        let unspent = rescale(submitted, quote_quantity_scale, scale)?
+            .checked_sub(rescale(used, used_scale, scale)?)?;
+        exact_decimal(unspent, scale)
     }
 }
 

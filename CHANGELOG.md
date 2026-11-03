@@ -13,7 +13,9 @@ literals or matches `Error` exhaustively, so the next release is a minor one.
   net of rebates. `Order::quote_used(base_scale)` and
   `Order::quote_unspent(base_scale, quote_scale)` tell how much of a
   quote-sized buy's amount the fills used; `None` until the fee total covers
-  every fill. All exact `Decimal`s, zero with no fills.
+  every fill. All exact `Decimal`s, zero with no fills, and `None` rather
+  than a rounded value when a result needs more digits than a `Decimal`
+  holds.
 - Trigger events: `fire_refused` (also a `list_events` filter) for a fire
   refused while the trigger stays live, with the new
   `TriggerEvent.fire_refusal_reason` (`rate_limited`, `account_repairing`,
@@ -52,6 +54,11 @@ literals or matches `Error` exhaustively, so the next release is a minor one.
 - `client.stop_all_trading(scope)` cancels every live trigger, then every open
   order. Cancel-all and the dead-man switch cancel orders only, never
   triggers; `cancel_all`, `cancel_all_after` and `cancel` document it.
+- Fixed: with `WireFormat::Json`, a response naming an enum value newer than
+  this SDK (a new changelog surface, for example) failed the whole call with
+  a retryable `Error::Server`. The value now reads as unset (and is dropped
+  from a repeated field), as protojson's `DiscardUnknown` does; binary
+  responses keep the value's number.
 - Changelog: surface labels `market_data`, `quickswap` and `rewards`;
   `ChangelogSection.surface` names the product area a section covers;
   `list_changes` refuses more than 10 `surfaces` before sending.

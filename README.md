@@ -446,7 +446,8 @@ average rounded down to 1e-9. `Order::cum_quote(base_quantity_scale)` is the
 exact quote amount of the fills before fees (from `cum_notional`, in units of
 10^-(9 + the pair's `base_quantity_scale`)), and `Order.fee_total` is their
 fee net of rebates in `fee_asset` (`amount()`, `is_rebate`, `qty`). All are
-`rust_decimal::Decimal`, never floats, and zero with no fills. Order history
+`rust_decimal::Decimal`, never floats, and zero with no fills; a value that
+needs more digits than a `Decimal` holds reads `None`, never a rounded value. Order history
 reads and `get` with execution history carry `fee_total`; open-order reads and
 stream updates leave it `None`. For a buy sized by a quote amount,
 `Order::quote_used(base_scale)` is what the fills used (fees in quote added,
@@ -604,7 +605,9 @@ Category, audience and surface are lowercase labels (`breaking_change`, `api`,
 `CHANGELOG_*` constants in `polyester::models`). A value newer than this SDK
 reads as `unknown(<n>)`. `ChangelogSection::surface` is the product area a
 section covers, empty for a section not tied to one area (such as the changes
-that need your attention); `list_changes` takes at most 10 `surfaces`. `ChangelogChange::id` is
+that need your attention); `list_changes` takes at most 10 `surfaces`. With
+`WireFormat::Json`, an enum name this SDK does not know reads as unset (and is
+dropped from a list) instead of failing the call. `ChangelogChange::id` is
 the change's public base58 id. The service returns `Unavailable`
 (`Error::Server`) while it is starting.
 

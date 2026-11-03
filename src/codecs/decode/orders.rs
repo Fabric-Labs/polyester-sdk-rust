@@ -1170,6 +1170,78 @@ mod tests {
     }
 
     #[test]
+    fn quote_totals_are_exact_or_none_never_rounded() {
+        use rust_decimal::Decimal;
+        use std::str::FromStr;
+
+        let order = |cum_notional: &str, fee_e18: &str, submitted: Option<i64>| Order {
+            fee_asset: "quote".into(),
+            cum_notional: cum_notional.into(),
+            submitted_max_quote_debit_scaled: submitted,
+            fee_total: Some(OrderFeeTotal {
+                amount_e18: fee_e18.into(),
+                is_rebate: false,
+                qty: decode_qty_scaled_allow_zero(5, None, None, None),
+            }),
+            cum_qty: decode_qty_scaled_allow_zero(5, None, None, None),
+            ..order_from_proto(&ProtoOrder {
+                order_id: 1,
+                ..Default::default()
+            })
+            .unwrap()
+        };
+        // At base scale 18, 70.000000000000000000000000001 + 10 needs 29
+        // digits, more than a Decimal holds: no total rather than a rounded one.
+        let wide = order(
+            "70000000000000000000000000001",
+            "10000000000000000000",
+            Some(100_000_000),
+        );
+        assert_eq!(
+            wide.cum_quote(18),
+            Some(Decimal::from_str("70.000000000000000000000000001").unwrap())
+        );
+        assert_eq!(wide.quote_used(18), None);
+        // What is left of 100 still fits, so it is exact.
+        assert_eq!(
+            wide.quote_unspent(18, 6),
+            Some(Decimal::from_str("19.999999999999999999999999999").unwrap())
+        );
+        // When neither fits, no unspent amount either.
+        let wider = order(
+            "70000000000000000000000000001",
+            "10000000000000000000",
+            Some(i64::MAX),
+        );
+        assert_eq!(wider.quote_unspent(18, 6), None);
+
+        // Every digit kept when the exact result fits.
+        let exact = order(
+            "1234567890123456789012345678",
+            "1",
+            Some(200_000_000_000_000),
+        );
+        assert_eq!(
+            exact.quote_used(10),
+            Some(Decimal::from_str("123456789.0123456789012345688").unwrap())
+        );
+        assert_eq!(
+            exact.quote_unspent(10, 6),
+            Some(Decimal::from_str("76543210.9876543210987654312").unwrap())
+        );
+        // Trailing zeros do not count against the precision.
+        let zeros = order("10000000000000000000000000000000000", "0", None);
+        assert_eq!(
+            zeros.cum_quote(22),
+            Some(Decimal::from_str("1000").unwrap())
+        );
+        assert_eq!(
+            zeros.quote_used(22),
+            Some(Decimal::from_str("1000").unwrap())
+        );
+    }
+
+    #[test]
     fn order_from_proto_maps_reject_and_cancel_reasons() {
         use crate::proto::orders::v1::{CancelReason, ErrorCode};
 

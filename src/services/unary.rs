@@ -7,13 +7,42 @@ use connectrpc::client::{CallOptions, UnaryResponse};
 use connectrpc::{ConnectError, ErrorCode};
 use serde::Serialize;
 use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::time::Duration;
+
+/// A call whose JSON response decoding reads an enum value this SDK does not
+/// know as unset (a repeated enum drops it) instead of rejecting the whole
+/// response, as protojson's `DiscardUnknown` does. Binary responses keep
+/// their unknown numbers either way.
+///
+/// The decode runs while the call is polled, and buffa scopes its JSON parse
+/// options to the current thread, so they are set around every poll.
+struct TolerantJson<F> {
+    inner: Pin<Box<F>>,
+}
+
+impl<F: Future> Future for TolerantJson<F> {
+    type Output = F::Output;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let opts = buffa::json::JsonParseOptions::new().ignore_unknown_enum_values(true);
+        let inner = self.inner.as_mut();
+        buffa::json::with_json_parse_options(&opts, || inner.poll(cx))
+    }
+}
+
+fn tolerant_json<F: Future>(call: F) -> TolerantJson<F> {
+    TolerantJson {
+        inner: Box::pin(call),
+    }
+}
 
 #[inline]
 pub async fn await_public<R>(
     call: impl Future<Output = std::result::Result<UnaryResponse<R>, ConnectError>>,
 ) -> Result<UnaryResponse<R>> {
-    call.await.map_err(Factory::map_error)
+    tolerant_json(call).await.map_err(Factory::map_error)
 }
 
 #[inline]
@@ -28,7 +57,9 @@ where
     Fut: Future<Output = std::result::Result<UnaryResponse<R>, ConnectError>>,
 {
     let opts = factory.sign_options_async(procedure, &request).await?;
-    call(request, opts).await.map_err(Factory::map_error)
+    tolerant_json(call(request, opts))
+        .await
+        .map_err(Factory::map_error)
 }
 
 /// Backoff for a side-effect-free read the server may answer with a
@@ -70,7 +101,7 @@ where
     Fut: Future<Output = std::result::Result<UnaryResponse<R>, ConnectError>>,
 {
     let opts = factory.sign_options_async(procedure, &request).await?;
-    Ok(call(request, opts).await)
+    Ok(tolerant_json(call(request, opts)).await)
 }
 
 /// [`await_auth`] for a read without side effects: Connect `unavailable`
