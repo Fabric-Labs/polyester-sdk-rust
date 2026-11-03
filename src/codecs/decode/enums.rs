@@ -1,7 +1,8 @@
 //! Proto enum → SDK label helpers (Go `codecs/proto_helpers` parity).
 
 use crate::proto::orders::v1::{
-    CancelReason, ErrorCode, FeeAsset, OrderStatus, OrderType, Side, TimeInForce,
+    CancelReason, ErrorCode, FeeAsset, OrderStatus, OrderType, SelfTradePreventionMode, Side,
+    TimeInForce,
 };
 use buffa::Enumeration;
 
@@ -87,6 +88,21 @@ pub fn enum_value_fee_asset(value: buffa::EnumValue<FeeAsset>) -> String {
             FeeAsset::FeeAssetUnspecified => String::new(),
         })
         .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
+}
+
+/// Self-trade prevention mode label: `expire_taker`, `expire_maker` or
+/// `expire_both`, empty when unset, or `UNKNOWN(<number>)` for a mode this SDK
+/// does not know.
+pub fn enum_value_self_trade_prevention_mode(
+    value: buffa::EnumValue<SelfTradePreventionMode>,
+) -> String {
+    match value.as_known() {
+        Some(SelfTradePreventionMode::ExpireTaker) => "expire_taker".to_owned(),
+        Some(SelfTradePreventionMode::ExpireMaker) => "expire_maker".to_owned(),
+        Some(SelfTradePreventionMode::ExpireBoth) => "expire_both".to_owned(),
+        Some(_) => String::new(),
+        None => format!("UNKNOWN({})", value.to_i32()),
+    }
 }
 
 /// An order's or order event's `reject_reason`: the `orders.v1.ErrorCode`

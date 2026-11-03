@@ -507,6 +507,9 @@ mod tests {
                 event(8, order_event::Kind::CANCELED, |e| {
                     e.cancel_reason = CancelReason::CANCEL_REASON_MARKET_HALTED.into();
                 }),
+                event(9, order_event::Kind::CANCELED, |e| {
+                    e.cancel_reason = CancelReason::CANCEL_REASON_ATTACHED_EXIT_FIRED.into();
+                }),
             ],
             ..Default::default()
         };
@@ -544,6 +547,11 @@ mod tests {
                 "canceled".to_owned(),
                 None,
                 some("CANCEL_REASON_MARKET_HALTED"),
+            ),
+            (
+                "canceled".to_owned(),
+                None,
+                some("CANCEL_REASON_ATTACHED_EXIT_FIRED"),
             ),
         ];
         assert_eq!(reasons, want);

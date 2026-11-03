@@ -39,6 +39,11 @@ pub struct Order {
     /// generation, before fees (integer string), in quote units scaled by
     /// 10^(9 + the pair's `base_quantity_scale`). `"0"` while the order has
     /// no fills. Read it as a decimal with [`Order::cum_quote`].
+    ///
+    /// Each fill settles its quote rounded down to 18 decimal places, so this
+    /// is exactly the quote the fills settled when the pair's
+    /// `base_quantity_scale` is at most 9. Above that it can exceed the
+    /// settled quote by less than 1e-18 per fill.
     pub cum_notional: String,
     /// Total fee of the fills, net of rebates, in `fee_asset`. Order history
     /// reads and single-order reads with execution history (the default)
@@ -51,6 +56,12 @@ pub struct Order {
     /// Asset selected to pay fees: `quote`, `base`, or an
     /// `UNKNOWN(<number>)` forward-compatible enum value.
     pub fee_asset: String,
+    /// The order's self-trade prevention mode: `expire_taker`,
+    /// `expire_maker` or `expire_both`, empty when the read does not carry
+    /// it, or `UNKNOWN(<number>)` for a mode this SDK does not know. Its
+    /// attached take-profit, stop-loss and trailing-stop exits use the same
+    /// mode.
+    pub self_trade_prevention_mode: String,
     /// Hard all-in quote debit submitted with quote-budget sizing, when used.
     pub submitted_max_quote_debit_scaled: Option<i64>,
     /// Attached risk policy when requested via `include_attached_risk`.
@@ -130,6 +141,10 @@ impl Order {
     /// REST `cumQuote`. `base_quantity_scale` is the pair's (from
     /// `GetSpotConfig`); zero while the order has no fills. `None` only when
     /// the value needs more digits than a [`Decimal`] holds; never rounded.
+    ///
+    /// It equals the quote the fills settled when `base_quantity_scale` is
+    /// at most 9; above that it can exceed it by less than 1e-18 per fill
+    /// (see [`Order::cum_notional`](Self::cum_notional)).
     pub fn cum_quote(&self, base_quantity_scale: u32) -> Option<Decimal> {
         scaled_decimal(&self.cum_notional, 9 + base_quantity_scale)
     }
@@ -141,6 +156,11 @@ impl Order {
     /// `None` until the fee total covers every fill (`fee_total.qty` equals
     /// `cum_qty`), when the read carries no fee total, and for a fee asset
     /// this SDK does not know.
+    ///
+    /// Reconciling against the balance: this is exactly the settled quote
+    /// debit when the pair's `base_quantity_scale` is at most 9. Above that it
+    /// can exceed the settled debit by less than 1e-18 per fill, and
+    /// [`Self::quote_unspent`] can fall short of the actual remainder by as much.
     pub fn quote_used(&self, base_quantity_scale: u32) -> Option<Decimal> {
         let (used, scale) = self.quote_used_scaled(base_quantity_scale)?;
         exact_decimal(used, scale)

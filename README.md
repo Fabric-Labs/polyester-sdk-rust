@@ -358,6 +358,21 @@ API host, so handle an unimplemented/not-found response and do not make Preview
 a prerequisite for order submission. Fee selection is `FeeAsset::Quote` or, for
 BUYs only, `FeeAsset::Base`; the former `received` fee mode no longer exists.
 
+A buy sized by a quote amount (`max_quote_debit_scaled`, market or limit IOC)
+can carry `attached_risk` like any other order: the server checks each leg
+against the pair's minimums at the quantity the amount buys at the order's
+price limit, and the legs then protect what the fills buy.
+
+`CreateOrderParams.self_trade_prevention` (`OrderSelfTradePrevention`,
+default `ExpireMaker`) also applies to the order's attached take-profit,
+stop-loss and trailing-stop exits, which have no mode of their own. Order
+reads report it as `Order.self_trade_prevention_mode` (`expire_taker`,
+`expire_maker`, `expire_both`), and each leg's trigger as
+`Trigger.self_trade_prevention_mode`. An attached exit never trades with the
+order it protects: when it fires while that order still rests, the order's
+unfilled rest is canceled first (fills before stand) and the order ends
+`canceled` with `CANCEL_REASON_ATTACHED_EXIT_FIRED`.
+
 Standalone trailing stops take either side. A SELL trailing stop tracks the
 highest price and fires a market-IOC child; it takes no `limit_price`. A BUY
 trailing stop tracks the lowest price and requires `limit_price`: its maximum
@@ -447,7 +462,10 @@ exact quote amount of the fills before fees (from `cum_notional`, in units of
 10^-(9 + the pair's `base_quantity_scale`)), and `Order.fee_total` is their
 fee net of rebates in `fee_asset` (`amount()`, `is_rebate`, `qty`). All are
 `rust_decimal::Decimal`, never floats, and zero with no fills; a value that
-needs more digits than a `Decimal` holds reads `None`, never a rounded value. Order history
+needs more digits than a `Decimal` holds reads `None`, never a rounded value.
+`cum_quote` is exactly the quote the fills settled when the pair's
+`base_quantity_scale` is at most 9; above that it can exceed it by less than
+1e-18 per fill, and so can `quote_used`. Order history
 reads and `get` with execution history carry `fee_total`; open-order reads and
 stream updates leave it `None`. For a buy sized by a quote amount,
 `Order::quote_used(base_scale)` is what the fills used (fees in quote added,
@@ -686,8 +704,14 @@ failure reason label: `market_halted` or `pair_post_only` (an attached leg
 waits for the next price through its trigger price), `min_notional`,
 `min_quantity` or `step_size` (the order would have been below the market's
 minimum; it fires again once the position changes), `rate_limited` or
-`account_repairing` (it retries shortly). `child_seq` is the refused attempt,
-`child_order_id` is empty and `fire_price` is the price it fired at. A refusal
+`account_repairing` (it retries shortly), or `self_trade_prevented` (self-trade
+prevention expired the attached exit's order against another of the account's
+resting orders; the leg stays armed and fires again at the next trade through
+its trigger price, or once the blocking order is gone). `fire_price` is the
+price it fired at. For `self_trade_prevented`, `child_seq` names the child
+order that was placed and expired (`CANCEL_REASON_STP_EXPIRE_TAKER` or
+`CANCEL_REASON_STP_EXPIRE_BOTH`); for every other reason `child_seq` is an
+attempt that placed no order and `child_order_id` is empty. A refusal
 that ends the trigger is still `failed` with `failure_reason`. A ladder whose
 levels were all canceled before any filled ends `cancelled` with
 `user_request`.
@@ -715,9 +739,9 @@ Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
 When the exchange halts a market it ends the market's open triggers with
 `cancel_reason` `market_halted` and cancels its open orders with
 `Order.cancel_reason` `CANCEL_REASON_MARKET_HALTED`. A trigger the halted
-market refused after admission currently reads `failure_reason`
-`UNKNOWN_TRIGGER_FAILURE_REASON(212)` until the server reports
-`market_halted`.
+market refuses reads `failure_reason` `market_halted` when it ends `failed`,
+and `fire_refusal_reason` `market_halted` on a refused fire. A reason this SDK
+does not name still decodes as `UNKNOWN_TRIGGER_FAILURE_REASON(<n>)`.
 
 `Trigger.version` is 1 for a trigger's first state and higher for every later
 state change. Reads and realtime trigger updates carry the same version for
@@ -813,6 +837,34 @@ use polyester::proto::ledger::read::v1::GetBalancesRequest;
 let balances = client.balances.list(GetBalancesRequest::default()).await?;
 for bal in balances.balances {
     println!("{} funding={} trading={}", bal.asset_id, bal.funding, bal.trading);
+}
+```
+
+A sub-account read can include the sub-account's balances in the same shape:
+set `GetSubaccountOpts::include_balances`, and `GetSubaccountResult.balances`
+is the balances list (`None` when not asked for). It needs the
+`READ_BALANCES` action on the sub-account (its role, its attached policy and,
+for an API key, the key's policy), or the read fails with `PermissionDenied`
+(`AUTH_SUBACCOUNT_ACCESS_DENIED`). An API key bound to a sub-account reads only
+that sub-account, and a root-scoped API key cannot read a sub-account's
+balances. When balances cannot be read right now the read fails with the
+retryable `AUTH_TEMPORARILY_UNAVAILABLE`.
+
+```rust,no_run
+use polyester::services::GetSubaccountOpts;
+
+let view = client
+    .sub_accounts
+    .get(
+        subaccount_id,
+        GetSubaccountOpts {
+            include_balances: true,
+            ..Default::default()
+        },
+    )
+    .await?;
+for bal in view.balances.map(|list| list.balances).unwrap_or_default() {
+    println!("{} available={}", bal.asset_id, bal.available);
 }
 ```
 

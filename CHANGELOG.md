@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+**Attached-exit self-trade prevention, sub-account balances (contract
+`54dc59d`).** Breaking for code that builds `Order`, `GetSubaccountResult` or
+`GetSubaccountOpts` with a struct literal naming every field.
+- `GetSubaccountOpts::include_balances` asks a sub-account read for the
+  sub-account's balances, and `GetSubaccountResult.balances` returns them as a
+  `BalancesList`, the shape of `balances.list`. `None` unless asked for; an
+  empty list when the sub-account holds none. It needs the `READ_BALANCES`
+  action on the sub-account, or the read fails with `PermissionDenied`; a
+  root-scoped API key cannot read a sub-account's balances. A read that
+  cannot reach the balances right now fails with the retryable
+  `AUTH_TEMPORARILY_UNAVAILABLE`.
+- `Order.self_trade_prevention_mode` reports the order's mode
+  (`expire_taker`, `expire_maker`, `expire_both`, `UNKNOWN(<n>)` for a newer
+  one). The order's attached take-profit, stop-loss and trailing-stop exits
+  use it; set it with `CreateOrderParams.self_trade_prevention`.
+- An attached exit never trades with the order it protects. When it fires
+  while that order still rests, the order's unfilled rest is canceled first
+  and the order ends with `cancel_reason` `CANCEL_REASON_ATTACHED_EXIT_FIRED`
+  (on reads and on the private order stream).
+- A self-trade prevention block of an attached exit is a refused fire, not an
+  end: a `fire_refused` trigger event with `fire_refusal_reason`
+  `self_trade_prevented`, whose `child_seq` names the child order self-trade
+  prevention expired. The leg stays armed. Reject reason
+  `ERROR_CODE_SELF_TRADE_PREVENTED` decodes too; no request is answered with
+  it.
+- A trigger a halted market refuses now reads `market_halted` as its
+  `failure_reason` or `fire_refusal_reason`, never the unnamed
+  `UNKNOWN_TRIGGER_FAILURE_REASON(212)`. Unknown reasons still decode with
+  their number.
+- A buy sized by a quote amount can carry attached exits; the server checks
+  the legs against the pair's minimums.
+- Docs: `Order.cum_notional`, `cum_quote()` and `quote_used()` are exactly the
+  settled quote when the pair's `base_quantity_scale` is at most 9; above
+  that they can exceed it by less than 1e-18 per fill.
+- The generated module tree compiles contract `54dc59d`.
+
 **Exact order totals, refused trigger fires, API-key refusal reasons
 (contract `e96897c`).** Breaking for code that builds these types with struct
 literals or matches `Error` exhaustively, so the next release is a minor one.

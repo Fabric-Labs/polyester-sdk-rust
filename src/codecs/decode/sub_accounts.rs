@@ -1,5 +1,6 @@
 //! Sub-account decoders.
 
+use crate::codecs::decode::balances::balances_list_from_proto;
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
@@ -66,9 +67,12 @@ pub fn subaccounts_list_from_proto(msg: &ListSubaccountsResponse) -> SubAccounts
     }
 }
 
+/// Decode a `GetSubaccount` answer. `balances` is the balances list when the
+/// answer carries it, `None` otherwise.
 pub fn get_subaccount_from_proto(msg: &GetSubaccountResponse) -> GetSubaccountResult {
     GetSubaccountResult {
         subaccount: msg.subaccount.as_option().map(subaccount_from_proto),
+        balances: msg.balances.as_option().map(balances_list_from_proto),
     }
 }
 

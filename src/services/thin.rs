@@ -327,6 +327,16 @@ pub struct GetSubaccountOpts {
     pub include_members: bool,
     pub include_invites: bool,
     pub include_policy: bool,
+    /// Also return the sub-account's current balances
+    /// ([`crate::models::GetSubaccountResult::balances`]). It needs the
+    /// `READ_BALANCES` action on the sub-account (its role, its attached
+    /// policy and, for an API key, the key's policy), or the read fails with
+    /// `PermissionDenied` (`AUTH_SUBACCOUNT_ACCESS_DENIED`). A root-scoped API
+    /// key cannot read a sub-account's balances. When balances cannot be
+    /// read right now the read fails with the retryable
+    /// `AUTH_TEMPORARILY_UNAVAILABLE`; send it again, or leave this unset to
+    /// get the rest of the view.
+    pub include_balances: bool,
     pub invites_direction: String,
 }
 
@@ -378,6 +388,10 @@ impl SubAccountsService {
         Ok(subaccounts_list_from_proto(&resp))
     }
 
+    /// Read a sub-account's aggregated view. With
+    /// [`GetSubaccountOpts::include_balances`] the result also carries the
+    /// sub-account's balances (an empty list when it holds none); without it
+    /// `balances` is `None`.
     pub async fn get(
         &self,
         subaccount_id: u64,
@@ -393,6 +407,7 @@ impl SubAccountsService {
             include_members: opts.include_members,
             include_invites: opts.include_invites,
             include_policy: opts.include_policy,
+            include_balances: opts.include_balances,
             invites_direction: invites_direction.into(),
             ..Default::default()
         };
@@ -411,7 +426,15 @@ impl SubAccountsService {
             .await?
             .into_owned()
         };
-        Ok(get_subaccount_from_proto(&resp))
+        let mut result = get_subaccount_from_proto(&resp);
+        result.balances = if opts.include_balances {
+            Some(result.balances.unwrap_or(crate::models::BalancesList {
+                balances: Vec::new(),
+            }))
+        } else {
+            None
+        };
+        Ok(result)
     }
 
     pub async fn list_members(
