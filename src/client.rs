@@ -7,6 +7,10 @@ use crate::environment::{
     parse_polyester_environment,
 };
 use crate::errors::{Error, Result};
+use crate::models::{
+    CancelAllOpts, ListTriggersOpts, StopAllTradingFailure, StopAllTradingResult,
+    StopAllTradingScope,
+};
 use crate::services::{
     AddressBookService, ApiKeysService, AuthService, BalancesService, ChainAnalyticsService,
     ChangelogService, DepositService, FeeService, GuardSignerService, HeatmapService,
@@ -23,6 +27,10 @@ use std::time::Duration;
 use tokio::sync::OnceCell;
 
 use crate::realtime::Client as RealtimeClient;
+
+/// Triggers per `ListTriggers` page in [`Client::stop_all_trading`]: the
+/// server's maximum.
+const STOP_ALL_TRADING_PAGE_LIMIT: u32 = 1000;
 
 /// Client configuration.
 #[derive(Clone)]
@@ -447,6 +455,84 @@ impl Client {
     /// Most recent catalog hydration error, if any.
     pub fn catalogs_last_error(&self) -> Option<Error> {
         crate::realtime::lock_unpoisoned(&self.catalog_last_error).clone()
+    }
+
+    /// Stop all automated and resting trading of `scope`: cancel every live
+    /// trigger, then every open order.
+    ///
+    /// Cancel-all and the dead-man switch cancel open orders, never
+    /// triggers: a stop-loss, take-profit or trailing stop that has not fired
+    /// stays armed, a TWAP keeps running, and a paused trigger stays paused.
+    /// This pages through the triggers in the live statuses (`created`,
+    /// `armed`, `running`, `paused`, attached legs included, up to 1000 per
+    /// page), cancels each one, and only then cancels all open orders, so an
+    /// order a trigger places before its cancel is still canceled.
+    ///
+    /// A trigger whose cancel fails does not stop the run; it is listed in
+    /// [`StopAllTradingResult::trigger_failures`]. An error listing the
+    /// triggers returns before anything is canceled; an error of the final
+    /// cancel-all is returned as is.
+    pub async fn stop_all_trading(
+        &self,
+        scope: StopAllTradingScope,
+    ) -> Result<StopAllTradingResult> {
+        let mut trigger_ids = Vec::new();
+        let mut seen_tokens = std::collections::HashSet::new();
+        let mut page_token = None;
+        loop {
+            let page = self
+                .triggers
+                .list_with(ListTriggersOpts {
+                    symbol: scope.symbol.clone(),
+                    status: ["created", "armed", "running", "paused"]
+                        .map(str::to_owned)
+                        .to_vec(),
+                    limit: Some(STOP_ALL_TRADING_PAGE_LIMIT),
+                    page_token: page_token.clone(),
+                    subaccount_id: scope.subaccount_id,
+                    ..Default::default()
+                })
+                .await?;
+            trigger_ids.extend(page.triggers.into_iter().map(|t| t.trigger_id));
+            if page.next_page_token.is_empty() {
+                break;
+            }
+            if !seen_tokens.insert(page.next_page_token.clone()) {
+                return Err(Error::response_contract(
+                    "ListTriggers pagination",
+                    "next_page_token repeats an earlier page_token",
+                ));
+            }
+            page_token = Some(page.next_page_token);
+        }
+
+        let mut canceled_trigger_ids = Vec::new();
+        let mut trigger_failures = Vec::new();
+        for trigger_id in trigger_ids {
+            match self
+                .triggers
+                .cancel_by_id(&trigger_id, scope.subaccount_id)
+                .await
+            {
+                Ok(_) => canceled_trigger_ids.push(trigger_id),
+                Err(error) => trigger_failures.push(StopAllTradingFailure { trigger_id, error }),
+            }
+        }
+
+        let orders = self
+            .orders
+            .cancel_all_with(CancelAllOpts {
+                symbol: scope.symbol,
+                subaccount_id: scope.subaccount_id,
+                request_id: scope.request_id,
+                ..Default::default()
+            })
+            .await?;
+        Ok(StopAllTradingResult {
+            canceled_trigger_ids,
+            trigger_failures,
+            orders,
+        })
     }
 }
 

@@ -25,6 +25,12 @@ pub const CHANGELOG_SURFACE_API: &str = "api";
 pub const CHANGELOG_SURFACE_EXPLORER: &str = "explorer";
 pub const CHANGELOG_SURFACE_DOCUMENTATION: &str = "documentation";
 pub const CHANGELOG_SURFACE_PLATFORM: &str = "platform";
+/// Prices, candles, order book, heatmaps and market overviews.
+pub const CHANGELOG_SURFACE_MARKET_DATA: &str = "market_data";
+/// The QuickSwap swap app.
+pub const CHANGELOG_SURFACE_QUICKSWAP: &str = "quickswap";
+/// Daily claims, campaigns, VIP tiers and fee discounts.
+pub const CHANGELOG_SURFACE_REWARDS: &str = "rewards";
 
 /// One product change in a changelog post.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -50,6 +56,12 @@ pub struct ChangelogSection {
     pub heading: String,
     pub summary: Option<String>,
     pub changes: Vec<ChangelogChange>,
+    /// The product area the section covers, a `CHANGELOG_SURFACE_*` label
+    /// (`unknown(<n>)` for an area newer than this SDK). Empty for a section
+    /// not tied to one area, such as the changes that need your attention.
+    /// It does not change which changes `list_changes` matches: a change
+    /// keeps its own `surfaces`.
+    pub surface: String,
 }
 
 /// A changelog post without its sections, with change counts by kind.

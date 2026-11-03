@@ -50,6 +50,7 @@ fn section_from_proto(msg: &Section) -> ChangelogSection {
         heading: msg.heading.clone(),
         summary: msg.summary.clone(),
         changes: msg.changes.iter().map(change_from_proto).collect(),
+        surface: changelog_enum_label(&msg.surface),
     }
 }
 
@@ -143,6 +144,29 @@ mod tests {
         assert_eq!(unknown.category, "unknown(7)");
         let unspecified = change_from_proto(&Change::default());
         assert_eq!(unspecified.category, "");
+    }
+
+    #[test]
+    fn sections_say_which_product_area_they_cover() {
+        let section = |surface: EnumValue<Surface>| {
+            section_from_proto(&Section {
+                heading: "Section".into(),
+                surface,
+                ..Default::default()
+            })
+        };
+        assert_eq!(section(Surface::MARKET_DATA.into()).surface, "market_data");
+        assert_eq!(section(Surface::QUICKSWAP.into()).surface, "quickswap");
+        assert_eq!(section(Surface::REWARDS.into()).surface, "rewards");
+        // A section not tied to one area, and an area newer than this SDK.
+        assert_eq!(section(Surface::SURFACE_UNSPECIFIED.into()).surface, "");
+        assert_eq!(section(EnumValue::Unknown(77)).surface, "unknown(77)");
+
+        let change = change_from_proto(&Change {
+            surfaces: vec![Surface::MARKET_DATA.into(), Surface::REWARDS.into()],
+            ..Default::default()
+        });
+        assert_eq!(change.surfaces, vec!["market_data", "rewards"]);
     }
 
     #[test]

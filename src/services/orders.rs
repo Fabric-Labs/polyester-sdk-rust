@@ -90,6 +90,22 @@ fn validate_bps_at_most(field: &str, value: i32, max: i32) -> Result<()> {
     Ok(())
 }
 
+/// A refusal the SDK raises before sending, with the code, field path and
+/// rule ID the server answers for the same mistake, so both read the same
+/// ([`Error::Api`] with one violation).
+fn order_field_refusal(code: &str, field_path: String, rule_id: &str, message: &str) -> Error {
+    Error::Api {
+        message: message.to_owned(),
+        code: code.to_owned(),
+        metadata: Vec::new(),
+        violations: vec![crate::models::OrderFieldViolation {
+            field_path,
+            rule_id: rule_id.to_owned(),
+            message: message.to_owned(),
+        }],
+    }
+}
+
 /// When a batch's status window ends, as a local instant: `window` after
 /// `accepted_ts_ns` (Unix nanoseconds), or `window` after `fallback` when the
 /// admission time is unknown.
@@ -639,8 +655,12 @@ impl OrdersService {
             }
         });
         if let Some(risk) = params.attached_risk.as_ref() {
-            *intent.attached_risk.get_or_insert_default() =
-                self.encode_attached_risk(risk, Some(&params.symbol), Some(params.side))?;
+            *intent.attached_risk.get_or_insert_default() = self.encode_attached_risk(
+                risk,
+                Some(&params.symbol),
+                Some(params.side),
+                "order.attached_risk",
+            )?;
         }
         Ok(intent)
     }
@@ -720,6 +740,7 @@ impl OrdersService {
         stop: &TrailingStop,
         symbol: Option<&str>,
         parent_side: Option<CreateSide>,
+        risk_field: &str,
     ) -> Result<TrailingStopPolicy> {
         // `order_type` is not on the trailing-stop policy wire; the child is an
         // implicit market execution.
@@ -737,28 +758,47 @@ impl OrdersService {
         }
         // The trailing stop of a sell order buys back and declares the most its
         // exit pays; the trailing stop of a buy order sells and declares none.
-        match (parent_side, stop.limit_price.as_ref()) {
+        // Refusals carry the server's codes, rule IDs and field path.
+        let refuse = |code: &str, rule_id: &str, message: &str| {
+            order_field_refusal(
+                code,
+                format!("{risk_field}.trailing_stop.limit_price_ticks"),
+                rule_id,
+                message,
+            )
+        };
+        let limit_ticks = stop
+            .limit_price
+            .as_ref()
+            .map(|limit| self.resolve_constraint_price(limit, symbol))
+            .transpose()?;
+        match (parent_side, limit_ticks) {
             (Some(CreateSide::Buy), Some(_)) => {
-                return Err(Error::validation(
+                return Err(refuse(
+                    "ERROR_CODE_BAD_PRICE",
+                    "sell_unset",
                     "attached trailing_stop limit_price is only valid when the parent order sells (its buy-back maximum price)",
                 ));
             }
-            (Some(CreateSide::Sell), None) => {
-                return Err(Error::validation(
+            (Some(CreateSide::Sell), None | Some(0)) => {
+                return Err(refuse(
+                    "ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT",
+                    "buy_required",
                     "an attached trailing_stop of a sell order requires limit_price: the maximum price its buy-back pays",
                 ));
             }
             _ => {}
         }
-        if let Some(limit) = stop.limit_price.as_ref() {
-            let ticks = self.resolve_constraint_price(limit, symbol)?;
+        if let Some(ticks) = limit_ticks {
             if ticks <= 0 {
                 return Err(Error::validation(
                     "attached trailing_stop limit_price must be positive",
                 ));
             }
             if ticks < proto.activation_price_ticks {
-                return Err(Error::validation(
+                return Err(refuse(
+                    "ERROR_CODE_BAD_PRICE",
+                    "buy_at_least_activation",
                     "attached trailing_stop limit_price must be at least its activation_price",
                 ));
             }
@@ -803,11 +843,14 @@ impl OrdersService {
 
     /// `parent_side` is the parent order's side when the request carries it;
     /// a modify does not, and the server then checks the side rule.
+    /// `risk_field` is the request's field path of the policy, which a
+    /// refusal of the trailing stop's maximum names.
     fn encode_attached_risk(
         &self,
         risk: &AttachedRisk,
         symbol: Option<&str>,
         parent_side: Option<CreateSide>,
+        risk_field: &str,
     ) -> Result<RiskPolicy> {
         if risk.stop_loss.is_some() && risk.trailing_stop.is_some() {
             return Err(Error::validation(
@@ -840,7 +883,7 @@ impl OrdersService {
             )));
         } else if let Some(ts) = risk.trailing_stop.as_ref() {
             proto.stop_leg = Some(risk_policy::StopLeg::TrailingStop(Box::new(
-                self.encode_trailing_stop(ts, symbol, parent_side)?,
+                self.encode_trailing_stop(ts, symbol, parent_side, risk_field)?,
             )));
         }
         Ok(proto)
@@ -916,7 +959,7 @@ impl OrdersService {
         }
         if let Some(risk) = params.new_attached_risk.as_ref() {
             *req.new_attached_risk.get_or_insert_default() =
-                self.encode_attached_risk(risk, Some(&params.symbol), None)?;
+                self.encode_attached_risk(risk, Some(&params.symbol), None, "new_attached_risk")?;
         }
         if let Some(behavior) = params.behavior.as_deref() {
             req.behavior = Self::modify_behavior(behavior)?.into();
@@ -1119,7 +1162,7 @@ impl OrdersService {
             })?;
         let scale = Self::resolve_batch_replace_scale(&self.ctx.catalogs, symbol)?;
         let mut proto_items = Vec::with_capacity(items.len());
-        for item in items {
+        for (index, item) in items.iter().enumerate() {
             if item.new_price.is_none()
                 && item.new_qty.is_none()
                 && item.new_attached_risk.is_none()
@@ -1144,8 +1187,12 @@ impl OrdersService {
                 )?);
             }
             if let Some(risk) = item.new_attached_risk.as_ref() {
-                *proto.new_attached_risk.get_or_insert_default() =
-                    self.encode_attached_risk(risk, Some(symbol), None)?;
+                *proto.new_attached_risk.get_or_insert_default() = self.encode_attached_risk(
+                    risk,
+                    Some(symbol),
+                    None,
+                    &format!("items[{index}].new_attached_risk"),
+                )?;
             }
             if let Some(ncid) = optional_client_order_id(item.new_client_order_id.as_deref())? {
                 proto.new_client_order_id = ncid;
@@ -1281,6 +1328,11 @@ impl OrdersService {
 
     /// Schedules cancel-all-after for the account scope.
     ///
+    /// When it fires, the dead-man switch cancels open orders, never
+    /// triggers: the client's triggers stay live. Cancel them with
+    /// [`crate::services::TriggersService::cancel`], or stop everything with
+    /// [`crate::Client::stop_all_trading`].
+    ///
     /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
     /// non-empty value when retrying the same logical cancel-all-after.
     pub async fn cancel_all_after(
@@ -1312,6 +1364,18 @@ impl OrdersService {
         cancel_all_after_from_proto(&resp)
     }
 
+    /// Cancel one order.
+    ///
+    /// A cancel of an order that has already ended, a repeat of the cancel
+    /// that ended it included, is refused with
+    /// `ERROR_CODE_ORDER_ALREADY_TERMINAL`
+    /// ([`crate::Error::is_order_already_terminal`]): treat it as "already
+    /// done" and read the order for how it ended. A repeat sent while the
+    /// first cancel is still in progress answers `accepted` again. Retry by
+    /// order ID once you have it: a client order ID names its order for at
+    /// least a minute after the order ends, then reads
+    /// `ERROR_CODE_ORDER_UNKNOWN`. Every cancel counts against the cancel
+    /// rate limit, repeats included.
     pub async fn cancel(&self, req: CancelOrderRequest) -> Result<OrderMutationResult> {
         let client = self.write_client();
         let resp = unary::await_auth(
@@ -1374,6 +1438,12 @@ impl OrdersService {
     }
 
     /// Cancels all matching open orders for the account scope (optional symbol / dry-run).
+    ///
+    /// Open orders only, never triggers: orders that triggers placed (a TWAP
+    /// slice, ladder levels, a fired stop's order, an attached leg's working
+    /// exit) are canceled like any other, but the triggers stay live and keep
+    /// their reserved funds. `matched_orders` counts orders, never triggers.
+    /// To stop all automated trading use [`crate::Client::stop_all_trading`].
     ///
     /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
     /// non-empty value via [`Self::cancel_all_with`] when retrying the same logical bulk cancellation.
@@ -2226,6 +2296,17 @@ mod tests {
         params
     }
 
+    /// The code, field path and rule ID of a refusal the SDK raises.
+    fn refusal(err: &Error) -> (&str, &str, &str) {
+        let code = err.auth_error_code().unwrap_or_default();
+        match err.violations() {
+            [violation] => (code, &violation.field_path, &violation.rule_id),
+            other => panic!("{err:?}: expected one violation, got {other:?}"),
+        }
+    }
+
+    const ATTACHED_TRAILING_LIMIT: &str = "order.attached_risk.trailing_stop.limit_price_ticks";
+
     #[test]
     fn attached_trailing_stop_on_a_sell_order_sends_its_buy_back_limit_price() {
         let client = client();
@@ -2257,6 +2338,14 @@ mod tests {
             .order_intent_from_params(&items[0])
             .unwrap_err();
         assert!(err.to_string().contains("requires limit_price"), "{err}");
+        assert_eq!(
+            refusal(&err),
+            (
+                "ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT",
+                ATTACHED_TRAILING_LIMIT,
+                "buy_required"
+            )
+        );
     }
 
     #[test]
@@ -2272,6 +2361,16 @@ mod tests {
                 .contains("attached trailing_stop of a sell order requires limit_price"),
             "{err}"
         );
+        // The server's code, field path and rule ID for the same mistake.
+        assert_eq!(
+            refusal(&err),
+            (
+                "ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT",
+                ATTACHED_TRAILING_LIMIT,
+                "buy_required"
+            )
+        );
+        assert!(!err.is_retryable() && !err.mutation_outcome_unknown());
 
         let mut buy = sell_order(buy_back_trailing(None, Some(51_000_000_000_000)));
         buy.side = CreateSide::Buy;
@@ -2280,6 +2379,14 @@ mod tests {
             err.to_string()
                 .contains("limit_price is only valid when the parent order sells"),
             "{err}"
+        );
+        assert_eq!(
+            refusal(&err),
+            (
+                "ERROR_CODE_BAD_PRICE",
+                ATTACHED_TRAILING_LIMIT,
+                "sell_unset"
+            )
         );
 
         let mut buy = sell_order(buy_back_trailing(None, None));
@@ -2299,14 +2406,18 @@ mod tests {
     fn attached_trailing_stop_buy_back_limit_must_be_positive_and_cover_activation() {
         let client = client();
 
+        // A zero maximum is no maximum.
         let err = client
             .orders
             .encode_create_params(&sell_order(buy_back_trailing(None, Some(0))))
             .unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("attached trailing_stop limit_price must be positive"),
-            "{err}"
+        assert_eq!(
+            refusal(&err),
+            (
+                "ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT",
+                ATTACHED_TRAILING_LIMIT,
+                "buy_required"
+            )
         );
 
         let err = client
@@ -2320,6 +2431,14 @@ mod tests {
             err.to_string()
                 .contains("limit_price must be at least its activation_price"),
             "{err}"
+        );
+        assert_eq!(
+            refusal(&err),
+            (
+                "ERROR_CODE_BAD_PRICE",
+                ATTACHED_TRAILING_LIMIT,
+                "buy_at_least_activation"
+            )
         );
     }
 
@@ -2346,6 +2465,15 @@ mod tests {
             err.to_string()
                 .contains("limit_price must be at least its activation_price"),
             "{err}"
+        );
+        // A modify names its own request field.
+        assert_eq!(
+            refusal(&err),
+            (
+                "ERROR_CODE_BAD_PRICE",
+                "new_attached_risk.trailing_stop.limit_price_ticks",
+                "buy_at_least_activation"
+            )
         );
     }
 
@@ -3061,6 +3189,9 @@ mod tests {
                 inherited_cum_qty: None,
                 price: None,
                 avg_px: None,
+                avg_price_e18: "0".into(),
+                cum_notional: "0".into(),
+                fee_total: None,
                 created_ts_ns: String::new(),
                 version: 1,
                 post_only: false,

@@ -404,6 +404,17 @@ params.attached_risk = Some(AttachedRisk {
 let result = client.orders.create(params).await?;
 ```
 
+The SDK checks the trailing stop's maximum before sending and refuses a
+mistake with the code, field path and rule ID the server answers, as an
+`Error::Api` with one entry in `Error::violations()`
+(`order.attached_risk.trailing_stop.limit_price_ticks`): set on a BUY parent,
+`ERROR_CODE_BAD_PRICE` / `sell_unset`; missing on a SELL parent,
+`ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT` / `buy_required`; below the activation
+price, `ERROR_CODE_BAD_PRICE` / `buy_at_least_activation`. A modify or batch
+replace sends the maximum as given: it does not carry the order's side, so the
+server applies the side rule and answers `ERROR_CODE_BAD_PRICE` with no
+violation.
+
 Stop-loss, take-profit and trailing-stop triggers, and attached take-profit,
 stop-loss and trailing-stop legs, can watch the index price instead of the
 last trade price. Set `CreateTriggerParams.trigger_price_source` to `index`
@@ -428,6 +439,37 @@ before overriding `market_max_slippage`. `MaxSlippage::Bps` is 1–10000 for a
 buy and 1–9999 for a sell: a 100% cap would leave a sell no positive price.
 An attached trailing stop's `max_slippage` takes at most 9999 bps on either
 side.
+
+Orders carry exact execution totals. `Order::avg_price()` is the exact average
+execution price (from `avg_price_e18`, 18 decimals); `avg_px` stays the same
+average rounded down to 1e-9. `Order::cum_quote(base_quantity_scale)` is the
+exact quote amount of the fills before fees (from `cum_notional`, in units of
+10^-(9 + the pair's `base_quantity_scale`)), and `Order.fee_total` is their
+fee net of rebates in `fee_asset` (`amount()`, `is_rebate`, `qty`). All are
+`rust_decimal::Decimal`, never floats, and zero with no fills. Order history
+reads and `get` with execution history carry `fee_total`; open-order reads and
+stream updates leave it `None`. For a buy sized by a quote amount,
+`Order::quote_used(base_scale)` is what the fills used (fees in quote added,
+a rebate subtracted, a base fee left out) and
+`Order::quote_unspent(base_scale, quote_scale)` what is left of
+`submitted_max_quote_debit_scaled`. Both are `None` until `fee_total.qty`
+equals `cum_qty`: a fill's fee is recorded shortly after the fill. Such a buy
+ends `filled` once it spent its amount, and `canceled` with
+`CANCEL_REASON_MARKET_REMAINDER` or `CANCEL_REASON_IOC_REMAINDER` when the book
+or its price limit stopped it first.
+
+```rust,no_run
+let read = client.orders.get(OrderKey::OrderId(order_id), None).await?;
+if let Some(order) = read.order {
+    let base = client.catalogs.base_quantity_scale_for_symbol_id(order.symbol_id);
+    let quote = client.catalogs.quote_quantity_scale_for_symbol_id(order.symbol_id);
+    println!("average {:?}", order.avg_price());
+    if let (Some(base), Some(quote)) = (base, quote) {
+        println!("used {:?}", order.quote_used(base));
+        println!("unspent {:?}", order.quote_unspent(base, quote));
+    }
+}
+```
 
 A replacement order reports `Order.inherited_cum_qty`, the filled quantity it
 inherited from its predecessors (zero for an original order); `cum_qty` minus
@@ -558,8 +600,11 @@ requests are rate-limited per client address. Responses are newest post first.
   matching change published at or after `t`.
 
 Category, audience and surface are lowercase labels (`breaking_change`, `api`,
-`market_makers`, ...; see the `CHANGELOG_*` constants in `polyester::models`).
-A value newer than this SDK reads as `unknown(<n>)`. `ChangelogChange::id` is
+`market_makers`, `market_data`, `quickswap`, `rewards`, ...; see the
+`CHANGELOG_*` constants in `polyester::models`). A value newer than this SDK
+reads as `unknown(<n>)`. `ChangelogSection::surface` is the product area a
+section covers, empty for a section not tied to one area (such as the changes
+that need your attention); `list_changes` takes at most 10 `surfaces`. `ChangelogChange::id` is
 the change's public base58 id. The service returns `Unavailable`
 (`Error::Server`) while it is starting.
 
@@ -629,6 +674,27 @@ trailing stop's `limit_price` must be at least its `activation_price`.
 symbol: leave it out to target the trigger's own market. An API key limited to
 some markets must name the market. A trailing stop's runtime details expose
 `trigger_price`, its current threshold, once it is armed.
+
+A trigger's history records every fire refused while it stayed live as a
+`fire_refused` event (also a `list_events` filter). It is not terminal: the
+trigger keeps its status, so read the trigger's `status` rather than inferring
+it from its last event. `TriggerEvent.fire_refusal_reason` says why, as a
+failure reason label: `market_halted` or `pair_post_only` (an attached leg
+waits for the next price through its trigger price), `min_notional`,
+`min_quantity` or `step_size` (the order would have been below the market's
+minimum; it fires again once the position changes), `rate_limited` or
+`account_repairing` (it retries shortly). `child_seq` is the refused attempt,
+`child_order_id` is empty and `fire_price` is the price it fired at. A refusal
+that ends the trigger is still `failed` with `failure_reason`. A ladder whose
+levels were all canceled before any filled ends `cancelled` with
+`user_request`.
+
+To stop all automated trading, call `client.stop_all_trading(scope)`. Cancel-all
+and the dead-man switch cancel open orders, never triggers: an unfired stop
+stays armed, a TWAP keeps running. `stop_all_trading` pages through the live
+triggers (`created`, `armed`, `running`, `paused`), cancels each, then cancels
+all open orders, so an order a trigger places before its cancel is still
+canceled. Triggers it could not cancel are listed in `trigger_failures`.
 
 `triggers.get` / `get_by_id` and `triggers.list` / `list_with` read your own
 writes: once a create, modify, pause or resume has answered, they return the
@@ -768,6 +834,50 @@ window. It is retryable: the request did nothing, and a retry signs it again wit
 timestamp. If it persists, fix the local clock. Other gateway rejections (`SIGNATURE_INVALID`,
 `KEY_DISABLED`, `IP_NOT_ALLOWED`, ...) are `Error::ApiKeyRejected { status, code }` and are not
 retryable. `Error::auth_error_code()` returns the code of either.
+
+Services answer the same reasons with a ConnectRPC `unauthenticated` error and an
+`auth.v1.AuthErrorDetail` (`AUTH_SIGNATURE_INVALID`, `AUTH_TIMESTAMP_SKEW`,
+`AUTH_MISSING_HEADERS`, `AUTH_KEY_EXPIRED`, `AUTH_KEY_DISABLED`,
+`AUTH_IP_NOT_ALLOWED`, `AUTH_API_KEY_NOT_ACCEPTED`); they map to the same
+`Error::TimestampSkew` and `Error::ApiKeyRejected`. `Error::auth_code()`
+returns the typed `auth.v1.AuthErrorCode` whichever transport answered: the
+Connect detail, or a REST problem or gateway `code` with `AUTH_` added
+(`UNAUTHENTICATED` reads `AUTH_AUTHENTICATION_REQUIRED`). Only
+`AUTH_TIMESTAMP_SKEW` is retryable.
+
+```rust,no_run
+use polyester::proto::auth::v1::AuthErrorCode;
+
+match client.orders.list_open(None).await {
+    Err(err) if err.auth_code() == Some(AuthErrorCode::AUTH_IP_NOT_ALLOWED) => {
+        eprintln!("call from an address on the key's allowlist");
+    }
+    other => { other?; }
+}
+```
+
+Session-only methods (a wallet trading withdraw, the auto-withdraw rule writes,
+the portfolio equity reads, VIP status, ...) refuse an account API key with
+`AUTH_SESSION_KIND_NOT_ALLOWED`, HTTP 403. It maps to one error,
+`Error::SessionRequired`, on ConnectRPC and REST alike
+(`Error::is_session_required()`); call the method with a session token. An API
+key whose policy lacks an action gets `permission_denied` with a message that
+names it, such as `api key policy does not allow READ_AUTO_WITHDRAW`; the
+message reaches you as is.
+
+Order refusals name the request fields to fix: `Error::violations()` lists the
+`orders.v1.ErrorDetail` violations (`field_path`, `rule_id`, `message`) with
+ConnectRPC field paths, such as `order.base_qty_scaled` for an off-step
+quantity or `order.limit_gtc.price_ticks` for an off-tick price. Branch on the
+code, then on `rule_id`.
+
+A cancel of an order that has already ended, a repeat of the cancel that ended
+it included, is refused with `ERROR_CODE_ORDER_ALREADY_TERMINAL`:
+`Error::is_order_already_terminal()` is true. Treat it as "already done" and
+read the order for how it ended. Retry a cancel by order ID once you have it: a
+client order ID names its order for at least a minute after the order ends,
+then reads `ERROR_CODE_ORDER_UNKNOWN`. Every cancel counts against the cancel
+rate limit, repeats included.
 
 A sub-account member call that targets the sub-account's owner (inviting the owner, accepting
 an invite for the owner, changing the owner's role or removing the owner) is refused with

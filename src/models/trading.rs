@@ -2,6 +2,7 @@
 
 use crate::types::{AssetAmount, Price, Quantity};
 use buffa_types::google::protobuf::Timestamp;
+use rust_decimal::Decimal;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Order {
@@ -25,7 +26,25 @@ pub struct Order {
     /// this is what this generation executed itself.
     pub inherited_cum_qty: Option<Quantity>,
     pub price: Option<Price>,
+    /// Average execution price in 1e9 price ticks, rounded down. Prefer
+    /// [`Order::avg_price`], which is exact.
     pub avg_px: Option<Price>,
+    /// Exact average execution price across the lineage through this
+    /// generation, in quote units scaled by 1e18 (integer string): the exact
+    /// executed quote amount divided by `cum_qty`, rounded half to even at
+    /// the 18th decimal. `"0"` while the order has no fills. Read it as a
+    /// decimal with [`Order::avg_price`].
+    pub avg_price_e18: String,
+    /// Exact quote amount of the fills across the lineage through this
+    /// generation, before fees (integer string), in quote units scaled by
+    /// 10^(9 + the pair's `base_quantity_scale`). `"0"` while the order has
+    /// no fills. Read it as a decimal with [`Order::cum_quote`].
+    pub cum_notional: String,
+    /// Total fee of the fills, net of rebates, in `fee_asset`. Order history
+    /// reads and single-order reads with execution history (the default)
+    /// carry it; open-order reads, single-order reads without execution
+    /// history and private stream updates leave it `None`.
+    pub fee_total: Option<OrderFeeTotal>,
     pub created_ts_ns: String,
     pub version: u32,
     pub post_only: bool,
@@ -50,6 +69,96 @@ pub struct Order {
     /// `CANCEL_REASON_GTD_EXPIRED`), or `UNKNOWN(<number>)` for a reason this
     /// SDK does not know. `None` for every other status.
     pub cancel_reason: Option<String>,
+}
+
+/// Total fee of an order's fills, net of rebates, in the order's fee asset.
+///
+/// A fill's fee is recorded shortly after the fill executes, so the total
+/// can trail the order's fills: it covers them all once `qty` equals the
+/// order's `cum_qty`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderFeeTotal {
+    /// Net fee magnitude in fixed 18-decimal units of the order's fee asset
+    /// (integer string): the fees of the covered fills less their rebates.
+    pub amount_e18: String,
+    /// True when rebates exceed fees, so the amount was credited.
+    pub is_rebate: bool,
+    /// Executed base quantity of the fills the total covers, scaled as the
+    /// order's `cum_qty`.
+    pub qty: Option<Quantity>,
+}
+
+impl OrderFeeTotal {
+    /// The net fee as an exact decimal in units of the order's fee asset.
+    /// `None` only when the amount does not fit a [`Decimal`].
+    pub fn amount(&self) -> Option<Decimal> {
+        scaled_decimal(&self.amount_e18, 18)
+    }
+}
+
+/// `value / 10^scale` for an unsigned integer string, exactly; `None` when it
+/// does not fit a [`Decimal`].
+fn scaled_decimal(value: &str, scale: u32) -> Option<Decimal> {
+    let value = value.parse::<i128>().ok()?;
+    Decimal::try_from_i128_with_scale(value, scale)
+        .ok()
+        .map(|d| d.normalize())
+}
+
+impl Order {
+    /// Exact average execution price in quote units per base unit, from
+    /// `avg_price_e18`; zero while the order has no fills. `None` only when
+    /// the value does not fit a [`Decimal`].
+    pub fn avg_price(&self) -> Option<Decimal> {
+        scaled_decimal(&self.avg_price_e18, 18)
+    }
+
+    /// Exact quote amount of the fills, before fees, in quote units: the
+    /// REST `cumQuote`. `base_quantity_scale` is the pair's (from
+    /// `GetSpotConfig`); zero while the order has no fills. `None` only when
+    /// the value does not fit a [`Decimal`].
+    pub fn cum_quote(&self, base_quantity_scale: u32) -> Option<Decimal> {
+        scaled_decimal(&self.cum_notional, 9 + base_quantity_scale)
+    }
+
+    /// Quote the fills used, in quote units: [`Self::cum_quote`] plus the
+    /// fee total when the fee is paid in quote (less it when `is_rebate`), or
+    /// `cum_quote` alone when the fee is taken from the base received.
+    ///
+    /// `None` until the fee total covers every fill (`fee_total.qty` equals
+    /// `cum_qty`), when the read carries no fee total, and for a fee asset
+    /// this SDK does not know.
+    pub fn quote_used(&self, base_quantity_scale: u32) -> Option<Decimal> {
+        let fee = self.fee_total.as_ref()?;
+        let covered = fee.qty.as_ref().map(Quantity::as_scaled);
+        if covered != Some(self.cum_qty.as_ref().map_or(0, Quantity::as_scaled)) {
+            return None;
+        }
+        let quote = self.cum_quote(base_quantity_scale)?;
+        match self.fee_asset.as_str() {
+            "base" => Some(quote),
+            "quote" if fee.is_rebate => quote.checked_sub(fee.amount()?),
+            "quote" => quote.checked_add(fee.amount()?),
+            _ => None,
+        }
+    }
+
+    /// What a buy sized by a quote amount did not use, in quote units:
+    /// `submitted_max_quote_debit_scaled` (at the pair's
+    /// `quote_quantity_scale`) less [`Self::quote_used`]. `None` for an order
+    /// not sized by a quote amount and whenever `quote_used` is `None`.
+    pub fn quote_unspent(
+        &self,
+        base_quantity_scale: u32,
+        quote_quantity_scale: u32,
+    ) -> Option<Decimal> {
+        let submitted = self.submitted_max_quote_debit_scaled?;
+        let submitted =
+            Decimal::try_from_i128_with_scale(i128::from(submitted), quote_quantity_scale).ok()?;
+        submitted
+            .checked_sub(self.quote_used(base_quantity_scale)?)
+            .map(|d| d.normalize())
+    }
 }
 
 /// Stable replacement-chain identity. `id` is the first generation's public
@@ -249,6 +358,10 @@ pub struct BatchReplaceItem {
     pub key: OrderKey,
     pub new_price: Option<Price>,
     pub new_qty: Option<Quantity>,
+    /// Replacement attached risk. A trailing stop's `limit_price` is sent as
+    /// given: the request does not carry the order's side, so the server
+    /// applies the side rule (a maximum only when the order sells) and
+    /// answers `ERROR_CODE_BAD_PRICE` with no violation when it is broken.
     pub new_attached_risk: Option<AttachedRisk>,
     pub new_client_order_id: Option<String>,
 }
@@ -268,6 +381,10 @@ pub struct ModifyOrderParams {
     pub request_id: Option<String>,
     pub new_price: Option<Price>,
     pub new_qty: Option<Quantity>,
+    /// Replacement attached risk. A trailing stop's `limit_price` is sent as
+    /// given: the request does not carry the order's side, so the server
+    /// applies the side rule (a maximum only when the order sells) and
+    /// answers `ERROR_CODE_BAD_PRICE` with no violation when it is broken.
     pub new_attached_risk: Option<AttachedRisk>,
     pub behavior: Option<String>,
     pub new_client_order_id: Option<String>,
@@ -728,6 +845,38 @@ pub struct CancelAllOpts {
     /// ambiguous failure, and reuse that same value on retry. A blind retry that omits
     /// `request_id` mints a *new* id and is not an idempotent replay.
     pub request_id: Option<String>,
+}
+
+/// Scope of [`crate::Client::stop_all_trading`]: one account (or sub-account)
+/// and optionally one market.
+#[derive(Debug, Clone, Default)]
+pub struct StopAllTradingScope {
+    /// Sub-account to stop; `None` uses the client's default scope.
+    pub subaccount_id: Option<u64>,
+    /// Market to stop, such as `BTC-USDT`; `None` stops every market.
+    pub symbol: Option<String>,
+    /// Request id of the final cancel-all; generated when omitted. Reuse it
+    /// when retrying the same stop after an ambiguous failure.
+    pub request_id: Option<String>,
+}
+
+/// One live trigger [`crate::Client::stop_all_trading`] could not cancel.
+#[derive(Debug, Clone)]
+pub struct StopAllTradingFailure {
+    pub trigger_id: String,
+    pub error: crate::Error,
+}
+
+/// What [`crate::Client::stop_all_trading`] canceled.
+#[derive(Debug, Clone)]
+pub struct StopAllTradingResult {
+    /// Live triggers canceled, in the order they were canceled.
+    pub canceled_trigger_ids: Vec<String>,
+    /// Live triggers whose cancel failed. The open orders were still canceled
+    /// after them; cancel these triggers again, then the orders.
+    pub trigger_failures: Vec<StopAllTradingFailure>,
+    /// The final cancel-all of the open orders, those triggers placed included.
+    pub orders: CancelAllOrdersResult,
 }
 
 /// Order inputs accepted by [`crate::services::OrdersService::create`].

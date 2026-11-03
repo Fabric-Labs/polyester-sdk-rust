@@ -16,9 +16,9 @@ use crate::models::{
     BatchReplaceOrdersResult, BatchReplaceStatusItem, BatchReplaceStatusResult,
     CancelAllAfterResult, CancelAllOrdersResult, CancelledOrder, CreateOrderType,
     DeadManSwitchScope, GetOrderResult, MaxSlippage, ModifyOrderResult, Order, OrderErrorDetail,
-    OrderFieldViolation, OrderLineage, OrderMutationResult, OrderTransfer, OrdersList,
-    PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, TriggerPriceSourceKind, UserTrade,
-    UserTradesList,
+    OrderFeeTotal, OrderFieldViolation, OrderLineage, OrderMutationResult, OrderTransfer,
+    OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop,
+    TriggerPriceSourceKind, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
     AttachedRisk as ProtoAttachedRisk, AttachedRiskLegState as ProtoAttachedRiskLegState,
@@ -61,6 +61,13 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
         ),
         price: decode_price_ticks(msg.price_ticks, None),
         avg_px: decode_price_ticks(msg.avg_price_ticks, None),
+        avg_price_e18: u128_field(msg.avg_price_e18.as_option()),
+        cum_notional: u128_field(msg.cum_notional.as_option()),
+        fee_total: msg.fee_total.as_option().map(|fee| OrderFeeTotal {
+            amount_e18: u128_field(fee.amount_e18.as_option()),
+            is_rebate: fee.is_rebate,
+            qty: decode_qty_scaled_allow_zero(fee.qty_scaled, None, None, symbol_id_opt),
+        }),
         created_ts_ns: TsNs::from_wire(msg.created_ts_ns, "Order.created_ts_ns")?.optional_string(),
         version: msg.version,
         post_only: msg.post_only,
@@ -1059,6 +1066,107 @@ mod tests {
         msg2.version = 7;
         let order2 = order_from_proto(&msg2).unwrap();
         assert_eq!(order2.version, 7);
+    }
+
+    #[test]
+    fn order_from_proto_reads_exact_execution_totals() {
+        use crate::proto::orders::v1::{FeeAsset as ProtoFeeAsset, OrderFeeTotal as ProtoFeeTotal};
+        use rust_decimal::Decimal;
+        use std::str::FromStr;
+
+        let dec = |s: &str| Decimal::from_str(s).unwrap();
+        // The quote-amount buy of the contract note: 0.04148504 bought for
+        // 3215.5809531728 quote plus a 0.96467428595184 quote fee.
+        let proto = ProtoOrder {
+            order_id: 9,
+            symbol_id: 7,
+            side: Side::Buy.into(),
+            cum_qty_scaled: 4_148_504,
+            fee_asset: ProtoFeeAsset::QUOTE.into(),
+            submitted_max_quote_debit_scaled: Some(6_000_000_000),
+            avg_price_e18: U128 {
+                hi: 0,
+                lo: 2_908_714_285_714,
+                ..Default::default()
+            }
+            .into(),
+            cum_notional: U128 {
+                hi: 17,
+                lo: 7_963_446_064_217_622_528,
+                ..Default::default()
+            }
+            .into(),
+            fee_total: ProtoFeeTotal {
+                amount_e18: U128 {
+                    hi: 0,
+                    lo: 964_674_285_951_840_000,
+                    ..Default::default()
+                }
+                .into(),
+                is_rebate: false,
+                qty_scaled: 4_148_504,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let order = order_from_proto(&proto).unwrap();
+        assert_eq!(order.avg_price_e18, "2908714285714");
+        assert_eq!(order.avg_price(), Some(dec("0.000002908714285714")));
+        assert_eq!(order.cum_notional, "321558095317280000000");
+        assert_eq!(order.cum_quote(8), Some(dec("3215.5809531728")));
+        let fee = order.fee_total.as_ref().expect("fee total");
+        assert_eq!(fee.amount(), Some(dec("0.96467428595184")));
+        assert!(!fee.is_rebate);
+        assert_eq!(
+            fee.qty.as_ref().map(crate::Quantity::as_scaled),
+            Some(4_148_504)
+        );
+        assert_eq!(order.quote_used(8), Some(dec("3216.54562745875184")));
+        assert_eq!(order.quote_unspent(8, 6), Some(dec("2783.45437254124816")));
+
+        // A rebate is credited; a base fee comes out of the base received.
+        let mut rebate = order.clone();
+        rebate.fee_total.as_mut().unwrap().is_rebate = true;
+        assert_eq!(rebate.quote_used(8), Some(dec("3214.61627888684816")));
+        let mut base_fee = order.clone();
+        base_fee.fee_asset = "base".into();
+        assert_eq!(base_fee.quote_used(8), Some(dec("3215.5809531728")));
+        let mut unknown_fee = order.clone();
+        unknown_fee.fee_asset = "UNKNOWN(9)".into();
+        assert_eq!(unknown_fee.quote_used(8), None);
+
+        // Until the fee of every fill is recorded the total trails cum_qty.
+        let mut trailing = proto.clone();
+        trailing.fee_total.get_or_insert_default().qty_scaled = 4_000_000;
+        let trailing = order_from_proto(&trailing).unwrap();
+        assert_eq!(trailing.quote_used(8), None);
+        assert_eq!(trailing.quote_unspent(8, 6), None);
+        // Open-order reads and stream updates carry no fee total.
+        let mut open = proto.clone();
+        open.fee_total = Default::default();
+        let open = order_from_proto(&open).unwrap();
+        assert!(open.fee_total.is_none());
+        assert_eq!(open.quote_used(8), None);
+        assert_eq!(open.cum_quote(8), Some(dec("3215.5809531728")));
+
+        // No fills: every total reads zero.
+        let unfilled = order_from_proto(&ProtoOrder {
+            order_id: 10,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            (
+                unfilled.avg_price_e18.as_str(),
+                unfilled.cum_notional.as_str()
+            ),
+            ("0", "0")
+        );
+        assert_eq!(unfilled.avg_price(), Some(Decimal::ZERO));
+        assert_eq!(unfilled.cum_quote(8), Some(Decimal::ZERO));
+        // A base-sized order has no quote amount to leave unspent.
+        assert_eq!(unfilled.quote_unspent(8, 6), None);
     }
 
     #[test]
