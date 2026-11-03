@@ -342,9 +342,10 @@ impl ::buffa::Enumeration for Audience {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum Surface {
-    /// Not set. Never returned.
+    /// Not set. Never in Change.surfaces; Section.surface carries it for a section
+    /// not tied to one area.
     SURFACE_UNSPECIFIED = 0i32,
-    /// Trading.
+    /// Orders, triggers and protective orders, and order outcomes.
     TRADING = 1i32,
     /// Deposits, withdrawals and transfers.
     FUNDING = 2i32,
@@ -358,6 +359,12 @@ pub enum Surface {
     DOCUMENTATION = 6i32,
     /// Platform-wide behavior.
     PLATFORM = 7i32,
+    /// Market data: prices, candles, order book, heatmaps and market overviews.
+    MARKET_DATA = 8i32,
+    /// The QuickSwap swap app.
+    QUICKSWAP = 9i32,
+    /// Rewards: daily claims, campaigns, VIP tiers and fee discounts.
+    REWARDS = 10i32,
 }
 impl Surface {
     ///Idiomatic alias for [`Self::SURFACE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -384,6 +391,15 @@ impl Surface {
     ///Idiomatic alias for [`Self::PLATFORM`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Platform: Self = Self::PLATFORM;
+    ///Idiomatic alias for [`Self::MARKET_DATA`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MarketData: Self = Self::MARKET_DATA;
+    ///Idiomatic alias for [`Self::QUICKSWAP`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Quickswap: Self = Self::QUICKSWAP;
+    ///Idiomatic alias for [`Self::REWARDS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Rewards: Self = Self::REWARDS;
 }
 impl ::core::default::Default for Surface {
     fn default() -> Self {
@@ -487,6 +503,9 @@ impl ::buffa::Enumeration for Surface {
             5i32 => ::core::option::Option::Some(Self::EXPLORER),
             6i32 => ::core::option::Option::Some(Self::DOCUMENTATION),
             7i32 => ::core::option::Option::Some(Self::PLATFORM),
+            8i32 => ::core::option::Option::Some(Self::MARKET_DATA),
+            9i32 => ::core::option::Option::Some(Self::QUICKSWAP),
+            10i32 => ::core::option::Option::Some(Self::REWARDS),
             _ => ::core::option::Option::None,
         }
     }
@@ -503,6 +522,9 @@ impl ::buffa::Enumeration for Surface {
             Self::EXPLORER => "EXPLORER",
             Self::DOCUMENTATION => "DOCUMENTATION",
             Self::PLATFORM => "PLATFORM",
+            Self::MARKET_DATA => "MARKET_DATA",
+            Self::QUICKSWAP => "QUICKSWAP",
+            Self::REWARDS => "REWARDS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -517,6 +539,9 @@ impl ::buffa::Enumeration for Surface {
             "EXPLORER" => ::core::option::Option::Some(Self::EXPLORER),
             "DOCUMENTATION" => ::core::option::Option::Some(Self::DOCUMENTATION),
             "PLATFORM" => ::core::option::Option::Some(Self::PLATFORM),
+            "MARKET_DATA" => ::core::option::Option::Some(Self::MARKET_DATA),
+            "QUICKSWAP" => ::core::option::Option::Some(Self::QUICKSWAP),
+            "REWARDS" => ::core::option::Option::Some(Self::REWARDS),
             _ => ::core::option::Option::None,
         }
     }
@@ -530,6 +555,9 @@ impl ::buffa::Enumeration for Surface {
             Self::EXPLORER,
             Self::DOCUMENTATION,
             Self::PLATFORM,
+            Self::MARKET_DATA,
+            Self::QUICKSWAP,
+            Self::REWARDS,
         ]
     }
 }
@@ -1151,6 +1179,16 @@ pub struct Section {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub changes: ::buffa::alloc::vec::Vec<Change>,
+    /// Product area of the section. SURFACE_UNSPECIFIED for sections not tied to
+    /// one area (for example changes that need your attention, or general).
+    ///
+    /// Field 4: `surface`
+    #[serde(
+        rename = "surface",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub surface: ::buffa::EnumValue<Surface>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1161,6 +1199,7 @@ impl ::core::fmt::Debug for Section {
             .field("heading", &self.heading)
             .field("summary", &self.summary)
             .field("changes", &self.changes)
+            .field("surface", &self.surface)
             .finish()
     }
 }
@@ -1215,6 +1254,12 @@ impl ::buffa::Message for Section {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        {
+            let val = self.surface.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1234,6 +1279,12 @@ impl ::buffa::Message for Section {
         for v in &self.changes {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
+        }
+        {
+            let val = self.surface.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1274,6 +1325,15 @@ impl ::buffa::Message for Section {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.changes.push(elem);
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.surface = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1285,6 +1345,7 @@ impl ::buffa::Message for Section {
         self.heading.clear();
         self.summary = ::core::option::Option::None;
         self.changes.clear();
+        self.surface = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4003,6 +4064,11 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::ChangeView<'a>,
             >,
+            /// Product area of the section. SURFACE_UNSPECIFIED for sections not tied to
+            /// one area (for example changes that need your attention, or general).
+            ///
+            /// Field 4: `surface`
+            pub surface: ::buffa::EnumValue<super::super::Surface>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SectionView<'a> {
@@ -4050,6 +4116,15 @@ pub mod __buffa {
                         )?;
                         view.summary = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.surface = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -4095,6 +4170,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    surface: self.surface,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -4125,6 +4201,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                {
+                    let val = self.surface.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -4149,6 +4231,12 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                {
+                    let val = self.surface.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -4179,6 +4267,11 @@ pub mod __buffa {
                 }
                 if !self.changes.is_empty() {
                     __map.serialize_entry("changes", &*self.changes)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.surface,
+                ) {
+                    __map.serialize_entry("surface", &self.surface)?;
                 }
                 __map.end()
             }
@@ -4296,6 +4389,14 @@ pub mod __buffa {
                 super::super::__buffa::view::ChangeView<'_>,
             > {
                 &self.0.reborrow().changes
+            }
+            /// Product area of the section. SURFACE_UNSPECIFIED for sections not tied to
+            /// one area (for example changes that need your attention, or general).
+            ///
+            /// Field 4: `surface`
+            #[must_use]
+            pub fn surface(&self) -> ::buffa::EnumValue<super::super::Surface> {
+                self.0.reborrow().surface
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SectionView<'static>>>

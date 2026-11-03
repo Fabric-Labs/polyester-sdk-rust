@@ -2,6 +2,72 @@
 
 ## Unreleased
 
+**Exact order totals, refused trigger fires, API-key refusal reasons
+(contract `e96897c`).** Breaking for code that builds these types with struct
+literals or matches `Error` exhaustively, so the next release is a minor one.
+- `Order::avg_price()` is the exact average execution price from the new
+  `Order.avg_price_e18` (18 decimals; `avg_px` stays rounded down to 1e-9).
+  `Order.cum_notional` / `Order::cum_quote(base_quantity_scale)` is the exact
+  quote amount of the fills before fees, and `Order.fee_total`
+  (`OrderFeeTotal`: `amount_e18` / `amount()`, `is_rebate`, `qty`) their fee
+  net of rebates. `Order::quote_used(base_scale)` and
+  `Order::quote_unspent(base_scale, quote_scale)` tell how much of a
+  quote-sized buy's amount the fills used; `None` until the fee total covers
+  every fill. All exact `Decimal`s, zero with no fills, and `None` rather
+  than a rounded value when a result needs more digits than a `Decimal`
+  holds.
+- Trigger events: `fire_refused` (also a `list_events` filter) for a fire
+  refused while the trigger stays live, with the new
+  `TriggerEvent.fire_refusal_reason` (`rate_limited`, `account_repairing`,
+  `market_halted`, `min_notional`, ...). It is not terminal. The failure reason
+  `account_repairing` is named. Unknown event types and reasons still read as
+  `UNKNOWN(<n>)` / `UNKNOWN_TRIGGER_FAILURE_REASON(<n>)`.
+- `Error::auth_code()` returns the typed `auth.v1.AuthErrorCode` of a refusal
+  on ConnectRPC (`AuthErrorDetail`) and REST (`code` with `AUTH_` added,
+  `UNAUTHENTICATED` as `AUTH_AUTHENTICATION_REQUIRED`);
+  `errors::auth_codes::from_rest_code` maps a REST code, and `auth_codes` names
+  the seven new values (`SIGNATURE_INVALID`, `MISSING_HEADERS`, `KEY_EXPIRED`,
+  `KEY_DISABLED`, `IP_NOT_ALLOWED`, `API_KEY_NOT_ACCEPTED`, plus the existing
+  `TIMESTAMP_SKEW`).
+- Changed: a ConnectRPC `AUTH_TIMESTAMP_SKEW` detail is the retryable
+  `Error::TimestampSkew`, and the other API-key reasons are
+  `Error::ApiKeyRejected` with the REST form of the code (`SIGNATURE_INVALID`),
+  the same errors the API gateway's answers map to. They were `Error::Api`.
+- New `Error::SessionRequired` (`is_session_required()`) for
+  `AUTH_SESSION_KIND_NOT_ALLOWED`: a session-only method called with an
+  account API key, read from the Connect `permission_denied` detail and the
+  REST 403 `code` alike. It was `Error::Api` on Connect and
+  `Error::ApiKeyRejected` on REST.
+- `Error::Api` gains `violations` (`Error::violations()`): the request fields
+  an order refusal names, with ConnectRPC field paths. A missing or wrong
+  attached trailing-stop maximum on create, preview or batch create is now
+  refused before sending with the server's code, rule ID and field path
+  (`ERROR_CODE_BAD_PRICE` / `sell_unset` or `buy_at_least_activation`,
+  `ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT` / `buy_required`) as `Error::Api`
+  instead of `Error::Validation`; a modify names `new_attached_risk...` and
+  a batch replace item `items[N].new_attached_risk...`.
+- `Error::is_order_already_terminal()` and
+  `order_codes::ORDER_ALREADY_TERMINAL` / `ORDER_UNKNOWN`: a cancel of an order
+  that has already ended, a repeat of the cancel that ended it included, is
+  now always refused with `ERROR_CODE_ORDER_ALREADY_TERMINAL`. Treat it as
+  "already done".
+- `client.stop_all_trading(scope)` cancels every live trigger, then every open
+  order. Cancel-all and the dead-man switch cancel orders only, never
+  triggers; `cancel_all`, `cancel_all_after` and `cancel` document it.
+- Fixed: with `WireFormat::Json`, a response naming an enum value newer than
+  this SDK (a new changelog surface, for example) failed the whole call with
+  a retryable `Error::Server`. The value now reads as unset (and is dropped
+  from a repeated field), as protojson's `DiscardUnknown` does; binary
+  responses keep the value's number.
+- Changelog: surface labels `market_data`, `quickswap` and `rewards`;
+  `ChangelogSection.surface` names the product area a section covers;
+  `list_changes` refuses more than 10 `surfaces` before sending.
+- The generated module tree compiles contract `e96897c`.
+- Docs: an API key's `permission_denied` message names the missing policy
+  action and reaches the caller as is; a quote-sized buy that spent its amount
+  ends `filled`; a ladder whose levels were all canceled before any filled
+  ends `cancelled`.
+
 **New: public product changelog (`client.changelog`).** Read the changelog of
 the environment you call without an API key. It is available on
 devnet now and on testnet with its next release.

@@ -210,6 +210,7 @@ mod tests {
             message: "address book write denied".into(),
             code: "AUTH_UNSPECIFIED".into(),
             metadata: Vec::new(),
+            violations: Vec::new(),
         };
         assert!(is_permission_denied(&api));
         assert!(!jwt_session_only(&api));
@@ -230,6 +231,7 @@ mod tests {
             message: "Order notional exceeds the maximum allowed".into(),
             code: "ERROR_CODE_POLICY_MAX_NOTIONAL".into(),
             metadata: Vec::new(),
+            violations: Vec::new(),
         };
         assert!(!is_notional_validation(&maximum));
 
@@ -237,6 +239,7 @@ mod tests {
             message: "Order sizing below minimum notional".into(),
             code: "ERROR_CODE_MIN_NOTIONAL".into(),
             metadata: Vec::new(),
+            violations: Vec::new(),
         };
         assert!(is_notional_validation(&minimum));
     }

@@ -1035,6 +1035,11 @@ pub struct MarketOverview {
     )]
     pub last_trade_ts_ns: u64,
     /// Rolling 24h change expressed in basis points (bp). Example: +123 = +1.23%.
+    /// Measured from the 24h open to the last price, at minute granularity: the
+    /// 24h open is the price at the start of the minute that contains the time
+    /// 24h ago or, for a market that first traded later, its first trade. 0 when
+    /// the market has no trade yet (its last trade timestamp is 0 too) and until
+    /// its first minute of trading has ended.
     ///
     /// Field 5: `change_24h_bps`
     #[serde(
@@ -4892,6 +4897,11 @@ pub mod __buffa {
             /// Field 4: `last_trade_ts_ns`
             pub last_trade_ts_ns: u64,
             /// Rolling 24h change expressed in basis points (bp). Example: +123 = +1.23%.
+            /// Measured from the 24h open to the last price, at minute granularity: the
+            /// 24h open is the price at the start of the minute that contains the time
+            /// 24h ago or, for a market that first traded later, its first trade. 0 when
+            /// the market has no trade yet (its last trade timestamp is 0 too) and until
+            /// its first minute of trading has ended.
             ///
             /// Field 5: `change_24h_bps`
             pub change_24h_bps: i32,
@@ -5596,6 +5606,11 @@ pub mod __buffa {
                 self.0.reborrow().last_trade_ts_ns
             }
             /// Rolling 24h change expressed in basis points (bp). Example: +123 = +1.23%.
+            /// Measured from the 24h open to the last price, at minute granularity: the
+            /// 24h open is the price at the start of the minute that contains the time
+            /// 24h ago or, for a market that first traded later, its first trade. 0 when
+            /// the market has no trade yet (its last trade timestamp is 0 too) and until
+            /// its first minute of trading has ended.
             ///
             /// Field 5: `change_24h_bps`
             #[must_use]

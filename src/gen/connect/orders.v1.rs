@@ -438,6 +438,14 @@ pub trait OrdersService: Send + Sync + 'static {
     /// Cancels an existing order by id or client order id.
     /// REST clients submit base58 order IDs. ConnectRPC clients submit fixed64
     /// order IDs.
+    /// A cancel of an order that has already ended returns
+    /// ERROR_CODE_ORDER_ALREADY_TERMINAL, including a cancel retried after a
+    /// timeout once the order has ended: treat it as already done. A repeat
+    /// while an earlier cancel of the order is still in progress is accepted
+    /// again and changes nothing. A client order ID keeps naming its order for
+    /// at least a minute after the order ends; a cancel by client order ID sent
+    /// later may return ERROR_CODE_ORDER_UNKNOWN instead. Retry by order ID, or
+    /// read the order, to tell an ended order from an unknown one.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -465,6 +473,28 @@ pub trait OrdersService: Send + Sync + 'static {
     /// requests cancellation of every one, however many match. The response
     /// lists up to 200 of them, oldest first, with the total count.
     /// Final state is confirmed via the order update stream or read path.
+    /// It cancels orders, not triggers. Open orders that triggers placed match
+    /// like any other order and are canceled: a TWAP's working slice, a
+    /// ladder's levels, the order a fired stop placed, and the working exit of
+    /// an attached take-profit, stop-loss or trailing stop. The triggers
+    /// themselves are not canceled, and their reserved funds stay reserved:
+    /// - A stop-loss, take-profit or trailing stop that has not fired stays
+    /// armed and places its order when its condition is met.
+    /// - A TWAP keeps running and places its next slice when it is due.
+    /// - A ladder ends once none of its levels remains open: canceled when
+    /// none of them filled, completed when any did.
+    /// - An attached leg whose working exit is canceled ends canceled, and so
+    /// do the parent's other legs when oco is set. Attached legs without a
+    /// working exit keep protecting the parent's filled position, even when
+    /// the parent order itself is canceled; they end only if the parent is
+    /// canceled before any fill.
+    /// - A paused trigger stays paused and can be resumed.
+    /// To stop all automated trading, cancel each live trigger with
+    /// TriggersService.CancelTrigger, then cancel the orders: a trigger that
+    /// fires before its cancel places an order that the cancel-all then
+    /// cancels. TriggersService.ListTriggers with the statuses STATUS_CREATED,
+    /// STATUS_ARMED, STATUS_RUNNING and STATUS_PAUSED lists the live triggers,
+    /// attached legs included.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -489,6 +519,13 @@ pub trait OrdersService: Send + Sync + 'static {
     > + Send;
     /// Set cancel-all-after (dead-man switch).
     /// Arms or disables automatic cancel-all if heartbeat is not refreshed before expiry.
+    /// When the switch fires, it cancels what CancelAllOrders with the same
+    /// symbol and side scope cancels: open orders, including those that
+    /// triggers placed, and no trigger. Armed stop-loss, take-profit and
+    /// trailing stops, running TWAPs and attached legs without a working exit
+    /// stay active and can place new orders after it fires, exactly as after
+    /// CancelAllOrders. The switch does not stop them: only
+    /// TriggersService.CancelTrigger cancels a trigger.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

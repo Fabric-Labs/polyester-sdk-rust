@@ -47,7 +47,7 @@ pub struct ListChangelogChangesOptions {
     pub categories: Vec<String>,
     /// Keep only changes whose `action_required` matches.
     pub action_required: Option<bool>,
-    /// `CHANGELOG_SURFACE_*` labels.
+    /// `CHANGELOG_SURFACE_*` labels, at most 10.
     pub surfaces: Vec<String>,
     /// `CHANGELOG_AUDIENCE_*` labels. Changes addressed to all users always
     /// match.
@@ -239,7 +239,16 @@ where
     .try_flatten()
 }
 
+/// Most `surfaces` a `list_changes` filter takes, one per surface.
+const MAX_SURFACE_FILTERS: usize = 10;
+
 fn list_changes_request(opts: ListChangelogChangesOptions) -> Result<ListChangesRequest> {
+    if opts.surfaces.len() > MAX_SURFACE_FILTERS {
+        return Err(Error::validation(format!(
+            "list_changes surfaces: at most {MAX_SURFACE_FILTERS} values, got {}",
+            opts.surfaces.len()
+        )));
+    }
     Ok(ListChangesRequest {
         categories: labels_to_enums::<ChangeCategory>(&opts.categories, "categories")?,
         action_required: opts.action_required,
@@ -339,6 +348,29 @@ mod tests {
         assert!(req.end_time.as_option().is_none());
         assert_eq!(req.sort, SortDirection::SORT_ASC);
         assert_eq!(req.limit, 50);
+    }
+
+    #[test]
+    fn list_changes_request_filters_by_the_new_product_areas() {
+        let req = list_changes_request(ListChangelogChangesOptions {
+            surfaces: vec!["market_data".into(), "QUICKSWAP".into(), "rewards".into()],
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            req.surfaces,
+            vec![
+                buffa::EnumValue::from(Surface::MARKET_DATA),
+                buffa::EnumValue::from(Surface::QUICKSWAP),
+                buffa::EnumValue::from(Surface::REWARDS)
+            ]
+        );
+        let err = list_changes_request(ListChangelogChangesOptions {
+            surfaces: vec!["api".into(); 11],
+            ..Default::default()
+        })
+        .unwrap_err();
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
     }
 
     #[test]

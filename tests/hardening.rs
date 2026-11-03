@@ -4718,3 +4718,341 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
     assert!(!matches!(err, Error::Transport(_)), "{err:?}");
     assert_eq!(http.requests.load(Ordering::SeqCst), 1);
 }
+
+fn connect_auth_error(
+    connect_code: &str,
+    code: polyester::proto::auth::v1::AuthErrorCode,
+    message: &str,
+) -> String {
+    use base64::Engine as _;
+    use polyester::proto::auth::v1::AuthErrorDetail;
+    let detail = AuthErrorDetail {
+        code: code.into(),
+        message: message.into(),
+        ..Default::default()
+    };
+    let value = base64::engine::general_purpose::STANDARD_NO_PAD.encode(detail.encode_to_bytes());
+    json!({
+        "code": connect_code,
+        "message": message,
+        "details": [{"type": "auth.v1.AuthErrorDetail", "value": value}],
+    })
+    .to_string()
+}
+
+// Order reads, order and trigger writes and balance reads answer a refused
+// API key with a ConnectRPC error whose `auth.v1.AuthErrorDetail` names the
+// reason; the REST problem answers the same reason as its `code`.
+#[tokio::test]
+async fn l2_api_key_refusal_reasons_read_the_same_on_connect_and_rest() {
+    use polyester::proto::auth::v1::AuthErrorCode;
+
+    for (code, rest_code, retryable) in [
+        (
+            AuthErrorCode::AUTH_SIGNATURE_INVALID,
+            "SIGNATURE_INVALID",
+            false,
+        ),
+        (AuthErrorCode::AUTH_TIMESTAMP_SKEW, "TIMESTAMP_SKEW", true),
+        (
+            AuthErrorCode::AUTH_MISSING_HEADERS,
+            "MISSING_HEADERS",
+            false,
+        ),
+        (AuthErrorCode::AUTH_KEY_EXPIRED, "KEY_EXPIRED", false),
+        (AuthErrorCode::AUTH_KEY_DISABLED, "KEY_DISABLED", false),
+        (AuthErrorCode::AUTH_IP_NOT_ALLOWED, "IP_NOT_ALLOWED", false),
+        (
+            AuthErrorCode::AUTH_API_KEY_NOT_ACCEPTED,
+            "API_KEY_NOT_ACCEPTED",
+            false,
+        ),
+    ] {
+        let connect = connect_auth_error("unauthenticated", code, "refused");
+        let rest = json!({"status": 401, "code": rest_code, "title": "Unauthorized"}).to_string();
+        for (content_type, body) in [
+            ("application/json", connect),
+            ("application/problem+json", rest),
+        ] {
+            let http = MockHttpServer::spawn(move |_| json_body(401, content_type, &body)).await;
+            let err = api_key_client(&http)
+                .orders
+                .list_open(None)
+                .await
+                .expect_err("refused");
+            assert_eq!(err.auth_code(), Some(code), "{content_type}: {err:?}");
+            assert_eq!(
+                err.auth_error_code(),
+                Some(rest_code),
+                "{content_type}: {err:?}"
+            );
+            assert_eq!(err.is_retryable(), retryable, "{content_type}: {err:?}");
+            if retryable {
+                assert!(
+                    matches!(err, Error::TimestampSkew { status: 401 }),
+                    "{err:?}"
+                );
+            } else {
+                assert!(
+                    matches!(&err, Error::ApiKeyRejected { status: 401, .. }),
+                    "{err:?}"
+                );
+            }
+        }
+    }
+
+    // No credentials, or a missing or expired session: REST `UNAUTHENTICATED`.
+    let http = MockHttpServer::spawn(|_| {
+        json_body(
+            401,
+            "application/problem+json",
+            r#"{"status":401,"code":"UNAUTHENTICATED"}"#,
+        )
+    })
+    .await;
+    let err = api_key_client(&http)
+        .orders
+        .list_open(None)
+        .await
+        .expect_err("refused");
+    assert_eq!(
+        err.auth_code(),
+        Some(AuthErrorCode::AUTH_AUTHENTICATION_REQUIRED),
+        "{err:?}"
+    );
+}
+
+// Every session-only method refuses an account API key with
+// AUTH_SESSION_KIND_NOT_ALLOWED: HTTP 403, Connect `permission_denied` with an
+// AuthErrorDetail, or a REST problem with the code. Both read as one error.
+#[tokio::test]
+async fn l2_session_only_refusal_is_session_required_on_connect_and_rest() {
+    use polyester::proto::auth::v1::AuthErrorCode;
+
+    let connect = connect_auth_error(
+        "permission_denied",
+        AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED,
+        "interactive session required",
+    );
+    let rest = r#"{"type":"https://polyester.dev/problems/auth-session-kind-not-allowed","title":"Interactive Session Required","status":403,"detail":"interactive session required","code":"AUTH_SESSION_KIND_NOT_ALLOWED"}"#.to_owned();
+    for (content_type, body) in [
+        ("application/json", connect),
+        ("application/problem+json", rest),
+    ] {
+        let http = MockHttpServer::spawn(move |_| json_body(403, content_type, &body)).await;
+        let err = api_key_client(&http)
+            .orders
+            .list_open(None)
+            .await
+            .expect_err("refused");
+        assert!(
+            matches!(&err, Error::SessionRequired { message } if message == "interactive session required"),
+            "{content_type}: {err:?}"
+        );
+        assert!(err.is_session_required());
+        assert_eq!(
+            err.auth_code(),
+            Some(AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED)
+        );
+        assert!(!err.is_retryable());
+    }
+}
+
+// Cancel-all cancels open orders, never triggers. stop_all_trading pages
+// through the live triggers, cancels each, and only then cancels all orders.
+#[tokio::test]
+async fn l2_stop_all_trading_cancels_live_triggers_before_the_orders() {
+    use polyester::models::StopAllTradingScope;
+    use polyester::proto::orders::v1::{CancelAllOrdersRequest, CancelAllOrdersResponse};
+    use polyester::proto::triggers::v1::{
+        CancelTriggerRequest, CancelTriggerResponse, ListTriggersRequest, ListTriggersResponse,
+        Trigger, TriggerStatus,
+    };
+
+    const CANCEL_TRIGGER: &str = "/triggers.v1.TriggersService/CancelTrigger";
+    const CANCEL_ALL: &str = "/orders.v1.OrdersService/CancelAllOrders";
+    let calls = Arc::new(std::sync::Mutex::new(Vec::<(String, Vec<u8>)>::new()));
+    let seen = calls.clone();
+    let http = MockHttpServer::spawn(move |request| {
+        seen.lock()
+            .unwrap()
+            .push((request.path.clone(), request.body.clone()));
+        let trigger = |id| Trigger {
+            trigger_id: id,
+            status: TriggerStatus::STATUS_ARMED.into(),
+            ..Default::default()
+        };
+        match request.path.as_str() {
+            LIST_TRIGGERS_PATH => {
+                let req = ListTriggersRequest::decode_from_slice(&request.body).unwrap();
+                if req.page_token.is_empty() {
+                    connect_proto_ok(&ListTriggersResponse {
+                        triggers: vec![trigger(11), trigger(12)],
+                        next_page_token: "page-2".into(),
+                        ..Default::default()
+                    })
+                } else {
+                    connect_proto_ok(&ListTriggersResponse {
+                        triggers: vec![trigger(13)],
+                        ..Default::default()
+                    })
+                }
+            }
+            CANCEL_TRIGGER => {
+                let req = CancelTriggerRequest::decode_from_slice(&request.body).unwrap();
+                if req.trigger_id == 12 {
+                    return json_body(
+                        400,
+                        "application/json",
+                        r#"{"code":"failed_precondition","message":"trigger already ended"}"#,
+                    );
+                }
+                connect_proto_ok(&CancelTriggerResponse {
+                    trigger_id: req.trigger_id,
+                    status: TriggerStatus::STATUS_CANCELED.into(),
+                    ..Default::default()
+                })
+            }
+            CANCEL_ALL => connect_proto_ok(&CancelAllOrdersResponse {
+                status: polyester::proto::orders::v1::cancel_all_orders_response::Status::SUBMITTED
+                    .into(),
+                matched_orders: 2,
+                submitted_cancels: 2,
+                ..Default::default()
+            }),
+            _ => hardening_support::HttpScript::NotFound,
+        }
+    })
+    .await;
+    let client = api_key_client(&http);
+    let result = client
+        .stop_all_trading(StopAllTradingScope {
+            request_id: Some("stop-all-1".into()),
+            ..Default::default()
+        })
+        .await
+        .expect("stop all trading");
+
+    let id = polyester::codecs::format_uint64_id;
+    assert_eq!(result.canceled_trigger_ids, vec![id(11), id(13)]);
+    assert_eq!(result.trigger_failures.len(), 1);
+    assert_eq!(result.trigger_failures[0].trigger_id, id(12));
+    assert_eq!(result.orders.matched_orders, 2);
+
+    let calls = calls.lock().unwrap();
+    let paths: Vec<&str> = calls.iter().map(|(path, _)| path.as_str()).collect();
+    assert_eq!(
+        paths,
+        [
+            LIST_TRIGGERS_PATH,
+            LIST_TRIGGERS_PATH,
+            CANCEL_TRIGGER,
+            CANCEL_TRIGGER,
+            CANCEL_TRIGGER,
+            CANCEL_ALL
+        ],
+        "every trigger is canceled before the orders"
+    );
+    for (n, (_, body)) in calls.iter().take(2).enumerate() {
+        let req = ListTriggersRequest::decode_from_slice(body).unwrap();
+        let statuses: Vec<_> = req.status.iter().map(|s| s.to_i32()).collect();
+        assert_eq!(
+            statuses,
+            [
+                TriggerStatus::STATUS_CREATED as i32,
+                TriggerStatus::STATUS_ARMED as i32,
+                TriggerStatus::STATUS_RUNNING as i32,
+                TriggerStatus::STATUS_PAUSED as i32
+            ]
+        );
+        assert_eq!(req.limit, 1000);
+        assert_eq!(req.page_token, if n == 0 { "" } else { "page-2" });
+    }
+    let cancel_all = CancelAllOrdersRequest::decode_from_slice(&calls[5].1).unwrap();
+    assert_eq!(cancel_all.request_id, "stop-all-1");
+}
+
+// A JSON-wire response naming an enum value newer than this SDK reads it as
+// unknown instead of rejecting the whole response (changelog sections and
+// change surfaces gain product areas over time).
+#[tokio::test]
+async fn l2_json_wire_reads_unknown_enum_names_instead_of_failing() {
+    let http = MockHttpServer::spawn(|request| match request.path.as_str() {
+        "/changelog.v1.ChangelogService/GetPost" => json_body(
+            200,
+            "application/json",
+            r#"{"post":{"summary":{"slug":"2026-11-04","changeCount":2},"sections":[
+                {"heading":"Market data","surface":"MARKET_DATA","changes":[{"id":"1","surfaces":["MARKET_DATA","FUTURE_SURFACE"]}]},
+                {"heading":"Future","surface":"FUTURE_SURFACE","changes":[{"id":"2","category":"FUTURE_CATEGORY","surfaces":["FUTURE_SURFACE"]}]}]}}"#,
+        ),
+        _ => hardening_support::HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        hydrate_catalogs: false,
+        wire_format: polyester::transport::WireFormat::Json,
+        ..Default::default()
+    })
+    .expect("client");
+    let post = client
+        .changelog
+        .get_post("2026-11-04")
+        .await
+        .expect("an unknown enum name must not reject the response");
+    assert_eq!(post.sections.len(), 2);
+    assert_eq!(post.sections[0].surface, "market_data");
+    assert_eq!(post.sections[0].changes[0].surfaces, vec!["market_data"]);
+    // A name this SDK does not know reads as unset: no product-area label.
+    assert_eq!(post.sections[1].surface, "");
+    assert!(post.sections[1].changes[0].surfaces.is_empty());
+    assert_eq!(post.sections[1].changes[0].category, "");
+}
+
+// The same holds for trigger enums: an event type or refusal reason newer
+// than this SDK reads as unset over JSON, and the known ones keep their labels.
+#[tokio::test]
+async fn l2_json_wire_reads_unknown_trigger_enum_names() {
+    use polyester::proto::triggers::v1::ListTriggerEventsRequest;
+
+    let http = MockHttpServer::spawn(|request| match request.path.as_str() {
+        "/triggers.v1.TriggersService/ListTriggerEvents" => json_body(
+            200,
+            "application/json",
+            r#"{"events":[
+                {"triggerId":"7","triggerType":"FUTURE_TYPE","eventType":"EVENT_FUTURE","childSeq":1,"fireRefusalReason":"TRIGGER_FAILURE_REASON_FUTURE"},
+                {"triggerId":"7","triggerType":"TAKE_PROFIT","eventType":"EVENT_FIRE_REFUSED","childSeq":2,"firePriceTicks":"104000000000","fireRefusalReason":"TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING"}],
+              "nextPageToken":""}"#,
+        ),
+        _ => hardening_support::HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        wire_format: polyester::transport::WireFormat::Json,
+        ..Default::default()
+    })
+    .expect("client");
+    let events = client
+        .triggers
+        .list_events(ListTriggerEventsRequest {
+            trigger_id: 7,
+            ..Default::default()
+        })
+        .await
+        .expect("unknown trigger enum names must not reject the response");
+    assert_eq!(events.events.len(), 2);
+    let (future, refused) = (&events.events[0], &events.events[1]);
+    assert_eq!(
+        (future.event_type.as_str(), future.trigger_type.as_str()),
+        ("", "")
+    );
+    assert_eq!(future.fire_refusal_reason, "");
+    assert_eq!(refused.event_type, "fire_refused");
+    assert_eq!(refused.trigger_type, "take_profit");
+    assert_eq!(refused.fire_refusal_reason, "account_repairing");
+    assert_eq!(refused.fire_price.as_ref().unwrap().format(), "104");
+}

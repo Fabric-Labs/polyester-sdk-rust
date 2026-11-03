@@ -508,7 +508,7 @@ pub struct GuardApproval {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub deadline_unix: u64,
-    /// EIP-712 signature over the guard approval message.
+    /// EIP-712 signature over the guard approval message. Must not be empty.
     ///
     /// Field 3: `signature`
     #[serde(
@@ -3729,7 +3729,7 @@ pub mod __buffa {
             ///
             /// Field 2: `deadline_unix`
             pub deadline_unix: u64,
-            /// EIP-712 signature over the guard approval message.
+            /// EIP-712 signature over the guard approval message. Must not be empty.
             ///
             /// Field 3: `signature`
             pub signature: &'a [u8],
@@ -4022,7 +4022,7 @@ pub mod __buffa {
             pub fn deadline_unix(&self) -> u64 {
                 self.0.reborrow().deadline_unix
             }
-            /// EIP-712 signature over the guard approval message.
+            /// EIP-712 signature over the guard approval message. Must not be empty.
             ///
             /// Field 3: `signature`
             #[must_use]

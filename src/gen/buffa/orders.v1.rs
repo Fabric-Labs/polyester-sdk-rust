@@ -7643,7 +7643,9 @@ pub const __PREVIEW_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 pub struct CancelOrderRequest {
     /// Optional trading symbol numeric identifier. When set, it must match the
     /// order's symbol, or the order is reported unknown (ERROR_CODE_ORDER_UNKNOWN)
-    /// and nothing is canceled. When omitted, the order's own symbol is used.
+    /// and nothing is canceled. An order that ended a while ago may instead be
+    /// reported ended (ERROR_CODE_ORDER_ALREADY_TERMINAL). When omitted, the
+    /// order's own symbol is used.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -10634,6 +10636,9 @@ pub mod risk_policy {
 /// =============================================================================
 ///
 /// CancelAllOrdersRequest cancels all matching open orders for an account.
+/// It cancels orders only, never triggers: see CancelAllOrders for what
+/// happens to stop-loss, take-profit and trailing stops, TWAPs, ladders and
+/// attached legs, and how to stop them too.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -11092,9 +11097,10 @@ pub struct CancelAllOrdersResponse {
     )]
     pub status: ::buffa::EnumValue<cancel_all_orders_response::Status>,
     /// Number of open orders that matched the filter when the request was
-    /// accepted, including orders whose cancellation was already in progress.
-    /// Orders placed after acceptance are not counted. Unless `dry_run` is set,
-    /// equals `submitted_cancels` plus `failed_cancels`.
+    /// accepted, including orders whose cancellation was already in progress
+    /// and open orders that triggers placed. Triggers themselves are never
+    /// counted. Orders placed after acceptance are not counted. Unless
+    /// `dry_run` is set, equals `submitted_cancels` plus `failed_cancels`.
     ///
     /// Field 2: `matched_orders`
     #[serde(
@@ -11796,6 +11802,8 @@ pub mod cancel_all_orders_response {
 /// =============================================================================
 ///
 /// CancelAllAfterRequest arms/disables a dead-man switch for automatic cancel-all.
+/// When the switch fires, it cancels what a CancelAllOrders with the same
+/// scope cancels: open orders, never triggers. See CancelAllAfter.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -12043,8 +12051,10 @@ pub const __CANCEL_ALL_AFTER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEn
     is_wkt: false,
 };
 /// DeadManSwitchScope describes the recorded scope of an armed dead-man switch.
-/// Expiry cancels working orders in this scope, including working child orders.
-/// Waiting triggers remain active and may create further orders.
+/// Expiry cancels working orders in this scope, including orders that
+/// triggers placed. It cancels no trigger: armed stop-loss, take-profit and
+/// trailing stops and running TWAPs remain active and may create further
+/// orders after expiry. Cancel them with TriggersService.CancelTrigger.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -17296,7 +17306,10 @@ pub enum OrderStatus {
     PENDING_CANCEL = 2i32,
     /// Accepted and actively working (resting and/or matching).
     WORKING = 3i32,
-    /// Fully filled (no remaining quantity).
+    /// Fully filled (no remaining quantity). A buy sized by a quote amount
+    /// (max_quote_debit_scaled) is fully filled once it has spent that amount:
+    /// what is left of it buys no further quantity step at the next price the
+    /// order could fill at. Its quantity is then what it bought.
     FILLED = 4i32,
     /// Canceled and no longer working.
     CANCELED = 5i32,
@@ -17481,10 +17494,15 @@ pub enum CancelReason {
     CANCEL_REASON_UNSPECIFIED = 0i32,
     /// A cancel the account sent: a cancel, a batch cancel or a cancel-all.
     CANCEL_REASON_USER_REQUEST = 1i32,
-    /// The unfilled remainder of an immediate-or-cancel order.
+    /// The unfilled remainder of an immediate-or-cancel order. A buy sized by a
+    /// quote amount (max_quote_debit_scaled) that spends that amount ends
+    /// FILLED instead.
     CANCEL_REASON_IOC_REMAINDER = 2i32,
-    /// The unfilled remainder of a market order: the book ran out, or the next
-    /// price was past the order's protection price.
+    /// The unfilled remainder of a market order: the book ran out, the next
+    /// price was past the order's protection price, or the order reached the
+    /// market's maximum order quantity. A market buy sized by a quote amount
+    /// (max_quote_debit_scaled) that spends that amount, so that what is left
+    /// buys no further quantity step, ends FILLED instead.
     CANCEL_REASON_MARKET_REMAINDER = 3i32,
     /// Self-trade prevention canceled this resting order when an order of the
     /// same account would have matched it.
@@ -19973,6 +19991,203 @@ pub const __ORDER_LINEAGE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
     from_json: ::buffa::type_registry::any_from_json::<OrderLineage>,
     is_wkt: false,
 };
+/// OrderFeeTotal is the total fee of an order's fills, net of rebates, as
+/// settled. A fill's fee is recorded shortly after the fill executes, so the
+/// total can trail the fills the order shows: qty_scaled says which fills it
+/// covers.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct OrderFeeTotal {
+    /// Net fee magnitude in fixed 18-decimal units of the order's fee_asset:
+    /// the fees of the covered fills less their rebates. Zero when they charged
+    /// no fee.
+    ///
+    /// Field 1: `amount_e18`
+    #[serde(
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub amount_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// True when the covered fills' rebates exceed their fees, so the amount
+    /// was credited to the account rather than charged.
+    ///
+    /// Field 2: `is_rebate`
+    #[serde(
+        rename = "isRebate",
+        alias = "is_rebate",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub is_rebate: bool,
+    /// Executed quantity of the fills the total covers, scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig. Equal to the order's
+    /// cum_qty_scaled once every fill's fee is recorded. While a fill is still
+    /// being recorded the two differ, and a later read of the order includes
+    /// it.
+    ///
+    /// Field 3: `qty_scaled`
+    #[serde(
+        rename = "qtyScaled",
+        alias = "qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub qty_scaled: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for OrderFeeTotal {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("OrderFeeTotal")
+            .field("amount_e18", &self.amount_e18)
+            .field("is_rebate", &self.is_rebate)
+            .field("qty_scaled", &self.qty_scaled)
+            .finish()
+    }
+}
+impl OrderFeeTotal {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.OrderFeeTotal";
+}
+::buffa::impl_default_instance!(OrderFeeTotal);
+impl ::buffa::MessageName for OrderFeeTotal {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "OrderFeeTotal";
+    const FULL_NAME: &'static str = "orders.v1.OrderFeeTotal";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.OrderFeeTotal";
+}
+impl ::buffa::Message for OrderFeeTotal {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.is_rebate {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        if self.qty_scaled != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
+        }
+        if self.is_rebate {
+            ::buffa::types::put_bool_field(2u32, self.is_rebate, buf);
+        }
+        if self.qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(3u32, self.qty_scaled, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.is_rebate = ::buffa::types::decode_bool(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.amount_e18 = ::buffa::MessageField::none();
+        self.is_rebate = false;
+        self.qty_scaled = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for OrderFeeTotal {
+    const PROTO_FQN: &'static str = "orders.v1.OrderFeeTotal";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OrderFeeTotal {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ORDER_FEE_TOTAL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.OrderFeeTotal",
+    to_json: ::buffa::type_registry::any_to_json::<OrderFeeTotal>,
+    from_json: ::buffa::type_registry::any_from_json::<OrderFeeTotal>,
+    is_wkt: false,
+};
 /// Order is the Connect-facing order view with compact binary fields.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -20125,7 +20340,8 @@ pub struct Order {
     )]
     pub leaves_qty_scaled: i64,
     /// Average execution price across the lineage through this generation,
-    /// in quote units scaled by 1e9. Zero if no fills.
+    /// in quote units scaled by 1e9, rounded down. Zero if no fills.
+    /// avg_price_e18 carries the exact average.
     ///
     /// Field 14: `avg_price_ticks`
     #[serde(
@@ -20135,6 +20351,56 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub avg_price_ticks: i64,
+    /// Average execution price across the lineage through this generation, in
+    /// quote units scaled by 1e18: the exact executed quote amount divided by
+    /// cum_qty_scaled, rounded half to even at the 18th decimal. Unset if no
+    /// fills.
+    ///
+    /// Field 36: `avg_price_e18`
+    #[serde(
+        rename = "avgPriceE18",
+        alias = "avg_price_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub avg_price_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// Exact quote amount of the fills across the lineage through this
+    /// generation, before fees: the sum over the fills of their quantity,
+    /// scaled as cum_qty_scaled, times their price in quote units scaled by
+    /// 1e9. It is in quote units scaled by 10^(9 + base_quantity_scale), with
+    /// the pair's base_quantity_scale from GetSpotConfig for symbol_id; REST
+    /// shows it in quote units. avg_price_e18 is this amount over
+    /// cum_qty_scaled. Unset if no fills. A fill settles its quote rounded down
+    /// to 18 decimal places, which is this amount exactly unless
+    /// base_quantity_scale is above 9.
+    ///
+    /// For a BUY sized by a quote amount (submitted_max_quote_debit_scaled),
+    /// the quote the order used is this amount plus fee_total's amount_e18
+    /// when fee_asset is QUOTE, or minus it when fee_total's is_rebate is true,
+    /// since a rebate is credited; it is this amount alone when fee_asset is
+    /// BASE, whose fee is taken from the base received. What it left unspent is
+    /// submitted_max_quote_debit_scaled less the quote it used.
+    ///
+    /// Field 37: `cum_notional`
+    #[serde(
+        rename = "cumNotional",
+        alias = "cum_notional",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub cum_notional: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// Total fee of the fills across the lineage through this generation, net
+    /// of rebates, in the order's fee asset. Order history reads and
+    /// single-order reads that include execution history (the default) carry
+    /// it. It can trail the order's fills: its quantity shows which fills it
+    /// covers. Open-order reads, single-order reads without execution history
+    /// and private stream order updates leave it unset.
+    ///
+    /// Field 38: `fee_total`
+    #[serde(
+        rename = "feeTotal",
+        alias = "fee_total",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub fee_total: ::buffa::MessageField<OrderFeeTotal>,
     /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
     ///
     /// Field 15: `price_ticks`
@@ -20318,6 +20584,9 @@ impl ::core::fmt::Debug for Order {
             .field("inherited_cum_qty_scaled", &self.inherited_cum_qty_scaled)
             .field("leaves_qty_scaled", &self.leaves_qty_scaled)
             .field("avg_price_ticks", &self.avg_price_ticks)
+            .field("avg_price_e18", &self.avg_price_e18)
+            .field("cum_notional", &self.cum_notional)
+            .field("fee_total", &self.fee_total)
             .field("price_ticks", &self.price_ticks)
             .field("created_ts_ns", &self.created_ts_ns)
             .field("terminal_ts_ns", &self.terminal_ts_ns)
@@ -20527,6 +20796,30 @@ impl ::buffa::Message for Order {
                 size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if self.avg_price_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.avg_price_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.cum_notional.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.cum_notional.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.fee_total.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.fee_total.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -20658,6 +20951,18 @@ impl ::buffa::Message for Order {
             if val != 0 {
                 ::buffa::types::put_int32_field(35u32, val, buf);
             }
+        }
+        if self.avg_price_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(36u32, __cache.consume_next(), buf);
+            self.avg_price_e18.write_to(__cache, buf);
+        }
+        if self.cum_notional.is_set() {
+            ::buffa::types::put_len_delimited_header(37u32, __cache.consume_next(), buf);
+            self.cum_notional.write_to(__cache, buf);
+        }
+        if self.fee_total.is_set() {
+            ::buffa::types::put_len_delimited_header(38u32, __cache.consume_next(), buf);
+            self.fee_total.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -20914,6 +21219,39 @@ impl ::buffa::Message for Order {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            36u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.avg_price_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            37u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.cum_notional.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            38u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.fee_total.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -20952,6 +21290,9 @@ impl ::buffa::Message for Order {
         self.inherited_cum_qty_scaled = 0i64;
         self.reject_reason = ::buffa::EnumValue::from(0);
         self.cancel_reason = ::buffa::EnumValue::from(0);
+        self.avg_price_e18 = ::buffa::MessageField::none();
+        self.cum_notional = ::buffa::MessageField::none();
+        self.fee_total = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -30112,7 +30453,9 @@ pub mod __buffa {
         pub struct CancelOrderRequestView<'a> {
             /// Optional trading symbol numeric identifier. When set, it must match the
             /// order's symbol, or the order is reported unknown (ERROR_CODE_ORDER_UNKNOWN)
-            /// and nothing is canceled. When omitted, the order's own symbol is used.
+            /// and nothing is canceled. An order that ended a while ago may instead be
+            /// reported ended (ERROR_CODE_ORDER_ALREADY_TERMINAL). When omitted, the
+            /// order's own symbol is used.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -30462,7 +30805,9 @@ pub mod __buffa {
             }
             /// Optional trading symbol numeric identifier. When set, it must match the
             /// order's symbol, or the order is reported unknown (ERROR_CODE_ORDER_UNKNOWN)
-            /// and nothing is canceled. When omitted, the order's own symbol is used.
+            /// and nothing is canceled. An order that ended a while ago may instead be
+            /// reported ended (ERROR_CODE_ORDER_ALREADY_TERMINAL). When omitted, the
+            /// order's own symbol is used.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -34587,6 +34932,9 @@ pub mod __buffa {
         /// =============================================================================
         ///
         /// CancelAllOrdersRequest cancels all matching open orders for an account.
+        /// It cancels orders only, never triggers: see CancelAllOrders for what
+        /// happens to stop-loss, take-profit and trailing stops, TWAPs, ladders and
+        /// attached legs, and how to stop them too.
         #[derive(Clone, Debug, Default)]
         pub struct CancelAllOrdersRequestView<'a> {
             /// Target sub-account numeric ID. When omitted, uses caller's root account.
@@ -35345,9 +35693,10 @@ pub mod __buffa {
                 super::super::cancel_all_orders_response::Status,
             >,
             /// Number of open orders that matched the filter when the request was
-            /// accepted, including orders whose cancellation was already in progress.
-            /// Orders placed after acceptance are not counted. Unless `dry_run` is set,
-            /// equals `submitted_cancels` plus `failed_cancels`.
+            /// accepted, including orders whose cancellation was already in progress
+            /// and open orders that triggers placed. Triggers themselves are never
+            /// counted. Orders placed after acceptance are not counted. Unless
+            /// `dry_run` is set, equals `submitted_cancels` plus `failed_cancels`.
             ///
             /// Field 2: `matched_orders`
             pub matched_orders: u32,
@@ -35905,9 +36254,10 @@ pub mod __buffa {
                 self.0.reborrow().status
             }
             /// Number of open orders that matched the filter when the request was
-            /// accepted, including orders whose cancellation was already in progress.
-            /// Orders placed after acceptance are not counted. Unless `dry_run` is set,
-            /// equals `submitted_cancels` plus `failed_cancels`.
+            /// accepted, including orders whose cancellation was already in progress
+            /// and open orders that triggers placed. Triggers themselves are never
+            /// counted. Orders placed after acceptance are not counted. Unless
+            /// `dry_run` is set, equals `submitted_cancels` plus `failed_cancels`.
             ///
             /// Field 2: `matched_orders`
             #[must_use]
@@ -36041,6 +36391,8 @@ pub mod __buffa {
         /// =============================================================================
         ///
         /// CancelAllAfterRequest arms/disables a dead-man switch for automatic cancel-all.
+        /// When the switch fires, it cancels what a CancelAllOrders with the same
+        /// scope cancels: open orders, never triggers. See CancelAllAfter.
         #[derive(Clone, Debug, Default)]
         pub struct CancelAllAfterRequestView<'a> {
             /// Target sub-account numeric ID. When omitted, uses caller's root account.
@@ -36459,8 +36811,10 @@ pub mod __buffa {
             }
         }
         /// DeadManSwitchScope describes the recorded scope of an armed dead-man switch.
-        /// Expiry cancels working orders in this scope, including working child orders.
-        /// Waiting triggers remain active and may create further orders.
+        /// Expiry cancels working orders in this scope, including orders that
+        /// triggers placed. It cancels no trigger: armed stop-loss, take-profit and
+        /// trailing stops and running TWAPs remain active and may create further
+        /// orders after expiry. Cancel them with TriggersService.CancelTrigger.
         #[derive(Clone, Debug, Default)]
         pub struct DeadManSwitchScopeView<'a> {
             /// Public ID of the account or sub-account whose orders are canceled.
@@ -47190,6 +47544,401 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// OrderFeeTotal is the total fee of an order's fills, net of rebates, as
+        /// settled. A fill's fee is recorded shortly after the fill executes, so the
+        /// total can trail the fills the order shows: qty_scaled says which fills it
+        /// covers.
+        #[derive(Clone, Debug, Default)]
+        pub struct OrderFeeTotalView<'a> {
+            /// Net fee magnitude in fixed 18-decimal units of the order's fee_asset:
+            /// the fees of the covered fills less their rebates. Zero when they charged
+            /// no fee.
+            ///
+            /// Field 1: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// True when the covered fills' rebates exceed their fees, so the amount
+            /// was credited to the account rather than charged.
+            ///
+            /// Field 2: `is_rebate`
+            pub is_rebate: bool,
+            /// Executed quantity of the fills the total covers, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. Equal to the order's
+            /// cum_qty_scaled once every fill's fee is recorded. While a fill is still
+            /// being recorded the two differ, and a later read of the order includes
+            /// it.
+            ///
+            /// Field 3: `qty_scaled`
+            pub qty_scaled: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for OrderFeeTotalView<'a> {
+            type Owned = super::super::OrderFeeTotal;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.is_rebate = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::OrderFeeTotal,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::OrderFeeTotal,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::OrderFeeTotal {
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    is_rebate: self.is_rebate,
+                    qty_scaled: self.qty_scaled,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for OrderFeeTotalView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.is_rebate {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                if self.qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
+                }
+                if self.is_rebate {
+                    ::buffa::types::put_bool_field(2u32, self.is_rebate, buf);
+                }
+                if self.qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(3u32, self.qty_scaled, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for OrderFeeTotalView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
+                }
+                if self.is_rebate {
+                    __map.serialize_entry("isRebate", &self.is_rebate)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
+                    __map
+                        .serialize_entry(
+                            "qtyScaled",
+                            &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for OrderFeeTotalView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "OrderFeeTotal";
+            const FULL_NAME: &'static str = "orders.v1.OrderFeeTotal";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.OrderFeeTotal";
+        }
+        ::buffa::impl_default_view_instance!(OrderFeeTotalView);
+        ::buffa::impl_view_reborrow!(OrderFeeTotalView);
+        /** Self-contained, `'static` owned view of a `OrderFeeTotal` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OrderFeeTotalView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OrderFeeTotalView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct OrderFeeTotalOwnedView(
+            ::buffa::OwnedView<OrderFeeTotalView<'static>>,
+        );
+        impl OrderFeeTotalOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrderFeeTotalOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrderFeeTotalOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::OrderFeeTotal,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OrderFeeTotalOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`OrderFeeTotalView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &OrderFeeTotalView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::OrderFeeTotal,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Net fee magnitude in fixed 18-decimal units of the order's fee_asset:
+            /// the fees of the covered fills less their rebates. Zero when they charged
+            /// no fee.
+            ///
+            /// Field 1: `amount_e18`
+            #[must_use]
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
+            }
+            /// True when the covered fills' rebates exceed their fees, so the amount
+            /// was credited to the account rather than charged.
+            ///
+            /// Field 2: `is_rebate`
+            #[must_use]
+            pub fn is_rebate(&self) -> bool {
+                self.0.reborrow().is_rebate
+            }
+            /// Executed quantity of the fills the total covers, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. Equal to the order's
+            /// cum_qty_scaled once every fill's fee is recorded. While a fill is still
+            /// being recorded the two differ, and a later read of the order includes
+            /// it.
+            ///
+            /// Field 3: `qty_scaled`
+            #[must_use]
+            pub fn qty_scaled(&self) -> i64 {
+                self.0.reborrow().qty_scaled
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<OrderFeeTotalView<'static>>>
+        for OrderFeeTotalOwnedView {
+            fn from(inner: ::buffa::OwnedView<OrderFeeTotalView<'static>>) -> Self {
+                OrderFeeTotalOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<OrderFeeTotalOwnedView>
+        for ::buffa::OwnedView<OrderFeeTotalView<'static>> {
+            fn from(wrapper: OrderFeeTotalOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<OrderFeeTotalView<'static>>>
+        for OrderFeeTotalOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<OrderFeeTotalView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::OrderFeeTotal {
+            type View<'a> = OrderFeeTotalView<'a>;
+            type ViewHandle = OrderFeeTotalOwnedView;
+        }
+        impl ::serde::Serialize for OrderFeeTotalOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// Order is the Connect-facing order view with compact binary fields.
         #[derive(Clone, Debug, Default)]
         pub struct OrderView<'a> {
@@ -47260,10 +48009,56 @@ pub mod __buffa {
             /// Field 20: `leaves_qty_scaled`
             pub leaves_qty_scaled: i64,
             /// Average execution price across the lineage through this generation,
-            /// in quote units scaled by 1e9. Zero if no fills.
+            /// in quote units scaled by 1e9, rounded down. Zero if no fills.
+            /// avg_price_e18 carries the exact average.
             ///
             /// Field 14: `avg_price_ticks`
             pub avg_price_ticks: i64,
+            /// Average execution price across the lineage through this generation, in
+            /// quote units scaled by 1e18: the exact executed quote amount divided by
+            /// cum_qty_scaled, rounded half to even at the 18th decimal. Unset if no
+            /// fills.
+            ///
+            /// Field 36: `avg_price_e18`
+            pub avg_price_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Exact quote amount of the fills across the lineage through this
+            /// generation, before fees: the sum over the fills of their quantity,
+            /// scaled as cum_qty_scaled, times their price in quote units scaled by
+            /// 1e9. It is in quote units scaled by 10^(9 + base_quantity_scale), with
+            /// the pair's base_quantity_scale from GetSpotConfig for symbol_id; REST
+            /// shows it in quote units. avg_price_e18 is this amount over
+            /// cum_qty_scaled. Unset if no fills. A fill settles its quote rounded down
+            /// to 18 decimal places, which is this amount exactly unless
+            /// base_quantity_scale is above 9.
+            ///
+            /// For a BUY sized by a quote amount (submitted_max_quote_debit_scaled),
+            /// the quote the order used is this amount plus fee_total's amount_e18
+            /// when fee_asset is QUOTE, or minus it when fee_total's is_rebate is true,
+            /// since a rebate is credited; it is this amount alone when fee_asset is
+            /// BASE, whose fee is taken from the base received. What it left unspent is
+            /// submitted_max_quote_debit_scaled less the quote it used.
+            ///
+            /// Field 37: `cum_notional`
+            pub cum_notional: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Total fee of the fills across the lineage through this generation, net
+            /// of rebates, in the order's fee asset. Order history reads and
+            /// single-order reads that include execution history (the default) carry
+            /// it. It can trail the order's fills: its quantity shows which fills it
+            /// covers. Open-order reads, single-order reads without execution history
+            /// and private stream order updates leave it unset.
+            ///
+            /// Field 38: `fee_total`
+            pub fee_total: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OrderFeeTotalView<'a>,
+            >,
             /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
             ///
             /// Field 15: `price_ticks`
@@ -47502,6 +48297,81 @@ pub mod __buffa {
                         )?;
                         view.avg_price_ticks = ::buffa::types::decode_int64(&mut cur)?;
                     }
+                    36u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.avg_price_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.avg_price_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    37u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.cum_notional.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.cum_notional = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    38u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.fee_total.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.fee_total = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OrderFeeTotalView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     15u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -47731,6 +48601,30 @@ pub mod __buffa {
                     inherited_cum_qty_scaled: self.inherited_cum_qty_scaled,
                     leaves_qty_scaled: self.leaves_qty_scaled,
                     avg_price_ticks: self.avg_price_ticks,
+                    avg_price_e18: match self.avg_price_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    cum_notional: match self.cum_notional.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    fee_total: match self.fee_total.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OrderFeeTotal,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     price_ticks: self.price_ticks,
                     created_ts_ns: self.created_ts_ns,
                     terminal_ts_ns: self.terminal_ts_ns,
@@ -47966,6 +48860,30 @@ pub mod __buffa {
                         size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if self.avg_price_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.avg_price_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.cum_notional.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.cum_notional.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.fee_total.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.fee_total.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -48127,6 +49045,30 @@ pub mod __buffa {
                         ::buffa::types::put_int32_field(35u32, val, buf);
                     }
                 }
+                if self.avg_price_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        36u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.avg_price_e18.write_to(__cache, buf);
+                }
+                if self.cum_notional.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        37u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.cum_notional.write_to(__cache, buf);
+                }
+                if self.fee_total.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        38u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.fee_total.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -48238,6 +49180,28 @@ pub mod __buffa {
                             "avgPriceTicks",
                             &::buffa::json_helpers::ProtoJson(&self.avg_price_ticks),
                         )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .avg_price_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("avgPriceE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .cum_notional
+                        .as_option()
+                    {
+                        __map.serialize_entry("cumNotional", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.fee_total.as_option()
+                    {
+                        __map.serialize_entry("feeTotal", __v)?;
+                    }
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
                     __map
@@ -48550,12 +49514,73 @@ pub mod __buffa {
                 self.0.reborrow().leaves_qty_scaled
             }
             /// Average execution price across the lineage through this generation,
-            /// in quote units scaled by 1e9. Zero if no fills.
+            /// in quote units scaled by 1e9, rounded down. Zero if no fills.
+            /// avg_price_e18 carries the exact average.
             ///
             /// Field 14: `avg_price_ticks`
             #[must_use]
             pub fn avg_price_ticks(&self) -> i64 {
                 self.0.reborrow().avg_price_ticks
+            }
+            /// Average execution price across the lineage through this generation, in
+            /// quote units scaled by 1e18: the exact executed quote amount divided by
+            /// cum_qty_scaled, rounded half to even at the 18th decimal. Unset if no
+            /// fills.
+            ///
+            /// Field 36: `avg_price_e18`
+            #[must_use]
+            pub fn avg_price_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().avg_price_e18
+            }
+            /// Exact quote amount of the fills across the lineage through this
+            /// generation, before fees: the sum over the fills of their quantity,
+            /// scaled as cum_qty_scaled, times their price in quote units scaled by
+            /// 1e9. It is in quote units scaled by 10^(9 + base_quantity_scale), with
+            /// the pair's base_quantity_scale from GetSpotConfig for symbol_id; REST
+            /// shows it in quote units. avg_price_e18 is this amount over
+            /// cum_qty_scaled. Unset if no fills. A fill settles its quote rounded down
+            /// to 18 decimal places, which is this amount exactly unless
+            /// base_quantity_scale is above 9.
+            ///
+            /// For a BUY sized by a quote amount (submitted_max_quote_debit_scaled),
+            /// the quote the order used is this amount plus fee_total's amount_e18
+            /// when fee_asset is QUOTE, or minus it when fee_total's is_rebate is true,
+            /// since a rebate is credited; it is this amount alone when fee_asset is
+            /// BASE, whose fee is taken from the base received. What it left unspent is
+            /// submitted_max_quote_debit_scaled less the quote it used.
+            ///
+            /// Field 37: `cum_notional`
+            #[must_use]
+            pub fn cum_notional(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().cum_notional
+            }
+            /// Total fee of the fills across the lineage through this generation, net
+            /// of rebates, in the order's fee asset. Order history reads and
+            /// single-order reads that include execution history (the default) carry
+            /// it. It can trail the order's fills: its quantity shows which fills it
+            /// covers. Open-order reads, single-order reads without execution history
+            /// and private stream order updates leave it unset.
+            ///
+            /// Field 38: `fee_total`
+            #[must_use]
+            pub fn fee_total(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OrderFeeTotalView<'_>,
+            > {
+                &self.0.reborrow().fee_total
             }
             /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
             ///
@@ -56542,6 +57567,7 @@ pub mod __buffa {
         reg.register_json_any(super::__ATTACHED_RISK_TRAILING_STOP_JSON_ANY);
         reg.register_json_any(super::__ATTACHED_RISK_JSON_ANY);
         reg.register_json_any(super::__ORDER_LINEAGE_JSON_ANY);
+        reg.register_json_any(super::__ORDER_FEE_TOTAL_JSON_ANY);
         reg.register_json_any(super::__ORDER_JSON_ANY);
         reg.register_json_any(super::__USER_TRADE_JSON_ANY);
         reg.register_json_any(super::__USER_TRADE_BATCH_JSON_ANY);
@@ -56755,6 +57781,10 @@ pub use self::__buffa::view::AttachedRiskOwnedView;
 pub use self::__buffa::view::OrderLineageView;
 #[doc(inline)]
 pub use self::__buffa::view::OrderLineageOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::OrderFeeTotalView;
+#[doc(inline)]
+pub use self::__buffa::view::OrderFeeTotalOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::OrderView;
 #[doc(inline)]

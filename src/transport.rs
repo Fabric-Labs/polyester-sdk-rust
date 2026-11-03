@@ -284,12 +284,12 @@ fn classify_failed_response(
         if code.parse::<ErrorCode>().is_ok() {
             return None;
         }
-        if code == crate::errors::auth_codes::SUBACCOUNT_OWNER_ROLE_LOCKED {
+        if let Some((connect_code, auth_code)) = rest_auth_problem(&code) {
             let message = parsed
                 .and_then(|body| body.detail.or(body.title))
                 .filter(|message| !message.is_empty())
                 .unwrap_or_else(|| code.clone());
-            return Some(owner_role_locked(status, message));
+            return Some(auth_problem(status, connect_code, auth_code, message));
         }
         if let Some(err) = gateway_rejection(status, code) {
             return Some(err);
@@ -337,17 +337,41 @@ fn gateway_rejection(status: StatusCode, code: String) -> Option<ConnectError> {
     ))
 }
 
-/// The Connect error ConnectRPC answers for a sub-account owner role lock
-/// (`failed_precondition` with an `auth.v1.AuthErrorDetail`), built from the
-/// REST problem body (HTTP 412) so both shapes map to the same SDK error.
-fn owner_role_locked(status: StatusCode, message: String) -> ConnectError {
-    use crate::proto::auth::v1::{AuthErrorCode, AuthErrorDetail};
+/// REST problem codes that ConnectRPC answers with an `auth.v1.AuthErrorDetail`,
+/// with the Connect code it uses: a sub-account owner role lock (HTTP 412,
+/// `failed_precondition`) and an API key on a session-only method (HTTP 403,
+/// `permission_denied`).
+fn rest_auth_problem(code: &str) -> Option<(ErrorCode, crate::proto::auth::v1::AuthErrorCode)> {
+    use crate::errors::auth_codes;
+    use crate::proto::auth::v1::AuthErrorCode;
+    match code {
+        auth_codes::SUBACCOUNT_OWNER_ROLE_LOCKED => Some((
+            ErrorCode::FailedPrecondition,
+            AuthErrorCode::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED,
+        )),
+        auth_codes::SESSION_KIND_NOT_ALLOWED => Some((
+            ErrorCode::PermissionDenied,
+            AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED,
+        )),
+        _ => None,
+    }
+}
+
+/// The Connect error ConnectRPC answers for `auth_code`, built from the REST
+/// problem body so both shapes map to the same SDK error.
+fn auth_problem(
+    status: StatusCode,
+    connect_code: ErrorCode,
+    auth_code: crate::proto::auth::v1::AuthErrorCode,
+    message: String,
+) -> ConnectError {
+    use crate::proto::auth::v1::AuthErrorDetail;
     let detail = AuthErrorDetail {
-        code: AuthErrorCode::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED.into(),
+        code: auth_code.into(),
         message: message.clone(),
         ..Default::default()
     };
-    ConnectError::new(ErrorCode::FailedPrecondition, message)
+    ConnectError::new(connect_code, message)
         .with_http_status(status)
         .with_detail(ErrorDetail::from_message(
             "auth.v1.AuthErrorDetail",

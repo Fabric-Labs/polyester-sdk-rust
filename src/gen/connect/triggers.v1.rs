@@ -441,7 +441,14 @@ pub trait TriggersService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Cancel a trigger.
+    /// Cancel a trigger: a standalone stop-loss, take-profit, trailing stop,
+    /// TWAP or ladder, or an order's attached leg. Canceling a TWAP or a ladder
+    /// also cancels its open child orders.
+    /// OrdersService.CancelAllOrders and the dead-man switch
+    /// (OrdersService.CancelAllAfter) cancel open orders only, never triggers:
+    /// after either, armed stops and running TWAPs can still place orders. To
+    /// stop them, cancel each live trigger with this method; ListTriggers lists
+    /// them.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

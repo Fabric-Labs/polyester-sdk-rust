@@ -6,8 +6,8 @@ use buffa::{Enumeration, Message};
 use connectrpc::{ConnectError, ErrorCode, ErrorDetail};
 use thiserror::Error;
 
-use crate::models::RateLimitDetail;
-use crate::proto::auth::v1::AuthErrorDetail;
+use crate::models::{OrderFieldViolation, RateLimitDetail};
+use crate::proto::auth::v1::{AuthErrorCode, AuthErrorDetail};
 use crate::proto::chain::withdraw::v1::{
     ErrorCode as WithdrawErrorCode, ErrorDetail as WithdrawErrorDetail,
 };
@@ -61,6 +61,11 @@ pub enum Error {
         message: String,
         code: String,
         metadata: Vec<(String, String)>,
+        /// The request fields to fix, from `orders.v1.ErrorDetail.violations`,
+        /// with ConnectRPC field paths such as `order.base_qty_scaled` or
+        /// `order.attached_risk.trailing_stop.limit_price_ticks`. Empty when
+        /// the refusal names no field. Branch on `code`, then on `rule_id`.
+        violations: Vec<OrderFieldViolation>,
     },
     #[error(
         "RPC not exposed on this API host{procedure}. The procedure may be unimplemented on \
@@ -83,12 +88,23 @@ pub enum Error {
         "API-key request timestamp is outside the allowed skew window (HTTP {status}); check the local clock"
     )]
     TimestampSkew { status: u16 },
-    /// The API gateway rejected an API-key request before any service saw
-    /// it, for example `SIGNATURE_INVALID`, `KEY_DISABLED` or
-    /// `IP_NOT_ALLOWED`. Not retryable: fix the key, signature or allowlist.
-    /// [`Error::auth_error_code`] returns `code`.
+    /// An API-key request's credentials were refused, for example
+    /// `SIGNATURE_INVALID`, `KEY_DISABLED` or `IP_NOT_ALLOWED`: by the API
+    /// gateway before any service saw it, or by the service with an
+    /// `auth.v1.AuthErrorDetail` (`AUTH_SIGNATURE_INVALID`, ...). `code` is
+    /// the reason without the `AUTH_` prefix either way. Not retryable: fix
+    /// the key, signature or allowlist. [`Error::auth_error_code`] returns
+    /// `code`, [`Error::auth_code`] the typed reason.
     #[error("API-key request rejected (HTTP {status}, code {code})")]
     ApiKeyRejected { status: u16, code: String },
+    /// The method accepts only an interactive session token, and the request
+    /// carried an account API key (or a session token that carries one):
+    /// `AUTH_SESSION_KIND_NOT_ALLOWED`, HTTP 403. Every session-only method
+    /// answers it the same way, for example a wallet trading withdraw, the
+    /// auto-withdraw rule writes and the portfolio equity reads. Not
+    /// retryable: call the method with a session token.
+    #[error("{message}")]
+    SessionRequired { message: String },
     #[error("{0}")]
     Realtime(String),
     /// Realtime subscription queue was full; the subscription fails instead of
@@ -113,8 +129,47 @@ pub mod auth_codes {
     /// [`super::Error::is_subaccount_owner_role_locked`].
     pub const SUBACCOUNT_OWNER_ROLE_LOCKED: &str = "AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED";
     /// API-gateway rejection of an API-key request whose timestamp is outside
-    /// the allowed skew window; see [`super::Error::TimestampSkew`].
+    /// the allowed skew window; see [`super::Error::TimestampSkew`]. A
+    /// service answers the same reason as `AUTH_TIMESTAMP_SKEW`, which maps
+    /// to the same error.
     pub const TIMESTAMP_SKEW: &str = "TIMESTAMP_SKEW";
+    /// A request with no credentials, or with a missing, malformed or expired
+    /// session token. REST answers it as `UNAUTHENTICATED`.
+    pub const AUTHENTICATION_REQUIRED: &str = "AUTH_AUTHENTICATION_REQUIRED";
+    /// A session-only method called with an account API key; see
+    /// [`super::Error::SessionRequired`].
+    pub const SESSION_KIND_NOT_ALLOWED: &str = "AUTH_SESSION_KIND_NOT_ALLOWED";
+    /// The API key signature does not verify, or the key is unknown.
+    pub const SIGNATURE_INVALID: &str = "AUTH_SIGNATURE_INVALID";
+    /// The timestamp or signature header is missing.
+    pub const MISSING_HEADERS: &str = "AUTH_MISSING_HEADERS";
+    /// The API key has expired.
+    pub const KEY_EXPIRED: &str = "AUTH_KEY_EXPIRED";
+    /// The API key is disabled or revoked.
+    pub const KEY_DISABLED: &str = "AUTH_KEY_DISABLED";
+    /// The key's IP allowlist does not include the request's source address.
+    pub const IP_NOT_ALLOWED: &str = "AUTH_IP_NOT_ALLOWED";
+    /// The API does not accept API keys.
+    pub const API_KEY_NOT_ACCEPTED: &str = "AUTH_API_KEY_NOT_ACCEPTED";
+
+    /// The `auth.v1.AuthErrorCode` of a REST problem `code` or an API-gateway
+    /// rejection code: the code with the `AUTH_` prefix added
+    /// (`SIGNATURE_INVALID` reads `AUTH_SIGNATURE_INVALID`), a code that
+    /// already has it unchanged, and `UNAUTHENTICATED` as
+    /// `AUTH_AUTHENTICATION_REQUIRED`. `None` for a code that is no auth
+    /// reason this SDK version knows.
+    pub fn from_rest_code(code: &str) -> Option<crate::proto::auth::v1::AuthErrorCode> {
+        use crate::proto::auth::v1::AuthErrorCode;
+        use buffa::Enumeration;
+
+        let code = code.trim();
+        if code == "UNAUTHENTICATED" {
+            return Some(AuthErrorCode::AUTH_AUTHENTICATION_REQUIRED);
+        }
+        AuthErrorCode::from_proto_name(code)
+            .or_else(|| AuthErrorCode::from_proto_name(&format!("AUTH_{code}")))
+            .filter(|value| value.to_i32() != 0)
+    }
 }
 
 /// Stable orders.v1.ErrorDetail codes used for retry control flow.
@@ -134,6 +189,13 @@ pub mod order_codes {
     /// short time while its balances are brought back in line. Nothing
     /// changed; send the same request again shortly.
     pub const ACCOUNT_REPAIRING: &str = "ERROR_CODE_ACCOUNT_REPAIRING";
+    /// The order has already ended; see
+    /// [`super::Error::is_order_already_terminal`].
+    pub const ORDER_ALREADY_TERMINAL: &str = "ERROR_CODE_ORDER_ALREADY_TERMINAL";
+    /// The order is unknown, or a cancel named another market than the
+    /// order's. A cancel by client order ID more than a minute after the
+    /// order ended can answer this once the ID no longer names the order.
+    pub const ORDER_UNKNOWN: &str = "ERROR_CODE_ORDER_UNKNOWN";
 
     /// A mutation that was sent but not confirmed in time; it may still
     /// apply. The server returns these as Connect `deadline_exceeded` with
@@ -174,6 +236,18 @@ pub mod order_codes {
         })
     }
 }
+
+/// API-key credential refusals a service answers with an
+/// `auth.v1.AuthErrorDetail`. They map to [`Error::ApiKeyRejected`], as the
+/// API gateway's answers for the same reasons do.
+const API_KEY_REJECTIONS: [AuthErrorCode; 6] = [
+    AuthErrorCode::AUTH_SIGNATURE_INVALID,
+    AuthErrorCode::AUTH_MISSING_HEADERS,
+    AuthErrorCode::AUTH_KEY_EXPIRED,
+    AuthErrorCode::AUTH_KEY_DISABLED,
+    AuthErrorCode::AUTH_IP_NOT_ALLOWED,
+    AuthErrorCode::AUTH_API_KEY_NOT_ACCEPTED,
+];
 
 /// [`Error::Api`] metadata key holding [`Error::existing_order_id`].
 const EXISTING_ORDER_ID_METADATA: &str = "existing_order_id";
@@ -280,14 +354,61 @@ impl Error {
     }
 
     /// Structured error code: the auth.v1.AuthErrorDetail (or other service)
-    /// code of an [`Error::Api`], or the API-gateway code of an
-    /// [`Error::ApiKeyRejected`] or [`Error::TimestampSkew`].
+    /// code of an [`Error::Api`], the code of an [`Error::ApiKeyRejected`],
+    /// `TIMESTAMP_SKEW` for [`Error::TimestampSkew`] and
+    /// `AUTH_SESSION_KIND_NOT_ALLOWED` for [`Error::SessionRequired`].
     pub fn auth_error_code(&self) -> Option<&str> {
         match self {
             Self::Api { code, .. } | Self::ApiKeyRejected { code, .. } => Some(code.as_str()),
             Self::TimestampSkew { .. } => Some(auth_codes::TIMESTAMP_SKEW),
+            Self::SessionRequired { .. } => Some(auth_codes::SESSION_KIND_NOT_ALLOWED),
             _ => None,
         }
+    }
+
+    /// Why the request's credentials or session were refused, as an
+    /// `auth.v1.AuthErrorCode`, whichever transport answered: ConnectRPC's
+    /// `auth.v1.AuthErrorDetail`, or a REST problem or API-gateway `code`
+    /// read as [`auth_codes::from_rest_code`] does. For example
+    /// `AUTH_TIMESTAMP_SKEW` (retryable, see [`Self::TimestampSkew`]),
+    /// `AUTH_SIGNATURE_INVALID`, `AUTH_IP_NOT_ALLOWED` or
+    /// `AUTH_SESSION_KIND_NOT_ALLOWED`.
+    ///
+    /// `None` for an error that carries no auth reason, and for a reason
+    /// this SDK version does not know: [`Self::auth_error_code`] still
+    /// returns its raw code.
+    pub fn auth_code(&self) -> Option<AuthErrorCode> {
+        match self {
+            Self::Api { code, .. } => AuthErrorCode::from_proto_name(code),
+            Self::ApiKeyRejected { code, .. } => auth_codes::from_rest_code(code),
+            Self::TimestampSkew { .. } => Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW),
+            Self::SessionRequired { .. } => Some(AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED),
+            _ => None,
+        }
+    }
+
+    /// True for [`Self::SessionRequired`]: a session-only method was called
+    /// with an account API key.
+    pub fn is_session_required(&self) -> bool {
+        matches!(self, Self::SessionRequired { .. })
+    }
+
+    /// The request fields an [`Error::Api`] names to fix; empty for every
+    /// other error.
+    pub fn violations(&self) -> &[OrderFieldViolation] {
+        match self {
+            Self::Api { violations, .. } => violations,
+            _ => &[],
+        }
+    }
+
+    /// True when an order cancel (or change) was refused because the order
+    /// has already ended (`ERROR_CODE_ORDER_ALREADY_TERMINAL`): filled,
+    /// expired or canceled, by an earlier cancel or otherwise. A repeated
+    /// cancel of an order it ended answers this too. Treat it as "already
+    /// done" and read the order for how it ended.
+    pub fn is_order_already_terminal(&self) -> bool {
+        self.auth_error_code() == Some(order_codes::ORDER_ALREADY_TERMINAL)
     }
 
     /// True for [`Self::NotImplemented`] and its narrower case
@@ -493,6 +614,27 @@ pub fn map_connect_error(err: ConnectError) -> Error {
     }
     for detail in &err.details {
         if let Some(auth_detail) = decode_auth_error_detail(detail) {
+            match auth_detail.code.as_known() {
+                Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW) => {
+                    return Error::TimestampSkew { status };
+                }
+                Some(AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED) => {
+                    return Error::SessionRequired {
+                        message: if auth_detail.message.is_empty() {
+                            fallback_message
+                        } else {
+                            auth_detail.message
+                        },
+                    };
+                }
+                Some(known) if API_KEY_REJECTIONS.contains(&known) => {
+                    return Error::ApiKeyRejected {
+                        status,
+                        code: known.proto_name().trim_start_matches("AUTH_").to_owned(),
+                    };
+                }
+                _ => {}
+            }
             let code = known_or_unknown_code(
                 auth_detail.code.as_known().map(|c| c.proto_name()),
                 auth_detail.code.to_i32(),
@@ -506,6 +648,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
                 message,
                 code,
                 metadata: Vec::new(),
+                violations: Vec::new(),
             };
         }
         if let Some(rl) = decode_rate_limit_detail(detail) {
@@ -545,10 +688,20 @@ pub fn map_connect_error(err: ConnectError) -> Error {
                     )]
                 })
                 .unwrap_or_default();
+            let violations = order_detail
+                .violations
+                .iter()
+                .map(|v| OrderFieldViolation {
+                    field_path: v.field_path.clone(),
+                    rule_id: v.rule_id.clone(),
+                    message: v.message.clone(),
+                })
+                .collect();
             return Error::Api {
                 message: fallback_message.clone(),
                 code,
                 metadata,
+                violations,
             };
         }
         if let Some(withdraw_detail) = decode_withdraw_error_detail(detail) {
@@ -569,6 +722,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
                 message: fallback_message.clone(),
                 code,
                 metadata: Vec::new(),
+                violations: Vec::new(),
             };
         }
         if let Some(transfer_detail) = decode_transfer_error_detail(detail) {
@@ -589,6 +743,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
                 message: fallback_message.clone(),
                 code,
                 metadata: Vec::new(),
+                violations: Vec::new(),
             };
         }
     }
@@ -607,6 +762,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
             message,
             code: format!("{code:?}"),
             metadata: Vec::new(),
+            violations: Vec::new(),
         },
     }
 }
@@ -1001,6 +1157,204 @@ mod tests {
         assert!(err.is_retryable() && !err.mutation_outcome_unknown());
     }
 
+    fn map_auth_with(connect_code: ErrorCode, code: AuthErrorCode, message: &str) -> Error {
+        let detail = AuthErrorDetail {
+            code: EnumValue::Known(code),
+            message: message.into(),
+            ..Default::default()
+        };
+        map_connect_error(ConnectError::new(connect_code, message).with_detail(
+            ErrorDetail::from_message("auth.v1.AuthErrorDetail", &detail),
+        ))
+    }
+
+    #[test]
+    fn connect_timestamp_skew_detail_is_the_retryable_skew_error() {
+        let err = map_auth_with(
+            ErrorCode::Unauthenticated,
+            AuthErrorCode::AUTH_TIMESTAMP_SKEW,
+            "API key timestamp is outside the allowed window",
+        );
+        assert!(
+            matches!(err, Error::TimestampSkew { status: 401 }),
+            "{err:?}"
+        );
+        assert!(err.is_retryable() && !err.mutation_outcome_unknown());
+        assert_eq!(err.auth_code(), Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW));
+        assert_eq!(err.auth_error_code(), Some(auth_codes::TIMESTAMP_SKEW));
+    }
+
+    #[test]
+    fn connect_api_key_refusals_map_like_the_gateway_answers() {
+        for (proto_code, rest_code) in [
+            (AuthErrorCode::AUTH_SIGNATURE_INVALID, "SIGNATURE_INVALID"),
+            (AuthErrorCode::AUTH_MISSING_HEADERS, "MISSING_HEADERS"),
+            (AuthErrorCode::AUTH_KEY_EXPIRED, "KEY_EXPIRED"),
+            (AuthErrorCode::AUTH_KEY_DISABLED, "KEY_DISABLED"),
+            (AuthErrorCode::AUTH_IP_NOT_ALLOWED, "IP_NOT_ALLOWED"),
+            (
+                AuthErrorCode::AUTH_API_KEY_NOT_ACCEPTED,
+                "API_KEY_NOT_ACCEPTED",
+            ),
+        ] {
+            let err = map_auth_with(ErrorCode::Unauthenticated, proto_code, "refused");
+            assert!(
+                matches!(&err, Error::ApiKeyRejected { status: 401, code } if code == rest_code),
+                "{err:?}"
+            );
+            assert_eq!(err.auth_code(), Some(proto_code));
+            assert!(!err.is_retryable(), "{rest_code} is not retryable");
+
+            // The gateway's REST code reads as the same typed reason.
+            let gateway = gateway_rejection_error(401, rest_code);
+            assert_eq!(gateway.auth_code(), Some(proto_code), "{rest_code}");
+            assert!(!gateway.is_retryable());
+        }
+        let skew = gateway_rejection_error(401, auth_codes::TIMESTAMP_SKEW);
+        assert_eq!(skew.auth_code(), Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW));
+    }
+
+    #[test]
+    fn rest_auth_codes_read_as_auth_error_codes() {
+        let read = auth_codes::from_rest_code;
+        assert_eq!(
+            read("SIGNATURE_INVALID"),
+            Some(AuthErrorCode::AUTH_SIGNATURE_INVALID)
+        );
+        assert_eq!(
+            read("AUTH_SESSION_KIND_NOT_ALLOWED"),
+            Some(AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED)
+        );
+        assert_eq!(
+            read("UNAUTHENTICATED"),
+            Some(AuthErrorCode::AUTH_AUTHENTICATION_REQUIRED)
+        );
+        assert_eq!(read("UNSPECIFIED"), None);
+        assert_eq!(read("SOME_FUTURE_REASON"), None);
+        assert_eq!(read(""), None);
+
+        let unauthenticated = gateway_rejection_error(401, "UNAUTHENTICATED");
+        assert_eq!(
+            unauthenticated.auth_code(),
+            Some(AuthErrorCode::AUTH_AUTHENTICATION_REQUIRED)
+        );
+        // An auth reason newer than this SDK keeps its raw code.
+        let detail = AuthErrorDetail {
+            code: EnumValue::Unknown(99),
+            ..Default::default()
+        };
+        let unknown = map_connect_error(ConnectError::unauthenticated("new reason").with_detail(
+            ErrorDetail::from_message("auth.v1.AuthErrorDetail", &detail),
+        ));
+        assert_eq!(unknown.auth_code(), None);
+        assert_eq!(unknown.auth_error_code(), Some("UNKNOWN_ERROR_CODE(99)"));
+        // Errors without an auth reason have none.
+        assert_eq!(Error::transport("down").auth_code(), None);
+        assert_eq!(
+            map_order(
+                OrderErrorCode::ERROR_CODE_BAD_PRICE,
+                ErrorCode::InvalidArgument
+            )
+            .auth_code(),
+            None
+        );
+    }
+
+    #[test]
+    fn session_kind_not_allowed_is_one_typed_session_required_error() {
+        let err = map_auth_with(
+            ErrorCode::PermissionDenied,
+            AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED,
+            "interactive session required",
+        );
+        match &err {
+            Error::SessionRequired { message } => {
+                assert_eq!(message, "interactive session required")
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+        assert!(err.is_session_required());
+        assert_eq!(
+            err.auth_code(),
+            Some(AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED)
+        );
+        assert_eq!(
+            err.auth_error_code(),
+            Some(auth_codes::SESSION_KIND_NOT_ALLOWED)
+        );
+        assert!(!err.is_retryable() && !err.mutation_outcome_unknown());
+        assert!(!map_auth(AuthErrorCode::AUTH_INVALID_REQUEST, "bad").is_session_required());
+    }
+
+    #[test]
+    fn withdraw_policy_refusal_message_reaches_the_caller() {
+        let detail = WithdrawErrorDetail {
+            code: EnumValue::Known(WithdrawErrorCode::PermissionDenied),
+            ..Default::default()
+        };
+        let err = map_connect_error(
+            ConnectError::permission_denied("api key policy does not allow READ_AUTO_WITHDRAW")
+                .with_detail(ErrorDetail::from_message(
+                    "chain.withdraw.v1.ErrorDetail",
+                    &detail,
+                )),
+        );
+        assert!(matches!(err, Error::Auth(_)), "{err:?}");
+        assert!(
+            err.to_string()
+                .contains("api key policy does not allow READ_AUTO_WITHDRAW"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn order_errors_carry_their_field_violations() {
+        use crate::proto::orders::v1::FieldViolation;
+        let detail = OrderErrorDetail {
+            code: EnumValue::Known(OrderErrorCode::ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT),
+            violations: vec![FieldViolation {
+                field_path: "order.attached_risk.trailing_stop.limit_price_ticks".into(),
+                rule_id: "buy_required".into(),
+                message: "limit_price_ticks is required when the parent order sells".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let err = map_connect_error(
+            ConnectError::new(ErrorCode::InvalidArgument, "trailing stop maximum required")
+                .with_detail(ErrorDetail::from_message("orders.v1.ErrorDetail", &detail)),
+        );
+        assert_eq!(
+            err.auth_error_code(),
+            Some("ERROR_CODE_TRIGGER_BUY_REQUIRES_LIMIT")
+        );
+        assert_eq!(
+            err.violations(),
+            [OrderFieldViolation {
+                field_path: "order.attached_risk.trailing_stop.limit_price_ticks".into(),
+                rule_id: "buy_required".into(),
+                message: "limit_price_ticks is required when the parent order sells".into(),
+            }]
+        );
+        assert!(Error::transport("down").violations().is_empty());
+    }
+
+    #[test]
+    fn cancel_of_an_ended_order_is_already_terminal() {
+        let ended = map_order(
+            OrderErrorCode::ERROR_CODE_ORDER_ALREADY_TERMINAL,
+            ErrorCode::FailedPrecondition,
+        );
+        assert!(ended.is_order_already_terminal());
+        assert!(!ended.is_retryable() && !ended.mutation_outcome_unknown());
+        let unknown = map_order(
+            OrderErrorCode::ERROR_CODE_ORDER_UNKNOWN,
+            ErrorCode::NotFound,
+        );
+        assert!(!unknown.is_order_already_terminal());
+        assert_eq!(unknown.auth_error_code(), Some(order_codes::ORDER_UNKNOWN));
+    }
+
     #[test]
     fn account_repairing_is_retryable_and_changed_nothing() {
         let repairing = map_order(
@@ -1176,6 +1530,7 @@ mod tests {
                 message: "step-up required".into(),
                 code: "permission_denied".into(),
                 metadata: Vec::new(),
+                violations: Vec::new(),
             }
             .is_step_up_required()
         );
@@ -1184,6 +1539,7 @@ mod tests {
                 message: "api key mfa".into(),
                 code: "AUTH_API_KEY_MFA_REQUIRED".into(),
                 metadata: Vec::new(),
+                violations: Vec::new(),
             }
             .is_mfa_enrollment_required()
         );

@@ -282,13 +282,23 @@ pub struct TriggerEvent {
     pub trigger_type: String,
     pub event_type: String,
     pub ts_ns: String,
+    /// The fire attempt the event names. A `fire_refused` event uses a
+    /// `child_seq` of its own; the next attempt takes the next one.
     pub child_seq: i32,
+    /// Child order the fire placed. Empty on `fire_refused`: no order was
+    /// placed.
     pub child_order_id: String,
     pub fire_price: Option<Price>,
     /// Proto `terminal_reason.cancel_reason`. Empty when unset or unspecified.
     pub cancel_reason: String,
     /// Proto `terminal_reason.failure_reason`. Empty when unset or unspecified.
     pub failure_reason: String,
+    /// Why the fire attempt of a `fire_refused` event was refused while the
+    /// trigger stayed live, as a failure reason label (`rate_limited`,
+    /// `account_repairing`, `market_halted`, `min_notional`, ...), or
+    /// `UNKNOWN_TRIGGER_FAILURE_REASON(<n>)` for a reason this SDK does not
+    /// know. Empty on every other event type.
+    pub fire_refusal_reason: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

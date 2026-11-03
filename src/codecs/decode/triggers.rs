@@ -549,6 +549,7 @@ fn trigger_event_type_label(value: buffa::EnumValue<TriggerEventType>) -> String
         Some(TriggerEventType::EventFailed) => "failed".to_owned(),
         Some(TriggerEventType::EventActivated) => "activated".to_owned(),
         Some(TriggerEventType::EventArmed) => "armed".to_owned(),
+        Some(TriggerEventType::EventFireRefused) => "fire_refused".to_owned(),
         Some(TriggerEventType::EventUnspecified) => String::new(),
         None => format!("UNKNOWN({})", value.to_i32()),
     }
@@ -574,8 +575,9 @@ pub fn trigger_event_type_from_label(label: &str) -> Result<TriggerEventType, St
         "failed" => Ok(TriggerEventType::EventFailed),
         "activated" => Ok(TriggerEventType::EventActivated),
         "armed" => Ok(TriggerEventType::EventArmed),
+        "fire_refused" => Ok(TriggerEventType::EventFireRefused),
         other => Err(format!(
-            "invalid trigger event type {other:?}; expected one of: fired, canceled, updated, failed, activated, armed"
+            "invalid trigger event type {other:?}; expected one of: fired, canceled, updated, failed, activated, armed, fire_refused"
         )),
     }
 }
@@ -605,6 +607,11 @@ pub fn trigger_event_from_proto(msg: &ProtoTriggerEvent) -> crate::errors::Resul
             .and_then(|ticks| decode_price_ticks(ticks, None)),
         cancel_reason,
         failure_reason,
+        fire_refusal_reason: msg
+            .fire_refusal_reason
+            .as_ref()
+            .map(|reason| enum_label(reason, "UNKNOWN_TRIGGER_FAILURE_REASON"))
+            .unwrap_or_default(),
     })
 }
 
@@ -1252,7 +1259,83 @@ mod tests {
             trigger_event_type_from_label("armed").unwrap(),
             TriggerEventType::EventArmed
         );
+        assert_eq!(
+            trigger_event_type_from_label("fire_refused").unwrap(),
+            TriggerEventType::EventFireRefused
+        );
         assert!(trigger_event_type_from_label("nope").is_err());
+    }
+
+    #[test]
+    fn trigger_event_decodes_a_refused_fire_and_its_reason() {
+        let event = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 6,
+            trigger_type: TriggerType::TakeProfit.into(),
+            event_type: TriggerEventType::EventFireRefused.into(),
+            child_seq: 1,
+            fire_price_ticks: Some(104_000_000_000),
+            fire_refusal_reason: Some(TriggerFailureReason::RateLimited.into()),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(event.event_type, "fire_refused");
+        assert_eq!(event.fire_refusal_reason, "rate_limited");
+        assert_eq!(event.child_seq, 1);
+        assert!(event.child_order_id.is_empty());
+        assert_eq!(event.fire_price.unwrap().format(), "104");
+        // A refused fire is not terminal: no terminal reason is set.
+        assert!(event.cancel_reason.is_empty() && event.failure_reason.is_empty());
+
+        for (reason, want) in [
+            (
+                TriggerFailureReason::AccountRepairing.into(),
+                "account_repairing".to_owned(),
+            ),
+            (
+                TriggerFailureReason::MarketHalted.into(),
+                "market_halted".to_owned(),
+            ),
+            (
+                TriggerFailureReason::MinNotional.into(),
+                "min_notional".to_owned(),
+            ),
+            (
+                buffa::EnumValue::Unknown(321),
+                "UNKNOWN_TRIGGER_FAILURE_REASON(321)".to_owned(),
+            ),
+        ] {
+            let event = trigger_event_from_proto(&ProtoTriggerEvent {
+                trigger_id: 6,
+                event_type: TriggerEventType::EventFireRefused.into(),
+                fire_refusal_reason: Some(reason),
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(event.fire_refusal_reason, want);
+        }
+
+        // Only a refused fire carries a refusal reason.
+        let fired = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 6,
+            event_type: TriggerEventType::EventFired.into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(fired.fire_refusal_reason.is_empty());
+    }
+
+    #[test]
+    fn account_repairing_is_a_named_trigger_failure_reason() {
+        let failed = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 7,
+            event_type: TriggerEventType::EventFailed.into(),
+            terminal_reason: Some(trigger_event::TerminalReason::FailureReason(
+                TriggerFailureReason::AccountRepairing.into(),
+            )),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(failed.failure_reason, "account_repairing");
     }
 
     #[test]

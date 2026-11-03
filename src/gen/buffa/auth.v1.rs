@@ -13325,7 +13325,8 @@ pub struct CreateSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
-    /// Exact EIP-191 authorization returned by CreateSubaccountChallenge.
+    /// Exact EIP-191 authorization returned by CreateSubaccountChallenge. Maximum
+    /// length is 4096 UTF-8 bytes.
     ///
     /// Field 3: `message`
     #[serde(
@@ -17646,7 +17647,8 @@ pub struct ActivityEvent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub actor_account_id: u64,
-    /// Structured event details as a JSON string. Maximum 64 KiB.
+    /// Structured event details as a JSON string. Maximum 64 KiB (65536 UTF-8
+    /// bytes).
     ///
     /// Field 9: `payload_json`
     #[serde(
@@ -19522,7 +19524,8 @@ pub struct ExternalWithdrawAddress {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub polychain_chain_id: u32,
-    /// Destination address on the selected external network.
+    /// Destination address on the selected external network: 1-256 characters,
+    /// without whitespace or angle brackets.
     ///
     /// Field 2: `address`
     #[serde(
@@ -21326,7 +21329,8 @@ pub struct ExternalAddressBookEntry {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub polychain_chain_id: u32,
-    /// Destination address on the selected external network.
+    /// Destination address on the selected external network: 1-256 characters,
+    /// without whitespace or angle brackets.
     ///
     /// Field 8: `address`
     #[serde(
@@ -23199,7 +23203,8 @@ pub struct ExternalRecentDestination {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub polychain_chain_id: u32,
-    /// Destination address on the selected external network.
+    /// Destination address on the selected external network: 1-256 characters,
+    /// without whitespace or angle brackets.
     ///
     /// Field 8: `address`
     #[serde(
@@ -36885,6 +36890,25 @@ pub enum AuthErrorCode {
     /// The account owns this sub-account. An owner cannot be invited to it, and member role
     /// changes and member removal do not apply to the owner.
     AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED = 47i32,
+    /// The API key request signature does not verify against the request, or the key is unknown.
+    /// The REST problem code is SIGNATURE_INVALID.
+    AUTH_SIGNATURE_INVALID = 48i32,
+    /// The API key request timestamp is malformed or too far from the server clock. Sync the
+    /// clock, then sign the request again. The REST problem code is TIMESTAMP_SKEW.
+    AUTH_TIMESTAMP_SKEW = 49i32,
+    /// The API key request lacks its timestamp or signature header. The REST problem code is
+    /// MISSING_HEADERS.
+    AUTH_MISSING_HEADERS = 50i32,
+    /// The API key has expired. The REST problem code is KEY_EXPIRED.
+    AUTH_KEY_EXPIRED = 51i32,
+    /// The API key is disabled or revoked. The REST problem code is KEY_DISABLED.
+    AUTH_KEY_DISABLED = 52i32,
+    /// The API key's IP allowlist does not include the request's source address. The REST
+    /// problem code is IP_NOT_ALLOWED.
+    AUTH_IP_NOT_ALLOWED = 53i32,
+    /// This API does not accept API keys; authenticate with a session token. The REST problem
+    /// code is API_KEY_NOT_ACCEPTED.
+    AUTH_API_KEY_NOT_ACCEPTED = 54i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -37028,6 +37052,27 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthSubaccountOwnerRoleLocked: Self = Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED;
+    ///Idiomatic alias for [`Self::AUTH_SIGNATURE_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthSignatureInvalid: Self = Self::AUTH_SIGNATURE_INVALID;
+    ///Idiomatic alias for [`Self::AUTH_TIMESTAMP_SKEW`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthTimestampSkew: Self = Self::AUTH_TIMESTAMP_SKEW;
+    ///Idiomatic alias for [`Self::AUTH_MISSING_HEADERS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthMissingHeaders: Self = Self::AUTH_MISSING_HEADERS;
+    ///Idiomatic alias for [`Self::AUTH_KEY_EXPIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthKeyExpired: Self = Self::AUTH_KEY_EXPIRED;
+    ///Idiomatic alias for [`Self::AUTH_KEY_DISABLED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthKeyDisabled: Self = Self::AUTH_KEY_DISABLED;
+    ///Idiomatic alias for [`Self::AUTH_IP_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthIpNotAllowed: Self = Self::AUTH_IP_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::AUTH_API_KEY_NOT_ACCEPTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthApiKeyNotAccepted: Self = Self::AUTH_API_KEY_NOT_ACCEPTED;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -37190,6 +37235,13 @@ impl ::buffa::Enumeration for AuthErrorCode {
             47i32 => {
                 ::core::option::Option::Some(Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED)
             }
+            48i32 => ::core::option::Option::Some(Self::AUTH_SIGNATURE_INVALID),
+            49i32 => ::core::option::Option::Some(Self::AUTH_TIMESTAMP_SKEW),
+            50i32 => ::core::option::Option::Some(Self::AUTH_MISSING_HEADERS),
+            51i32 => ::core::option::Option::Some(Self::AUTH_KEY_EXPIRED),
+            52i32 => ::core::option::Option::Some(Self::AUTH_KEY_DISABLED),
+            53i32 => ::core::option::Option::Some(Self::AUTH_IP_NOT_ALLOWED),
+            54i32 => ::core::option::Option::Some(Self::AUTH_API_KEY_NOT_ACCEPTED),
             _ => ::core::option::Option::None,
         }
     }
@@ -37261,6 +37313,13 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED => {
                 "AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED"
             }
+            Self::AUTH_SIGNATURE_INVALID => "AUTH_SIGNATURE_INVALID",
+            Self::AUTH_TIMESTAMP_SKEW => "AUTH_TIMESTAMP_SKEW",
+            Self::AUTH_MISSING_HEADERS => "AUTH_MISSING_HEADERS",
+            Self::AUTH_KEY_EXPIRED => "AUTH_KEY_EXPIRED",
+            Self::AUTH_KEY_DISABLED => "AUTH_KEY_DISABLED",
+            Self::AUTH_IP_NOT_ALLOWED => "AUTH_IP_NOT_ALLOWED",
+            Self::AUTH_API_KEY_NOT_ACCEPTED => "AUTH_API_KEY_NOT_ACCEPTED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -37406,6 +37465,23 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED" => {
                 ::core::option::Option::Some(Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED)
             }
+            "AUTH_SIGNATURE_INVALID" => {
+                ::core::option::Option::Some(Self::AUTH_SIGNATURE_INVALID)
+            }
+            "AUTH_TIMESTAMP_SKEW" => {
+                ::core::option::Option::Some(Self::AUTH_TIMESTAMP_SKEW)
+            }
+            "AUTH_MISSING_HEADERS" => {
+                ::core::option::Option::Some(Self::AUTH_MISSING_HEADERS)
+            }
+            "AUTH_KEY_EXPIRED" => ::core::option::Option::Some(Self::AUTH_KEY_EXPIRED),
+            "AUTH_KEY_DISABLED" => ::core::option::Option::Some(Self::AUTH_KEY_DISABLED),
+            "AUTH_IP_NOT_ALLOWED" => {
+                ::core::option::Option::Some(Self::AUTH_IP_NOT_ALLOWED)
+            }
+            "AUTH_API_KEY_NOT_ACCEPTED" => {
+                ::core::option::Option::Some(Self::AUTH_API_KEY_NOT_ACCEPTED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -37458,6 +37534,13 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED,
             Self::AUTH_TEMPORARILY_UNAVAILABLE,
             Self::AUTH_SUBACCOUNT_OWNER_ROLE_LOCKED,
+            Self::AUTH_SIGNATURE_INVALID,
+            Self::AUTH_TIMESTAMP_SKEW,
+            Self::AUTH_MISSING_HEADERS,
+            Self::AUTH_KEY_EXPIRED,
+            Self::AUTH_KEY_DISABLED,
+            Self::AUTH_IP_NOT_ALLOWED,
+            Self::AUTH_API_KEY_NOT_ACCEPTED,
         ]
     }
 }
@@ -64905,7 +64988,8 @@ pub mod __buffa {
             ///
             /// Field 2: `smart_account_address`
             pub smart_account_address: &'a str,
-            /// Exact EIP-191 authorization returned by CreateSubaccountChallenge.
+            /// Exact EIP-191 authorization returned by CreateSubaccountChallenge. Maximum
+            /// length is 4096 UTF-8 bytes.
             ///
             /// Field 3: `message`
             pub message: &'a str,
@@ -65272,7 +65356,8 @@ pub mod __buffa {
             pub fn smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().smart_account_address
             }
-            /// Exact EIP-191 authorization returned by CreateSubaccountChallenge.
+            /// Exact EIP-191 authorization returned by CreateSubaccountChallenge. Maximum
+            /// length is 4096 UTF-8 bytes.
             ///
             /// Field 3: `message`
             #[must_use]
@@ -73414,7 +73499,8 @@ pub mod __buffa {
             ///
             /// Field 8: `actor_account_id`
             pub actor_account_id: u64,
-            /// Structured event details as a JSON string. Maximum 64 KiB.
+            /// Structured event details as a JSON string. Maximum 64 KiB (65536 UTF-8
+            /// bytes).
             ///
             /// Field 9: `payload_json`
             pub payload_json: &'a str,
@@ -73897,7 +73983,8 @@ pub mod __buffa {
             pub fn actor_account_id(&self) -> u64 {
                 self.0.reborrow().actor_account_id
             }
-            /// Structured event details as a JSON string. Maximum 64 KiB.
+            /// Structured event details as a JSON string. Maximum 64 KiB (65536 UTF-8
+            /// bytes).
             ///
             /// Field 9: `payload_json`
             #[must_use]
@@ -75416,7 +75503,8 @@ pub mod __buffa {
             ///
             /// Field 1: `polychain_chain_id`
             pub polychain_chain_id: u32,
-            /// Destination address on the selected external network.
+            /// Destination address on the selected external network: 1-256 characters,
+            /// without whitespace or angle brackets.
             ///
             /// Field 2: `address`
             pub address: &'a str,
@@ -75680,7 +75768,8 @@ pub mod __buffa {
             pub fn polychain_chain_id(&self) -> u32 {
                 self.0.reborrow().polychain_chain_id
             }
-            /// Destination address on the selected external network.
+            /// Destination address on the selected external network: 1-256 characters,
+            /// without whitespace or angle brackets.
             ///
             /// Field 2: `address`
             #[must_use]
@@ -78299,7 +78388,8 @@ pub mod __buffa {
             ///
             /// Field 7: `polychain_chain_id`
             pub polychain_chain_id: u32,
-            /// Destination address on the selected external network.
+            /// Destination address on the selected external network: 1-256 characters,
+            /// without whitespace or angle brackets.
             ///
             /// Field 8: `address`
             pub address: &'a str,
@@ -78957,7 +79047,8 @@ pub mod __buffa {
             pub fn polychain_chain_id(&self) -> u32 {
                 self.0.reborrow().polychain_chain_id
             }
-            /// Destination address on the selected external network.
+            /// Destination address on the selected external network: 1-256 characters,
+            /// without whitespace or angle brackets.
             ///
             /// Field 8: `address`
             #[must_use]
@@ -81182,7 +81273,8 @@ pub mod __buffa {
             ///
             /// Field 7: `polychain_chain_id`
             pub polychain_chain_id: u32,
-            /// Destination address on the selected external network.
+            /// Destination address on the selected external network: 1-256 characters,
+            /// without whitespace or angle brackets.
             ///
             /// Field 8: `address`
             pub address: &'a str,
@@ -81709,7 +81801,8 @@ pub mod __buffa {
             pub fn polychain_chain_id(&self) -> u32 {
                 self.0.reborrow().polychain_chain_id
             }
-            /// Destination address on the selected external network.
+            /// Destination address on the selected external network: 1-256 characters,
+            /// without whitespace or angle brackets.
             ///
             /// Field 8: `address`
             #[must_use]

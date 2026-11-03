@@ -194,17 +194,21 @@ pub enum TriggerStatus {
     /// Trigger is actively executing (for example, TWAP slices in progress).
     STATUS_RUNNING = 3i32,
     /// Trigger completed. A ladder completes once none of its child orders
-    /// remains open and at least one of them was placed on the book, however
-    /// each placed child order then ended: filled, canceled, or canceled by
-    /// self-trade prevention. Some of its child orders may have been rejected.
-    /// Completed does not mean the ladder filled: its executed quantity and
-    /// executed levels state what filled, and each child order's own status
-    /// states how it ended.
+    /// remains open and at least one of them was placed on the book, unless it
+    /// ends canceled (see STATUS_CANCELED). A ladder that filled any quantity
+    /// completes however its other child orders ended. Some of its child orders
+    /// may have been rejected. Completed does not mean the ladder filled: its
+    /// executed quantity and executed levels state what filled, and each child
+    /// order's own status states how it ended.
     STATUS_COMPLETED = 4i32,
     /// Trigger was canceled. The cancel reason states why, for example a user
     /// request or another attached leg's exit closing its parent's position. A
-    /// ladder is canceled only when the ladder itself is canceled; canceling
-    /// its child orders does not cancel it.
+    /// ladder is canceled when the ladder itself is canceled. A ladder whose
+    /// child orders were canceled with none filled, for example one by one, with
+    /// a cancel-all or by the dead man's switch, is canceled too, with a user
+    /// request reason, once none of them remains open. A ladder whose child
+    /// orders were canceled only by self-trade prevention, with none filled,
+    /// completes instead.
     STATUS_CANCELED = 5i32,
     /// Trigger failed (for example, reservation failure, child order rejection).
     /// A ladder fails when every child order was rejected before it was placed
@@ -411,6 +415,16 @@ pub enum TriggerEventType {
     /// it. An attached trailing stop still reports EVENT_ACTIVATED when it
     /// starts tracking.
     EVENT_ARMED = 6i32,
+    /// A fire of the trigger was refused and the trigger stayed live: an
+    /// attached take-profit, stop-loss or trailing stop waits for the next price
+    /// through its trigger price, or, refused because its order would be below
+    /// the market's minimums, waits until its position changes; a trigger
+    /// refused for a rate limit or an account repair fires again shortly. Not
+    /// terminal: the trigger keeps its
+    /// status. child_seq names the refused attempt, which placed no child order,
+    /// and fire_refusal_reason says why; the next fire takes the next child_seq.
+    /// A refusal that ends the trigger is EVENT_FAILED instead.
+    EVENT_FIRE_REFUSED = 7i32,
 }
 impl TriggerEventType {
     ///Idiomatic alias for [`Self::EVENT_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -434,6 +448,9 @@ impl TriggerEventType {
     ///Idiomatic alias for [`Self::EVENT_ARMED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const EventArmed: Self = Self::EVENT_ARMED;
+    ///Idiomatic alias for [`Self::EVENT_FIRE_REFUSED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const EventFireRefused: Self = Self::EVENT_FIRE_REFUSED;
 }
 impl ::core::default::Default for TriggerEventType {
     fn default() -> Self {
@@ -538,6 +555,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             4i32 => ::core::option::Option::Some(Self::EVENT_FAILED),
             5i32 => ::core::option::Option::Some(Self::EVENT_ACTIVATED),
             6i32 => ::core::option::Option::Some(Self::EVENT_ARMED),
+            7i32 => ::core::option::Option::Some(Self::EVENT_FIRE_REFUSED),
             _ => ::core::option::Option::None,
         }
     }
@@ -553,6 +571,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             Self::EVENT_FAILED => "EVENT_FAILED",
             Self::EVENT_ACTIVATED => "EVENT_ACTIVATED",
             Self::EVENT_ARMED => "EVENT_ARMED",
+            Self::EVENT_FIRE_REFUSED => "EVENT_FIRE_REFUSED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -564,6 +583,9 @@ impl ::buffa::Enumeration for TriggerEventType {
             "EVENT_FAILED" => ::core::option::Option::Some(Self::EVENT_FAILED),
             "EVENT_ACTIVATED" => ::core::option::Option::Some(Self::EVENT_ACTIVATED),
             "EVENT_ARMED" => ::core::option::Option::Some(Self::EVENT_ARMED),
+            "EVENT_FIRE_REFUSED" => {
+                ::core::option::Option::Some(Self::EVENT_FIRE_REFUSED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -576,6 +598,7 @@ impl ::buffa::Enumeration for TriggerEventType {
             Self::EVENT_FAILED,
             Self::EVENT_ACTIVATED,
             Self::EVENT_ARMED,
+            Self::EVENT_FIRE_REFUSED,
         ]
     }
 }
@@ -585,7 +608,10 @@ impl ::buffa::Enumeration for TriggerEventType {
 pub enum TriggerCancelReason {
     /// No cancellation reason was provided.
     TRIGGER_CANCEL_REASON_UNSPECIFIED = 0i32,
-    /// The user explicitly canceled the trigger.
+    /// The user explicitly canceled the trigger, or canceled an order that
+    /// ended it, alone, with a cancel-all or by the dead-man switch: an
+    /// attached leg's working exit (with oco set, the parent's other legs end
+    /// with it), or a level of a ladder that ended with nothing filled.
     TRIGGER_CANCEL_REASON_USER_REQUEST = 1i32,
     /// An attached leg ended because its parent order is terminal and another of
     /// the parent's legs made the last exit, leaving no position to protect.
@@ -1124,6 +1150,9 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT = 235i32,
     /// The market's order limits weren't set yet when the trigger fired.
     TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE = 238i32,
+    /// The account was under an automatic repair, so the fire was retried
+    /// shortly instead of placing its child order.
+    TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING = 239i32,
     /// The trigger watches the index price and the market has no index price.
     TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE = 241i32,
     /// The trigger price was already reached by the price the trigger watches
@@ -1411,6 +1440,9 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const OrderLimitsUnavailable: Self = Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AccountRepairing: Self = Self::TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const IndexPriceUnavailable: Self = Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE;
@@ -1930,6 +1962,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
                 )
             }
+            239i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING,
+                )
+            }
             241i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE,
@@ -2224,6 +2261,9 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             }
             Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE => {
                 "TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE"
+            }
+            Self::TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING => {
+                "TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING"
             }
             Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE => {
                 "TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE"
@@ -2656,6 +2696,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
                 )
             }
+            "TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING,
+                )
+            }
             "TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE,
@@ -2770,6 +2815,7 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_TWAP_CAPACITY_REACHED,
             Self::TRIGGER_FAILURE_REASON_CHILD_ORDER_INCONSISTENT,
             Self::TRIGGER_FAILURE_REASON_ORDER_LIMITS_UNAVAILABLE,
+            Self::TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING,
             Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE,
             Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -8204,6 +8250,19 @@ pub struct TriggerEvent {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub fire_price_ticks: ::core::option::Option<i64>,
+    /// Why the attempt named by child_seq was refused while the trigger stayed
+    /// live. Set only on EVENT_FIRE_REFUSED; other event types leave it unset.
+    ///
+    /// Field 22: `fire_refusal_reason`
+    #[serde(
+        rename = "fireRefusalReason",
+        alias = "fire_refusal_reason",
+        with = "::buffa::json_helpers::opt_enum",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub fire_refusal_reason: ::core::option::Option<
+        ::buffa::EnumValue<TriggerFailureReason>,
+    >,
     #[serde(flatten)]
     pub terminal_reason: ::core::option::Option<
         __buffa::oneof::trigger_event::TerminalReason,
@@ -8224,6 +8283,7 @@ impl ::core::fmt::Debug for TriggerEvent {
             .field("child_seq", &self.child_seq)
             .field("child_order_id", &self.child_order_id)
             .field("fire_price_ticks", &self.fire_price_ticks)
+            .field("fire_refusal_reason", &self.fire_refusal_reason)
             .field("terminal_reason", &self.terminal_reason)
             .finish()
     }
@@ -8241,6 +8301,16 @@ impl TriggerEvent {
     ///Sets [`Self::fire_price_ticks`] to `Some(value)`, consuming and returning `self`.
     pub fn with_fire_price_ticks(mut self, value: i64) -> Self {
         self.fire_price_ticks = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::fire_refusal_reason`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_fire_refusal_reason(
+        mut self,
+        value: impl Into<::buffa::EnumValue<TriggerFailureReason>>,
+    ) -> Self {
+        self.fire_refusal_reason = Some(value.into());
         self
     }
 }
@@ -8305,6 +8375,9 @@ impl ::buffa::Message for TriggerEvent {
                 }
             }
         }
+        if let Some(ref v) = self.fire_refusal_reason {
+            size += 2u32 + ::buffa::types::int32_encoded_len(v.to_i32()) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8357,6 +8430,9 @@ impl ::buffa::Message for TriggerEvent {
                     ::buffa::types::put_int32_field(21u32, x.to_i32(), buf);
                 }
             }
+        }
+        if let Some(ref v) = self.fire_refusal_reason {
+            ::buffa::types::put_int32_field(22u32, v.to_i32(), buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8462,6 +8538,15 @@ impl ::buffa::Message for TriggerEvent {
                     ),
                 );
             }
+            22u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fire_refusal_reason = ::core::option::Option::Some(
+                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8480,6 +8565,7 @@ impl ::buffa::Message for TriggerEvent {
         self.child_order_id = 0u64;
         self.fire_price_ticks = ::core::option::Option::None;
         self.terminal_reason = ::core::option::Option::None;
+        self.fire_refusal_reason = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8521,6 +8607,9 @@ impl<'de> serde::Deserialize<'de> for TriggerEvent {
                 let mut __f_child_order_id: ::core::option::Option<u64> = None;
                 let mut __f_fire_price_ticks: ::core::option::Option<
                     ::core::option::Option<i64>,
+                > = None;
+                let mut __f_fire_refusal_reason: ::core::option::Option<
+                    ::core::option::Option<::buffa::EnumValue<TriggerFailureReason>>,
                 > = None;
                 let mut __oneof_terminal_reason: ::core::option::Option<
                     __buffa::oneof::trigger_event::TerminalReason,
@@ -8671,6 +8760,28 @@ impl<'de> serde::Deserialize<'de> for TriggerEvent {
                                 map.next_value_seed(_S)?
                             });
                         }
+                        "fireRefusalReason" | "fire_refusal_reason" => {
+                            __f_fire_refusal_reason = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<
+                                        ::buffa::EnumValue<TriggerFailureReason>,
+                                    >;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<
+                                            ::buffa::EnumValue<TriggerFailureReason>,
+                                        >,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
                         "cancelReason" | "cancel_reason" => {
                             let v: ::core::option::Option<
                                 ::buffa::EnumValue<TriggerCancelReason>,
@@ -8755,6 +8866,9 @@ impl<'de> serde::Deserialize<'de> for TriggerEvent {
                 }
                 if let ::core::option::Option::Some(v) = __f_fire_price_ticks {
                     __r.fire_price_ticks = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_fire_refusal_reason {
+                    __r.fire_refusal_reason = v;
                 }
                 __r.terminal_reason = __oneof_terminal_reason;
                 Ok(__r)
@@ -21802,6 +21916,13 @@ pub mod __buffa {
             ///
             /// Field 13: `fire_price_ticks`
             pub fire_price_ticks: ::core::option::Option<i64>,
+            /// Why the attempt named by child_seq was refused while the trigger stayed
+            /// live. Set only on EVENT_FIRE_REFUSED; other event types leave it unset.
+            ///
+            /// Field 22: `fire_refusal_reason`
+            pub fire_refusal_reason: ::core::option::Option<
+                ::buffa::EnumValue<super::super::TriggerFailureReason>,
+            >,
             pub terminal_reason: ::core::option::Option<
                 super::super::__buffa::view::oneof::trigger_event::TerminalReason,
             >,
@@ -21907,6 +22028,17 @@ pub mod __buffa {
                             ::buffa::types::decode_int64(&mut cur)?,
                         );
                     }
+                    22u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fire_refusal_reason = Some(
+                            ::buffa::EnumValue::from(
+                                ::buffa::types::decode_int32(&mut cur)?,
+                            ),
+                        );
+                    }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -21971,6 +22103,7 @@ pub mod __buffa {
                     child_seq: self.child_seq,
                     child_order_id: self.child_order_id,
                     fire_price_ticks: self.fire_price_ticks,
+                    fire_refusal_reason: self.fire_refusal_reason,
                     terminal_reason: self
                         .terminal_reason
                         .as_ref()
@@ -22059,6 +22192,9 @@ pub mod __buffa {
                         }
                     }
                 }
+                if let Some(ref v) = self.fire_refusal_reason {
+                    size += 2u32 + ::buffa::types::int32_encoded_len(v.to_i32()) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -22116,6 +22252,9 @@ pub mod __buffa {
                             ::buffa::types::put_int32_field(21u32, x.to_i32(), buf);
                         }
                     }
+                }
+                if let Some(ref v) = self.fire_refusal_reason {
+                    ::buffa::types::put_int32_field(22u32, v.to_i32(), buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -22196,6 +22335,9 @@ pub mod __buffa {
                             "firePriceTicks",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
+                }
+                if let ::core::option::Option::Some(ref __v) = self.fire_refusal_reason {
+                    __map.serialize_entry("fireRefusalReason", __v)?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.terminal_reason {
                     match __ov {
@@ -22373,6 +22515,18 @@ pub mod __buffa {
             #[must_use]
             pub fn fire_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().fire_price_ticks
+            }
+            /// Why the attempt named by child_seq was refused while the trigger stayed
+            /// live. Set only on EVENT_FIRE_REFUSED; other event types leave it unset.
+            ///
+            /// Field 22: `fire_refusal_reason`
+            #[must_use]
+            pub fn fire_refusal_reason(
+                &self,
+            ) -> ::core::option::Option<
+                ::buffa::EnumValue<super::super::TriggerFailureReason>,
+            > {
+                self.0.reborrow().fire_refusal_reason
             }
             /// Oneof `terminal_reason`.
             #[must_use]
