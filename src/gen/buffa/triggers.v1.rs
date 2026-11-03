@@ -419,11 +419,18 @@ pub enum TriggerEventType {
     /// attached take-profit, stop-loss or trailing stop waits for the next price
     /// through its trigger price, or, refused because its order would be below
     /// the market's minimums, waits until its position changes; a trigger
-    /// refused for a rate limit or an account repair fires again shortly. Not
+    /// refused for a rate limit or an account repair fires again shortly. An
+    /// attached take-profit, stop-loss or trailing stop whose order self-trade
+    /// prevention expired against another of the account's resting orders stays
+    /// live too (TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED), reported once
+    /// while that order blocks it; it fires again at a new trade at or beyond its
+    /// trigger price, or once the other order is no longer at the best price. Not
     /// terminal: the trigger keeps its
     /// status. child_seq names the refused attempt, which placed no child order,
     /// and fire_refusal_reason says why; the next fire takes the next child_seq.
-    /// A refusal that ends the trigger is EVENT_FAILED instead.
+    /// With TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED, child_seq names the
+    /// expired child order instead, which was placed and canceled by self-trade
+    /// prevention. A refusal that ends the trigger is EVENT_FAILED instead.
     EVENT_FIRE_REFUSED = 7i32,
 }
 impl TriggerEventType {
@@ -1161,6 +1168,13 @@ pub enum TriggerFailureReason {
     /// released. A price that reaches the trigger price after submission fires
     /// the trigger normally.
     TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY = 244i32,
+    /// Self-trade prevention expired the order of an attached take-profit,
+    /// stop-loss or trailing stop because it would have traded with another of
+    /// the account's resting orders. Reported only as a fire refusal reason
+    /// (EVENT_FIRE_REFUSED): the attached order stays active and fires again at a
+    /// new trade at or beyond its trigger price, or once the other order is no
+    /// longer at the best price.
+    TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED = 249i32,
     /// The terminal state did not contain a failure reason.
     TRIGGER_FAILURE_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure caused the trigger to fail.
@@ -1449,6 +1463,9 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TriggerWouldTriggerImmediately: Self = Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SelfTradePrevented: Self = Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE;
@@ -1977,6 +1994,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
                 )
             }
+            249i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED,
+                )
+            }
             998i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -2270,6 +2292,9 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             }
             Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY => {
                 "TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY"
+            }
+            Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED => {
+                "TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED"
             }
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE"
@@ -2711,6 +2736,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
                 )
             }
+            "TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED,
+                )
+            }
             "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -2818,6 +2848,7 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING,
             Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE,
             Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
+            Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED,
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR,
         ]
