@@ -204,7 +204,10 @@ pub const AUTO_WITHDRAW_SERVICE_LIST_AUTO_WITHDRAW_RUNS_SPEC: ::connectrpc::Spec
 /// withdraw path, only to destinations on the account's external withdraw
 /// whitelist. Changing a
 /// rule requires a person with withdraw rights and a fresh single-use MFA
-/// step-up; API keys can read rules and runs but never change them.
+/// step-up; API keys can read rules and runs but never change them. An API
+/// key reads only when its policy grants READ_AUTO_WITHDRAW (or
+/// MANAGE_AUTO_WITHDRAW), and only its own account: a root-account key reads
+/// the root account, and a subaccount key reads its subaccount.
 ///
 /// # Implementing handlers
 ///
@@ -306,6 +309,11 @@ pub trait AutoWithdrawService: Send + Sync + 'static {
         >,
     > + Send;
     /// Read the account's latest rule version.
+    /// An API key needs READ_AUTO_WITHDRAW in its policy and reads only its own
+    /// account. Both refusals answer PERMISSION_DENIED: a key whose policy lacks
+    /// the action gets "api key policy does not allow READ_AUTO_WITHDRAW", and a
+    /// key that names an account other than its own, such as a root-account key
+    /// naming a subaccount, gets "api key target scope mismatch".
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -329,6 +337,11 @@ pub trait AutoWithdrawService: Send + Sync + 'static {
         >,
     > + Send;
     /// List the account's auto-withdraw runs with their payouts, newest first.
+    /// An API key needs READ_AUTO_WITHDRAW in its policy and reads only its own
+    /// account. Both refusals answer PERMISSION_DENIED: a key whose policy lacks
+    /// the action gets "api key policy does not allow READ_AUTO_WITHDRAW", and a
+    /// key that names an account other than its own, such as a root-account key
+    /// naming a subaccount, gets "api key target scope mismatch".
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

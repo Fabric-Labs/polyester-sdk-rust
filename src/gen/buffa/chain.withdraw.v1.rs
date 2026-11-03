@@ -5738,6 +5738,7 @@ pub struct CreateTradingWithdrawRequest {
     )]
     pub payload: ::buffa::MessageField<TradingWithdrawIntentPayload>,
     /// User/API signature over deterministic TradingWithdrawIntentPayload bytes.
+    /// Must not be empty.
     ///
     /// Field 2: `payload_signature`
     #[serde(
@@ -5921,7 +5922,8 @@ pub struct CreateWalletTradingWithdrawRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub signer_wallet: ::buffa::alloc::string::String,
-    /// Wallet EIP-191 personal_sign signature over the canonical withdraw authorization message.
+    /// Wallet EIP-191 personal_sign signature over the canonical withdraw
+    /// authorization message. Must not be empty.
     ///
     /// Field 4: `payload_signature`
     #[serde(
@@ -14256,6 +14258,7 @@ pub mod __buffa {
                 super::super::__buffa::view::TradingWithdrawIntentPayloadView<'a>,
             >,
             /// User/API signature over deterministic TradingWithdrawIntentPayload bytes.
+            /// Must not be empty.
             ///
             /// Field 2: `payload_signature`
             pub payload_signature: &'a [u8],
@@ -14559,6 +14562,7 @@ pub mod __buffa {
                 &self.0.reborrow().payload
             }
             /// User/API signature over deterministic TradingWithdrawIntentPayload bytes.
+            /// Must not be empty.
             ///
             /// Field 2: `payload_signature`
             #[must_use]
@@ -14620,7 +14624,8 @@ pub mod __buffa {
             ///
             /// Field 3: `signer_wallet`
             pub signer_wallet: &'a str,
-            /// Wallet EIP-191 personal_sign signature over the canonical withdraw authorization message.
+            /// Wallet EIP-191 personal_sign signature over the canonical withdraw
+            /// authorization message. Must not be empty.
             ///
             /// Field 4: `payload_signature`
             pub payload_signature: &'a [u8],
@@ -14982,7 +14987,8 @@ pub mod __buffa {
             pub fn signer_wallet(&self) -> &'_ str {
                 self.0.reborrow().signer_wallet
             }
-            /// Wallet EIP-191 personal_sign signature over the canonical withdraw authorization message.
+            /// Wallet EIP-191 personal_sign signature over the canonical withdraw
+            /// authorization message. Must not be empty.
             ///
             /// Field 4: `payload_signature`
             #[must_use]

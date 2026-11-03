@@ -7897,7 +7897,7 @@ pub struct CreateQuickSwapRequest {
     )]
     pub terms: ::buffa::MessageField<QuickSwapTerms>,
     /// Recipient of the swap output on the destination network, in its native
-    /// text form without memo.
+    /// text form without memo: 1-256 UTF-8 bytes.
     ///
     /// Field 3: `destination_address`
     #[serde(
@@ -7908,7 +7908,8 @@ pub struct CreateQuickSwapRequest {
     )]
     pub destination_address: ::buffa::alloc::string::String,
     /// Destination tag or memo for destination_address. Required when the
-    /// destination network needs one; must be empty otherwise.
+    /// destination network needs one; must be empty otherwise. At most 128 UTF-8
+    /// bytes.
     ///
     /// Field 4: `destination_memo`
     #[serde(
@@ -7919,8 +7920,9 @@ pub struct CreateQuickSwapRequest {
     )]
     pub destination_memo: ::buffa::alloc::string::String,
     /// Recipient of returned source funds on the source network, in its native
-    /// text form without memo. Deposits that are not accepted, and source funds
-    /// that are not traded, go here; never to an observed sender.
+    /// text form without memo: 1-256 UTF-8 bytes. Deposits that are not
+    /// accepted, and source funds that are not traded, go here; never to an
+    /// observed sender.
     ///
     /// Field 5: `return_address`
     #[serde(
@@ -7931,7 +7933,7 @@ pub struct CreateQuickSwapRequest {
     )]
     pub return_address: ::buffa::alloc::string::String,
     /// Destination tag or memo for return_address. Required when the source
-    /// network needs one; must be empty otherwise.
+    /// network needs one; must be empty otherwise. At most 128 UTF-8 bytes.
     ///
     /// Field 6: `return_memo`
     #[serde(
@@ -7957,7 +7959,7 @@ pub struct CreateQuickSwapRequest {
     )]
     pub refund_zipped_asset_id: u32,
     /// Recipient of refunded intermediate asset on the refund route's network,
-    /// in its native text form without memo.
+    /// in its native text form without memo. At most 256 UTF-8 bytes.
     ///
     /// Field 8: `refund_address`
     #[serde(
@@ -7968,7 +7970,7 @@ pub struct CreateQuickSwapRequest {
     )]
     pub refund_address: ::buffa::alloc::string::String,
     /// Destination tag or memo for refund_address. Required when the refund
-    /// network needs one; must be empty otherwise.
+    /// network needs one; must be empty otherwise. At most 128 UTF-8 bytes.
     ///
     /// Field 9: `refund_memo`
     #[serde(
@@ -7979,8 +7981,8 @@ pub struct CreateQuickSwapRequest {
     )]
     pub refund_memo: ::buffa::alloc::string::String,
     /// Optional source wallet the end user will deposit from, for brokers that
-    /// know it in advance. It must be a valid address on the source network and
-    /// is shown on the QuickSwap.
+    /// know it in advance. It must be a valid address on the source network, at
+    /// most 256 UTF-8 bytes, and is shown on the QuickSwap.
     ///
     /// Field 10: `source_wallet`
     #[serde(
@@ -30172,23 +30174,25 @@ pub mod __buffa {
                 super::super::__buffa::view::QuickSwapTermsView<'a>,
             >,
             /// Recipient of the swap output on the destination network, in its native
-            /// text form without memo.
+            /// text form without memo: 1-256 UTF-8 bytes.
             ///
             /// Field 3: `destination_address`
             pub destination_address: &'a str,
             /// Destination tag or memo for destination_address. Required when the
-            /// destination network needs one; must be empty otherwise.
+            /// destination network needs one; must be empty otherwise. At most 128 UTF-8
+            /// bytes.
             ///
             /// Field 4: `destination_memo`
             pub destination_memo: &'a str,
             /// Recipient of returned source funds on the source network, in its native
-            /// text form without memo. Deposits that are not accepted, and source funds
-            /// that are not traded, go here; never to an observed sender.
+            /// text form without memo: 1-256 UTF-8 bytes. Deposits that are not
+            /// accepted, and source funds that are not traded, go here; never to an
+            /// observed sender.
             ///
             /// Field 5: `return_address`
             pub return_address: &'a str,
             /// Destination tag or memo for return_address. Required when the source
-            /// network needs one; must be empty otherwise.
+            /// network needs one; must be empty otherwise. At most 128 UTF-8 bytes.
             ///
             /// Field 6: `return_memo`
             pub return_memo: &'a str,
@@ -30202,18 +30206,18 @@ pub mod __buffa {
             /// Field 7: `refund_zipped_asset_id`
             pub refund_zipped_asset_id: u32,
             /// Recipient of refunded intermediate asset on the refund route's network,
-            /// in its native text form without memo.
+            /// in its native text form without memo. At most 256 UTF-8 bytes.
             ///
             /// Field 8: `refund_address`
             pub refund_address: &'a str,
             /// Destination tag or memo for refund_address. Required when the refund
-            /// network needs one; must be empty otherwise.
+            /// network needs one; must be empty otherwise. At most 128 UTF-8 bytes.
             ///
             /// Field 9: `refund_memo`
             pub refund_memo: &'a str,
             /// Optional source wallet the end user will deposit from, for brokers that
-            /// know it in advance. It must be a valid address on the source network and
-            /// is shown on the QuickSwap.
+            /// know it in advance. It must be a valid address on the source network, at
+            /// most 256 UTF-8 bytes, and is shown on the QuickSwap.
             ///
             /// Field 10: `source_wallet`
             pub source_wallet: &'a str,
@@ -30784,7 +30788,7 @@ pub mod __buffa {
                 &self.0.reborrow().terms
             }
             /// Recipient of the swap output on the destination network, in its native
-            /// text form without memo.
+            /// text form without memo: 1-256 UTF-8 bytes.
             ///
             /// Field 3: `destination_address`
             #[must_use]
@@ -30792,7 +30796,8 @@ pub mod __buffa {
                 self.0.reborrow().destination_address
             }
             /// Destination tag or memo for destination_address. Required when the
-            /// destination network needs one; must be empty otherwise.
+            /// destination network needs one; must be empty otherwise. At most 128 UTF-8
+            /// bytes.
             ///
             /// Field 4: `destination_memo`
             #[must_use]
@@ -30800,8 +30805,9 @@ pub mod __buffa {
                 self.0.reborrow().destination_memo
             }
             /// Recipient of returned source funds on the source network, in its native
-            /// text form without memo. Deposits that are not accepted, and source funds
-            /// that are not traded, go here; never to an observed sender.
+            /// text form without memo: 1-256 UTF-8 bytes. Deposits that are not
+            /// accepted, and source funds that are not traded, go here; never to an
+            /// observed sender.
             ///
             /// Field 5: `return_address`
             #[must_use]
@@ -30809,7 +30815,7 @@ pub mod __buffa {
                 self.0.reborrow().return_address
             }
             /// Destination tag or memo for return_address. Required when the source
-            /// network needs one; must be empty otherwise.
+            /// network needs one; must be empty otherwise. At most 128 UTF-8 bytes.
             ///
             /// Field 6: `return_memo`
             #[must_use]
@@ -30829,7 +30835,7 @@ pub mod __buffa {
                 self.0.reborrow().refund_zipped_asset_id
             }
             /// Recipient of refunded intermediate asset on the refund route's network,
-            /// in its native text form without memo.
+            /// in its native text form without memo. At most 256 UTF-8 bytes.
             ///
             /// Field 8: `refund_address`
             #[must_use]
@@ -30837,7 +30843,7 @@ pub mod __buffa {
                 self.0.reborrow().refund_address
             }
             /// Destination tag or memo for refund_address. Required when the refund
-            /// network needs one; must be empty otherwise.
+            /// network needs one; must be empty otherwise. At most 128 UTF-8 bytes.
             ///
             /// Field 9: `refund_memo`
             #[must_use]
@@ -30845,8 +30851,8 @@ pub mod __buffa {
                 self.0.reborrow().refund_memo
             }
             /// Optional source wallet the end user will deposit from, for brokers that
-            /// know it in advance. It must be a valid address on the source network and
-            /// is shown on the QuickSwap.
+            /// know it in advance. It must be a valid address on the source network, at
+            /// most 256 UTF-8 bytes, and is shown on the QuickSwap.
             ///
             /// Field 10: `source_wallet`
             #[must_use]
