@@ -5008,3 +5008,51 @@ async fn l2_json_wire_reads_unknown_enum_names_instead_of_failing() {
     assert!(post.sections[1].changes[0].surfaces.is_empty());
     assert_eq!(post.sections[1].changes[0].category, "");
 }
+
+// The same holds for trigger enums: an event type or refusal reason newer
+// than this SDK reads as unset over JSON, and the known ones keep their labels.
+#[tokio::test]
+async fn l2_json_wire_reads_unknown_trigger_enum_names() {
+    use polyester::proto::triggers::v1::ListTriggerEventsRequest;
+
+    let http = MockHttpServer::spawn(|request| match request.path.as_str() {
+        "/triggers.v1.TriggersService/ListTriggerEvents" => json_body(
+            200,
+            "application/json",
+            r#"{"events":[
+                {"triggerId":"7","triggerType":"FUTURE_TYPE","eventType":"EVENT_FUTURE","childSeq":1,"fireRefusalReason":"TRIGGER_FAILURE_REASON_FUTURE"},
+                {"triggerId":"7","triggerType":"TAKE_PROFIT","eventType":"EVENT_FIRE_REFUSED","childSeq":2,"firePriceTicks":"104000000000","fireRefusalReason":"TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING"}],
+              "nextPageToken":""}"#,
+        ),
+        _ => hardening_support::HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        wire_format: polyester::transport::WireFormat::Json,
+        ..Default::default()
+    })
+    .expect("client");
+    let events = client
+        .triggers
+        .list_events(ListTriggerEventsRequest {
+            trigger_id: 7,
+            ..Default::default()
+        })
+        .await
+        .expect("unknown trigger enum names must not reject the response");
+    assert_eq!(events.events.len(), 2);
+    let (future, refused) = (&events.events[0], &events.events[1]);
+    assert_eq!(
+        (future.event_type.as_str(), future.trigger_type.as_str()),
+        ("", "")
+    );
+    assert_eq!(future.fire_refusal_reason, "");
+    assert_eq!(refused.event_type, "fire_refused");
+    assert_eq!(refused.trigger_type, "take_profit");
+    assert_eq!(refused.fire_refusal_reason, "account_repairing");
+    assert_eq!(refused.fire_price.as_ref().unwrap().format(), "104");
+}

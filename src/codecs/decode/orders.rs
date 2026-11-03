@@ -1229,6 +1229,23 @@ mod tests {
             exact.quote_unspent(10, 6),
             Some(Decimal::from_str("76543210.9876543210987654312").unwrap())
         );
+        // A rebate is subtracted exactly too, even from a notional that alone
+        // needs more digits than a Decimal holds.
+        let mut rebate = order(
+            "100000000000000000000000000001",
+            "30000000000000000000",
+            Some(100_000_000),
+        );
+        rebate.fee_total.as_mut().unwrap().is_rebate = true;
+        assert_eq!(rebate.cum_quote(18), None);
+        assert_eq!(
+            rebate.quote_used(18),
+            Some(Decimal::from_str("70.000000000000000000000000001").unwrap())
+        );
+        assert_eq!(
+            rebate.quote_unspent(18, 6),
+            Some(Decimal::from_str("29.999999999999999999999999999").unwrap())
+        );
         // Trailing zeros do not count against the precision.
         let zeros = order("10000000000000000000000000000000000", "0", None);
         assert_eq!(
