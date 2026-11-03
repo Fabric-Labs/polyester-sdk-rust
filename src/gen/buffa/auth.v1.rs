@@ -17103,6 +17103,20 @@ pub struct GetSubaccountRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub include_policy: bool,
+    /// Include current balances for this sub-account. The caller needs the READ_BALANCES action on
+    /// the sub-account: its role, any attached sub-account policy and, for an API key, the key's
+    /// policy must allow it, or the request fails with PermissionDenied. When balances cannot be
+    /// read right now, the request fails with Unavailable and AUTH_TEMPORARILY_UNAVAILABLE; retry
+    /// the same request.
+    ///
+    /// Field 6: `include_balances`
+    #[serde(
+        rename = "includeBalances",
+        alias = "include_balances",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub include_balances: bool,
     /// Optional invitation direction filter. An omitted value includes both scopes.
     ///
     /// Field 7: `invites_direction`
@@ -17125,6 +17139,7 @@ impl ::core::fmt::Debug for GetSubaccountRequest {
             .field("include_members", &self.include_members)
             .field("include_invites", &self.include_invites)
             .field("include_policy", &self.include_policy)
+            .field("include_balances", &self.include_balances)
             .field("invites_direction", &self.invites_direction)
             .finish()
     }
@@ -17169,6 +17184,9 @@ impl ::buffa::Message for GetSubaccountRequest {
         if self.include_policy {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
+        if self.include_balances {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         {
             let val = self.invites_direction.to_i32();
             if val != 0 {
@@ -17199,6 +17217,9 @@ impl ::buffa::Message for GetSubaccountRequest {
         }
         if self.include_policy {
             ::buffa::types::put_bool_field(5u32, self.include_policy, buf);
+        }
+        if self.include_balances {
+            ::buffa::types::put_bool_field(6u32, self.include_balances, buf);
         }
         {
             let val = self.invites_direction.to_i32();
@@ -17254,6 +17275,13 @@ impl ::buffa::Message for GetSubaccountRequest {
                 )?;
                 self.include_policy = ::buffa::types::decode_bool(buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.include_balances = ::buffa::types::decode_bool(buf)?;
+            }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -17276,6 +17304,7 @@ impl ::buffa::Message for GetSubaccountRequest {
         self.include_members = false;
         self.include_invites = false;
         self.include_policy = false;
+        self.include_balances = false;
         self.invites_direction = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
@@ -17358,6 +17387,16 @@ pub struct GetSubaccountResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub policy: ::buffa::MessageField<SubaccountPolicyView>,
+    /// Current balances when include_balances is true, in the same shape as GetBalances.
+    ///
+    /// Field 6: `balances`
+    #[serde(
+        rename = "balances",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub balances: ::buffa::MessageField<
+        super::super::ledger::read::v1::GetBalancesResponse,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -17370,6 +17409,7 @@ impl ::core::fmt::Debug for GetSubaccountResponse {
             .field("members", &self.members)
             .field("invites", &self.invites)
             .field("policy", &self.policy)
+            .field("balances", &self.balances)
             .finish()
     }
 }
@@ -17438,6 +17478,14 @@ impl ::buffa::Message for GetSubaccountResponse {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.balances.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.balances.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -17467,6 +17515,10 @@ impl ::buffa::Message for GetSubaccountResponse {
         if self.policy.is_set() {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.policy.write_to(__cache, buf);
+        }
+        if self.balances.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.balances.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -17530,6 +17582,17 @@ impl ::buffa::Message for GetSubaccountResponse {
                     ctx,
                 )?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.balances.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -17543,6 +17606,7 @@ impl ::buffa::Message for GetSubaccountResponse {
         self.members.clear();
         self.invites.clear();
         self.policy = ::buffa::MessageField::none();
+        self.balances = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -72501,6 +72565,14 @@ pub mod __buffa {
             ///
             /// Field 5: `include_policy`
             pub include_policy: bool,
+            /// Include current balances for this sub-account. The caller needs the READ_BALANCES action on
+            /// the sub-account: its role, any attached sub-account policy and, for an API key, the key's
+            /// policy must allow it, or the request fails with PermissionDenied. When balances cannot be
+            /// read right now, the request fails with Unavailable and AUTH_TEMPORARILY_UNAVAILABLE; retry
+            /// the same request.
+            ///
+            /// Field 6: `include_balances`
+            pub include_balances: bool,
             /// Optional invitation direction filter. An omitted value includes both scopes.
             ///
             /// Field 7: `invites_direction`
@@ -72575,6 +72647,13 @@ pub mod __buffa {
                         )?;
                         view.include_policy = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.include_balances = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -72618,6 +72697,7 @@ pub mod __buffa {
                     include_members: self.include_members,
                     include_invites: self.include_invites,
                     include_policy: self.include_policy,
+                    include_balances: self.include_balances,
                     invites_direction: self.invites_direction,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -72646,6 +72726,9 @@ pub mod __buffa {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
                 if self.include_policy {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                if self.include_balances {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
                 {
@@ -72679,6 +72762,9 @@ pub mod __buffa {
                 }
                 if self.include_policy {
                     ::buffa::types::put_bool_field(5u32, self.include_policy, buf);
+                }
+                if self.include_balances {
+                    ::buffa::types::put_bool_field(6u32, self.include_balances, buf);
                 }
                 {
                     let val = self.invites_direction.to_i32();
@@ -72725,6 +72811,9 @@ pub mod __buffa {
                 }
                 if self.include_policy {
                     __map.serialize_entry("includePolicy", &self.include_policy)?;
+                }
+                if self.include_balances {
+                    __map.serialize_entry("includeBalances", &self.include_balances)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
                     &self.invites_direction,
@@ -72862,6 +72951,17 @@ pub mod __buffa {
             pub fn include_policy(&self) -> bool {
                 self.0.reborrow().include_policy
             }
+            /// Include current balances for this sub-account. The caller needs the READ_BALANCES action on
+            /// the sub-account: its role, any attached sub-account policy and, for an API key, the key's
+            /// policy must allow it, or the request fails with PermissionDenied. When balances cannot be
+            /// read right now, the request fails with Unavailable and AUTH_TEMPORARILY_UNAVAILABLE; retry
+            /// the same request.
+            ///
+            /// Field 6: `include_balances`
+            #[must_use]
+            pub fn include_balances(&self) -> bool {
+                self.0.reborrow().include_balances
+            }
             /// Optional invitation direction filter. An omitted value includes both scopes.
             ///
             /// Field 7: `invites_direction`
@@ -72941,6 +73041,14 @@ pub mod __buffa {
             pub policy: ::buffa::MessageFieldView<
                 super::super::__buffa::view::SubaccountPolicyViewView<'a>,
             >,
+            /// Current balances when include_balances is true, in the same shape as GetBalances.
+            ///
+            /// Field 6: `balances`
+            pub balances: ::buffa::MessageFieldView<
+                super::super::super::super::ledger::read::v1::__buffa::view::GetBalancesResponseView<
+                    'a,
+                >,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetSubaccountResponseView<'a> {
@@ -73017,6 +73125,31 @@ pub mod __buffa {
                             None => {
                                 view.policy = ::buffa::MessageFieldView::set(
                                     <super::super::__buffa::view::SubaccountPolicyViewView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.balances.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.balances = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::ledger::read::v1::__buffa::view::GetBalancesResponseView as ::buffa::MessageView>::decode_view_ctx(
                                         sub,
                                         __sub_ctx,
                                     )?,
@@ -73129,6 +73262,14 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    balances: match self.balances.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::ledger::read::v1::GetBalancesResponse,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -73178,6 +73319,14 @@ pub mod __buffa {
                 if self.policy.is_set() {
                     let __slot = __cache.reserve();
                     let inner_size = self.policy.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.balances.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.balances.compute_size(__cache);
                     __cache.set(__slot, inner_size);
                     size
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
@@ -73234,6 +73383,14 @@ pub mod __buffa {
                     );
                     self.policy.write_to(__cache, buf);
                 }
+                if self.balances.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.balances.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -73275,6 +73432,12 @@ pub mod __buffa {
                 {
                     if let ::core::option::Option::Some(__v) = self.policy.as_option() {
                         __map.serialize_entry("policy", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.balances.as_option()
+                    {
+                        __map.serialize_entry("balances", __v)?;
                     }
                 }
                 __map.end()
@@ -73430,6 +73593,19 @@ pub mod __buffa {
                 super::super::__buffa::view::SubaccountPolicyViewView<'_>,
             > {
                 &self.0.reborrow().policy
+            }
+            /// Current balances when include_balances is true, in the same shape as GetBalances.
+            ///
+            /// Field 6: `balances`
+            #[must_use]
+            pub fn balances(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::ledger::read::v1::__buffa::view::GetBalancesResponseView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().balances
             }
         }
         impl ::core::convert::From<

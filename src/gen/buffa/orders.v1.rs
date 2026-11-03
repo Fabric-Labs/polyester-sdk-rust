@@ -1282,6 +1282,13 @@ pub enum ErrorCode {
     /// a replace keeps its order's place. Nothing changed; cancel a resting order
     /// in this market first.
     ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR = 306i32,
+    /// Self-trade prevention expired the order of an attached take-profit,
+    /// stop-loss or trailing stop because it would have traded with another of
+    /// the account's resting orders. It is reported as the trigger's fire refusal
+    /// reason, never as the answer to a request: the attached order stays active
+    /// and fires again at a new trade at or beyond its trigger price, or once the
+    /// other order is no longer at the best price.
+    ERROR_CODE_SELF_TRADE_PREVENTED = 307i32,
     /// The order already carries every attached leg it may hold, so another
     /// attached leg was refused. Legs being cancelled count until they end:
     /// retry once they have ended.
@@ -1863,6 +1870,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MaxOpenOrdersPerPair: Self = Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR;
+    ///Idiomatic alias for [`Self::ERROR_CODE_SELF_TRADE_PREVENTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SelfTradePrevented: Self = Self::ERROR_CODE_SELF_TRADE_PREVENTED;
     ///Idiomatic alias for [`Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AttachedLegsExceeded: Self = Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED;
@@ -2493,6 +2503,7 @@ impl ::buffa::Enumeration for ErrorCode {
             306i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR)
             }
+            307i32 => ::core::option::Option::Some(Self::ERROR_CODE_SELF_TRADE_PREVENTED),
             86i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED)
             }
@@ -2910,6 +2921,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR => {
                 "ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR"
             }
+            Self::ERROR_CODE_SELF_TRADE_PREVENTED => "ERROR_CODE_SELF_TRADE_PREVENTED",
             Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED => {
                 "ERROR_CODE_ATTACHED_LEGS_EXCEEDED"
             }
@@ -3591,6 +3603,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR)
             }
+            "ERROR_CODE_SELF_TRADE_PREVENTED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_SELF_TRADE_PREVENTED)
+            }
             "ERROR_CODE_ATTACHED_LEGS_EXCEEDED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED)
             }
@@ -3809,6 +3824,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN,
             Self::ERROR_CODE_TRIGGER_SYMBOL_MISMATCH,
             Self::ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR,
+            Self::ERROR_CODE_SELF_TRADE_PREVENTED,
             Self::ERROR_CODE_ATTACHED_LEGS_EXCEEDED,
             Self::ERROR_CODE_FEE_ASSET_INVALID,
             Self::ERROR_CODE_FEE_CEILING_INVALID,
@@ -10228,6 +10244,11 @@ pub mod trailing_stop_policy {
 /// RiskPolicy defines optional risk controls (take-profit, stop-loss or
 /// trailing stop) attached to an order. The legs protect the parent order's
 /// filled position: they arm as the parent fills and follow its later fills.
+/// A buy sized by max_quote_debit_scaled has no fixed quantity: its legs
+/// protect what its fills buy. When the order is created, each leg's exit is
+/// checked against the pair's minimums at the quantity the whole amount buys
+/// at the order's limit price, or a market order's maximum slippage price:
+/// the least it buys if it spends the amount.
 ///
 /// The legs of one parent share that position, whether or not oco is set, and
 /// only one exit works at a time. The first leg whose condition is met submits
@@ -17545,6 +17566,11 @@ pub enum CancelReason {
     /// market. Fills before the cancel stand. The market refuses new orders until
     /// it trades again.
     CANCEL_REASON_MARKET_HALTED = 17i32,
+    /// The order's attached take-profit, stop-loss or trailing stop fired while
+    /// the order still rested: the exchange canceled the order's unfilled
+    /// remainder before placing the attached order, so the two never trade with
+    /// each other. Fills before the cancel stand.
+    CANCEL_REASON_ATTACHED_EXIT_FIRED = 18i32,
 }
 impl CancelReason {
     ///Idiomatic alias for [`Self::CANCEL_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -17601,6 +17627,9 @@ impl CancelReason {
     ///Idiomatic alias for [`Self::CANCEL_REASON_MARKET_HALTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MarketHalted: Self = Self::CANCEL_REASON_MARKET_HALTED;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_ATTACHED_EXIT_FIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AttachedExitFired: Self = Self::CANCEL_REASON_ATTACHED_EXIT_FIRED;
 }
 impl ::core::default::Default for CancelReason {
     fn default() -> Self {
@@ -17718,6 +17747,9 @@ impl ::buffa::Enumeration for CancelReason {
             15i32 => ::core::option::Option::Some(Self::CANCEL_REASON_STRATEGY_CANCEL),
             16i32 => ::core::option::Option::Some(Self::CANCEL_REASON_SYSTEM),
             17i32 => ::core::option::Option::Some(Self::CANCEL_REASON_MARKET_HALTED),
+            18i32 => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_ATTACHED_EXIT_FIRED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -17748,6 +17780,9 @@ impl ::buffa::Enumeration for CancelReason {
             Self::CANCEL_REASON_STRATEGY_CANCEL => "CANCEL_REASON_STRATEGY_CANCEL",
             Self::CANCEL_REASON_SYSTEM => "CANCEL_REASON_SYSTEM",
             Self::CANCEL_REASON_MARKET_HALTED => "CANCEL_REASON_MARKET_HALTED",
+            Self::CANCEL_REASON_ATTACHED_EXIT_FIRED => {
+                "CANCEL_REASON_ATTACHED_EXIT_FIRED"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -17806,6 +17841,9 @@ impl ::buffa::Enumeration for CancelReason {
             "CANCEL_REASON_MARKET_HALTED" => {
                 ::core::option::Option::Some(Self::CANCEL_REASON_MARKET_HALTED)
             }
+            "CANCEL_REASON_ATTACHED_EXIT_FIRED" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_ATTACHED_EXIT_FIRED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -17829,6 +17867,7 @@ impl ::buffa::Enumeration for CancelReason {
             Self::CANCEL_REASON_STRATEGY_CANCEL,
             Self::CANCEL_REASON_SYSTEM,
             Self::CANCEL_REASON_MARKET_HALTED,
+            Self::CANCEL_REASON_ATTACHED_EXIT_FIRED,
         ]
     }
 }
@@ -34386,6 +34425,11 @@ pub mod __buffa {
         /// RiskPolicy defines optional risk controls (take-profit, stop-loss or
         /// trailing stop) attached to an order. The legs protect the parent order's
         /// filled position: they arm as the parent fills and follow its later fills.
+        /// A buy sized by max_quote_debit_scaled has no fixed quantity: its legs
+        /// protect what its fills buy. When the order is created, each leg's exit is
+        /// checked against the pair's minimums at the quantity the whole amount buys
+        /// at the order's limit price, or a market order's maximum slippage price:
+        /// the least it buys if it spends the amount.
         ///
         /// The legs of one parent share that position, whether or not oco is set, and
         /// only one exit works at a time. The first leg whose condition is met submits
