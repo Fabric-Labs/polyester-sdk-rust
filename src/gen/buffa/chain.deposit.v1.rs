@@ -161,8 +161,9 @@ pub const __DEPOSIT_ADDRESS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateDepositAddressRequest {
-    /// Optional subaccount public id. When omitted, the authenticated caller's
-    /// root account is used as the target account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -454,8 +455,9 @@ pub const __CREATE_DEPOSIT_ADDRESS_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListDepositAddressesRequest {
-    /// Optional subaccount public id. When omitted, the authenticated caller's
-    /// root account is used as the target account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -1068,8 +1070,9 @@ pub mod __buffa {
         /// selected account target and chain.
         #[derive(Clone, Debug, Default)]
         pub struct CreateDepositAddressRequestView<'a> {
-            /// Optional subaccount public id. When omitted, the authenticated caller's
-            /// root account is used as the target account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: u64,
@@ -1329,8 +1332,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional subaccount public id. When omitted, the authenticated caller's
-            /// root account is used as the target account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -1708,8 +1712,9 @@ pub mod __buffa {
         /// account target.
         #[derive(Clone, Debug, Default)]
         pub struct ListDepositAddressesRequestView<'a> {
-            /// Optional subaccount public id. When omitted, the authenticated caller's
-            /// root account is used as the target account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: u64,
@@ -1972,8 +1977,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional subaccount public id. When omitted, the authenticated caller's
-            /// root account is used as the target account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]

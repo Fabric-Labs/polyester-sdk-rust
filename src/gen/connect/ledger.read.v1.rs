@@ -52,14 +52,6 @@ pub type OwnedListTransfersRequestView = ::buffa::view::OwnedView<
 pub type OwnedListTransfersResponseView = ::buffa::view::OwnedView<
     crate::proto::ledger::read::v1::__buffa::view::ListTransfersResponseView<'static>,
 >;
-///Shorthand for `OwnedView<ListHoldsRequestView<'static>>`.
-pub type OwnedListHoldsRequestView = ::buffa::view::OwnedView<
-    crate::proto::ledger::read::v1::__buffa::view::ListHoldsRequestView<'static>,
->;
-///Shorthand for `OwnedView<ListHoldsResponseView<'static>>`.
-pub type OwnedListHoldsResponseView = ::buffa::view::OwnedView<
-    crate::proto::ledger::read::v1::__buffa::view::ListHoldsResponseView<'static>,
->;
 ///Shorthand for `OwnedView<GetBalancesRequestView<'static>>`.
 pub type OwnedGetBalancesRequestView = ::buffa::view::OwnedView<
     crate::proto::ledger::read::v1::__buffa::view::GetBalancesRequestView<'static>,
@@ -192,26 +184,6 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::ledger::read::v1::ListHoldsResponse>
-for crate::proto::ledger::read::v1::__buffa::view::ListHoldsResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::ledger::read::v1::ListHoldsResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::ledger::read::v1::__buffa::view::ListHoldsResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
 impl ::connectrpc::Encodable<crate::proto::ledger::read::v1::GetBalancesResponse>
 for crate::proto::ledger::read::v1::__buffa::view::GetBalancesResponseView<'_> {
     fn encode(
@@ -279,15 +251,6 @@ pub const LEDGER_READ_SERVICE_LIST_TRANSFERS_SPEC: ::connectrpc::Spec = ::connec
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListHolds` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const LEDGER_READ_SERVICE_LIST_HOLDS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/ledger.read.v1.LedgerReadService/ListHolds",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetBalances` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -297,7 +260,7 @@ pub const LEDGER_READ_SERVICE_GET_BALANCES_SPEC: ::connectrpc::Spec = ::connectr
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// LedgerReadService exposes read-only ledger endpoints (balances, history, transfers, holds).
+/// LedgerReadService exposes read-only ledger endpoints (balances, history, transfers).
 ///
 /// # Implementing handlers
 ///
@@ -447,7 +410,7 @@ pub trait LedgerReadService: Send + Sync + 'static {
         >,
     > + Send;
     /// List finalized transfer history for an account.
-    /// Supports optional subaccount, asset, ordering, and cursor filters.
+    /// Supports optional subaccount, asset, inclusive time-bound, ordering, and cursor filters.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -467,29 +430,6 @@ pub trait LedgerReadService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::ledger::read::v1::ListTransfersResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// ListHolds returns pending holds with integer amounts (u128) and asset ids.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn list_holds<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::ledger::read::v1::ListHoldsRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::ledger::read::v1::ListHoldsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -696,35 +636,6 @@ impl<S: LedgerReadService> LedgerReadServiceExt for S {
             .with_spec(LEDGER_READ_SERVICE_LIST_TRANSFERS_SPEC)
             .route_view(
                 LEDGER_READ_SERVICE_SERVICE_NAME,
-                "ListHolds",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::ledger::read::v1::__buffa::view::ListHoldsRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::ledger::read::v1::ListHoldsRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.list_holds(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::ledger::read::v1::ListHoldsResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(LEDGER_READ_SERVICE_LIST_HOLDS_SPEC)
-            .route_view(
-                LEDGER_READ_SERVICE_SERVICE_NAME,
                 "GetBalances",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -838,12 +749,6 @@ impl<T: LedgerReadService> ::connectrpc::Dispatcher for LedgerReadServiceServer<
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(LEDGER_READ_SERVICE_LIST_TRANSFERS_SPEC),
-                )
-            }
-            "ListHolds" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(LEDGER_READ_SERVICE_LIST_HOLDS_SPEC),
                 )
             }
             "GetBalances" => {
@@ -969,27 +874,6 @@ impl<T: LedgerReadService> ::connectrpc::Dispatcher for LedgerReadServiceServer<
                         .await?
                         .encode::<
                             crate::proto::ledger::read::v1::ListTransfersResponse,
-                        >(format)
-                })
-            }
-            "ListHolds" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::ledger::read::v1::ListHoldsRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::ledger::read::v1::__buffa::view::ListHoldsRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::ledger::read::v1::ListHoldsRequest,
-                    >::from_parts(&req, &body);
-                    svc.list_holds(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::ledger::read::v1::ListHoldsResponse,
                         >(format)
                 })
             }
@@ -1336,51 +1220,6 @@ where
                 &self.config,
                 LEDGER_READ_SERVICE_SERVICE_NAME,
                 "ListTransfers",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the ListHolds RPC. Sends a request to /ledger.read.v1.LedgerReadService/ListHolds.
-    pub async fn list_holds(
-        &self,
-        request: crate::proto::ledger::read::v1::ListHoldsRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::ledger::read::v1::__buffa::view::ListHoldsResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.list_holds_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the ListHolds RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn list_holds_with_options(
-        &self,
-        request: crate::proto::ledger::read::v1::ListHoldsRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::ledger::read::v1::__buffa::view::ListHoldsResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                LEDGER_READ_SERVICE_SERVICE_NAME,
-                "ListHolds",
                 request,
                 options,
             )

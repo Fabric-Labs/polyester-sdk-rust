@@ -3971,7 +3971,7 @@ pub enum ErrorCode {
     ERROR_CODE_STEP_UP_UNAVAILABLE = 37i32,
     /// Destination validation is temporarily unavailable.
     ERROR_CODE_DESTINATION_VALIDATION_UNAVAILABLE = 38i32,
-    /// The account shard cannot currently accept fund movement.
+    /// Funds movement for this account is temporarily unavailable. Retry later.
     ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE = 39i32,
     /// A required precondition was not satisfied.
     ERROR_CODE_FAILED_PRECONDITION = 40i32,

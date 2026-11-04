@@ -5181,7 +5181,8 @@ pub const __GET_CANDLES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
 };
 /// GetCandlesColumnsRequest selects a spot market candle series for columnar output.
 ///
-/// The response is ordered oldest-first for efficient chart ingestion. When both
+/// Each response page is ordered oldest-first. Pagination selects the newest
+/// eligible closed candles first and continues toward older candles. When both
 /// start_time and end_time are set, both bounds are inclusive.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -5237,9 +5238,8 @@ pub struct GetCandlesColumnsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub end_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Include the current open candle when it is available and inside the
-    /// requested range.
-    /// The open candle is prepended to the newest-first candle list and does not
+    /// Include the current open candle when available and inside the requested
+    /// range. It appears last in the oldest-first response columns and does not
     /// count toward the closed-candle limit.
     ///
     /// Field 6: `include_incomplete`
@@ -5263,9 +5263,9 @@ pub struct GetCandlesColumnsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub include_reference: bool,
-    /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-    /// bound to symbol, timeframe, time bounds, and oldest-first candle ordering.
-    /// Inclusion flags and columnar response shape may change between pages.
+    /// Opaque exclusive keyset cursor for older closed candles, bound to symbol,
+    /// timeframe, and time bounds. Columns within each page are ordered oldest-first.
+    /// Inclusion flags and response shape may change between pages.
     ///
     /// Field 8: `page_token`
     #[serde(
@@ -6095,7 +6095,8 @@ pub const __GET_CANDLES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
 /// GetCandlesColumnsResponse returns the same candle series as GetCandles but in columnar form.
 /// This is optimized for charting clients that ingest arrays of each field (binary only).
 ///
-/// Ordering: values are returned oldest-first (ascending ts_sec).
+/// Ordering: values within each page are oldest-first (ascending ts_sec).
+/// Continuation pages contain older candles.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -7443,9 +7444,10 @@ pub struct AssetConfig {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub quantity_display_decimals: u32,
-    /// Integer scale for quantities and balances in this asset (0..18).
-    /// A scale of 8 means one whole asset is represented as 100000000 in scaled
-    /// integer fields such as qty_scaled.
+    /// Decimal scale (0..18) for this asset's order quantities and other fields
+    /// that explicitly reference quantity_scale. A scale of 8 represents one whole
+    /// asset as 100000000 in those fields. Account balance amounts use fixed
+    /// 18-decimal units independently of this value.
     ///
     /// Field 5: `quantity_scale`
     #[serde(
@@ -8045,10 +8047,11 @@ pub struct PairConfig {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub max_market_qty_base: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Largest notional of one order, as a decimal string in quote-asset units:
-    /// its quantity times its limit price, or times its protection price for a
-    /// market order, compared exactly with no rounding. An order above it is
-    /// rejected with MAX_NOTIONAL. Absent when the pair has no maximum.
+    /// Maximum per-order notional as a decimal string in quote-asset units.
+    /// Base-sized orders are checked using quantity times limit price, or market
+    /// protection price, without rounding. For quote-sized buys, the entire all-in
+    /// maximum quote debit must also fit this maximum. Exceeding it returns
+    /// MAX_NOTIONAL. Absent when no maximum is configured.
     ///
     /// Field 22: `max_order_notional_quote`
     #[serde(
@@ -8073,12 +8076,12 @@ pub struct PairConfig {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub max_open_orders_per_pair: u32,
-    /// Largest notional of one market order, as a decimal string in quote-asset
-    /// units, compared exactly with no rounding. A market order is valued at the
-    /// top of the price range it may trade in: a buy at its protection price and
-    /// a sell at its reference price, the touch or the client's reference price,
-    /// before slippage. An order above it is rejected with MAX_NOTIONAL. Absent
-    /// when the pair has no maximum.
+    /// Additional maximum notional for market orders as a decimal string in
+    /// quote-asset units. Base-sized market orders are valued at the buy protection
+    /// price or the sell reference price before slippage, without rounding. For
+    /// quote-sized market buys, the entire all-in maximum quote debit must also fit
+    /// this maximum. Exceeding it returns MAX_NOTIONAL. Absent when no maximum is
+    /// configured.
     ///
     /// Field 24: `max_market_notional_quote`
     #[serde(
@@ -16356,7 +16359,8 @@ pub mod __buffa {
         }
         /// GetCandlesColumnsRequest selects a spot market candle series for columnar output.
         ///
-        /// The response is ordered oldest-first for efficient chart ingestion. When both
+        /// Each response page is ordered oldest-first. Pagination selects the newest
+        /// eligible closed candles first and continues toward older candles. When both
         /// start_time and end_time are set, both bounds are inclusive.
         #[derive(Clone, Debug, Default)]
         pub struct GetCandlesColumnsRequestView<'a> {
@@ -16388,9 +16392,8 @@ pub mod __buffa {
             pub end_time: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Include the current open candle when it is available and inside the
-            /// requested range.
-            /// The open candle is prepended to the newest-first candle list and does not
+            /// Include the current open candle when available and inside the requested
+            /// range. It appears last in the oldest-first response columns and does not
             /// count toward the closed-candle limit.
             ///
             /// Field 6: `include_incomplete`
@@ -16402,9 +16405,9 @@ pub mod __buffa {
             ///
             /// Field 7: `include_reference`
             pub include_reference: bool,
-            /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-            /// bound to symbol, timeframe, time bounds, and oldest-first candle ordering.
-            /// Inclusion flags and columnar response shape may change between pages.
+            /// Opaque exclusive keyset cursor for older closed candles, bound to symbol,
+            /// timeframe, and time bounds. Columns within each page are ordered oldest-first.
+            /// Inclusion flags and response shape may change between pages.
             ///
             /// Field 8: `page_token`
             pub page_token: &'a str,
@@ -16899,9 +16902,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().end_time
             }
-            /// Include the current open candle when it is available and inside the
-            /// requested range.
-            /// The open candle is prepended to the newest-first candle list and does not
+            /// Include the current open candle when available and inside the requested
+            /// range. It appears last in the oldest-first response columns and does not
             /// count toward the closed-candle limit.
             ///
             /// Field 6: `include_incomplete`
@@ -16919,9 +16921,9 @@ pub mod __buffa {
             pub fn include_reference(&self) -> bool {
                 self.0.reborrow().include_reference
             }
-            /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-            /// bound to symbol, timeframe, time bounds, and oldest-first candle ordering.
-            /// Inclusion flags and columnar response shape may change between pages.
+            /// Opaque exclusive keyset cursor for older closed candles, bound to symbol,
+            /// timeframe, and time bounds. Columns within each page are ordered oldest-first.
+            /// Inclusion flags and response shape may change between pages.
             ///
             /// Field 8: `page_token`
             #[must_use]
@@ -17944,7 +17946,8 @@ pub mod __buffa {
         /// GetCandlesColumnsResponse returns the same candle series as GetCandles but in columnar form.
         /// This is optimized for charting clients that ingest arrays of each field (binary only).
         ///
-        /// Ordering: values are returned oldest-first (ascending ts_sec).
+        /// Ordering: values within each page are oldest-first (ascending ts_sec).
+        /// Continuation pages contain older candles.
         #[derive(Clone, Debug, Default)]
         pub struct GetCandlesColumnsResponseView<'a> {
             /// Numeric spot market identifier.
@@ -19662,9 +19665,10 @@ pub mod __buffa {
             ///
             /// Field 4: `quantity_display_decimals`
             pub quantity_display_decimals: u32,
-            /// Integer scale for quantities and balances in this asset (0..18).
-            /// A scale of 8 means one whole asset is represented as 100000000 in scaled
-            /// integer fields such as qty_scaled.
+            /// Decimal scale (0..18) for this asset's order quantities and other fields
+            /// that explicitly reference quantity_scale. A scale of 8 represents one whole
+            /// asset as 100000000 in those fields. Account balance amounts use fixed
+            /// 18-decimal units independently of this value.
             ///
             /// Field 5: `quantity_scale`
             pub quantity_scale: u32,
@@ -20054,9 +20058,10 @@ pub mod __buffa {
             pub fn quantity_display_decimals(&self) -> u32 {
                 self.0.reborrow().quantity_display_decimals
             }
-            /// Integer scale for quantities and balances in this asset (0..18).
-            /// A scale of 8 means one whole asset is represented as 100000000 in scaled
-            /// integer fields such as qty_scaled.
+            /// Decimal scale (0..18) for this asset's order quantities and other fields
+            /// that explicitly reference quantity_scale. A scale of 8 represents one whole
+            /// asset as 100000000 in those fields. Account balance amounts use fixed
+            /// 18-decimal units independently of this value.
             ///
             /// Field 5: `quantity_scale`
             #[must_use]
@@ -20513,10 +20518,11 @@ pub mod __buffa {
             ///
             /// Field 21: `max_market_qty_base`
             pub max_market_qty_base: ::core::option::Option<&'a str>,
-            /// Largest notional of one order, as a decimal string in quote-asset units:
-            /// its quantity times its limit price, or times its protection price for a
-            /// market order, compared exactly with no rounding. An order above it is
-            /// rejected with MAX_NOTIONAL. Absent when the pair has no maximum.
+            /// Maximum per-order notional as a decimal string in quote-asset units.
+            /// Base-sized orders are checked using quantity times limit price, or market
+            /// protection price, without rounding. For quote-sized buys, the entire all-in
+            /// maximum quote debit must also fit this maximum. Exceeding it returns
+            /// MAX_NOTIONAL. Absent when no maximum is configured.
             ///
             /// Field 22: `max_order_notional_quote`
             pub max_order_notional_quote: ::core::option::Option<&'a str>,
@@ -20530,12 +20536,12 @@ pub mod __buffa {
             ///
             /// Field 23: `max_open_orders_per_pair`
             pub max_open_orders_per_pair: u32,
-            /// Largest notional of one market order, as a decimal string in quote-asset
-            /// units, compared exactly with no rounding. A market order is valued at the
-            /// top of the price range it may trade in: a buy at its protection price and
-            /// a sell at its reference price, the touch or the client's reference price,
-            /// before slippage. An order above it is rejected with MAX_NOTIONAL. Absent
-            /// when the pair has no maximum.
+            /// Additional maximum notional for market orders as a decimal string in
+            /// quote-asset units. Base-sized market orders are valued at the buy protection
+            /// price or the sell reference price before slippage, without rounding. For
+            /// quote-sized market buys, the entire all-in maximum quote debit must also fit
+            /// this maximum. Exceeding it returns MAX_NOTIONAL. Absent when no maximum is
+            /// configured.
             ///
             /// Field 24: `max_market_notional_quote`
             pub max_market_notional_quote: ::core::option::Option<&'a str>,
@@ -21622,10 +21628,11 @@ pub mod __buffa {
             pub fn max_market_qty_base(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().max_market_qty_base
             }
-            /// Largest notional of one order, as a decimal string in quote-asset units:
-            /// its quantity times its limit price, or times its protection price for a
-            /// market order, compared exactly with no rounding. An order above it is
-            /// rejected with MAX_NOTIONAL. Absent when the pair has no maximum.
+            /// Maximum per-order notional as a decimal string in quote-asset units.
+            /// Base-sized orders are checked using quantity times limit price, or market
+            /// protection price, without rounding. For quote-sized buys, the entire all-in
+            /// maximum quote debit must also fit this maximum. Exceeding it returns
+            /// MAX_NOTIONAL. Absent when no maximum is configured.
             ///
             /// Field 22: `max_order_notional_quote`
             #[must_use]
@@ -21645,12 +21652,12 @@ pub mod __buffa {
             pub fn max_open_orders_per_pair(&self) -> u32 {
                 self.0.reborrow().max_open_orders_per_pair
             }
-            /// Largest notional of one market order, as a decimal string in quote-asset
-            /// units, compared exactly with no rounding. A market order is valued at the
-            /// top of the price range it may trade in: a buy at its protection price and
-            /// a sell at its reference price, the touch or the client's reference price,
-            /// before slippage. An order above it is rejected with MAX_NOTIONAL. Absent
-            /// when the pair has no maximum.
+            /// Additional maximum notional for market orders as a decimal string in
+            /// quote-asset units. Base-sized market orders are valued at the buy protection
+            /// price or the sell reference price before slippage, without rounding. For
+            /// quote-sized market buys, the entire all-in maximum quote debit must also fit
+            /// this maximum. Exceeding it returns MAX_NOTIONAL. Absent when no maximum is
+            /// configured.
             ///
             /// Field 24: `max_market_notional_quote`
             #[must_use]
