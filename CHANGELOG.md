@@ -2,9 +2,13 @@
 
 ## Unreleased
 
-- Temporary rate-limit policy, trading policy and fee lookup failures now raise
-  retryable server errors on Connect, matching REST responses. Policy denials
+- Service-unavailable responses now raise retryable server errors on Connect
+  for orders, withdrawals and internal transfers, matching REST. This includes
+  policy and fee lookups, backlogs, operations in progress and temporarily
+  unavailable dependencies. Policy denials and permanent precondition failures
   remain non-retryable.
+- These failures now use the existing server error, which does not expose
+  the structured service code previously available on API errors.
 
 ## 0.7.0
 

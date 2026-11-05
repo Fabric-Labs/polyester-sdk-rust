@@ -729,6 +729,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             );
         }
         if let Some(order_detail) = decode_order_error_detail(detail) {
+            // Service details describe the reason; unavailable determines the
+            // retryable server classification regardless of the reason's name.
+            if err.code == ErrorCode::Unavailable {
+                return Error::Server(fallback_message.clone());
+            }
             let is_rate_limit = order_detail.rate_limit.is_set()
                 || matches!(
                     order_detail.code.as_known(),
@@ -745,11 +750,6 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 order_detail.code.as_known().map(|c| c.proto_name()),
                 order_detail.code.to_i32(),
             );
-            // Policy lookup outages are not policy denials. Some unavailable
-            // codes are permanent preconditions, so also check the Connect code.
-            if err.code == ErrorCode::Unavailable && code.ends_with("_UNAVAILABLE") {
-                return Error::Server(fallback_message.clone());
-            }
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
             }
@@ -780,6 +780,9 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             };
         }
         if let Some(withdraw_detail) = decode_withdraw_error_detail(detail) {
+            if err.code == ErrorCode::Unavailable {
+                return Error::Server(fallback_message.clone());
+            }
             let code = known_or_unknown_code(
                 withdraw_detail.code.as_known().map(|c| c.proto_name()),
                 withdraw_detail.code.to_i32(),
@@ -801,6 +804,9 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             };
         }
         if let Some(transfer_detail) = decode_transfer_error_detail(detail) {
+            if err.code == ErrorCode::Unavailable {
+                return Error::Server(fallback_message.clone());
+            }
             let code = known_or_unknown_code(
                 transfer_detail.code.as_known().map(|c| c.proto_name()),
                 transfer_detail.code.to_i32(),
@@ -1049,16 +1055,101 @@ mod tests {
 
     #[test]
     fn order_unavailable_classification() {
-        for code in [
-            OrderErrorCode::ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE,
-            OrderErrorCode::ERROR_CODE_POLICY_UNAVAILABLE,
-            OrderErrorCode::ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE,
-            OrderErrorCode::Unavailable,
+        for name in [
+            "ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE",
+            "ERROR_CODE_POLICY_UNAVAILABLE",
+            "ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE",
+            "ERROR_CODE_UNAVAILABLE",
+            "ERROR_CODE_PAIR_BACKLOGGED",
+            "ERROR_CODE_ORDER_MODIFY_IN_PROGRESS",
+            "ERROR_CODE_ORDER_PLACEMENT_PENDING",
+            "ERROR_CODE_SETTLEMENT_BACKLOGGED",
+            "ERROR_CODE_TRIGGER_CONTROLS_BUSY",
+            "ERROR_CODE_TRIGGER_CONTROL_IN_PROGRESS",
+            "ERROR_CODE_ACCOUNT_ROUTING_INVALID",
+            "ERROR_CODE_UPSTREAM_ERROR",
         ] {
+            let code = OrderErrorCode::from_proto_name(name).unwrap();
             let mapped = map_order(code, ErrorCode::Unavailable);
             assert!(matches!(mapped, Error::Server(_)), "{code:?}: {mapped:?}");
             assert!(!matches!(mapped, Error::Auth(_)));
             assert!(mapped.is_retryable(), "{code:?}: {mapped:?}");
+        }
+    }
+
+    #[test]
+    fn withdraw_unavailable_classification() {
+        for name in [
+            "ERROR_CODE_SERVICE_UNAVAILABLE",
+            "ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE",
+            "ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE",
+            "ERROR_CODE_CHAIN_METADATA_UNAVAILABLE",
+            "ERROR_CODE_DESTINATION_VALIDATION_UNAVAILABLE",
+            "ERROR_CODE_FEE_UNAVAILABLE",
+            "ERROR_CODE_STEP_UP_UNAVAILABLE",
+            "ERROR_CODE_SUPPLY_UNAVAILABLE",
+        ] {
+            let detail = WithdrawErrorDetail {
+                code: WithdrawErrorCode::from_proto_name(name).unwrap().into(),
+                ..Default::default()
+            };
+            let mapped = map_connect_error(
+                ConnectError::new(ErrorCode::Unavailable, "retry later").with_detail(
+                    ErrorDetail::from_message("chain.withdraw.v1.ErrorDetail", &detail),
+                ),
+            );
+            assert!(matches!(mapped, Error::Server(_)), "{name}: {mapped:?}");
+            assert!(!matches!(mapped, Error::Auth(_)));
+            assert!(mapped.is_retryable(), "{name}: {mapped:?}");
+        }
+    }
+
+    #[test]
+    fn transfer_unavailable_classification() {
+        for name in [
+            "ERROR_CODE_SERVICE_UNAVAILABLE",
+            "ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE",
+            "ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE",
+            "ERROR_CODE_STEP_UP_UNAVAILABLE",
+        ] {
+            let detail = TransferErrorDetail {
+                code: TransferErrorCode::from_proto_name(name).unwrap().into(),
+                ..Default::default()
+            };
+            let mapped = map_connect_error(
+                ConnectError::new(ErrorCode::Unavailable, "retry later").with_detail(
+                    ErrorDetail::from_message("transfer.v1.ErrorDetail", &detail),
+                ),
+            );
+            assert!(matches!(mapped, Error::Server(_)), "{name}: {mapped:?}");
+            assert!(!matches!(mapped, Error::Auth(_)));
+            assert!(mapped.is_retryable(), "{name}: {mapped:?}");
+        }
+    }
+
+    #[test]
+    fn fund_movement_unavailable_preconditions_are_not_retryable() {
+        let withdraw = WithdrawErrorDetail {
+            code: WithdrawErrorCode::from_proto_name("ERROR_CODE_SOURCE_SMART_ACCOUNT_UNAVAILABLE")
+                .unwrap()
+                .into(),
+            ..Default::default()
+        };
+        let transfer = TransferErrorDetail {
+            code: TransferErrorCode::from_proto_name("ERROR_CODE_SMART_ACCOUNT_UNAVAILABLE")
+                .unwrap()
+                .into(),
+            ..Default::default()
+        };
+        for detail in [
+            ErrorDetail::from_message("chain.withdraw.v1.ErrorDetail", &withdraw),
+            ErrorDetail::from_message("transfer.v1.ErrorDetail", &transfer),
+        ] {
+            let mapped = map_connect_error(
+                ConnectError::new(ErrorCode::FailedPrecondition, "not ready").with_detail(detail),
+            );
+            assert!(matches!(mapped, Error::Api { .. }), "{mapped:?}");
+            assert!(!mapped.is_retryable(), "{mapped:?}");
         }
     }
 
@@ -1474,17 +1565,16 @@ mod tests {
     }
 
     #[test]
-    fn account_repairing_is_retryable_and_changed_nothing() {
+    fn account_repairing_unavailable_uses_server_classification() {
         let repairing = map_order(
             OrderErrorCode::ERROR_CODE_ACCOUNT_REPAIRING,
             ErrorCode::Unavailable,
         );
-        assert_eq!(
-            repairing.auth_error_code(),
-            Some(order_codes::ACCOUNT_REPAIRING)
-        );
+        assert!(matches!(repairing, Error::Server(_)), "{repairing:?}");
+        assert_eq!(repairing.auth_error_code(), None);
         assert!(repairing.is_retryable(), "{repairing:?}");
-        assert!(!repairing.mutation_outcome_unknown());
+        // The common server class conservatively matches REST's outcome flag.
+        assert!(repairing.mutation_outcome_unknown());
 
         // The order itself is being canceled; retrying the change cannot succeed.
         let order_repairing = map_order(
