@@ -5,9 +5,9 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** `0.7.1` (git tag `v0.7.1`). Pre-1.0: minor releases may break the API.
+**Status:** `0.7.2` (git tag `v0.7.2`). Pre-1.0: minor releases may break the API.
 The Go, Python and Rust SDKs are released together. Their versions match unless a
-change breaks only one SDK's API: Rust 0.7.1 is the release of Go and Python 0.6.1.
+change breaks only one SDK's API: Rust 0.7.2 is the release of Go and Python 0.6.2.
 Proprietary license (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.90+
@@ -86,7 +86,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.7.1"
+polyester-sdk = "0.7.2"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -96,7 +96,7 @@ To pin a git tag instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.7.1" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.7.2" }
 ```
 
 For development from a git checkout:
