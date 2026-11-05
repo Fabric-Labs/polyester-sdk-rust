@@ -5,9 +5,9 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** `0.6.0` (git tag `v0.6.0`). Pre-1.0: minor releases may break the API.
+**Status:** `0.7.0` (git tag `v0.7.0`). Pre-1.0: minor releases may break the API.
 The Go, Python and Rust SDKs are released together. Their versions match unless a
-change breaks only one SDK's API: Rust 0.6.0 is the release of Go and Python 0.5.1.
+change breaks only one SDK's API: Rust 0.7.0 is the release of Go and Python 0.6.0.
 Proprietary license (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.90+
@@ -86,7 +86,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.6.0"
+polyester-sdk = "0.7.0"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -96,7 +96,7 @@ To pin a git tag instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.6.0" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.7.0" }
 ```
 
 For development from a git checkout:
@@ -581,9 +581,11 @@ surface, not a guaranteed quote of every future fill. The completed user-trade r
 owns the exact charge.
 
 Rows also expose `reserve_fee_rate_percent`,
-`post_only_reserve_fee_rate_percent`, `next_change_at` and `breakdown`. Size
-buys with the reserve rate, using the post-only reserve rate for post-only
-orders; effective maker/taker rates apply to fills. Refetch rates at
+`post_only_reserve_fee_rate_percent`, `next_change_at` and `breakdown`. Size a
+buy limit order that pays its fee in the quote asset with the reserve rate,
+using the post-only reserve rate for a post-only order. A buy sized by a quote
+amount reserves at the lower of the reserve and taker rates. Effective
+maker/taker rates apply to fills. Refetch rates at
 `next_change_at` when present. `breakdown` contains tier rates, a market
 multiplier, account discounts and a referral discount. Optional components
 and times may be `None`; absent account discounts decode as an empty vector.

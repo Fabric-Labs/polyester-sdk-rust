@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
+
+Package version: `0.7.0`. Git tag: `v0.7.0`. Released 2026-11-05.
 
 - **Breaking:** a trailing stop created with an activation price already
   reached now ends `FAILED` with
