@@ -2,12 +2,21 @@
 
 ## Unreleased
 
+- **Breaking:** a trailing stop created with an activation price already
+  reached now ends `FAILED` with
+  `TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (244).
+  `ModifyTrigger` and order modifies that would make a trailing stop act at
+  once are refused with `ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (302),
+  leaving the existing state unchanged. To start trailing from the market,
+  clear the activation price with a present zero.
 - **Breaking:** remove the public holds-list method, hold models and decoders.
   Read aggregate held trading funds from each asset's `reserved` balance in
   the balances API. Individual hold IDs and expiry times have no replacement.
 - **Breaking:** listing events for an unreadable trigger now returns the same
   not-found error as reading that trigger, instead of an empty history.
   Events reads retry a catching-up `UNAVAILABLE` with the trigger-read policy.
+- **Breaking:** `SpotFeeRate` gains public fields, so exhaustive struct literals
+  must initialize them. `SpotFeeRate` and `SpotFeeRatesList` no longer implement `Eq`.
 - Expose reserve fee rates, the next scheduled change and the full fee
   breakdown. Omitted optional components remain absent and omitted account
   discounts decode as an empty list.

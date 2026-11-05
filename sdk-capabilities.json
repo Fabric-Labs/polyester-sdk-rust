@@ -91,7 +91,7 @@
     },
     {
       "id": "balances",
-      "label": "Balances, holds, equity history",
+      "label": "Balances and equity history",
       "supported": true
     },
     {

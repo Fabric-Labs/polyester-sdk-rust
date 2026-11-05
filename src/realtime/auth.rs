@@ -337,14 +337,28 @@ mod problem_contract_tests {
     use super::*;
     #[test]
     fn realtime_problem_keeps_status_code_detail_and_type() {
-        let err=map_permission_denied("token","https://api.test/v1/rt/subscribe",403,br#"{"type":"https://polyester.dev/problems/permission-denied","status":403,"code":"PERMISSION_DENIED","detail":"missing read permission"}"#);
-        let problem = err.http_problem().expect("problem metadata");
-        assert_eq!(problem.code, "PERMISSION_DENIED");
-        assert_eq!(problem.status, 403);
-        assert_eq!(problem.detail, "missing read permission");
-        assert_eq!(
-            problem.problem_type,
-            "https://polyester.dev/problems/permission-denied"
-        );
+        for supplied_type in [
+            None,
+            Some("https://polyester.dev/problems/AUTH_SESSION_KIND_NOT_ALLOWED"),
+        ] {
+            let mut body = serde_json::json!({"status":403,"code":"AUTH_SESSION_KIND_NOT_ALLOWED","detail":"missing read permission"});
+            if let Some(value) = supplied_type {
+                body["type"] = value.into();
+            }
+            let err = map_permission_denied(
+                "token",
+                "https://api.test/v1/rt/subscribe",
+                403,
+                body.to_string().as_bytes(),
+            );
+            let problem = err.http_problem().expect("problem metadata");
+            assert_eq!(problem.code, "AUTH_SESSION_KIND_NOT_ALLOWED");
+            assert_eq!(problem.status, 403);
+            assert_eq!(problem.detail, "missing read permission");
+            assert_eq!(
+                problem.problem_type,
+                "https://polyester.dev/problems/auth-session-kind-not-allowed"
+            );
+        }
     }
 }

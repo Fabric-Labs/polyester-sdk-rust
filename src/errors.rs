@@ -286,6 +286,7 @@ fn is_outcome_unknown_code(code: &str) -> bool {
 
 impl Error {
     /// Original REST metadata, when a REST problem supplied this error.
+    /// For `Error::Api`, this decodes the synthetic JSON `http_problem` metadata entry.
     pub fn http_problem(&self) -> Option<crate::problem::HttpProblem> {
         match self {
             Self::ApiKeyRejected { problem, .. }

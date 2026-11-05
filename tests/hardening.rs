@@ -3726,31 +3726,52 @@ async fn l2_unimplemented_and_bare_501_map_to_not_implemented() {
 
 #[tokio::test]
 async fn l2_realtime_token_gateway_rejections_are_typed() {
-    for (body, retryable) in [
-        (r#"{"code":"TIMESTAMP_SKEW"}"#, true),
-        (r#"{"code":"SIGNATURE_INVALID"}"#, false),
+    for (code, retryable, expected_type) in [
+        (
+            "TIMESTAMP_SKEW",
+            true,
+            "https://polyester.dev/problems/timestamp-skew",
+        ),
+        (
+            "SIGNATURE_INVALID",
+            false,
+            "https://polyester.dev/problems/signature-invalid",
+        ),
     ] {
-        let http = MockHttpServer::spawn(move |_| hardening_support::HttpScript::Json {
-            status: 401,
-            body: body.as_bytes().to_vec(),
-        })
-        .await;
-        let active = Arc::new(AtomicUsize::new(0));
-        let ws = MockWsServer::spawn_centrifugo_public(active).await;
-        let rt = private_rt(&ws, &http, Duration::from_secs(2));
-        let err = subscribe_raw_err(&rt, PRIVATE_CHANNEL).await;
-        if retryable {
-            assert!(
-                matches!(err, Error::TimestampSkew { status: 401, .. }),
-                "{err:?}"
-            );
-        } else {
-            assert!(
-                matches!(&err, Error::ApiKeyRejected { status: 401, code, .. } if code == "SIGNATURE_INVALID"),
-                "{err:?}"
-            );
+        for supplied_type in [
+            None,
+            Some("https://polyester.dev/problems/AUTH_SESSION_KIND_NOT_ALLOWED"),
+        ] {
+            let mut body = serde_json::json!({"code":code,"status":403,"detail":""});
+            if let Some(value) = supplied_type {
+                body["type"] = value.into();
+            }
+            let body = body.to_string();
+            let http =
+                MockHttpServer::spawn(move |_| json_body(401, "application/problem+json", &body))
+                    .await;
+            let active = Arc::new(AtomicUsize::new(0));
+            let ws = MockWsServer::spawn_centrifugo_public(active).await;
+            let rt = private_rt(&ws, &http, Duration::from_secs(2));
+            let err = subscribe_raw_err(&rt, PRIVATE_CHANNEL).await;
+            if retryable {
+                assert!(
+                    matches!(err, Error::TimestampSkew { status: 401, .. }),
+                    "{err:?}"
+                );
+            } else {
+                assert!(
+                    matches!(&err, Error::ApiKeyRejected { status: 401, code, .. } if code == "SIGNATURE_INVALID"),
+                    "{err:?}"
+                );
+            }
+            assert_eq!(err.is_retryable(), retryable, "{err:?}");
+            let problem = err.http_problem().expect("realtime 401 problem metadata");
+            assert_eq!(problem.code, code);
+            assert_eq!(problem.status, 401);
+            assert_eq!(problem.detail, "");
+            assert_eq!(problem.problem_type, expected_type);
         }
-        assert_eq!(err.is_retryable(), retryable, "{err:?}");
     }
 }
 
@@ -5230,25 +5251,44 @@ async fn l2_execution_pages_pin_the_returned_generation() {
 
 #[tokio::test]
 async fn l2_early_auth_problem_metadata_and_trigger_not_found() {
-    for code in [
-        "UNAUTHENTICATED",
-        "AUTH_AUTHENTICATION_REQUIRED",
-        "AUTH_SESSION_KIND_NOT_ALLOWED",
+    for (code, expected_type) in [
+        (
+            "UNAUTHENTICATED",
+            "https://polyester.dev/problems/unauthenticated",
+        ),
+        (
+            "AUTH_AUTHENTICATION_REQUIRED",
+            "https://polyester.dev/problems/auth-authentication-required",
+        ),
+        (
+            "AUTH_SESSION_KIND_NOT_ALLOWED",
+            "https://polyester.dev/problems/auth-session-kind-not-allowed",
+        ),
     ] {
-        let body=serde_json::json!({"code":code,"status":401,"detail":"","type":polyester::problem::problem_type(code)}).to_string();
-        let http =
-            MockHttpServer::spawn(move |_| json_body(401, "application/problem+json", &body)).await;
-        let err = api_key_client(&http)
-            .auth
-            .me()
-            .await
-            .expect_err("early auth refused");
-        let problem = err.http_problem().expect("problem metadata");
-        assert_eq!(problem.code, code);
-        assert_eq!(problem.status, 401);
-        assert_eq!(problem.detail, "");
-        assert_eq!(problem.problem_type, polyester::problem::problem_type(code));
-        assert!(!err.is_retryable());
+        for supplied_type in [
+            None,
+            Some("https://polyester.dev/problems/AUTH_SESSION_KIND_NOT_ALLOWED"),
+        ] {
+            let mut body = serde_json::json!({"code":code,"status":401,"detail":""});
+            if let Some(value) = supplied_type {
+                body["type"] = value.into();
+            }
+            let body = body.to_string();
+            let http =
+                MockHttpServer::spawn(move |_| json_body(401, "application/problem+json", &body))
+                    .await;
+            let err = api_key_client(&http)
+                .auth
+                .me()
+                .await
+                .expect_err("early auth refused");
+            let problem = err.http_problem().expect("problem metadata");
+            assert_eq!(problem.code, code);
+            assert_eq!(problem.status, 401);
+            assert_eq!(problem.detail, "");
+            assert_eq!(problem.problem_type, expected_type);
+            assert!(!err.is_retryable());
+        }
     }
     let http = MockHttpServer::spawn(|_| {
         json_body(

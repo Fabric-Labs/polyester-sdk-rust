@@ -90,6 +90,7 @@ impl BalancesService {
         Ok(transfers_list_from_proto(&resp))
     }
 
+    /// Subscribe to private balance updates (requires `realtime` feature).
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,

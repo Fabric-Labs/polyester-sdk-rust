@@ -1,4 +1,4 @@
-//! Ledger balance / hold / transfer decoders.
+//! Ledger balance / transfer decoders.
 
 use crate::codecs::scalars::{format_uint64_id, u128_to_str};
 use crate::models::{
