@@ -729,11 +729,6 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             );
         }
         if let Some(order_detail) = decode_order_error_detail(detail) {
-            // Service details describe the reason; unavailable determines the
-            // retryable server classification regardless of the reason's name.
-            if err.code == ErrorCode::Unavailable {
-                return Error::Server(fallback_message.clone());
-            }
             let is_rate_limit = order_detail.rate_limit.is_set()
                 || matches!(
                     order_detail.code.as_known(),
@@ -750,6 +745,10 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 order_detail.code.as_known().map(|c| c.proto_name()),
                 order_detail.code.to_i32(),
             );
+            // Backoff hints and unknown mutation outcomes take precedence.
+            if err.code == ErrorCode::Unavailable && !code.ends_with("_OUTCOME_UNKNOWN") {
+                return Error::Server(fallback_message.clone());
+            }
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
             }
@@ -780,9 +779,6 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             };
         }
         if let Some(withdraw_detail) = decode_withdraw_error_detail(detail) {
-            if err.code == ErrorCode::Unavailable {
-                return Error::Server(fallback_message.clone());
-            }
             let code = known_or_unknown_code(
                 withdraw_detail.code.as_known().map(|c| c.proto_name()),
                 withdraw_detail.code.to_i32(),
@@ -792,6 +788,9 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 Some(WithdrawErrorCode::RateLimitExceeded)
             ) {
                 return rate_limit_error(fallback_message.clone(), None, header_retry);
+            }
+            if err.code == ErrorCode::Unavailable {
+                return Error::Server(fallback_message.clone());
             }
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
@@ -804,9 +803,6 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             };
         }
         if let Some(transfer_detail) = decode_transfer_error_detail(detail) {
-            if err.code == ErrorCode::Unavailable {
-                return Error::Server(fallback_message.clone());
-            }
             let code = known_or_unknown_code(
                 transfer_detail.code.as_known().map(|c| c.proto_name()),
                 transfer_detail.code.to_i32(),
@@ -816,6 +812,9 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 Some(TransferErrorCode::RateLimitExceeded)
             ) {
                 return rate_limit_error(fallback_message.clone(), None, header_retry);
+            }
+            if err.code == ErrorCode::Unavailable {
+                return Error::Server(fallback_message.clone());
             }
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
@@ -1565,16 +1564,117 @@ mod tests {
     }
 
     #[test]
-    fn account_repairing_unavailable_uses_server_classification() {
+    fn unavailable_keeps_nested_rate_limit_delay() {
+        use crate::proto::polyester::ratelimit::v1::FailureReason;
+        for code in [
+            OrderErrorCode::ERROR_CODE_UNAVAILABLE,
+            OrderErrorCode::ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE,
+            OrderErrorCode::RateLimitExceeded,
+        ] {
+            let detail = OrderErrorDetail {
+                code: code.into(),
+                rate_limit: ProtoRateLimitDetail {
+                    reason: FailureReason::AUTHORITY_UNAVAILABLE.into(),
+                    retry_after_ms: Some(1250),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            };
+            let mapped = map_connect_error(
+                ConnectError::new(ErrorCode::Unavailable, "back off")
+                    .with_detail(ErrorDetail::from_message("orders.v1.ErrorDetail", &detail)),
+            );
+            assert!(
+                matches!(
+                    mapped,
+                    Error::RateLimit {
+                        retry_after: Some(1.25),
+                        ..
+                    }
+                ),
+                "{mapped:?}"
+            );
+            assert!(mapped.is_retryable());
+            assert!(!mapped.mutation_outcome_unknown());
+        }
+    }
+
+    #[test]
+    fn unavailable_keeps_rate_limit_classification() {
+        let details = [
+            ErrorDetail::from_message(
+                "orders.v1.ErrorDetail",
+                &OrderErrorDetail {
+                    code: OrderErrorCode::RateLimitExceeded.into(),
+                    ..Default::default()
+                },
+            ),
+            ErrorDetail::from_message(
+                "chain.withdraw.v1.ErrorDetail",
+                &WithdrawErrorDetail {
+                    code: WithdrawErrorCode::RateLimitExceeded.into(),
+                    ..Default::default()
+                },
+            ),
+            ErrorDetail::from_message(
+                "transfer.v1.ErrorDetail",
+                &TransferErrorDetail {
+                    code: TransferErrorCode::RateLimitExceeded.into(),
+                    ..Default::default()
+                },
+            ),
+        ];
+        for detail in details {
+            let mut headers = http::HeaderMap::new();
+            headers.insert("retry-after", http::HeaderValue::from_static("2"));
+            let mapped = map_connect_error(
+                ConnectError::new(ErrorCode::Unavailable, "back off")
+                    .with_headers(headers)
+                    .with_detail(detail),
+            );
+            assert!(
+                matches!(
+                    mapped,
+                    Error::RateLimit {
+                        retry_after: Some(2.0),
+                        ..
+                    }
+                ),
+                "{mapped:?}"
+            );
+            assert!(mapped.is_retryable());
+            assert!(!mapped.mutation_outcome_unknown());
+        }
+    }
+
+    #[test]
+    fn unavailable_outcome_unknown_stays_non_retryable() {
+        for code in OrderErrorCode::values().iter().copied() {
+            if !code.proto_name().ends_with("_OUTCOME_UNKNOWN") {
+                continue;
+            }
+            let mapped = map_order(code, ErrorCode::Unavailable);
+            assert!(matches!(mapped, Error::Api { .. }), "{mapped:?}");
+            assert_eq!(mapped.auth_error_code(), Some(code.proto_name()));
+            assert!(!mapped.is_retryable(), "{mapped:?}");
+            assert!(mapped.mutation_outcome_unknown(), "{mapped:?}");
+        }
+    }
+
+    #[test]
+    fn account_repairing_is_retryable_and_changed_nothing() {
         let repairing = map_order(
             OrderErrorCode::ERROR_CODE_ACCOUNT_REPAIRING,
-            ErrorCode::Unavailable,
+            ErrorCode::FailedPrecondition,
         );
-        assert!(matches!(repairing, Error::Server(_)), "{repairing:?}");
-        assert_eq!(repairing.auth_error_code(), None);
+        assert!(matches!(repairing, Error::Api { .. }), "{repairing:?}");
+        assert_eq!(
+            repairing.auth_error_code(),
+            Some(order_codes::ACCOUNT_REPAIRING)
+        );
         assert!(repairing.is_retryable(), "{repairing:?}");
-        // The common server class conservatively matches REST's outcome flag.
-        assert!(repairing.mutation_outcome_unknown());
+        assert!(!repairing.mutation_outcome_unknown());
 
         // The order itself is being canceled; retrying the change cannot succeed.
         let order_repairing = map_order(

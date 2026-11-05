@@ -6,7 +6,8 @@
   for orders, withdrawals and internal transfers, matching REST. This includes
   policy and fee lookups, backlogs, operations in progress and temporarily
   unavailable dependencies. Policy denials and permanent precondition failures
-  remain non-retryable.
+  remain non-retryable. Rate-limit errors keep their retry delay, and unknown
+  mutation outcomes remain non-retryable even on an unavailable response.
 - These failures now use the existing server error, which does not expose
   the structured service code previously available on API errors.
 
