@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **Breaking:** remove the public holds-list method, hold models and decoders.
+  Read aggregate held trading funds from each asset's `reserved` balance in
+  the balances API. Individual hold IDs and expiry times have no replacement.
+- **Breaking:** listing events for an unreadable trigger now returns the same
+  not-found error as reading that trigger, instead of an empty history.
+  Events reads retry a catching-up `UNAVAILABLE` with the trigger-read policy.
+- Expose reserve fee rates, the next scheduled change and the full fee
+  breakdown. Omitted optional components remain absent and omitted account
+  discounts decode as an empty list.
+- **Breaking:** `Error::PermissionDenied`, `Error::ApiKeyRejected`,
+  `Error::TimestampSkew` and `Error::SessionRequired` gain
+  optional problem metadata. Include `..` in variant patterns when ignoring it.
+- Preserve REST problem status, code, detail and canonical type on realtime
+  authorization and early gateway authentication errors.
+- Pin execution-history continuation pages to the returned exchange order ID
+  so reuse of a client order ID cannot change generations between pages.
+
 **Attached-exit self-trade prevention, sub-account balances (contract
 `54dc59d`).** Breaking for code that builds `Order`, `GetSubaccountResult` or
 `GetSubaccountOpts` with a struct literal naming every field.

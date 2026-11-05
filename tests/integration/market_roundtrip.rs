@@ -8,12 +8,12 @@ use crate::support::{
     is_internal_order_error, is_notional_validation, maker_client_from_env, market_ref_price,
     min_base_qty_for_pair, pair_for_symbol, quote_asset_id, require_funded, require_live_client,
     require_mutation, require_trading_quote_balance, reserved_balance_raw,
-    resolve_post_only_buy_limit_price, route_unavailable, strict_live_enabled, trade_e2e_enabled,
-    trade_symbol, trading_balance_raw, unique_client_order_id, wait_for_terminal_order,
+    resolve_post_only_buy_limit_price, strict_live_enabled, trade_e2e_enabled, trade_symbol,
+    trading_balance_raw, unique_client_order_id, wait_for_terminal_order,
     wait_until_no_open_client_ids, wait_until_reserved_reconciles,
 };
 use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
-use polyester::proto::ledger::read::v1::{GetBalancesRequest, ListHoldsRequest};
+use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::types::{Price, Quantity, QuantityDomain};
 use std::time::Duration;
 
@@ -407,26 +407,6 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
     if let (Some(qid), Some(q_before)) = (quote_id, quote_reserved_before) {
         let q_after = reserved_balance_raw(&balances_after.balances, qid);
         assert_eq!(q_after, q_before, "quote reserved balance must reconcile");
-    }
-
-    // Exercise the detailed holds route when mounted. Reserved balance
-    // reconciliation above remains mandatory even when this optional route is absent.
-    match client
-        .balances
-        .list_holds(ListHoldsRequest {
-            limit: 20,
-            ..Default::default()
-        })
-        .await
-    {
-        Ok(_holds) => {}
-        Err(err) if route_unavailable(&err) => {}
-        Err(err) => {
-            if strict_live_enabled() {
-                panic!("list_holds after roundtrip: {err}");
-            }
-            eprintln!("holds reconcile skipped: {err}");
-        }
     }
 
     if let Some(maker) = maker.as_ref() {

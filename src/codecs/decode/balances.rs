@@ -2,13 +2,13 @@
 
 use crate::codecs::scalars::{format_uint64_id, u128_to_str};
 use crate::models::{
-    AssetBalance, BalanceHistory, BalanceHistorySeries, BalancesList, Hold, HoldsList,
-    LedgerTransfer, TransferSide, TransfersList,
+    AssetBalance, BalanceHistory, BalanceHistorySeries, BalancesList, LedgerTransfer, TransferSide,
+    TransfersList,
 };
 use crate::proto::ledger::read::v1::{
     AssetBalance as ProtoAssetBalance, BalanceRange, GetBalanceHistoryResponse,
-    GetBalancesResponse, HoldRow, ListHoldsResponse, ListTransfersResponse, TransferRow,
-    TransferSide as ProtoTransferSide, TransferSideKind,
+    GetBalancesResponse, ListTransfersResponse, TransferRow, TransferSide as ProtoTransferSide,
+    TransferSideKind,
 };
 use crate::proto::polyester::r#type::v1::U128;
 
@@ -116,25 +116,6 @@ pub fn equity_history_from_proto(
     }
 }
 
-pub fn hold_from_proto(msg: &HoldRow) -> Hold {
-    Hold {
-        hold_id: format_uint64_id(msg.hold_id),
-        asset_id: msg.asset_id,
-        amount_reserved: u128_field(msg.amount_reserved_e18.as_option()),
-        expires_at_ns: if msg.expires_at_ns == 0 {
-            String::new()
-        } else {
-            msg.expires_at_ns.to_string()
-        },
-    }
-}
-
-pub fn holds_list_from_proto(msg: &ListHoldsResponse) -> HoldsList {
-    HoldsList {
-        holds: msg.holds.iter().map(hold_from_proto).collect(),
-    }
-}
-
 fn transfer_side_kind_label(kind: buffa::EnumValue<TransferSideKind>) -> String {
     match kind.as_known() {
         Some(TransferSideKind::FundingAccount) => "funding_account".to_owned(),
@@ -199,7 +180,7 @@ mod tests {
     use crate::proto::ledger::read::v1::__buffa::oneof::equity_series::Grouping;
     use crate::proto::ledger::read::v1::{
         AccountGrouping, BalanceSeries, GetBalanceHistoryResponse, GetEquityHistorySeriesResponse,
-        ListHoldsResponse, ListTransfersResponse, PortfolioAccountGrouping,
+        ListTransfersResponse, PortfolioAccountGrouping,
     };
 
     #[test]
@@ -373,49 +354,6 @@ mod tests {
         });
         assert_eq!(balance.points, u32::MAX);
         assert_eq!(equity.points, u32::MAX);
-    }
-
-    #[test]
-    fn hold_formats_id_and_amount() {
-        let msg = HoldRow {
-            hold_id: 42,
-            asset_id: 1,
-            amount_reserved_e18: U128 {
-                hi: 0,
-                lo: 99,
-                ..Default::default()
-            }
-            .into(),
-            expires_at_ns: 123,
-            ..Default::default()
-        };
-        let hold = hold_from_proto(&msg);
-        assert_eq!(hold.hold_id, format_uint64_id(42));
-        assert_eq!(hold.amount_reserved, "99");
-        assert_eq!(hold.expires_at_ns, "123");
-    }
-
-    #[test]
-    fn holds_list_maps_rows() {
-        let msg = ListHoldsResponse {
-            holds: vec![HoldRow {
-                hold_id: 42,
-                asset_id: 1,
-                amount_reserved_e18: U128 {
-                    hi: 0,
-                    lo: 500,
-                    ..Default::default()
-                }
-                .into(),
-                expires_at_ns: 1_700_000_000_000,
-                ..Default::default()
-            }],
-            ..Default::default()
-        };
-        let result = holds_list_from_proto(&msg);
-        assert_eq!(result.holds.len(), 1);
-        assert_eq!(result.holds[0].hold_id, format_uint64_id(42));
-        assert_eq!(result.holds[0].amount_reserved, "500");
     }
 
     #[test]

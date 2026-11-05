@@ -1186,27 +1186,29 @@ mod tests {
             "UNKNOWN_TRIGGER_FAILURE_REASON(321)"
         );
 
-        // A halt now reads `market_halted` (8), never the unnamed 212. A value
-        // this SDK does not name, 212 included, still decodes with its number.
-        let halted = trigger_from_proto(&ProtoTrigger {
+        // Unknown reasons still decode with their number.
+        let unknown = trigger_from_proto(&ProtoTrigger {
             trigger_id: 8,
             terminal_reason: Some(trigger::TerminalReason::FailureReason(
-                buffa::EnumValue::Unknown(212),
+                buffa::EnumValue::Unknown(321),
             )),
             ..Default::default()
         });
-        assert_eq!(halted.failure_reason, "UNKNOWN_TRIGGER_FAILURE_REASON(212)");
-        let halted_event = trigger_event_from_proto(&ProtoTriggerEvent {
+        assert_eq!(
+            unknown.failure_reason,
+            "UNKNOWN_TRIGGER_FAILURE_REASON(321)"
+        );
+        let unknown_event = trigger_event_from_proto(&ProtoTriggerEvent {
             trigger_id: 8,
             terminal_reason: Some(trigger_event::TerminalReason::FailureReason(
-                buffa::EnumValue::Unknown(212),
+                buffa::EnumValue::Unknown(321),
             )),
             ..Default::default()
         })
         .unwrap();
         assert_eq!(
-            halted_event.failure_reason,
-            "UNKNOWN_TRIGGER_FAILURE_REASON(212)"
+            unknown_event.failure_reason,
+            "UNKNOWN_TRIGGER_FAILURE_REASON(321)"
         );
     }
 

@@ -760,10 +760,11 @@ impl TriggersService {
 
     pub async fn list_events(&self, req: ListTriggerEventsRequest) -> Result<TriggerEventsList> {
         let client = self.client();
-        let resp = unary::await_auth(
+        let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,
             "/triggers.v1.TriggersService/ListTriggerEvents",
             req,
+            unary::TRIGGER_READ_RETRY,
             |req, opts| client.list_trigger_events_with_options(req, opts),
         )
         .await?

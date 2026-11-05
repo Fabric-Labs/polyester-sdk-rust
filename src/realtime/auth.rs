@@ -137,12 +137,20 @@ async fn fetch_rt_token(
     let gateway_code = gateway_code(&body);
     if !status.is_success() && gateway_code.as_deref() == Some(auth_codes::TIMESTAMP_SKEW) {
         return Err(Error::TimestampSkew {
+            problem: crate::problem::decode_http_problem(&body, status_code).map(Box::new),
             status: status_code,
         });
     }
     if status_code == 401 {
         if let Some(code) = gateway_code {
-            return Err(gateway_rejection_error(status_code, &code));
+            let err = gateway_rejection_error(status_code, &code);
+            return Err(
+                if let Some(problem) = crate::problem::decode_http_problem(&body, status_code) {
+                    err.with_http_problem(problem)
+                } else {
+                    err
+                },
+            );
         }
         return Err(Error::auth(format!(
             "{label}: authentication failed (HTTP 401)"
@@ -188,9 +196,10 @@ fn map_permission_denied(label: &str, endpoint: &str, status: u16, body: &[u8]) 
         .filter(|value| !value.trim().is_empty())
         .unwrap_or("permission_denied")
         .to_owned();
+    let problem = crate::problem::decode_http_problem(body, status);
     let message = parsed
         .as_ref()
-        .and_then(|value| value.get("message"))
+        .and_then(|value| value.get("detail").or_else(|| value.get("message")))
         .and_then(|value| value.as_str())
         .filter(|value| !value.trim().is_empty())
         .map(str::to_owned)
@@ -201,6 +210,7 @@ fn map_permission_denied(label: &str, endpoint: &str, status: u16, body: &[u8]) 
         code,
         context: label.to_owned(),
         endpoint: endpoint.to_owned(),
+        problem: problem.map(Box::new),
     }
 }
 
@@ -309,6 +319,7 @@ mod tests {
                 code,
                 context,
                 endpoint,
+                ..
             } => {
                 assert_eq!(message, "missing transfer:read");
                 assert_eq!(status, 403);
@@ -318,5 +329,22 @@ mod tests {
             }
             other => panic!("expected PermissionDenied, got {other:?}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod problem_contract_tests {
+    use super::*;
+    #[test]
+    fn realtime_problem_keeps_status_code_detail_and_type() {
+        let err=map_permission_denied("token","https://api.test/v1/rt/subscribe",403,br#"{"type":"https://polyester.dev/problems/permission-denied","status":403,"code":"PERMISSION_DENIED","detail":"missing read permission"}"#);
+        let problem = err.http_problem().expect("problem metadata");
+        assert_eq!(problem.code, "PERMISSION_DENIED");
+        assert_eq!(problem.status, 403);
+        assert_eq!(problem.detail, "missing read permission");
+        assert_eq!(
+            problem.problem_type,
+            "https://polyester.dev/problems/permission-denied"
+        );
     }
 }

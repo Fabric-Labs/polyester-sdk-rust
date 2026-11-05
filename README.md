@@ -1,5 +1,8 @@
 # Polyester Rust SDK
 
+For the holds-list removal, reserve fee fields, trigger-event errors and REST
+problem metadata, see [the contract migration notes](docs/contract-748066a.md).
+
 Official Rust SDK for Polyester APIs, built for trading bots, backend services,
 and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
