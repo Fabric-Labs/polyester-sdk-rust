@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
+
+Package version: `0.7.0`. Git tag: `v0.7.0`. Released 2026-11-05. Built on
+public contract `748066a`.
 
 - **Breaking:** a trailing stop created with an activation price already
   reached now ends `FAILED` with
@@ -62,11 +65,10 @@
 - Docs: `Order.cum_notional`, `cum_quote()` and `quote_used()` are exactly the
   settled quote when the pair's `base_quantity_scale` is at most 9; above
   that they can exceed it by less than 1e-18 per fill.
-- The generated module tree compiles contract `54dc59d`.
 
 **Exact order totals, refused trigger fires, API-key refusal reasons
 (contract `e96897c`).** Breaking for code that builds these types with struct
-literals or matches `Error` exhaustively, so the next release is a minor one.
+literals or matches `Error` exhaustively.
 - `Order::avg_price()` is the exact average execution price from the new
   `Order.avg_price_e18` (18 decimals; `avg_px` stays rounded down to 1e-9).
   `Order.cum_notional` / `Order::cum_quote(base_quantity_scale)` is the exact
@@ -124,7 +126,6 @@ literals or matches `Error` exhaustively, so the next release is a minor one.
 - Changelog: surface labels `market_data`, `quickswap` and `rewards`;
   `ChangelogSection.surface` names the product area a section covers;
   `list_changes` refuses more than 10 `surfaces` before sending.
-- The generated module tree compiles contract `e96897c`.
 - Docs: an API key's `permission_denied` message names the missing policy
   action and reaches the caller as is; a quote-sized buy that spent its amount
   ends `filled`; a ladder whose levels were all canceled before any filled
