@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- REST errors that say an order or trigger outcome is unknown now use the
+  same non-retryable API error as Connect. Read the order or trigger back
+  before retrying: the first request may still apply. A gateway timeout
+  without a recognised outcome code remains a retryable transport/server
+  failure with an unknown outcome; reconcile before retrying a mutation.
+
 ## 0.7.1
 
 Package version: `0.7.1`. Git tag: `v0.7.1`. Released 2026-11-06.
