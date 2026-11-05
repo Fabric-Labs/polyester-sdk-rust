@@ -5323,3 +5323,42 @@ async fn l2_early_auth_problem_metadata_and_trigger_not_found() {
         "not-found is not retried"
     );
 }
+
+#[tokio::test]
+async fn l2_rest_order_unavailable_classification() {
+    for (code, status) in [
+        ("RATE_LIMIT_POLICY_UNAVAILABLE", 503),
+        ("POLICY_UNAVAILABLE", 503),
+        ("FEE_SCHEDULE_UNAVAILABLE", 503),
+        ("UNAVAILABLE", 503),
+        ("PAIR_BACKLOGGED", 503),
+        ("ORDER_MODIFY_IN_PROGRESS", 503),
+        ("ORDER_PLACEMENT_PENDING", 503),
+        ("SETTLEMENT_BACKLOGGED", 503),
+        ("TRIGGER_CONTROLS_BUSY", 503),
+        ("TRIGGER_CONTROL_IN_PROGRESS", 503),
+        ("ACCOUNT_ROUTING_INVALID", 503),
+        ("UPSTREAM_ERROR", 502),
+        ("SERVICE_UNAVAILABLE", 503),
+        ("ACCOUNT_SHARD_UNAVAILABLE", 503),
+        ("CAPITAL_VIEW_UNAVAILABLE", 503),
+        ("CHAIN_METADATA_UNAVAILABLE", 503),
+        ("DESTINATION_VALIDATION_UNAVAILABLE", 503),
+        ("FEE_UNAVAILABLE", 503),
+        ("STEP_UP_UNAVAILABLE", 503),
+        ("SUPPLY_UNAVAILABLE", 503),
+    ] {
+        let body = json!({"code": code, "status": status, "detail": "retry later"}).to_string();
+        let http =
+            MockHttpServer::spawn(move |_| json_body(status, "application/problem+json", &body))
+                .await;
+        let err = api_key_client(&http)
+            .auth
+            .me()
+            .await
+            .expect_err("unavailable");
+        assert!(matches!(err, Error::Server(_)), "{code}: {err:?}");
+        assert!(!matches!(err, Error::Auth(_)));
+        assert!(err.is_retryable(), "{code}: {err:?}");
+    }
+}

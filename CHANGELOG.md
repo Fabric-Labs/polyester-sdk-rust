@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Service-unavailable responses now raise retryable server errors on Connect
+  for orders, withdrawals and internal transfers, matching REST. This includes
+  policy and fee lookups, backlogs, operations in progress and temporarily
+  unavailable dependencies. Policy denials and permanent precondition failures
+  remain non-retryable. Rate-limit errors keep their retry delay, and unknown
+  mutation outcomes remain non-retryable even on an unavailable response.
+- These failures now use the existing server error, which does not expose
+  the structured service code previously available on API errors.
+
 ## 0.7.0
 
 Package version: `0.7.0`. Git tag: `v0.7.0`. Released 2026-11-05. Built on
