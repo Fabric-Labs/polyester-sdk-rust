@@ -5362,3 +5362,117 @@ async fn l2_rest_order_unavailable_classification() {
         assert!(err.is_retryable(), "{code}: {err:?}");
     }
 }
+
+#[tokio::test]
+async fn l2_rest_outcome_unknown_matches_connect() {
+    use buffa::Enumeration;
+    use polyester::proto::orders::v1::ErrorCode;
+    for code in ErrorCode::values()
+        .iter()
+        .filter(|c| c.proto_name().ends_with("_OUTCOME_UNKNOWN"))
+    {
+        let name = code.proto_name();
+        for status in [504, 503] {
+            let body = json!({"code": name.trim_start_matches("ERROR_CODE_"), "detail": "read back first"}).to_string();
+            let http = MockHttpServer::spawn(move |_| {
+                json_body(status, "application/problem+json", &body)
+            })
+            .await;
+            let err = api_key_client(&http)
+                .auth
+                .me()
+                .await
+                .expect_err("unknown outcome");
+            assert!(
+                matches!(&err, Error::Api { code, .. } if code == name),
+                "{name}: {err:?}"
+            );
+            assert!(!err.is_retryable(), "{err:?}");
+            assert!(err.mutation_outcome_unknown(), "{err:?}");
+            assert_eq!(err.to_string(), "deadline_exceeded: read back first");
+            assert_eq!(http.requests.load(Ordering::SeqCst), 1);
+        }
+    }
+}
+
+#[tokio::test]
+async fn l2_unrecognised_rest_504_remains_ambiguous_transport_failure() {
+    for (content_type, body) in [
+        ("text/html", "<html>Gateway Timeout</html>"),
+        (
+            "application/problem+json",
+            r#"{"code":"UNKNOWN_GATEWAY_FAILURE"}"#,
+        ),
+    ] {
+        let http = MockHttpServer::spawn(move |_| json_body(504, content_type, body)).await;
+        let err = api_key_client(&http)
+            .auth
+            .me()
+            .await
+            .expect_err("gateway timeout");
+        assert!(matches!(err, Error::Server(_)), "{err:?}");
+        assert!(err.is_retryable());
+        assert!(err.mutation_outcome_unknown());
+        assert_eq!(http.requests.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[tokio::test]
+async fn l2_order_create_never_resends_unknown_outcome() {
+    use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide};
+    for (status, content_type, body) in [
+        (
+            504,
+            "application/problem+json",
+            r#"{"code":"ORDER_CREATE_OUTCOME_UNKNOWN"}"#,
+        ),
+        (504, "text/html", "<html>Gateway Timeout</html>"),
+        (
+            503,
+            "application/json",
+            r#"{"code":"unavailable","details":[{"type":"orders.v1.ErrorDetail","value":"CK8C"}]}"#,
+        ),
+        (
+            504,
+            "application/json",
+            r#"{"code":"deadline_exceeded","details":[{"type":"orders.v1.ErrorDetail","value":"CK8C"}]}"#,
+        ),
+    ] {
+        let http = MockHttpServer::spawn(move |request| {
+            assert_eq!(request.path, "/orders.v1.OrdersService/CreateOrder");
+            json_body(status, content_type, body)
+        })
+        .await;
+        let client = api_key_client(&http);
+        client
+            .catalogs
+            .hydrate_spot_config_json(json!({"pairs": [{
+                "symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8
+            }]}))
+            .unwrap();
+        let mut params =
+            CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Market);
+        params.quantity = Some(
+            Quantity::from_scaled(
+                1,
+                Some(8),
+                QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(1),
+            )
+            .unwrap(),
+        );
+        params.client_order_id = Some("reconcile-first".into());
+        let err = client
+            .orders
+            .create(params)
+            .await
+            .expect_err("unknown outcome");
+        assert!(err.mutation_outcome_unknown(), "{err:?}");
+        assert_eq!(http.requests.load(Ordering::SeqCst), 1);
+        if content_type != "text/html" {
+            assert!(matches!(err, Error::Api { .. }), "{err:?}");
+            assert!(!err.is_retryable());
+        }
+    }
+}

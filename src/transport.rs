@@ -3,7 +3,7 @@
 use crate::auth::{self, Credentials};
 use crate::errors::{Error, Result, map_connect_error};
 use crate::user_agent::user_agent;
-use buffa::Message;
+use buffa::{Enumeration, Message};
 use bytes::Bytes;
 use connectrpc::client::{
     BoxFuture, CallOptions, ClientBody, ClientConfig, ClientTransport, HttpClient,
@@ -299,6 +299,36 @@ fn classify_failed_response_inner(
         // Connect error codes are lowercase names such as `unimplemented`.
         if code.parse::<ErrorCode>().is_ok() {
             return None;
+        }
+        // Preserve a known mutation outcome before falling back to HTTP's
+        // temporary-failure code. The Connect detail gives both paths the
+        // same API error and reconciliation requirement.
+        let order_name = if code.starts_with("ERROR_CODE_") {
+            code.clone()
+        } else {
+            format!("ERROR_CODE_{code}")
+        };
+        if order_name.ends_with("_OUTCOME_UNKNOWN") {
+            use crate::proto::orders::v1::{
+                ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail,
+            };
+            if let Some(order_code) = OrderErrorCode::from_proto_name(&order_name) {
+                let message = parsed
+                    .and_then(|body| body.detail.or(body.title))
+                    .filter(|message| !message.is_empty())
+                    .unwrap_or(code);
+                return Some(
+                    ConnectError::new(ErrorCode::DeadlineExceeded, message)
+                        .with_http_status(status)
+                        .with_detail(ErrorDetail::from_message(
+                            "orders.v1.ErrorDetail",
+                            &OrderErrorDetail {
+                                code: order_code.into(),
+                                ..Default::default()
+                            },
+                        )),
+                );
+            }
         }
         if let Some((connect_code, auth_code)) = rest_auth_problem(&code) {
             let message = parsed
