@@ -62,19 +62,6 @@ pub struct EquityHistory {
     pub series: Vec<EquityHistorySeries>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Hold {
-    pub hold_id: String,
-    pub asset_id: u32,
-    pub amount_reserved: String,
-    pub expires_at_ns: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HoldsList {
-    pub holds: Vec<Hold>,
-}
-
 /// One display side of a ledger transfer.
 ///
 /// `kind` is a snake_case label (`funding_account`, `trading_account`,

@@ -1,8 +1,8 @@
 use crate::support::{call_optional, require_live_client};
-use polyester::proto::ledger::read::v1::{ListHoldsRequest, ListTransfersRequest};
+use polyester::proto::ledger::read::v1::ListTransfersRequest;
 
 #[tokio::test]
-async fn balances_list_transfers_and_holds() {
+async fn balances_list_transfers() {
     let Some(client) = require_live_client() else {
         return;
     };
@@ -24,8 +24,4 @@ async fn balances_list_transfers_and_holds() {
             }
         }
     }
-    let _ = call_optional("balances.list_holds", || {
-        client.balances.list_holds(ListHoldsRequest::default())
-    })
-    .await;
 }

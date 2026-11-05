@@ -36,7 +36,7 @@ Proprietary license (not open source). API-key only; no browser login or JWT flo
 | Spot fee rates | Yes |
 | Trading rate limits | Yes |
 | Product changelog (posts + changes) | Yes |
-| Balances, holds, equity history | Yes |
+| Balances and equity history | Yes |
 | Orders (create, cancel, modify, batch, cancel-all) | Yes |
 | User trades | Yes |
 | Triggers | Yes |
@@ -580,6 +580,17 @@ percents per listed symbol (optional `symbol_id` filter). That is the live effec
 surface, not a guaranteed quote of every future fill. The completed user-trade record still
 owns the exact charge.
 
+Rows also expose `reserve_fee_rate_percent`,
+`post_only_reserve_fee_rate_percent`, `next_change_at` and `breakdown`. Size
+buys with the reserve rate, using the post-only reserve rate for post-only
+orders; effective maker/taker rates apply to fills. Refetch rates at
+`next_change_at` when present. `breakdown` contains tier rates, a market
+multiplier, account discounts and a referral discount. Optional components
+and times may be `None`; absent account discounts decode as an empty vector.
+
+See the [contract migration notes](docs/contract-748066a.md) for the full
+fee model and exact integer budgeting guidance.
+
 ## VIP, spot fees, and trading rate limits
 
 Public catalog reads need no credentials. Authenticated VIP status, effective spot fees, and
@@ -679,6 +690,18 @@ trailing distance are omitted when they have no meaningful runtime state.
 Order writes still require those policy fields and reject `None`.
 For writes, `oco=true` requires take-profit plus exactly one stop leg
 (`stop_loss` or `trailing_stop`); one-leg OCO policies are rejected locally.
+
+`triggers.list_events` returns the same not-found error as `triggers.get`
+for an unreadable trigger. It retries catching-up `UNAVAILABLE` responses
+with the same bounded policy and request as trigger reads.
+
+A trailing stop created with an activation price the market has already
+reached now ends `FAILED` with reason
+`TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (244).
+`ModifyTrigger` and order modifies that would make it act at once are refused
+with `ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (302), leaving the
+existing state unchanged. To start trailing from the market, clear the
+activation price with a present zero.
 
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 `max_slippage_bps` to preserve the current values. A trigger's child limit

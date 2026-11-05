@@ -51,7 +51,7 @@ pub enum ErrorCode {
     ERROR_CODE_FUNDS_LOCK_CONFLICT = 21i32,
     /// The authoritative capital view is not ready or is stale.
     ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE = 22i32,
-    /// The account shard cannot currently accept fund movement.
+    /// Funds movement for this account is temporarily unavailable. Retry later.
     ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE = 23i32,
     /// A required account or API-key policy rejected the transfer.
     ERROR_CODE_POLICY_DENIED = 24i32,
@@ -641,8 +641,9 @@ impl ::buffa::Enumeration for InternalTransferStatus {
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct CreateInternalTransferRequest {
-    /// Optional source subaccount public id. When omitted, the authenticated
-    /// caller's root account is used as the source account.
+    /// Optional source public subaccount ID. When omitted, subaccount-scoped API
+    /// keys use their bound subaccount; other callers use their authenticated
+    /// root account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -1830,8 +1831,9 @@ pub mod __buffa {
         /// to Trading internal transfer for the authenticated source account.
         #[derive(Clone, Debug, Default)]
         pub struct CreateInternalTransferRequestView<'a> {
-            /// Optional source subaccount public id. When omitted, the authenticated
-            /// caller's root account is used as the source account.
+            /// Optional source public subaccount ID. When omitted, subaccount-scoped API
+            /// keys use their bound subaccount; other callers use their authenticated
+            /// root account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: u64,
@@ -2310,8 +2312,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional source subaccount public id. When omitted, the authenticated
-            /// caller's root account is used as the source account.
+            /// Optional source public subaccount ID. When omitted, subaccount-scoped API
+            /// keys use their bound subaccount; other callers use their authenticated
+            /// root account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]

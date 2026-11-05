@@ -3,13 +3,11 @@ use super::scope;
 use super::unary;
 use crate::codecs::decode::{
     balance_history_from_proto, balances_list_from_proto, equity_history_from_proto,
-    holds_list_from_proto, transfers_list_from_proto,
+    transfers_list_from_proto,
 };
 use crate::connect::ledger::read::v1::LedgerReadServiceClient;
 use crate::errors::Result;
-use crate::models::{
-    AssetBalance, BalanceHistory, BalancesList, EquityHistory, HoldsList, TransfersList,
-};
+use crate::models::{AssetBalance, BalanceHistory, BalancesList, EquityHistory, TransfersList};
 use crate::proto::ledger::read::v1::{
     GetBalanceHistoryRequest, GetBalancesRequest, GetEquityHistorySeriesRequest,
 };
@@ -90,22 +88,6 @@ impl BalancesService {
         .await?
         .into_owned();
         Ok(transfers_list_from_proto(&resp))
-    }
-
-    pub async fn list_holds(
-        &self,
-        req: crate::proto::ledger::read::v1::ListHoldsRequest,
-    ) -> Result<HoldsList> {
-        let client = self.client();
-        let resp = unary::await_auth(
-            &self.ctx.factory,
-            "/ledger.read.v1.LedgerReadService/ListHolds",
-            req,
-            |req, opts| client.list_holds_with_options(req, opts),
-        )
-        .await?
-        .into_owned();
-        Ok(holds_list_from_proto(&resp))
     }
 
     /// Subscribe to private balance updates (requires `realtime` feature).

@@ -345,7 +345,7 @@ impl OrdersService {
         }
     }
 
-    async fn get_order_execution_pages(&self, key: OrderKey) -> Result<GetOrderResult> {
+    async fn get_order_execution_pages(&self, mut key: OrderKey) -> Result<GetOrderResult> {
         let mut page_token = None;
         let mut trades = Vec::new();
         let mut transfers = Vec::new();
@@ -362,7 +362,10 @@ impl OrdersService {
                     page_token,
                 })
                 .await?;
-            if page.order.is_some() {
+            if let Some(ref item) = page.order {
+                if !item.order_id.is_empty() {
+                    key = OrderKey::OrderId(item.order_id.clone());
+                }
                 order = page.order;
             }
             trades.extend(page.trades);

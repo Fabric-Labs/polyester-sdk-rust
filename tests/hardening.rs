@@ -1275,6 +1275,7 @@ async fn l2_token_http_403_maps_to_structured_permission_denied() {
             code,
             context,
             endpoint,
+            ..
         } => {
             assert_eq!(message, "missing transfer:read");
             assert_eq!(status, 403);
@@ -3591,7 +3592,7 @@ async fn l2_gateway_timestamp_skew_json_is_retryable() {
     ] {
         let err = auth_me_error(script).await;
         assert!(
-            matches!(err, Error::TimestampSkew { status: 401 }),
+            matches!(err, Error::TimestampSkew { status: 401, .. }),
             "{err:?}"
         );
         assert!(
@@ -3612,7 +3613,7 @@ async fn l2_gateway_api_key_rejections_carry_their_code_and_are_not_retryable() 
         auth_me_error(|| json_body(401, "application/json", r#"{"code":"SIGNATURE_INVALID"}"#))
             .await;
     match &err {
-        Error::ApiKeyRejected { status, code } => {
+        Error::ApiKeyRejected { status, code, .. } => {
             assert_eq!((*status, code.as_str()), (401, "SIGNATURE_INVALID"));
         }
         other => panic!("expected ApiKeyRejected, got {other:?}"),
@@ -3623,7 +3624,7 @@ async fn l2_gateway_api_key_rejections_carry_their_code_and_are_not_retryable() 
     let err =
         auth_me_error(|| json_body(403, "application/json", r#"{"code":"IP_NOT_ALLOWED"}"#)).await;
     assert!(
-        matches!(&err, Error::ApiKeyRejected { status: 403, code } if code == "IP_NOT_ALLOWED"),
+        matches!(&err, Error::ApiKeyRejected { status: 403, code, .. } if code == "IP_NOT_ALLOWED"),
         "{err:?}"
     );
     assert!(!err.is_retryable(), "{err:?}");
@@ -3725,31 +3726,52 @@ async fn l2_unimplemented_and_bare_501_map_to_not_implemented() {
 
 #[tokio::test]
 async fn l2_realtime_token_gateway_rejections_are_typed() {
-    for (body, retryable) in [
-        (r#"{"code":"TIMESTAMP_SKEW"}"#, true),
-        (r#"{"code":"SIGNATURE_INVALID"}"#, false),
+    for (code, retryable, expected_type) in [
+        (
+            "TIMESTAMP_SKEW",
+            true,
+            "https://polyester.dev/problems/timestamp-skew",
+        ),
+        (
+            "SIGNATURE_INVALID",
+            false,
+            "https://polyester.dev/problems/signature-invalid",
+        ),
     ] {
-        let http = MockHttpServer::spawn(move |_| hardening_support::HttpScript::Json {
-            status: 401,
-            body: body.as_bytes().to_vec(),
-        })
-        .await;
-        let active = Arc::new(AtomicUsize::new(0));
-        let ws = MockWsServer::spawn_centrifugo_public(active).await;
-        let rt = private_rt(&ws, &http, Duration::from_secs(2));
-        let err = subscribe_raw_err(&rt, PRIVATE_CHANNEL).await;
-        if retryable {
-            assert!(
-                matches!(err, Error::TimestampSkew { status: 401 }),
-                "{err:?}"
-            );
-        } else {
-            assert!(
-                matches!(&err, Error::ApiKeyRejected { status: 401, code } if code == "SIGNATURE_INVALID"),
-                "{err:?}"
-            );
+        for supplied_type in [
+            None,
+            Some("https://polyester.dev/problems/AUTH_SESSION_KIND_NOT_ALLOWED"),
+        ] {
+            let mut body = serde_json::json!({"code":code,"status":403,"detail":""});
+            if let Some(value) = supplied_type {
+                body["type"] = value.into();
+            }
+            let body = body.to_string();
+            let http =
+                MockHttpServer::spawn(move |_| json_body(401, "application/problem+json", &body))
+                    .await;
+            let active = Arc::new(AtomicUsize::new(0));
+            let ws = MockWsServer::spawn_centrifugo_public(active).await;
+            let rt = private_rt(&ws, &http, Duration::from_secs(2));
+            let err = subscribe_raw_err(&rt, PRIVATE_CHANNEL).await;
+            if retryable {
+                assert!(
+                    matches!(err, Error::TimestampSkew { status: 401, .. }),
+                    "{err:?}"
+                );
+            } else {
+                assert!(
+                    matches!(&err, Error::ApiKeyRejected { status: 401, code, .. } if code == "SIGNATURE_INVALID"),
+                    "{err:?}"
+                );
+            }
+            assert_eq!(err.is_retryable(), retryable, "{err:?}");
+            let problem = err.http_problem().expect("realtime 401 problem metadata");
+            assert_eq!(problem.code, code);
+            assert_eq!(problem.status, 401);
+            assert_eq!(problem.detail, "");
+            assert_eq!(problem.problem_type, expected_type);
         }
-        assert_eq!(err.is_retryable(), retryable, "{err:?}");
     }
 }
 
@@ -4155,7 +4177,7 @@ async fn l2_encoded_failed_responses_keep_their_classification() {
     })
     .await;
     assert!(
-        matches!(err, Error::TimestampSkew { status: 401 }),
+        matches!(err, Error::TimestampSkew { status: 401, .. }),
         "{err:?}"
     );
 }
@@ -4479,7 +4501,8 @@ fn catching_up(rest: bool) -> hardening_support::HttpScript {
 #[tokio::test]
 async fn l2_trigger_reads_retry_unavailable_with_the_same_request() {
     use polyester::proto::triggers::v1::{
-        GetTriggerRequest, GetTriggerResponse, ListTriggersRequest, ListTriggersResponse, Trigger,
+        GetTriggerRequest, GetTriggerResponse, ListTriggerEventsRequest, ListTriggerEventsResponse,
+        ListTriggersRequest, ListTriggersResponse, Trigger,
     };
 
     for rest in [false, true] {
@@ -4508,6 +4531,9 @@ async fn l2_trigger_reads_retry_unavailable_with_the_same_request() {
                     }],
                     ..Default::default()
                 }),
+                "/triggers.v1.TriggersService/ListTriggerEvents" => {
+                    connect_proto_ok(&ListTriggerEventsResponse::default())
+                }
                 _ => hardening_support::HttpScript::NotFound,
             }
         })
@@ -4533,8 +4559,25 @@ async fn l2_trigger_reads_retry_unavailable_with_the_same_request() {
             .expect("the retried list succeeds");
         assert_eq!(list.triggers.len(), 1);
 
+        let events = client
+            .triggers
+            .list_events(ListTriggerEventsRequest {
+                trigger_id: 77,
+                subaccount_id: Some(12),
+                limit: 17,
+                page_token: "next-page".into(),
+                event_type: polyester::proto::triggers::v1::TriggerEventType::EventFired.into(),
+                ..Default::default()
+            })
+            .await
+            .expect("events retry succeeds");
+        assert!(events.events.is_empty());
         let seen = bodies.lock().unwrap();
-        for path in [GET_TRIGGER_PATH, LIST_TRIGGERS_PATH] {
+        for path in [
+            GET_TRIGGER_PATH,
+            LIST_TRIGGERS_PATH,
+            "/triggers.v1.TriggersService/ListTriggerEvents",
+        ] {
             let attempts: Vec<_> = seen.iter().filter(|(p, _)| p == path).collect();
             assert_eq!(attempts.len(), 2, "{path} rest={rest}");
             assert!(
@@ -4789,7 +4832,7 @@ async fn l2_api_key_refusal_reasons_read_the_same_on_connect_and_rest() {
             assert_eq!(err.is_retryable(), retryable, "{content_type}: {err:?}");
             if retryable {
                 assert!(
-                    matches!(err, Error::TimestampSkew { status: 401 }),
+                    matches!(err, Error::TimestampSkew { status: 401, .. }),
                     "{err:?}"
                 );
             } else {
@@ -4846,7 +4889,7 @@ async fn l2_session_only_refusal_is_session_required_on_connect_and_rest() {
             .await
             .expect_err("refused");
         assert!(
-            matches!(&err, Error::SessionRequired { message } if message == "interactive session required"),
+            matches!(&err, Error::SessionRequired { message, .. } if message == "interactive session required"),
             "{content_type}: {err:?}"
         );
         assert!(err.is_session_required());
@@ -5142,4 +5185,141 @@ async fn l2_subaccount_get_requests_and_parses_balances_only_when_asked() {
         .expect("get without balances");
     assert!(without.balances.is_none());
     assert_eq!(*seen.lock().unwrap(), [true, false]);
+}
+
+#[tokio::test]
+async fn l2_execution_pages_pin_the_returned_generation() {
+    use polyester::models::OrderKey;
+    use polyester::proto::orders::v1::{
+        GetOrderRequest, GetOrderResponse, Order, OrderStatus, UserTrade,
+    };
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let captured = seen.clone();
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path != "/orders.v1.OrdersReadService/GetOrder" {
+            return hardening_support::HttpScript::NotFound;
+        }
+        let request = GetOrderRequest::decode_from_slice(&req.body).unwrap();
+        let mut seen = captured.lock().unwrap();
+        seen.push(request);
+        let first = seen.len() == 1;
+        connect_proto_ok(&GetOrderResponse {
+            order: Order {
+                order_id: 9,
+                symbol_id: 1,
+                cum_qty_scaled: 100,
+                inherited_cum_qty_scaled: 40,
+                status: OrderStatus::Filled.into(),
+                ..Default::default()
+            }
+            .into(),
+            trades: vec![UserTrade {
+                order_id: 9,
+                symbol_id: 1,
+                qty_scaled: if first { 40 } else { 60 },
+                ..Default::default()
+            }],
+            next_page_token: if first {
+                "older-executions".into()
+            } else {
+                String::new()
+            },
+            ..Default::default()
+        })
+    })
+    .await;
+    let result = api_key_client(&http)
+        .orders
+        .wait_for_order_trades_complete(
+            OrderKey::ClientOrderId("reused-client-id".into()),
+            Duration::from_secs(2),
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.trades.len(), 2);
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 2);
+    use polyester::proto::orders::v1::__buffa::oneof::get_order_request::Key;
+    assert!(matches!(&seen[0].key,Some(Key::ClientOrderId(value)) if value=="reused-client-id"));
+    assert!(
+        matches!(seen[1].key, Some(Key::OrderId(9))),
+        "cursor not pinned: {:?}",
+        seen[1]
+    );
+    assert_eq!(seen[1].page_token, "older-executions");
+}
+
+#[tokio::test]
+async fn l2_early_auth_problem_metadata_and_trigger_not_found() {
+    for (code, expected_type) in [
+        (
+            "UNAUTHENTICATED",
+            "https://polyester.dev/problems/unauthenticated",
+        ),
+        (
+            "AUTH_AUTHENTICATION_REQUIRED",
+            "https://polyester.dev/problems/auth-authentication-required",
+        ),
+        (
+            "AUTH_SESSION_KIND_NOT_ALLOWED",
+            "https://polyester.dev/problems/auth-session-kind-not-allowed",
+        ),
+    ] {
+        for supplied_type in [
+            None,
+            Some("https://polyester.dev/problems/AUTH_SESSION_KIND_NOT_ALLOWED"),
+        ] {
+            let mut body = serde_json::json!({"code":code,"status":401,"detail":""});
+            if let Some(value) = supplied_type {
+                body["type"] = value.into();
+            }
+            let body = body.to_string();
+            let http =
+                MockHttpServer::spawn(move |_| json_body(401, "application/problem+json", &body))
+                    .await;
+            let err = api_key_client(&http)
+                .auth
+                .me()
+                .await
+                .expect_err("early auth refused");
+            let problem = err.http_problem().expect("problem metadata");
+            assert_eq!(problem.code, code);
+            assert_eq!(problem.status, 401);
+            assert_eq!(problem.detail, "");
+            assert_eq!(problem.problem_type, expected_type);
+            assert!(!err.is_retryable());
+        }
+    }
+    let http = MockHttpServer::spawn(|_| {
+        json_body(
+            404,
+            "application/json",
+            r#"{"code":"not_found","message":"NOT_FOUND"}"#,
+        )
+    })
+    .await;
+    let client = api_key_client(&http);
+    let get = client
+        .triggers
+        .get(polyester::proto::triggers::v1::GetTriggerRequest {
+            trigger_id: 77,
+            ..Default::default()
+        })
+        .await
+        .expect_err("unknown trigger");
+    let events = client
+        .triggers
+        .list_events(polyester::proto::triggers::v1::ListTriggerEventsRequest {
+            trigger_id: 77,
+            ..Default::default()
+        })
+        .await
+        .expect_err("unknown trigger events");
+    assert!(matches!(&get,Error::Api{code,..} if code=="NotFound"));
+    assert!(matches!(&events,Error::Api{code,..} if code=="NotFound"));
+    assert_eq!(
+        http.requests.load(Ordering::SeqCst),
+        2,
+        "not-found is not retried"
+    );
 }

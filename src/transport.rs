@@ -266,6 +266,22 @@ fn classify_failed_response(
     is_json: bool,
     body: &[u8],
 ) -> Option<ConnectError> {
+    let mut err = classify_failed_response_inner(status, is_json, body)?;
+    if let Some(problem) = crate::problem::decode_http_problem(body, status.as_u16()) {
+        err = err.with_detail(ErrorDetail {
+            type_url: HTTP_PROBLEM_TYPE.into(),
+            value: None,
+            debug: serde_json::to_value(problem).ok(),
+        });
+    }
+    Some(err)
+}
+
+fn classify_failed_response_inner(
+    status: StatusCode,
+    is_json: bool,
+    body: &[u8],
+) -> Option<ConnectError> {
     #[derive(Deserialize)]
     struct Body {
         code: Option<String>,
@@ -525,6 +541,8 @@ fn build_http_client(api_url: &str) -> Result<GatewayTransport> {
     }
 }
 
+pub(crate) const HTTP_PROBLEM_TYPE: &str = "polyester.sdk.http_problem";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -580,7 +598,7 @@ mod tests {
             ),
             (ErrorCode::Unauthenticated, 401, Some("TIMESTAMP_SKEW"))
         );
-        assert_eq!(marker(&skew), [GATEWAY_REJECTION_TYPE]);
+        assert_eq!(marker(&skew), [GATEWAY_REJECTION_TYPE, HTTP_PROBLEM_TYPE]);
         let denied = classify(403, true, r#"{"code":"IP_NOT_ALLOWED"}"#).unwrap();
         assert_eq!(denied.code, ErrorCode::PermissionDenied);
         // A JSON body is only read for its code when it is JSON.

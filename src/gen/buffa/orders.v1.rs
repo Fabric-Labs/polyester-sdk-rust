@@ -297,7 +297,8 @@ impl ::buffa::Enumeration for OrderType {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum TimeInForce {
-    /// Time-in-force was not provided; create requests default to GTC.
+    /// Time-in-force was not provided. Create requests must select an execution
+    /// variant, which determines time-in-force.
     TIME_IN_FORCE_UNSPECIFIED = 0i32,
     /// Good-til-canceled.
     GTC = 1i32,
@@ -849,7 +850,7 @@ pub enum ErrorCode {
     /// API key policy does not allow trading this market, even though the
     /// sub-account policy does.
     ERROR_CODE_API_KEY_MARKET_DENY = 29i32,
-    /// Price must align with the pair tick size (LIMIT orders).
+    /// Price must align with the pair tick size, including trigger and activation prices.
     ERROR_CODE_PRICE_TICK_SIZE = 30i32,
     /// Quantity is below the pair minimum quantity (base units).
     ERROR_CODE_MIN_QTY = 31i32,
@@ -1254,12 +1255,16 @@ pub enum ErrorCode {
     /// back in line, so new orders, changes and trigger orders are paused for a
     /// short time. Nothing changed; cancels still work. Try again shortly.
     ERROR_CODE_ACCOUNT_REPAIRING = 300i32,
-    /// The new trigger price of a stop-loss or take-profit is already reached by
-    /// the price the trigger watches (at or past it), so the trigger would fire at
-    /// once and send its order. Nothing changed; the trigger keeps its previous
-    /// trigger price. Returned by ModifyTrigger, and by an order modify that moves
-    /// an attached take-profit or stop-loss of an order with a fill. Choose a
-    /// trigger price the market has not reached.
+    /// The change would act on the trigger at once. The new trigger price of a
+    /// stop-loss or take-profit, or the trigger price a new trailing distance
+    /// gives an activated trailing stop, is already reached by the price the
+    /// trigger watches (at or past it), so the trigger would fire at once and send
+    /// its order; or the new activation price of a trailing stop not yet
+    /// activated is already reached by that price, so it would activate at once.
+    /// Nothing changed; the trigger keeps its previous settings. Returned by
+    /// ModifyTrigger, and by an order modify that moves an attached take-profit,
+    /// stop-loss or trailing stop of an order with a fill. Choose a price the
+    /// market has not reached.
     ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY = 302i32,
     /// The order was sent but not confirmed in time. Its outcome is unknown and
     /// it may have been accepted; read the order by its client order ID, or read
@@ -1285,9 +1290,10 @@ pub enum ErrorCode {
     /// Self-trade prevention expired the order of an attached take-profit,
     /// stop-loss or trailing stop because it would have traded with another of
     /// the account's resting orders. It is reported as the trigger's fire refusal
-    /// reason, never as the answer to a request: the attached order stays active
-    /// and fires again at a new trade at or beyond its trigger price, or once the
-    /// other order is no longer at the best price.
+    /// reason, never as the answer to a request: the attached order stays active.
+    /// New trades and price updates do not fire it while the other order is first
+    /// in line at the best price; once that order is gone or no longer first
+    /// there, it fires again if its trigger condition still holds.
     ERROR_CODE_SELF_TRADE_PREVENTED = 307i32,
     /// The order already carries every attached leg it may hold, so another
     /// attached leg was refused. Legs being cancelled count until they end:
@@ -6638,7 +6644,9 @@ pub mod order_intent {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateOrderRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -7202,7 +7210,9 @@ pub const __CREATE_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct PreviewOrderRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -7671,7 +7681,9 @@ pub struct CancelOrderRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub symbol_id: u32,
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 4: `subaccount_id`
     #[serde(
@@ -10664,7 +10676,9 @@ pub mod risk_policy {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CancelAllOrdersRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -11131,9 +11145,10 @@ pub struct CancelAllOrdersResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub matched_orders: u32,
-    /// Number of matched orders submitted for cancellation, including orders
-    /// whose cancellation was already in progress. Each moves to `CANCELED`
-    /// asynchronously after the response. Zero when `dry_run` is set.
+    /// Number of matched orders for which cancellation was requested, including
+    /// orders whose cancellation was already in progress. Observe order updates or
+    /// reads for final outcomes; orders may execute before cancellation takes
+    /// effect. Zero when `dry_run` is set.
     ///
     /// Field 3: `submitted_cancels`
     #[serde(
@@ -11829,7 +11844,9 @@ pub mod cancel_all_orders_response {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CancelAllAfterRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -13468,7 +13485,9 @@ pub mod batch_create_result_item {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct BatchCreateOrdersRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -13922,7 +13941,9 @@ pub const __BATCH_CREATE_ORDERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonA
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct ModifyOrderRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -15772,7 +15793,9 @@ pub const __BATCH_REPLACE_ADMISSION_ITEM_JSON_ANY: ::buffa::type_registry::JsonA
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct BatchReplaceOrdersRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -16874,7 +16897,9 @@ pub mod batch_cancel_result_item {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct BatchCancelOrdersRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -17315,7 +17340,8 @@ pub const __BATCH_CANCEL_ORDERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonA
 /// Shared enums (Side, OrderType, TimeInForce, SelfTradePreventionMode,
 /// FeeAsset) are imported from orders.proto.
 ///
-/// OrderStatus is specific to the read API (write API uses simple "accepted" status string).
+/// OrderStatus describes the order's execution lifecycle state on read surfaces.
+/// CreateOrder acknowledges admission without returning execution status.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum OrderStatus {
@@ -17525,14 +17551,17 @@ pub enum CancelReason {
     /// (max_quote_debit_scaled) that spends that amount, so that what is left
     /// buys no further quantity step, ends FILLED instead.
     CANCEL_REASON_MARKET_REMAINDER = 3i32,
-    /// Self-trade prevention canceled this resting order when an order of the
-    /// same account would have matched it.
+    /// Self-trade prevention canceled this resting order when an incoming order
+    /// belonging to the same root account, including another subaccount of that
+    /// root, would have matched it.
     CANCEL_REASON_STP_EXPIRE_MAKER = 4i32,
     /// Self-trade prevention canceled this incoming order instead of matching a
-    /// resting order of the same account.
+    /// resting order belonging to the same root account, including another
+    /// subaccount of that root.
     CANCEL_REASON_STP_EXPIRE_TAKER = 5i32,
-    /// Self-trade prevention canceled both this order and the order of the same
-    /// account it would have matched.
+    /// Self-trade prevention canceled both this order and the order belonging to
+    /// the same root account, including another subaccount of that root, that it
+    /// would have matched.
     CANCEL_REASON_STP_EXPIRE_BOTH = 6i32,
     /// A replace ended this order and created its successor.
     CANCEL_REASON_REPLACED = 7i32,
@@ -20548,9 +20577,9 @@ pub struct Order {
     pub market_max_slippage_bps: i32,
     /// Per-order state version: 0 while the order is accepted but not yet on
     /// the book (status PENDING), then 1 from its first book state and higher
-    /// for every later published state change. A higher version is always
-    /// newer, and two copies of an order with the same version are identical,
-    /// so use this field to reconcile API and realtime updates.
+    /// for every later published execution-state change. Higher values identify
+    /// newer execution state. Fee totals and requested enrichments are not covered
+    /// by this version and may differ between responses with the same version.
     ///
     /// Field 26: `version`
     #[serde(
@@ -22335,7 +22364,9 @@ pub const __ORDER_TRANSFER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetOpenOrdersRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -22890,7 +22921,9 @@ pub const __GET_OPEN_ORDERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEn
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetOrderHistoryRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -23547,7 +23580,9 @@ pub const __GET_ORDER_HISTORY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct GetUserTradesRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -24540,7 +24575,9 @@ pub const __GET_USER_TRADES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEn
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct GetOrderRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -25345,7 +25382,9 @@ pub const __GET_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetBatchReplaceStatusRequest {
-    /// Target sub-account numeric ID. When omitted, uses caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -28684,7 +28723,9 @@ pub mod __buffa {
         /// back before retrying. UNAVAILABLE means the order was not accepted.
         #[derive(Clone, Debug, Default)]
         pub struct CreateOrderRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -28975,7 +29016,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -29641,7 +29684,9 @@ pub mod __buffa {
         /// creates no order, hold, reservation, or client-order-ID claim.
         #[derive(Clone, Debug, Default)]
         pub struct PreviewOrderRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -29932,7 +29977,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -30498,7 +30545,9 @@ pub mod __buffa {
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 4: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -30853,7 +30902,9 @@ pub mod __buffa {
             pub fn symbol_id(&self) -> u32 {
                 self.0.reborrow().symbol_id
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 4: `subaccount_id`
             #[must_use]
@@ -34981,7 +35032,9 @@ pub mod __buffa {
         /// attached legs, and how to stop them too.
         #[derive(Clone, Debug, Default)]
         pub struct CancelAllOrdersRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -35347,7 +35400,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -35744,9 +35799,10 @@ pub mod __buffa {
             ///
             /// Field 2: `matched_orders`
             pub matched_orders: u32,
-            /// Number of matched orders submitted for cancellation, including orders
-            /// whose cancellation was already in progress. Each moves to `CANCELED`
-            /// asynchronously after the response. Zero when `dry_run` is set.
+            /// Number of matched orders for which cancellation was requested, including
+            /// orders whose cancellation was already in progress. Observe order updates or
+            /// reads for final outcomes; orders may execute before cancellation takes
+            /// effect. Zero when `dry_run` is set.
             ///
             /// Field 3: `submitted_cancels`
             pub submitted_cancels: u32,
@@ -36308,9 +36364,10 @@ pub mod __buffa {
             pub fn matched_orders(&self) -> u32 {
                 self.0.reborrow().matched_orders
             }
-            /// Number of matched orders submitted for cancellation, including orders
-            /// whose cancellation was already in progress. Each moves to `CANCELED`
-            /// asynchronously after the response. Zero when `dry_run` is set.
+            /// Number of matched orders for which cancellation was requested, including
+            /// orders whose cancellation was already in progress. Observe order updates or
+            /// reads for final outcomes; orders may execute before cancellation takes
+            /// effect. Zero when `dry_run` is set.
             ///
             /// Field 3: `submitted_cancels`
             #[must_use]
@@ -36439,7 +36496,9 @@ pub mod __buffa {
         /// scope cancels: open orders, never triggers. See CancelAllAfter.
         #[derive(Clone, Debug, Default)]
         pub struct CancelAllAfterRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -36781,7 +36840,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -38966,7 +39027,9 @@ pub mod __buffa {
         /// BatchCreateOrdersRequest places multiple orders in one request.
         #[derive(Clone, Debug, Default)]
         pub struct BatchCreateOrdersRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -39278,7 +39341,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -39836,7 +39901,9 @@ pub mod __buffa {
         /// ModifyOrderRequest updates an existing order using policy-driven amend/replace behavior.
         #[derive(Clone, Debug, Default)]
         pub struct ModifyOrderRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -40395,7 +40462,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -42199,7 +42268,9 @@ pub mod __buffa {
         /// a different payload under the same key conflicts. Use a fresh key for a new batch.
         #[derive(Clone, Debug, Default)]
         pub struct BatchReplaceOrdersRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -42532,7 +42603,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -43946,7 +44019,9 @@ pub mod __buffa {
         /// BatchCancelOrdersRequest cancels multiple orders by explicit ID.
         #[derive(Clone, Debug, Default)]
         pub struct BatchCancelOrdersRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -44249,7 +44324,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -48158,9 +48235,9 @@ pub mod __buffa {
             pub market_max_slippage_bps: i32,
             /// Per-order state version: 0 while the order is accepted but not yet on
             /// the book (status PENDING), then 1 from its first book state and higher
-            /// for every later published state change. A higher version is always
-            /// newer, and two copies of an order with the same version are identical,
-            /// so use this field to reconcile API and realtime updates.
+            /// for every later published execution-state change. Higher values identify
+            /// newer execution state. Fee totals and requested enrichments are not covered
+            /// by this version and may differ between responses with the same version.
             ///
             /// Field 26: `version`
             pub version: u32,
@@ -49717,9 +49794,9 @@ pub mod __buffa {
             }
             /// Per-order state version: 0 while the order is accepted but not yet on
             /// the book (status PENDING), then 1 from its first book state and higher
-            /// for every later published state change. A higher version is always
-            /// newer, and two copies of an order with the same version are identical,
-            /// so use this field to reconcile API and realtime updates.
+            /// for every later published execution-state change. Higher values identify
+            /// newer execution state. Fee totals and requested enrichments are not covered
+            /// by this version and may differ between responses with the same version.
             ///
             /// Field 26: `version`
             #[must_use]
@@ -51496,7 +51573,9 @@ pub mod __buffa {
         /// GetOpenOrdersRequest lists currently non-terminal orders for an account.
         #[derive(Clone, Debug, Default)]
         pub struct GetOpenOrdersRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -51941,7 +52020,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -52365,7 +52446,9 @@ pub mod __buffa {
         /// GetOrderHistoryRequest lists terminal orders for an account.
         #[derive(Clone, Debug, Default)]
         pub struct GetOrderHistoryRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -52891,7 +52974,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -53347,7 +53432,9 @@ pub mod __buffa {
         /// GetUserTradesRequest lists trade fills for an account.
         #[derive(Clone, Debug, Default)]
         pub struct GetUserTradesRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -53910,7 +53997,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -54423,7 +54512,9 @@ pub mod __buffa {
         /// GetOrderRequest retrieves one physical order and a bounded page of its lineage executions.
         #[derive(Clone, Debug, Default)]
         pub struct GetOrderRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -54867,7 +54958,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -55462,7 +55555,9 @@ pub mod __buffa {
         /// unavailable, reconcile the individual orders; absence does not prove rejection.
         #[derive(Clone, Debug, Default)]
         pub struct GetBatchReplaceStatusRequestView<'a> {
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -55724,7 +55819,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account numeric ID. When omitted, uses caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -57282,11 +57379,12 @@ pub mod __buffa {
                     map.end()
                 }
             }
-            /// Optional price protection. If set, when the trailing stop triggers we place
-            /// an IOC LIMIT order at stop_price ± max_slippage (instead of an unprotected
-            /// MARKET order).
-            ///
-            /// Exactly one of these should be set (or neither for unprotected behavior).
+            /// Optional slippage override for the trailing-stop child. When set, the
+            /// child uses an IOC limit bounded by this delta from the trigger price and,
+            /// for a buy, by limit_price_ticks. When omitted, a market child uses the
+            /// pair's default market slippage for its side, or 200 basis points if no
+            /// positive default is configured. A buy child remains bounded by
+            /// limit_price_ticks. Set at most one of these fields.
             #[derive(Clone, PartialEq, Debug)]
             pub enum MaxSlippage {
                 MaxSlippageTicks(i64),

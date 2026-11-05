@@ -418,7 +418,10 @@ pub trait TriggersService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// List trigger events (append-only history).
+    /// List trigger events (append-only history). A trigger the caller cannot
+    /// read (no such trigger, another account's, or one outside the selected
+    /// sub-account) answers NOT_FOUND, as GetTrigger does. A trigger the caller
+    /// can read that has no event yet answers an empty list.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

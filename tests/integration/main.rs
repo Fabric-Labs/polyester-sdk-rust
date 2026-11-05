@@ -30,6 +30,7 @@ mod account_admin;
 mod auth;
 mod balances;
 mod batch_replace_regression;
+mod contract_followup;
 mod currency_conversion;
 mod environment_pins;
 mod funded_chain_userop;

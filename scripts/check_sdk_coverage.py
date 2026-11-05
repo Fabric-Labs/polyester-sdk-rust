@@ -685,7 +685,7 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
     },
     {
         "id": "balances",
-        "label": "Balances, holds, equity history",
+        "label": "Balances and equity history",
         "any_services": ["ledger.read.v1.LedgerReadService"],
         # LedgerRead also backs transfers; balances is yes if any ledger read RPC wrapped.
     },

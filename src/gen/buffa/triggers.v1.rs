@@ -204,11 +204,11 @@ pub enum TriggerStatus {
     /// Trigger was canceled. The cancel reason states why, for example a user
     /// request or another attached leg's exit closing its parent's position. A
     /// ladder is canceled when the ladder itself is canceled. A ladder whose
-    /// child orders were canceled with none filled, for example one by one, with
-    /// a cancel-all or by the dead man's switch, is canceled too, with a user
+    /// child orders the user canceled with none filled, one by one, with a
+    /// cancel-all or by the dead man's switch, is canceled too, with a user
     /// request reason, once none of them remains open. A ladder whose child
-    /// orders were canceled only by self-trade prevention, with none filled,
-    /// completes instead.
+    /// orders were canceled only by self-trade prevention, or by the exchange
+    /// while it recovered the account, with none filled, completes instead.
     STATUS_CANCELED = 5i32,
     /// Trigger failed (for example, reservation failure, child order rejection).
     /// A ladder fails when every child order was rejected before it was placed
@@ -423,11 +423,12 @@ pub enum TriggerEventType {
     /// attached take-profit, stop-loss or trailing stop whose order self-trade
     /// prevention expired against another of the account's resting orders stays
     /// live too (TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED), reported once
-    /// while that order blocks it; it fires again at a new trade at or beyond its
-    /// trigger price, or once the other order is no longer at the best price. Not
-    /// terminal: the trigger keeps its
-    /// status. child_seq names the refused attempt, which placed no child order,
-    /// and fire_refusal_reason says why; the next fire takes the next child_seq.
+    /// while that order blocks it. New trades and price updates do not fire it
+    /// while the other order is first in line at the best price; once that order
+    /// is gone or no longer first there, it fires again if its trigger condition
+    /// still holds. Not terminal: the trigger keeps its status. child_seq names
+    /// the refused attempt, which placed no child order, and fire_refusal_reason
+    /// says why; the next fire takes the next child_seq.
     /// With TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED, child_seq names the
     /// expired child order instead, which was placed and canceled by self-trade
     /// prevention. A refusal that ends the trigger is EVENT_FAILED instead.
@@ -1162,18 +1163,19 @@ pub enum TriggerFailureReason {
     TRIGGER_FAILURE_REASON_ACCOUNT_REPAIRING = 239i32,
     /// The trigger watches the index price and the market has no index price.
     TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE = 241i32,
-    /// The trigger price was already reached by the price the trigger watches
-    /// when the trigger was submitted (at or past it), so the trigger would have
-    /// fired at once. It never armed and sent no order; its reserved funds were
-    /// released. A price that reaches the trigger price after submission fires
-    /// the trigger normally.
+    /// The trigger price, or a trailing stop's activation price, was already
+    /// reached by the price the trigger watches when the trigger was submitted
+    /// (at or past it), so the trigger would have fired or activated at once. It
+    /// never armed and sent no order; its reserved funds were released. A price
+    /// that reaches it after submission fires or activates the trigger normally.
     TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY = 244i32,
     /// Self-trade prevention expired the order of an attached take-profit,
     /// stop-loss or trailing stop because it would have traded with another of
     /// the account's resting orders. Reported only as a fire refusal reason
-    /// (EVENT_FIRE_REFUSED): the attached order stays active and fires again at a
-    /// new trade at or beyond its trigger price, or once the other order is no
-    /// longer at the best price.
+    /// (EVENT_FIRE_REFUSED): the attached order stays active. New trades and price
+    /// updates do not fire it while the other order is first in line at the best
+    /// price; once that order is gone or no longer first there, it fires again if
+    /// its trigger condition still holds.
     TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED = 249i32,
     /// The terminal state did not contain a failure reason.
     TRIGGER_FAILURE_REASON_MISSING_REASON_CODE = 998i32,
@@ -5979,7 +5981,7 @@ pub const __LADDER_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
     from_json: ::buffa::type_registry::any_from_json::<LadderTrigger>,
     is_wkt: false,
 };
-/// TriggerIntent contains one standalone trigger's immutable configuration.
+/// TriggerIntent contains one standalone trigger's initial configuration.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -6722,7 +6724,9 @@ pub mod trigger_intent {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateTriggerRequest {
-    /// Target sub-account. When omitted, uses the caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -7125,7 +7129,9 @@ pub struct GetTriggerRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub trigger_id: u64,
-    /// Optional sub-account for authorization.
+    /// Optional public subaccount ID for authorization. When omitted,
+    /// subaccount-scoped API keys use their bound subaccount; other callers use
+    /// their authenticated root account.
     ///
     /// Field 2: `subaccount_id`
     #[serde(
@@ -7417,8 +7423,9 @@ pub const __GET_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListTriggersRequest {
-    /// Optional sub-account to list triggers for. When empty or omitted, uses the
-    /// caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -7946,8 +7953,9 @@ pub struct ListTriggerEventsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub trigger_id: u64,
-    /// Optional sub-account (authorization). When empty or omitted, uses the
-    /// caller's root account.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 2: `subaccount_id`
     #[serde(
@@ -9261,7 +9269,9 @@ pub struct CancelTriggerRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub trigger_id: u64,
-    /// Optional sub-account for authorization.
+    /// Optional public subaccount ID for authorization. When omitted,
+    /// subaccount-scoped API keys use their bound subaccount; other callers use
+    /// their authenticated root account.
     ///
     /// Field 2: `subaccount_id`
     #[serde(
@@ -9649,7 +9659,9 @@ pub struct ModifyTriggerRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub trigger_id: u64,
-    /// Optional sub-account for authorization.
+    /// Optional public subaccount ID for authorization. When omitted,
+    /// subaccount-scoped API keys use their bound subaccount; other callers use
+    /// their authenticated root account.
     ///
     /// Field 2: `subaccount_id`
     #[serde(
@@ -10587,7 +10599,9 @@ pub struct PauseTriggerRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub trigger_id: u64,
-    /// Optional sub-account for authorization.
+    /// Optional public subaccount ID for authorization. When omitted,
+    /// subaccount-scoped API keys use their bound subaccount; other callers use
+    /// their authenticated root account.
     ///
     /// Field 2: `subaccount_id`
     #[serde(
@@ -10971,7 +10985,9 @@ pub struct ResumeTriggerRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub trigger_id: u64,
-    /// Optional sub-account for authorization.
+    /// Optional public subaccount ID for authorization. When omitted,
+    /// subaccount-scoped API keys use their bound subaccount; other callers use
+    /// their authenticated root account.
     ///
     /// Field 2: `subaccount_id`
     #[serde(
@@ -18408,7 +18424,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// TriggerIntent contains one standalone trigger's immutable configuration.
+        /// TriggerIntent contains one standalone trigger's initial configuration.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerIntentView<'a> {
             /// Stable numeric pair ID from GetSpotConfig.
@@ -19228,7 +19244,9 @@ pub mod __buffa {
         /// the trigger was not created.
         #[derive(Clone, Debug, Default)]
         pub struct CreateTriggerRequestView<'a> {
-            /// Target sub-account. When omitted, uses the caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -19519,7 +19537,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Target sub-account. When omitted, uses the caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -20003,7 +20023,9 @@ pub mod __buffa {
             ///
             /// Field 1: `trigger_id`
             pub trigger_id: u64,
-            /// Optional sub-account for authorization.
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -20262,7 +20284,9 @@ pub mod __buffa {
             pub fn trigger_id(&self) -> u64 {
                 self.0.reborrow().trigger_id
             }
-            /// Optional sub-account for authorization.
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
             ///
             /// Field 2: `subaccount_id`
             #[must_use]
@@ -20616,8 +20640,9 @@ pub mod __buffa {
         /// ListTriggersRequest lists triggers for an account.
         #[derive(Clone, Debug, Default)]
         pub struct ListTriggersRequestView<'a> {
-            /// Optional sub-account to list triggers for. When empty or omitted, uses the
-            /// caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -21054,8 +21079,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional sub-account to list triggers for. When empty or omitted, uses the
-            /// caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]
@@ -21486,8 +21512,9 @@ pub mod __buffa {
             ///
             /// Field 1: `trigger_id`
             pub trigger_id: u64,
-            /// Optional sub-account (authorization). When empty or omitted, uses the
-            /// caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -21832,8 +21859,9 @@ pub mod __buffa {
             pub fn trigger_id(&self) -> u64 {
                 self.0.reborrow().trigger_id
             }
-            /// Optional sub-account (authorization). When empty or omitted, uses the
-            /// caller's root account.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 2: `subaccount_id`
             #[must_use]
@@ -23255,7 +23283,9 @@ pub mod __buffa {
             ///
             /// Field 1: `trigger_id`
             pub trigger_id: u64,
-            /// Optional sub-account for authorization.
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -23514,7 +23544,9 @@ pub mod __buffa {
             pub fn trigger_id(&self) -> u64 {
                 self.0.reborrow().trigger_id
             }
-            /// Optional sub-account for authorization.
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
             ///
             /// Field 2: `subaccount_id`
             #[must_use]
@@ -23981,7 +24013,9 @@ pub mod __buffa {
             ///
             /// Field 1: `trigger_id`
             pub trigger_id: u64,
-            /// Optional sub-account for authorization.
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -24548,7 +24582,9 @@ pub mod __buffa {
             pub fn trigger_id(&self) -> u64 {
                 self.0.reborrow().trigger_id
             }
-            /// Optional sub-account for authorization.
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
             ///
             /// Field 2: `subaccount_id`
             #[must_use]
@@ -25069,7 +25105,9 @@ pub mod __buffa {
             ///
             /// Field 1: `trigger_id`
             pub trigger_id: u64,
-            /// Optional sub-account for authorization.
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -25328,7 +25366,9 @@ pub mod __buffa {
             pub fn trigger_id(&self) -> u64 {
                 self.0.reborrow().trigger_id
             }
-            /// Optional sub-account for authorization.
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
             ///
             /// Field 2: `subaccount_id`
             #[must_use]
@@ -25789,7 +25829,9 @@ pub mod __buffa {
             ///
             /// Field 1: `trigger_id`
             pub trigger_id: u64,
-            /// Optional sub-account for authorization.
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -26080,7 +26122,9 @@ pub mod __buffa {
             pub fn trigger_id(&self) -> u64 {
                 self.0.reborrow().trigger_id
             }
-            /// Optional sub-account for authorization.
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
             ///
             /// Field 2: `subaccount_id`
             #[must_use]
@@ -30917,8 +30961,9 @@ pub mod __buffa {
                     map.end()
                 }
             }
-            /// Immutable strategy configuration. The selected variant is the trigger
-            /// category and uses the same shape accepted by CreateTrigger.
+            /// Current strategy configuration, including successfully applied
+            /// modifications. The selected variant identifies the trigger category and
+            /// uses the same shape accepted by CreateTrigger.
             #[derive(Clone, PartialEq, Debug)]
             pub enum Configuration {
                 StopLoss(

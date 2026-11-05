@@ -90,8 +90,9 @@ pub const FEE_SERVICE_GET_SPOT_FEE_RATES_SPEC: ::connectrpc::Spec = ::connectrpc
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait FeeService: Send + Sync + 'static {
-    /// Get effective maker and taker fee rates for the authenticated caller's
-    /// root account or selected subaccount.
+    /// Get effective maker and taker fee rates, the rates an order reserves its
+    /// fee at, and the components of the effective rates for the authenticated
+    /// caller's root account or selected subaccount.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

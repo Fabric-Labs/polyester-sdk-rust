@@ -709,8 +709,9 @@ pub const __GET_RATE_LIMIT_CONFIG_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetTradingRateLimitsRequest {
-    /// Optional subaccount public identifier. When omitted, the authenticated
-    /// caller's root account is used.
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
     ///
     /// Field 1: `subaccount_id`
     #[serde(
@@ -2193,8 +2194,9 @@ pub mod __buffa {
         /// account target.
         #[derive(Clone, Debug, Default)]
         pub struct GetTradingRateLimitsRequestView<'a> {
-            /// Optional subaccount public identifier. When omitted, the authenticated
-            /// caller's root account is used.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -2429,8 +2431,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional subaccount public identifier. When omitted, the authenticated
-            /// caller's root account is used.
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
             ///
             /// Field 1: `subaccount_id`
             #[must_use]

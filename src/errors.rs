@@ -33,6 +33,7 @@ pub enum Error {
         code: String,
         context: String,
         endpoint: String,
+        problem: Option<Box<crate::problem::HttpProblem>>,
     },
     #[error("{0}")]
     Validation(String),
@@ -87,7 +88,10 @@ pub enum Error {
     #[error(
         "API-key request timestamp is outside the allowed skew window (HTTP {status}); check the local clock"
     )]
-    TimestampSkew { status: u16 },
+    TimestampSkew {
+        status: u16,
+        problem: Option<Box<crate::problem::HttpProblem>>,
+    },
     /// An API-key request's credentials were refused, for example
     /// `SIGNATURE_INVALID`, `KEY_DISABLED` or `IP_NOT_ALLOWED`: by the API
     /// gateway before any service saw it, or by the service with an
@@ -96,7 +100,11 @@ pub enum Error {
     /// the key, signature or allowlist. [`Error::auth_error_code`] returns
     /// `code`, [`Error::auth_code`] the typed reason.
     #[error("API-key request rejected (HTTP {status}, code {code})")]
-    ApiKeyRejected { status: u16, code: String },
+    ApiKeyRejected {
+        status: u16,
+        code: String,
+        problem: Option<Box<crate::problem::HttpProblem>>,
+    },
     /// The method accepts only an interactive session token, and the request
     /// carried an account API key (or a session token that carries one):
     /// `AUTH_SESSION_KIND_NOT_ALLOWED`, HTTP 403. Every session-only method
@@ -104,7 +112,10 @@ pub enum Error {
     /// auto-withdraw rule writes and the portfolio equity reads. Not
     /// retryable: call the method with a session token.
     #[error("{message}")]
-    SessionRequired { message: String },
+    SessionRequired {
+        message: String,
+        problem: Option<Box<crate::problem::HttpProblem>>,
+    },
     #[error("{0}")]
     Realtime(String),
     /// Realtime subscription queue was full; the subscription fails instead of
@@ -256,11 +267,15 @@ const EXISTING_ORDER_ID_METADATA: &str = "existing_order_id";
 /// from the gateway's `{"code": ...}` JSON body.
 pub(crate) fn gateway_rejection_error(status: u16, code: &str) -> Error {
     if code == auth_codes::TIMESTAMP_SKEW {
-        Error::TimestampSkew { status }
+        Error::TimestampSkew {
+            status,
+            problem: None,
+        }
     } else {
         Error::ApiKeyRejected {
             status,
             code: code.to_owned(),
+            problem: None,
         }
     }
 }
@@ -270,6 +285,38 @@ fn is_outcome_unknown_code(code: &str) -> bool {
 }
 
 impl Error {
+    /// Original REST metadata, when a REST problem supplied this error.
+    /// For `Error::Api`, this decodes the synthetic JSON `http_problem` metadata entry.
+    pub fn http_problem(&self) -> Option<crate::problem::HttpProblem> {
+        match self {
+            Self::ApiKeyRejected { problem, .. }
+            | Self::PermissionDenied { problem, .. }
+            | Self::TimestampSkew { problem, .. }
+            | Self::SessionRequired { problem, .. } => problem.as_deref().cloned(),
+            Self::Api { metadata, .. } => metadata
+                .iter()
+                .find(|(key, _)| key == "http_problem")
+                .and_then(|(_, value)| serde_json::from_str(value).ok()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn with_http_problem(mut self, value: crate::problem::HttpProblem) -> Self {
+        match &mut self {
+            Self::ApiKeyRejected { problem, .. }
+            | Self::PermissionDenied { problem, .. }
+            | Self::TimestampSkew { problem, .. }
+            | Self::SessionRequired { problem, .. } => *problem = Some(Box::new(value)),
+            Self::Api { metadata, .. } => {
+                if let Ok(encoded) = serde_json::to_string(&value) {
+                    metadata.push(("http_problem".into(), encoded));
+                }
+            }
+            _ => {}
+        }
+        self
+    }
+
     pub fn auth(msg: impl Into<String>) -> Self {
         Self::Auth(msg.into())
     }
@@ -581,6 +628,21 @@ fn retry_after_seconds(err: &ConnectError) -> Option<f64> {
 
 /// Map a ConnectRPC error into an SDK error.
 pub fn map_connect_error(err: ConnectError) -> Error {
+    let problem = err
+        .details
+        .iter()
+        .find(|d| d.type_url == crate::transport::HTTP_PROBLEM_TYPE)
+        .and_then(|d| d.debug.as_ref())
+        .and_then(|v| serde_json::from_value(v.clone()).ok());
+    let mapped = map_connect_error_inner(err);
+    if let Some(problem) = problem {
+        mapped.with_http_problem(problem)
+    } else {
+        mapped
+    }
+}
+
+fn map_connect_error_inner(err: ConnectError) -> Error {
     let fallback_message = {
         let message = err.to_string();
         if message.trim().is_empty() {
@@ -610,16 +672,23 @@ pub fn map_connect_error(err: ConnectError) -> Error {
         };
     }
     if raw_message == auth_codes::TIMESTAMP_SKEW {
-        return Error::TimestampSkew { status };
+        return Error::TimestampSkew {
+            status,
+            problem: None,
+        };
     }
     for detail in &err.details {
         if let Some(auth_detail) = decode_auth_error_detail(detail) {
             match auth_detail.code.as_known() {
                 Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW) => {
-                    return Error::TimestampSkew { status };
+                    return Error::TimestampSkew {
+                        status,
+                        problem: None,
+                    };
                 }
                 Some(AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED) => {
                     return Error::SessionRequired {
+                        problem: None,
                         message: if auth_detail.message.is_empty() {
                             fallback_message
                         } else {
@@ -631,6 +700,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
                     return Error::ApiKeyRejected {
                         status,
                         code: known.proto_name().trim_start_matches("AUTH_").to_owned(),
+                        problem: None,
                     };
                 }
                 _ => {}
@@ -1151,7 +1221,7 @@ mod tests {
             auth_codes::TIMESTAMP_SKEW,
         ));
         assert!(
-            matches!(err, Error::TimestampSkew { status: 401 }),
+            matches!(err, Error::TimestampSkew { status: 401, .. }),
             "{err:?}"
         );
         assert!(err.is_retryable() && !err.mutation_outcome_unknown());
@@ -1176,7 +1246,7 @@ mod tests {
             "API key timestamp is outside the allowed window",
         );
         assert!(
-            matches!(err, Error::TimestampSkew { status: 401 }),
+            matches!(err, Error::TimestampSkew { status: 401, .. }),
             "{err:?}"
         );
         assert!(err.is_retryable() && !err.mutation_outcome_unknown());
@@ -1199,7 +1269,7 @@ mod tests {
         ] {
             let err = map_auth_with(ErrorCode::Unauthenticated, proto_code, "refused");
             assert!(
-                matches!(&err, Error::ApiKeyRejected { status: 401, code } if code == rest_code),
+                matches!(&err, Error::ApiKeyRejected { status: 401, code, .. } if code == rest_code),
                 "{err:?}"
             );
             assert_eq!(err.auth_code(), Some(proto_code));
@@ -1268,7 +1338,7 @@ mod tests {
             "interactive session required",
         );
         match &err {
-            Error::SessionRequired { message } => {
+            Error::SessionRequired { message, .. } => {
                 assert_eq!(message, "interactive session required")
             }
             other => panic!("unexpected error: {other:?}"),
