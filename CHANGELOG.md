@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.7.2
+
+Package version: `0.7.2`. Git tag: `v0.7.2`. Released 2026-11-06.
 
 - REST errors that say an order or trigger outcome is unknown now use the
   same non-retryable API error as Connect. Read the order or trigger back
