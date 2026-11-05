@@ -745,6 +745,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 order_detail.code.as_known().map(|c| c.proto_name()),
                 order_detail.code.to_i32(),
             );
+            // Policy lookup outages are not policy denials. Some unavailable
+            // codes are permanent preconditions, so also check the Connect code.
+            if err.code == ErrorCode::Unavailable && code.ends_with("_UNAVAILABLE") {
+                return Error::Server(fallback_message.clone());
+            }
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
             }
@@ -1040,6 +1045,49 @@ mod tests {
         assert!(contract.mutation_outcome_unknown());
 
         assert!(!Error::validation("bad price").is_retryable());
+    }
+
+    #[test]
+    fn order_unavailable_classification() {
+        for code in [
+            OrderErrorCode::ERROR_CODE_RATE_LIMIT_POLICY_UNAVAILABLE,
+            OrderErrorCode::ERROR_CODE_POLICY_UNAVAILABLE,
+            OrderErrorCode::ERROR_CODE_FEE_SCHEDULE_UNAVAILABLE,
+            OrderErrorCode::Unavailable,
+        ] {
+            let mapped = map_order(code, ErrorCode::Unavailable);
+            assert!(matches!(mapped, Error::Server(_)), "{code:?}: {mapped:?}");
+            assert!(!matches!(mapped, Error::Auth(_)));
+            assert!(mapped.is_retryable(), "{code:?}: {mapped:?}");
+        }
+    }
+
+    #[test]
+    fn order_policy_denial_classification() {
+        for name in [
+            "ERROR_CODE_POLICY_MARKET_DENY",
+            "ERROR_CODE_POLICY_TRADING_HALTED",
+            "ERROR_CODE_POLICY_SPOT_TRADE_DENY",
+            "ERROR_CODE_POLICY_SPOT_READ_DENY",
+        ] {
+            let code = OrderErrorCode::from_proto_name(name).unwrap();
+            let mapped = map_order(code, ErrorCode::PermissionDenied);
+            assert!(matches!(mapped, Error::Auth(_)), "{name}: {mapped:?}");
+            assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
+        }
+    }
+
+    #[test]
+    fn order_unavailable_precondition_classification() {
+        for name in [
+            "ERROR_CODE_MARKET_PRICE_UNAVAILABLE",
+            "ERROR_CODE_ORDER_LIMITS_UNAVAILABLE",
+        ] {
+            let code = OrderErrorCode::from_proto_name(name).unwrap();
+            let mapped = map_order(code, ErrorCode::FailedPrecondition);
+            assert!(matches!(mapped, Error::Api { .. }), "{name}: {mapped:?}");
+            assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
+        }
     }
 
     fn map_order(code: OrderErrorCode, connect_code: ErrorCode) -> Error {

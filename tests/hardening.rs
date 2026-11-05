@@ -5323,3 +5323,25 @@ async fn l2_early_auth_problem_metadata_and_trigger_not_found() {
         "not-found is not retried"
     );
 }
+
+#[tokio::test]
+async fn l2_rest_order_unavailable_classification() {
+    for code in [
+        "RATE_LIMIT_POLICY_UNAVAILABLE",
+        "POLICY_UNAVAILABLE",
+        "FEE_SCHEDULE_UNAVAILABLE",
+        "UNAVAILABLE",
+    ] {
+        let body = json!({"code": code, "status": 503, "detail": "retry later"}).to_string();
+        let http =
+            MockHttpServer::spawn(move |_| json_body(503, "application/problem+json", &body)).await;
+        let err = api_key_client(&http)
+            .auth
+            .me()
+            .await
+            .expect_err("unavailable");
+        assert!(matches!(err, Error::Server(_)), "{code}: {err:?}");
+        assert!(!matches!(err, Error::Auth(_)));
+        assert!(err.is_retryable(), "{code}: {err:?}");
+    }
+}
