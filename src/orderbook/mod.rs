@@ -55,6 +55,11 @@ pub fn bucket_side(book: &BookSide, bucket_ticks: i64, asks: bool) -> Result<Boo
             if qty < 0 {
                 return Err(Error::validation("orderbook quantity must be non-negative"));
             }
+            if price == 0 && qty > 0 {
+                return Err(Error::validation(
+                    "orderbook level has invalid or missing price",
+                ));
+            }
         }
         return Ok(book.clone());
     }
@@ -67,6 +72,11 @@ pub fn bucket_side(book: &BookSide, bucket_ticks: i64, asks: bool) -> Result<Boo
         }
         if qty <= 0 {
             continue;
+        }
+        if price == 0 {
+            return Err(Error::validation(
+                "orderbook level has invalid or missing price",
+            ));
         }
         let quotient = price.div_euclid(bucket_ticks);
         let floor = quotient
@@ -186,7 +196,7 @@ fn side_to_levels(
     let mut levels = Vec::with_capacity(limit);
     for (price, qty) in entries.into_iter().take(limit) {
         // A positive raw bid may floor into a zero display boundary.
-        let decode_price = if bucket_ticks > 0 {
+        let decode_price = if bucket_ticks > 0 && side == "bids" {
             decode_price_ticks_allow_zero
         } else {
             decode_price_ticks
