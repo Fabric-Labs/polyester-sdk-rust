@@ -5848,3 +5848,453 @@ async fn l2_market_overview_follows_token_with_unchanged_filters() {
         assert!(next.include_sparklines);
     }
 }
+
+// Each case goes through the public helper and a capture server; both refusal and
+// supported wire values are checked, so a missing scenario cannot pass silently.
+#[tokio::test]
+async fn poly_8539_trigger_option_applicability() {
+    use polyester::Price;
+    use polyester::models::{CreateOrderType, CreateSide, CreateTriggerParams, CreateTriggerType};
+    use polyester::proto::triggers::v1::{
+        CreateTriggerRequest, CreateTriggerResponse, trigger_intent,
+    };
+    use std::sync::Mutex;
+
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let capture = Arc::clone(&captured);
+    let http = MockHttpServer::spawn(move |request| {
+        capture
+            .lock()
+            .unwrap()
+            .push(CreateTriggerRequest::decode_from_slice(&request.body).unwrap());
+        connect_proto_ok(&CreateTriggerResponse {
+            trigger_id: 1,
+            client_trigger_id: "capture-option".into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = api_key_client(&http);
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{"symbol":"BTC-USDT", "symbol_id":1, "base_quantity_scale":8}]
+        }))
+        .unwrap();
+    let kinds = [
+        CreateTriggerType::StopLoss,
+        CreateTriggerType::TakeProfit,
+        CreateTriggerType::TrailingStop,
+        CreateTriggerType::Twap,
+        CreateTriggerType::Ladder,
+    ];
+    let fields = [
+        "trailing_distance_ticks",
+        "trailing_distance_bps",
+        "activation_price",
+        "twap_duration_ms",
+        "twap_slice_interval_ms",
+        "ladder_price_min",
+        "ladder_price_max",
+        "ladder_levels",
+        "ladder_distribution",
+        "trigger_price",
+        "trigger_price_source",
+    ];
+    let mut failures = Vec::new();
+    let mut executed = 0;
+    for kind in kinds {
+        for field in fields {
+            let price = || Price::from_ticks(90_000_000_000, Some("BTC-USDT".into())).unwrap();
+            let qty = Quantity::from_scaled(
+                1_000_000,
+                Some(8),
+                QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(1),
+            )
+            .unwrap();
+            let mut params = CreateTriggerParams::new(
+                "BTC-USDT",
+                kind,
+                CreateSide::Sell,
+                CreateOrderType::Market,
+                qty,
+            );
+            params.client_trigger_id = "capture-option".into();
+            match kind {
+                CreateTriggerType::StopLoss | CreateTriggerType::TakeProfit => {
+                    params.trigger_price = Some(price())
+                }
+                CreateTriggerType::TrailingStop => params.trailing_distance_bps = Some(50),
+                CreateTriggerType::Twap => {
+                    params.twap_duration_ms = Some(60000);
+                    params.twap_slice_interval_ms = Some(10000);
+                }
+                CreateTriggerType::Ladder => {
+                    params.ladder_price_min = Some(price());
+                    params.ladder_price_max =
+                        Some(Price::from_ticks(110_000_000_000, Some("BTC-USDT".into())).unwrap());
+                    params.ladder_levels = Some(4);
+                }
+            }
+            let allowed = match field {
+                "trailing_distance_ticks" => {
+                    params.trailing_distance_bps = None;
+                    params.trailing_distance_ticks = Some(5);
+                    kind == CreateTriggerType::TrailingStop
+                }
+                "trailing_distance_bps" => {
+                    params.trailing_distance_bps = Some(50);
+                    kind == CreateTriggerType::TrailingStop
+                }
+                "activation_price" => {
+                    params.activation_price = Some(price());
+                    kind == CreateTriggerType::TrailingStop
+                }
+                "twap_duration_ms" => {
+                    params.twap_duration_ms = Some(60000);
+                    kind == CreateTriggerType::Twap
+                }
+                "twap_slice_interval_ms" => {
+                    params.twap_slice_interval_ms = Some(10000);
+                    kind == CreateTriggerType::Twap
+                }
+                "ladder_price_min" => {
+                    params.ladder_price_min = Some(price());
+                    kind == CreateTriggerType::Ladder
+                }
+                "ladder_price_max" => {
+                    params.ladder_price_max =
+                        Some(Price::from_ticks(110_000_000_000, Some("BTC-USDT".into())).unwrap());
+                    kind == CreateTriggerType::Ladder
+                }
+                "ladder_levels" => {
+                    params.ladder_levels = Some(4);
+                    kind == CreateTriggerType::Ladder
+                }
+                "ladder_distribution" => {
+                    params.ladder_distribution = Some("linear".into());
+                    kind == CreateTriggerType::Ladder
+                }
+                "trigger_price" => {
+                    params.trigger_price = Some(price());
+                    matches!(
+                        kind,
+                        CreateTriggerType::StopLoss | CreateTriggerType::TakeProfit
+                    )
+                }
+                "trigger_price_source" => {
+                    params.trigger_price_source = Some("index".into());
+                    !matches!(kind, CreateTriggerType::Twap | CreateTriggerType::Ladder)
+                }
+                _ => unreachable!(),
+            };
+            captured.lock().unwrap().clear();
+            let result = client.triggers.create(params).await;
+            let requests = captured.lock().unwrap();
+            executed += 1;
+            if !allowed {
+                if !matches!(&result, Err(Error::Validation(message)) if message.contains(field))
+                    || !requests.is_empty()
+                {
+                    failures.push(format!(
+                        "{kind:?}/{field}: result={result:?}, requests={}",
+                        requests.len()
+                    ));
+                }
+                continue;
+            }
+            assert!(result.is_ok(), "{kind:?}/{field}: {result:?}");
+            assert_eq!(requests.len(), 1, "valid {kind:?}/{field} must send once");
+            match requests[0].trigger.strategy.as_ref().unwrap() {
+                trigger_intent::Strategy::TrailingStop(s) => match field {
+                    "trailing_distance_ticks" => assert!(matches!(s.trailing_distance,Some(polyester::proto::triggers::v1::trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(5)))),
+                    "trailing_distance_bps" => assert!(matches!(s.trailing_distance,Some(polyester::proto::triggers::v1::trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(50)))),
+                    "activation_price" => assert_eq!(s.activation_price_ticks,90_000_000_000),
+                    "trigger_price_source" => assert_eq!(s.trigger_price_source,polyester::proto::orders::v1::TriggerPriceSource::IndexPrice),
+                    _=>panic!("unexpected trailing control"),
+                },
+                trigger_intent::Strategy::Twap(s) => match field {"twap_duration_ms"=>assert_eq!(s.duration_ms,60000),"twap_slice_interval_ms"=>assert_eq!(s.slice_interval_ms,10000),_=>panic!("unexpected twap control")},
+                trigger_intent::Strategy::Ladder(s) => match field {"ladder_price_min"=>assert_eq!(s.price_min_ticks,90_000_000_000),"ladder_price_max"=>assert_eq!(s.price_max_ticks,110_000_000_000),"ladder_levels"|"ladder_distribution"=>assert_eq!(s.levels,4),_=>panic!("unexpected ladder control")},
+                trigger_intent::Strategy::StopLoss(s)|trigger_intent::Strategy::TakeProfit(s) => match field {"trigger_price"=>assert_eq!(s.trigger_price_ticks,90_000_000_000),"trigger_price_source"=>assert_eq!(s.trigger_price_source,polyester::proto::orders::v1::TriggerPriceSource::IndexPrice),_=>panic!("unexpected conditional control")},
+            }
+        }
+    }
+    assert_eq!(executed, 55);
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+fn poly_8539_params(
+    kind: polyester::models::CreateTriggerType,
+    order_type: polyester::models::CreateOrderType,
+) -> polyester::models::CreateTriggerParams {
+    use polyester::Price;
+    use polyester::models::{CreateSide, CreateTriggerParams, CreateTriggerType};
+    let price = |ticks| Price::from_ticks(ticks, Some("BTC-USDT".into())).unwrap();
+    let qty = Quantity::from_scaled(
+        1_000_000,
+        Some(8),
+        QuantityDomain::OrderBase,
+        Some("BTC-USDT".into()),
+        Some(1),
+    )
+    .unwrap();
+    let mut p = CreateTriggerParams::new("BTC-USDT", kind, CreateSide::Sell, order_type, qty);
+    p.client_trigger_id = "capture-execution".into();
+    match kind {
+        CreateTriggerType::StopLoss | CreateTriggerType::TakeProfit => {
+            p.trigger_price = Some(price(100_000_000_000))
+        }
+        CreateTriggerType::TrailingStop => p.trailing_distance_bps = Some(50),
+        CreateTriggerType::Twap => {
+            p.twap_duration_ms = Some(60000);
+            p.twap_slice_interval_ms = Some(10000);
+        }
+        CreateTriggerType::Ladder => {
+            p.ladder_price_min = Some(price(90_000_000_000));
+            p.ladder_price_max = Some(price(110_000_000_000));
+            p.ladder_levels = Some(4);
+        }
+    }
+    p
+}
+
+#[tokio::test]
+async fn poly_8539_trigger_execution_applicability() {
+    use polyester::Price;
+    use polyester::models::{CreateOrderType, CreateTimeInForce, CreateTriggerType};
+    use polyester::proto::triggers::v1::{
+        CreateTriggerRequest, CreateTriggerResponse, conditional_child_execution,
+        trailing_stop_trigger, trigger_intent, trigger_market_ioc, twap_market_ioc, twap_trigger,
+    };
+    use std::sync::Mutex;
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let capture = Arc::clone(&captured);
+    let http = MockHttpServer::spawn(move |request| {
+        capture
+            .lock()
+            .unwrap()
+            .push(CreateTriggerRequest::decode_from_slice(&request.body).unwrap());
+        connect_proto_ok(&CreateTriggerResponse {
+            trigger_id: 1,
+            client_trigger_id: "capture-option".into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = api_key_client(&http);
+    client
+        .catalogs
+        .hydrate_spot_config_json(
+            json!({"pairs":[{"symbol":"BTC-USDT","symbol_id":1,"base_quantity_scale":8}]}),
+        )
+        .unwrap();
+    let mut failures = Vec::new();
+    let mut executed = 0;
+    for kind in [
+        CreateTriggerType::StopLoss,
+        CreateTriggerType::TakeProfit,
+        CreateTriggerType::TrailingStop,
+        CreateTriggerType::Twap,
+        CreateTriggerType::Ladder,
+    ] {
+        for order_type in [CreateOrderType::Market, CreateOrderType::Limit] {
+            if kind == CreateTriggerType::TrailingStop && order_type == CreateOrderType::Limit {
+                continue;
+            }
+            for field in [
+                "post_only",
+                "limit_price",
+                "time_in_force",
+                "max_slippage_ticks",
+                "max_slippage_bps",
+            ] {
+                let mut p = poly_8539_params(kind, order_type);
+                let price = || Price::from_ticks(100_000_000_000, Some("BTC-USDT".into())).unwrap();
+                if order_type == CreateOrderType::Limit && kind != CreateTriggerType::Ladder {
+                    p.limit_price = Some(price());
+                }
+                let allowed = match field {
+                    "post_only" => {
+                        p.post_only = true;
+                        kind == CreateTriggerType::Ladder
+                            || (order_type == CreateOrderType::Limit
+                                && matches!(
+                                    kind,
+                                    CreateTriggerType::StopLoss | CreateTriggerType::TakeProfit
+                                ))
+                    }
+                    "limit_price" => {
+                        p.limit_price = Some(price());
+                        order_type == CreateOrderType::Limit && kind != CreateTriggerType::Ladder
+                    }
+                    "time_in_force" => {
+                        p.time_in_force = Some(CreateTimeInForce::Fok);
+                        order_type == CreateOrderType::Limit
+                            && matches!(
+                                kind,
+                                CreateTriggerType::StopLoss | CreateTriggerType::TakeProfit
+                            )
+                    }
+                    "max_slippage_ticks" => {
+                        p.max_slippage_ticks = Some(5);
+                        kind == CreateTriggerType::TrailingStop
+                            || (kind != CreateTriggerType::Ladder
+                                && order_type == CreateOrderType::Market)
+                    }
+                    "max_slippage_bps" => {
+                        p.max_slippage_bps = Some(5);
+                        kind == CreateTriggerType::TrailingStop
+                            || (kind != CreateTriggerType::Ladder
+                                && order_type == CreateOrderType::Market)
+                    }
+                    _ => unreachable!(),
+                };
+                captured.lock().unwrap().clear();
+                let result = client.triggers.create(p).await;
+                executed += 1;
+                let requests = captured.lock().unwrap();
+                if !allowed {
+                    if !matches!(&result,Err(Error::Validation(message)) if message.contains(field))
+                        || !requests.is_empty()
+                    {
+                        failures.push(format!(
+                            "{kind:?}/{order_type:?}/{field}: {result:?}, {} requests",
+                            requests.len()
+                        ));
+                    }
+                    continue;
+                }
+                assert!(result.is_ok(), "{kind:?}/{field}: {result:?}");
+                assert_eq!(requests.len(), 1);
+                match requests[0].trigger.strategy.as_ref().unwrap() {
+                    trigger_intent::Strategy::Ladder(s) => assert!(s.post_only),
+                    trigger_intent::Strategy::TrailingStop(s) => match field {
+                        "max_slippage_ticks" => assert!(matches!(
+                            s.max_slippage,
+                            Some(trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(5))
+                        )),
+                        "max_slippage_bps" => assert!(matches!(
+                            s.max_slippage,
+                            Some(trailing_stop_trigger::MaxSlippage::MaxSlippageBps(5))
+                        )),
+                        _ => panic!("unexpected trailing control"),
+                    },
+                    trigger_intent::Strategy::Twap(s) => match s.execution.as_ref().unwrap() {
+                        twap_trigger::Execution::LimitGtc(child) => {
+                            assert_eq!(child.price_ticks, 100_000_000_000)
+                        }
+                        twap_trigger::Execution::MarketIoc(child) => match field {
+                            "max_slippage_ticks" => assert!(matches!(
+                                child.max_slippage,
+                                Some(twap_market_ioc::MaxSlippage::MaxSlippageTicks(5))
+                            )),
+                            "max_slippage_bps" => assert!(matches!(
+                                child.max_slippage,
+                                Some(twap_market_ioc::MaxSlippage::MaxSlippageBps(5))
+                            )),
+                            _ => panic!("unexpected twap control"),
+                        },
+                    },
+                    trigger_intent::Strategy::StopLoss(s)
+                    | trigger_intent::Strategy::TakeProfit(s) => {
+                        match s.child.execution.as_ref().unwrap() {
+                            conditional_child_execution::Execution::LimitGtc(child) => {
+                                assert_eq!(child.price_ticks, 100_000_000_000);
+                                if field == "post_only" {
+                                    assert!(child.post_only);
+                                }
+                            }
+                            conditional_child_execution::Execution::LimitFok(child) => {
+                                assert_eq!(field, "time_in_force");
+                                assert_eq!(child.price_ticks, 100_000_000_000);
+                            }
+                            conditional_child_execution::Execution::MarketIoc(child) => match field
+                            {
+                                "max_slippage_ticks" => assert!(matches!(
+                                    child.max_slippage,
+                                    Some(trigger_market_ioc::MaxSlippage::MaxSlippageTicks(5))
+                                )),
+                                "max_slippage_bps" => assert!(matches!(
+                                    child.max_slippage,
+                                    Some(trigger_market_ioc::MaxSlippage::MaxSlippageBps(5))
+                                )),
+                                _ => panic!("unexpected market control"),
+                            },
+                            _ => panic!("unexpected conditional control"),
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(executed, 45);
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[tokio::test]
+async fn poly_8539_trailing_side_execution_and_buy_maximum() {
+    use polyester::Price;
+    use polyester::models::{CreateOrderType, CreateSide, CreateTriggerType};
+    use polyester::proto::triggers::v1::{
+        CreateTriggerRequest, CreateTriggerResponse, trigger_intent,
+    };
+    use std::sync::Mutex;
+
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let capture = Arc::clone(&captured);
+    let http = MockHttpServer::spawn(move |request| {
+        capture
+            .lock()
+            .unwrap()
+            .push(CreateTriggerRequest::decode_from_slice(&request.body).unwrap());
+        connect_proto_ok(&CreateTriggerResponse {
+            trigger_id: 1,
+            client_trigger_id: "capture-execution".into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = api_key_client(&http);
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{"symbol":"BTC-USDT", "symbol_id":1, "base_quantity_scale":8}]
+        }))
+        .unwrap();
+    let mut executed = 0;
+    for (side, order_type) in [
+        (CreateSide::Sell, CreateOrderType::Limit),
+        (CreateSide::Buy, CreateOrderType::Limit),
+        (CreateSide::Buy, CreateOrderType::Market),
+    ] {
+        let mut p = poly_8539_params(CreateTriggerType::TrailingStop, order_type);
+        p.side = side;
+        if side == CreateSide::Buy {
+            p.limit_price =
+                Some(Price::from_ticks(100_000_000_000, Some("BTC-USDT".into())).unwrap());
+        }
+        captured.lock().unwrap().clear();
+        let result = client.triggers.create(p).await;
+        let requests = captured.lock().unwrap();
+        executed += 1;
+        if side == CreateSide::Sell {
+            assert!(
+                matches!(result, Err(Error::Validation(ref message)) if message.contains("order_type=limit")),
+                "{result:?}"
+            );
+            assert_eq!(requests.len(), 0);
+        } else {
+            assert!(result.is_ok(), "{result:?}");
+            assert_eq!(requests.len(), 1);
+            let Some(trigger_intent::Strategy::TrailingStop(trailing)) =
+                &requests[0].trigger.strategy
+            else {
+                panic!("missing trailing strategy");
+            };
+            assert_eq!(trailing.limit_price_ticks, 100_000_000_000);
+        }
+    }
+    assert_eq!(executed, 3);
+}

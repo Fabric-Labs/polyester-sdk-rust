@@ -50,6 +50,124 @@ fn validate_bps_at_most(field: &str, bps: i32, allow_clear: bool, max: i32) -> R
     Ok(())
 }
 
+// The flat public helper must not silently discard fields when it selects a
+// different strategy or one of the contract's fixed child executions.
+fn validate_create_option_applicability(p: &CreateTriggerParams) -> Result<()> {
+    use CreateTriggerType::{Ladder, StopLoss, TakeProfit, TrailingStop, Twap};
+    for (present, option, supported, label) in [
+        (
+            p.trailing_distance_ticks.is_some(),
+            "trailing_distance_ticks",
+            TrailingStop,
+            "trailing_stop",
+        ),
+        (
+            p.trailing_distance_bps.is_some(),
+            "trailing_distance_bps",
+            TrailingStop,
+            "trailing_stop",
+        ),
+        (
+            p.activation_price.is_some(),
+            "activation_price",
+            TrailingStop,
+            "trailing_stop",
+        ),
+        (
+            p.twap_duration_ms.is_some(),
+            "twap_duration_ms",
+            Twap,
+            "twap",
+        ),
+        (
+            p.twap_slice_interval_ms.is_some(),
+            "twap_slice_interval_ms",
+            Twap,
+            "twap",
+        ),
+        (
+            p.ladder_price_min.is_some(),
+            "ladder_price_min",
+            Ladder,
+            "ladder",
+        ),
+        (
+            p.ladder_price_max.is_some(),
+            "ladder_price_max",
+            Ladder,
+            "ladder",
+        ),
+        (p.ladder_levels.is_some(), "ladder_levels", Ladder, "ladder"),
+        (
+            p.ladder_distribution.is_some(),
+            "ladder_distribution",
+            Ladder,
+            "ladder",
+        ),
+    ] {
+        if present && p.trigger_type != supported {
+            return Err(Error::validation(format!(
+                "{option} applies only to {label}"
+            )));
+        }
+    }
+    if p.trigger_price.is_some() && !matches!(p.trigger_type, StopLoss | TakeProfit) {
+        return Err(Error::validation(
+            "trigger_price applies only to stop_loss or take_profit",
+        ));
+    }
+    if p.post_only && matches!(p.trigger_type, TrailingStop | Twap) {
+        return Err(Error::validation(
+            "post_only applies only to limit GTC stops or ladder",
+        ));
+    }
+    if p.limit_price.is_some()
+        && (p.trigger_type == Ladder
+            || (p.trigger_type != TrailingStop && p.order_type == CreateOrderType::Market))
+    {
+        return Err(Error::validation(
+            "limit_price applies only to limit children or a buy trailing_stop",
+        ));
+    }
+    if (p.trigger_type == Ladder
+        || (p.trigger_type == Twap && p.order_type == CreateOrderType::Limit))
+        && (p.max_slippage_ticks.is_some() || p.max_slippage_bps.is_some())
+    {
+        return Err(Error::validation(
+            "max_slippage_ticks and max_slippage_bps apply only to market children or trailing_stop",
+        ));
+    }
+    // None leaves execution unspecified. Retain explicit Gtc for compatibility;
+    // fixed IOC executions also accept Ioc.
+    if p.trigger_type == Ladder
+        || (p.trigger_type == Twap && p.order_type == CreateOrderType::Limit)
+    {
+        if matches!(
+            p.time_in_force,
+            Some(CreateTimeInForce::Ioc | CreateTimeInForce::Fok)
+        ) {
+            return Err(Error::validation(
+                "time_in_force must be Gtc for ladder or twap limit slices",
+            ));
+        }
+    } else if (p.trigger_type == TrailingStop || p.order_type == CreateOrderType::Market)
+        && p.time_in_force == Some(CreateTimeInForce::Fok)
+    {
+        return Err(Error::validation(
+            "time_in_force=Fok applies only to stop_loss or take_profit limit children",
+        ));
+    }
+    if p.trigger_type == TrailingStop
+        && p.side == CreateSide::Sell
+        && p.order_type == CreateOrderType::Limit
+    {
+        return Err(Error::validation(
+            "order_type=limit applies only to buy trailing_stop children",
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Clone)]
 pub struct TriggersService {
     ctx: ServiceContext,
@@ -158,6 +276,7 @@ impl TriggersService {
     }
 
     fn encode_create_params(&self, params: &CreateTriggerParams) -> Result<CreateTriggerRequest> {
+        validate_create_option_applicability(params)?;
         let scale = self
             .ctx
             .catalogs
@@ -1138,6 +1257,7 @@ mod tests {
         // TWAP and ladder triggers have no watched price.
         let mut twap = params.clone();
         twap.trigger_type = CreateTriggerType::Twap;
+        twap.trigger_price = None;
         twap.trigger_price_source = Some("index".into());
         let err = client.triggers.encode_create_params(&twap).unwrap_err();
         assert!(err.to_string().contains("trigger_price_source"), "{err}");
@@ -1208,6 +1328,7 @@ mod tests {
             crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
         );
         params.trigger_type = CreateTriggerType::TrailingStop;
+        params.order_type = CreateOrderType::Market;
         params.side = CreateSide::Sell;
         params.trailing_distance_bps = Some(100);
         params.trigger_price = None;
@@ -1265,6 +1386,7 @@ mod tests {
 
         let mut trailing = base.clone();
         trailing.trigger_type = CreateTriggerType::TrailingStop;
+        trailing.order_type = CreateOrderType::Market;
         trailing.trigger_price = None;
         trailing.limit_price = None;
         trailing.trailing_distance_ticks = Some(10);
@@ -1346,6 +1468,7 @@ mod tests {
             crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
         );
         params.trigger_type = CreateTriggerType::TrailingStop;
+        params.order_type = CreateOrderType::Market;
         params.side = CreateSide::Sell;
         params.trailing_distance_bps = Some(100);
         params.trigger_price = None;
