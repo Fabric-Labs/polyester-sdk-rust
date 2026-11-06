@@ -6298,3 +6298,61 @@ async fn poly_8539_trailing_side_execution_and_buy_maximum() {
     }
     assert_eq!(executed, 3);
 }
+
+#[tokio::test]
+async fn create_quantity_uses_catalog_scale_on_wire_and_result() {
+    use polyester::Price;
+    use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide};
+    use polyester::proto::orders::v1::{CreateOrderRequest, CreateOrderResponse};
+    let calls = Arc::new(AtomicUsize::new(0));
+    let observed = calls.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        assert_eq!(request.path, "/orders.v1.OrdersService/CreateOrder");
+        let req = CreateOrderRequest::decode_from_slice(&request.body).unwrap();
+        let intent = req.order.as_option().unwrap();
+        assert_eq!(intent.symbol_id, 1);
+        assert_eq!(
+            intent.sizing,
+            Some(polyester::proto::orders::v1::order_intent::Sizing::BaseQtyScaled(16000))
+        );
+        observed.fetch_add(1, Ordering::SeqCst);
+        connect_proto_ok(&CreateOrderResponse {
+            order_id: 42,
+            resolved_base_qty_scaled: 16000,
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("scale-test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({"pairs": [{
+            "symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8
+        }]}))
+        .unwrap();
+    for scale in [None, Some(8), Some(6)] {
+        let mut params =
+            CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+        params.quantity = Some(
+            Quantity::from_scaled(16000, scale, QuantityDomain::OrderBase, None, None).unwrap(),
+        );
+        params.price = Some(Price::from_decimal_str("100", None).unwrap());
+        let before = calls.load(Ordering::SeqCst);
+        let result = client.orders.create(params).await;
+        if scale == Some(6) {
+            assert!(result.unwrap_err().to_string().contains("scale mismatch"));
+            assert_eq!(calls.load(Ordering::SeqCst), before);
+        } else {
+            let qty = result.unwrap().resolved_base_qty.unwrap();
+            assert_eq!(qty.scale(), Some(8));
+            assert_eq!(qty.format(None).unwrap(), "0.00016");
+        }
+    }
+}

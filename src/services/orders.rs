@@ -977,6 +977,8 @@ impl OrdersService {
     pub async fn create(&self, params: CreateOrderParams) -> Result<OrderMutationResult> {
         self.ctx.wait_for_catalogs().await?;
         let req = self.encode_create_params(&params)?;
+        let base_scale = self.require_quantity_scale(&params.symbol, None)?;
+        let symbol_id = self.ctx.catalogs.require_symbol_id(&params.symbol)?;
         let client = self.write_client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -986,7 +988,14 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        order_mutation_from_create(&resp)
+        let mut result = order_mutation_from_create(&resp)?;
+        result.resolved_base_qty = crate::codecs::decode::decode_qty_scaled(
+            resp.resolved_base_qty_scaled,
+            Some(base_scale),
+            Some(params.symbol),
+            Some(symbol_id),
+        );
+        Ok(result)
     }
 
     /// Check whether an order intent is currently admissible without submitting
