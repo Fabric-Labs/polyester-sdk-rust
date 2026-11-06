@@ -49,6 +49,9 @@ pub enum Error {
     ResponseContract { context: String, message: String },
     #[error("{message}")]
     RateLimit {
+        /// Structured service code, or None when none was supplied.
+        /// Known order codes use the `ERROR_CODE_` prefix.
+        code: Option<String>,
         message: String,
         retry_after: Option<f64>,
         /// Structured `polyester.ratelimit.v1.RateLimitDetail` when attached.
@@ -57,6 +60,13 @@ pub enum Error {
     },
     #[error("{0}")]
     Server(String),
+    /// A REST gateway timeout without a recognized mutation outcome code.
+    /// The write may have applied; reconcile before retrying. Safe reads may retry.
+    #[error("{message}")]
+    GatewayTimeout {
+        message: String,
+        problem: Option<Box<crate::problem::HttpProblem>>,
+    },
     #[error("{message}")]
     Api {
         message: String,
@@ -281,7 +291,7 @@ pub(crate) fn gateway_rejection_error(status: u16, code: &str) -> Error {
 }
 
 fn is_outcome_unknown_code(code: &str) -> bool {
-    order_codes::OUTCOME_UNKNOWN.contains(&code)
+    code.ends_with("_OUTCOME_UNKNOWN")
 }
 
 impl Error {
@@ -289,7 +299,8 @@ impl Error {
     /// For `Error::Api`, this decodes the synthetic JSON `http_problem` metadata entry.
     pub fn http_problem(&self) -> Option<crate::problem::HttpProblem> {
         match self {
-            Self::ApiKeyRejected { problem, .. }
+            Self::GatewayTimeout { problem, .. }
+            | Self::ApiKeyRejected { problem, .. }
             | Self::PermissionDenied { problem, .. }
             | Self::TimestampSkew { problem, .. }
             | Self::SessionRequired { problem, .. } => problem.as_deref().cloned(),
@@ -303,7 +314,8 @@ impl Error {
 
     pub(crate) fn with_http_problem(mut self, value: crate::problem::HttpProblem) -> Self {
         match &mut self {
-            Self::ApiKeyRejected { problem, .. }
+            Self::GatewayTimeout { problem, .. }
+            | Self::ApiKeyRejected { problem, .. }
             | Self::PermissionDenied { problem, .. }
             | Self::TimestampSkew { problem, .. }
             | Self::SessionRequired { problem, .. } => *problem = Some(Box::new(value)),
@@ -356,6 +368,11 @@ impl Error {
     /// retry can place a second order. Read the order or trigger back and
     /// reuse the original idempotency key instead.
     ///
+    /// A plain REST gateway 504 is [`Self::GatewayTimeout`], non-retryable
+    /// with outcome unknown. This classifier has no operation context: safe
+    /// reads may explicitly retry it; writes must read back first. A client
+    /// order ID enables reconciliation, not exact replay of a single create.
+    ///
     /// This is not a guarantee that a mutation was not applied. A transport
     /// or server error is retryable and its outcome is also unknown: when
     /// [`Self::mutation_outcome_unknown`] is true, reconcile server state and
@@ -386,7 +403,10 @@ impl Error {
     /// is necessary.
     pub fn mutation_outcome_unknown(&self) -> bool {
         match self {
-            Self::Transport(_) | Self::ResponseContract { .. } | Self::Server(_) => true,
+            Self::Transport(_)
+            | Self::ResponseContract { .. }
+            | Self::Server(_)
+            | Self::GatewayTimeout { .. } => true,
             Self::Api { code, .. } => is_outcome_unknown_code(code),
             _ => false,
         }
@@ -591,16 +611,27 @@ fn rate_limit_detail_from_proto_local(msg: &ProtoRateLimitDetail) -> RateLimitDe
     }
 }
 
+fn order_error_code_from_name(code: &str) -> String {
+    let prefixed = format!("ERROR_CODE_{code}");
+    if OrderErrorCode::from_proto_name(&prefixed).is_some() {
+        prefixed
+    } else {
+        code.to_owned()
+    }
+}
+
 fn rate_limit_error(
     message: String,
     detail: Option<RateLimitDetail>,
     header_retry: Option<f64>,
+    code: Option<String>,
 ) -> Error {
     let retry_after = detail
         .as_ref()
         .and_then(RateLimitDetail::retry_after_seconds)
         .or(header_retry);
     Error::RateLimit {
+        code,
         message,
         retry_after,
         detail: detail.map(Box::new),
@@ -665,6 +696,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             Error::RouteNotFound {
                 procedure: String::new(),
             }
+        } else if status == 504 {
+            Error::GatewayTimeout {
+                message: fallback_message,
+                problem: None,
+            }
         } else {
             Error::NotImplemented {
                 message: fallback_message,
@@ -726,25 +762,35 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 fallback_message.clone(),
                 Some(rate_limit_detail_from_proto_local(&rl)),
                 header_retry,
+                None,
             );
         }
         if let Some(order_detail) = decode_order_error_detail(detail) {
+            let code = known_or_unknown_code(
+                order_detail.code.as_known().map(|c| c.proto_name()),
+                order_detail.code.to_i32(),
+            );
             let is_rate_limit = order_detail.rate_limit.is_set()
                 || matches!(
                     order_detail.code.as_known(),
-                    Some(OrderErrorCode::RateLimitExceeded)
+                    Some(
+                        OrderErrorCode::RateLimitExceeded
+                            | OrderErrorCode::Overloaded
+                            | OrderErrorCode::SystemRateLimited
+                    )
                 );
             if is_rate_limit {
                 let detail = order_detail
                     .rate_limit
                     .as_option()
                     .map(rate_limit_detail_from_proto_local);
-                return rate_limit_error(fallback_message.clone(), detail, header_retry);
+                return rate_limit_error(
+                    fallback_message.clone(),
+                    detail,
+                    header_retry,
+                    Some(code),
+                );
             }
-            let code = known_or_unknown_code(
-                order_detail.code.as_known().map(|c| c.proto_name()),
-                order_detail.code.to_i32(),
-            );
             // Backoff hints and unknown mutation outcomes take precedence.
             if err.code == ErrorCode::Unavailable && !code.ends_with("_OUTCOME_UNKNOWN") {
                 return Error::Server(fallback_message.clone());
@@ -787,7 +833,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 withdraw_detail.code.as_known(),
                 Some(WithdrawErrorCode::RateLimitExceeded)
             ) {
-                return rate_limit_error(fallback_message.clone(), None, header_retry);
+                return rate_limit_error(fallback_message.clone(), None, header_retry, Some(code));
             }
             if err.code == ErrorCode::Unavailable {
                 return Error::Server(fallback_message.clone());
@@ -811,7 +857,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 transfer_detail.code.as_known(),
                 Some(TransferErrorCode::RateLimitExceeded)
             ) {
-                return rate_limit_error(fallback_message.clone(), None, header_retry);
+                return rate_limit_error(fallback_message.clone(), None, header_retry, Some(code));
             }
             if err.code == ErrorCode::Unavailable {
                 return Error::Server(fallback_message.clone());
@@ -827,6 +873,25 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             };
         }
     }
+    let named_code = err
+        .details
+        .iter()
+        .find(|d| d.type_url == crate::transport::HTTP_PROBLEM_TYPE)
+        .and_then(|d| d.debug.as_ref())
+        .and_then(|d| d.get("code"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(raw_message);
+    if is_outcome_unknown_code(named_code)
+        || (err.code == ErrorCode::ResourceExhausted
+            && named_code.trim_start_matches("ERROR_CODE_") == "ORDER_SEQUENCE_EXHAUSTED")
+    {
+        return Error::Api {
+            message: fallback_message,
+            code: order_error_code_from_name(named_code),
+            metadata: Vec::new(),
+            violations: Vec::new(),
+        };
+    }
     let code = err.code;
     let message = fallback_message;
     if is_cloudflare_browser_ban(&message) {
@@ -834,7 +899,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
     }
     match code {
         ErrorCode::Unauthenticated | ErrorCode::PermissionDenied => Error::Auth(message),
-        ErrorCode::ResourceExhausted => rate_limit_error(message, None, header_retry),
+        ErrorCode::ResourceExhausted => {
+            let code = order_error_code_from_name(named_code);
+            let code = OrderErrorCode::from_proto_name(&code).map(|_| code);
+            rate_limit_error(message, None, header_retry, code)
+        }
         ErrorCode::Unavailable | ErrorCode::Internal => Error::Server(message),
         ErrorCode::DeadlineExceeded => Error::Transport(message),
         ErrorCode::Unimplemented => Error::NotImplemented { message },
@@ -949,10 +1018,12 @@ mod tests {
                 message,
                 retry_after,
                 detail,
+                code,
             } => {
                 assert_eq!(message, "resource_exhausted: request rate exceeded");
                 assert_eq!(retry_after, Some(2.5));
                 assert!(detail.is_none());
+                assert!(code.is_none());
             }
             other => panic!("unexpected error: {other:?}"),
         }
@@ -1037,6 +1108,7 @@ mod tests {
         assert!(timeout.mutation_outcome_unknown());
 
         let limited = Error::RateLimit {
+            code: None,
             message: "slow down".into(),
             retry_after: Some(1.0),
             detail: None,

@@ -4505,7 +4505,7 @@ async fn l2_trigger_reads_retry_unavailable_with_the_same_request() {
         ListTriggersRequest, ListTriggersResponse, Trigger,
     };
 
-    for rest in [false, true] {
+    for rest in [0, 1, 2] {
         let bodies = Arc::new(std::sync::Mutex::new(Vec::<(String, Vec<u8>)>::new()));
         let seen = bodies.clone();
         let http = MockHttpServer::spawn(move |request| {
@@ -4513,7 +4513,11 @@ async fn l2_trigger_reads_retry_unavailable_with_the_same_request() {
             seen.push((request.path.clone(), request.body.clone()));
             let attempts = seen.iter().filter(|(p, _)| *p == request.path).count();
             if attempts == 1 {
-                return catching_up(rest);
+                return if rest == 2 {
+                    json_body(504, "text/html", "<html>Gateway Timeout</html>")
+                } else {
+                    catching_up(rest == 1)
+                };
             }
             match request.path.as_str() {
                 GET_TRIGGER_PATH => connect_proto_ok(&GetTriggerResponse {
@@ -4678,36 +4682,44 @@ fn batch_status(
 async fn l2_wait_batch_replace_polls_until_no_item_is_admitted() {
     use polyester::proto::orders::v1::BatchReplacePhase;
 
-    let calls = Arc::new(AtomicUsize::new(0));
-    let counter = calls.clone();
-    let http = MockHttpServer::spawn(move |request| {
-        assert_eq!(request.path, BATCH_STATUS_PATH);
-        match counter.fetch_add(1, Ordering::SeqCst) {
-            // Right after admission the status is not readable yet.
-            0 => json_body(
-                404,
-                "application/json",
-                r#"{"code":"not_found","message":"batch replace status not found"}"#,
-            ),
-            1 => batch_status(BatchReplacePhase::Admitted, ""),
-            2 => catching_up(false),
-            _ => batch_status(BatchReplacePhase::Rejected, "POST_ONLY_CROSS"),
-        }
-    })
-    .await;
-    let status = api_key_client(&http)
-        .orders
-        .wait_batch_replace(&polyester::codecs::format_uint64_id(4242), None, None)
-        .await
-        .expect("settled");
-    assert_eq!(calls.load(Ordering::SeqCst), 4);
-    let item = &status.items[0];
-    assert_eq!(item.phase, "rejected");
-    assert_eq!(
-        item.error_code().as_deref(),
-        Some("ERROR_CODE_POST_ONLY_CROSS")
-    );
-    assert_eq!(item.replacement_order_id, "");
+    for gateway in [false, true] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let counter = calls.clone();
+        let http = MockHttpServer::spawn(move |request| {
+            assert_eq!(request.path, BATCH_STATUS_PATH);
+            match counter.fetch_add(1, Ordering::SeqCst) {
+                // Right after admission the status is not readable yet.
+                0 => json_body(
+                    404,
+                    "application/json",
+                    r#"{"code":"not_found","message":"batch replace status not found"}"#,
+                ),
+                1 => batch_status(BatchReplacePhase::Admitted, ""),
+                2 => {
+                    if gateway {
+                        json_body(504, "text/html", "Gateway Timeout")
+                    } else {
+                        catching_up(false)
+                    }
+                }
+                _ => batch_status(BatchReplacePhase::Rejected, "POST_ONLY_CROSS"),
+            }
+        })
+        .await;
+        let status = api_key_client(&http)
+            .orders
+            .wait_batch_replace(&polyester::codecs::format_uint64_id(4242), None, None)
+            .await
+            .expect("settled");
+        assert_eq!(calls.load(Ordering::SeqCst), 4);
+        let item = &status.items[0];
+        assert_eq!(item.phase, "rejected");
+        assert_eq!(
+            item.error_code().as_deref(),
+            Some("ERROR_CODE_POST_ONLY_CROSS")
+        );
+        assert_eq!(item.replacement_order_id, "");
+    }
 }
 
 #[tokio::test]
@@ -5410,8 +5422,8 @@ async fn l2_unrecognised_rest_504_remains_ambiguous_transport_failure() {
             .me()
             .await
             .expect_err("gateway timeout");
-        assert!(matches!(err, Error::Server(_)), "{err:?}");
-        assert!(err.is_retryable());
+        assert!(matches!(err, Error::GatewayTimeout { .. }), "{err:?}");
+        assert!(!err.is_retryable());
         assert!(err.mutation_outcome_unknown());
         assert_eq!(http.requests.load(Ordering::SeqCst), 1);
     }
@@ -5420,59 +5432,62 @@ async fn l2_unrecognised_rest_504_remains_ambiguous_transport_failure() {
 #[tokio::test]
 async fn l2_order_create_never_resends_unknown_outcome() {
     use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide};
-    for (status, content_type, body) in [
-        (
-            504,
-            "application/problem+json",
-            r#"{"code":"ORDER_CREATE_OUTCOME_UNKNOWN"}"#,
-        ),
-        (504, "text/html", "<html>Gateway Timeout</html>"),
-        (
-            503,
-            "application/json",
-            r#"{"code":"unavailable","details":[{"type":"orders.v1.ErrorDetail","value":"CK8C"}]}"#,
-        ),
-        (
-            504,
-            "application/json",
-            r#"{"code":"deadline_exceeded","details":[{"type":"orders.v1.ErrorDetail","value":"CK8C"}]}"#,
-        ),
-    ] {
-        let http = MockHttpServer::spawn(move |request| {
-            assert_eq!(request.path, "/orders.v1.OrdersService/CreateOrder");
-            json_body(status, content_type, body)
-        })
-        .await;
-        let client = api_key_client(&http);
-        client
-            .catalogs
-            .hydrate_spot_config_json(json!({"pairs": [{
-                "symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8
-            }]}))
-            .unwrap();
-        let mut params =
-            CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Market);
-        params.quantity = Some(
-            Quantity::from_scaled(
-                1,
-                Some(8),
-                QuantityDomain::OrderBase,
-                Some("BTC-USDT".into()),
-                Some(1),
-            )
-            .unwrap(),
-        );
-        params.client_order_id = Some("reconcile-first".into());
-        let err = client
-            .orders
-            .create(params)
-            .await
-            .expect_err("unknown outcome");
-        assert!(err.mutation_outcome_unknown(), "{err:?}");
-        assert_eq!(http.requests.load(Ordering::SeqCst), 1);
-        if content_type != "text/html" {
-            assert!(matches!(err, Error::Api { .. }), "{err:?}");
+    for client_order_id in [None, Some("reconcile-first")] {
+        for (status, content_type, body) in [
+            (
+                504,
+                "application/problem+json",
+                r#"{"code":"ORDER_CREATE_OUTCOME_UNKNOWN"}"#,
+            ),
+            (504, "text/html", "<html>Gateway Timeout</html>"),
+            (
+                503,
+                "application/json",
+                r#"{"code":"unavailable","details":[{"type":"orders.v1.ErrorDetail","value":"CK8C"}]}"#,
+            ),
+            (
+                504,
+                "application/json",
+                r#"{"code":"deadline_exceeded","details":[{"type":"orders.v1.ErrorDetail","value":"CK8C"}]}"#,
+            ),
+        ] {
+            let http = MockHttpServer::spawn(move |request| {
+                assert_eq!(request.path, "/orders.v1.OrdersService/CreateOrder");
+                json_body(status, content_type, body)
+            })
+            .await;
+            let client = api_key_client(&http);
+            client
+                .catalogs
+                .hydrate_spot_config_json(json!({"pairs": [{
+                    "symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8
+                }]}))
+                .unwrap();
+            let mut params =
+                CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Market);
+            params.quantity = Some(
+                Quantity::from_scaled(
+                    1,
+                    Some(8),
+                    QuantityDomain::OrderBase,
+                    Some("BTC-USDT".into()),
+                    Some(1),
+                )
+                .unwrap(),
+            );
+            params.client_order_id = client_order_id.map(str::to_owned);
+            let err = client
+                .orders
+                .create(params)
+                .await
+                .expect_err("unknown outcome");
+            assert!(err.mutation_outcome_unknown(), "{err:?}");
+            assert_eq!(http.requests.load(Ordering::SeqCst), 1);
             assert!(!err.is_retryable());
+            if content_type != "text/html" {
+                assert!(matches!(err, Error::Api { .. }), "{err:?}");
+                assert!(!err.is_retryable());
+            }
         }
     }
 }
@@ -6872,4 +6887,157 @@ async fn ticket_8511_zero_sequence_disconnect_then_503_releases_receiver() {
         .expect("replacement socket must be released")
         .unwrap();
     sub.close();
+}
+
+#[tokio::test]
+async fn l2_admission_error_classification() {
+    use base64::Engine;
+    use buffa::{Enumeration, Message};
+    use polyester::proto::orders::v1::{ErrorCode, ErrorDetail};
+    let mut failures = Vec::new();
+    for (name, status, retryable) in [
+        ("OVERLOADED", 503, true),
+        ("SYSTEM_RATE_LIMITED", 429, true),
+        ("ORDER_SEQUENCE_EXHAUSTED", 429, false),
+    ] {
+        for shape in ["rest", "connect", "connect_detail"] {
+            let mut body = json!({"code":name,"detail":"admission refused"});
+            let http_status = if shape == "rest" { status } else { 429 };
+            if shape != "rest" {
+                body = json!({"code":"resource_exhausted","message":name});
+            }
+            if shape == "connect_detail" {
+                let detail = ErrorDetail {
+                    code: ErrorCode::from_proto_name(&format!("ERROR_CODE_{name}"))
+                        .unwrap()
+                        .into(),
+                    ..Default::default()
+                };
+                body["details"] = json!([{"type":"orders.v1.ErrorDetail", "value":base64::engine::general_purpose::STANDARD.encode(detail.encode_to_vec())}]);
+            }
+            let body = body.to_string();
+            let http =
+                MockHttpServer::spawn(move |_| json_body(http_status, "application/json", &body))
+                    .await;
+            let err = api_key_client(&http)
+                .auth
+                .me()
+                .await
+                .expect_err("refused admission");
+            let actual_code = match &err {
+                Error::Api { code, .. } => Some(code.as_str()),
+                Error::RateLimit { code, .. } => code.as_deref(),
+                _ => None,
+            };
+            let expected_code = format!("ERROR_CODE_{name}");
+            if actual_code != Some(expected_code.as_str()) {
+                failures.push(format!("{name}/{shape} code={actual_code:?}: {err:?}"));
+            }
+            if err.is_retryable() != retryable || err.mutation_outcome_unknown() {
+                failures.push(format!("{name}/{shape}: {err:?}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[tokio::test]
+async fn l2_future_outcome_code_classification() {
+    for name in [
+        "ORDER_CREATE_OUTCOME_UNKNOWN",
+        "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN",
+        "TWAP_CREATE_OUTCOME_UNKNOWN",
+        "ERROR_CODE_TWAP_CREATE_OUTCOME_UNKNOWN",
+    ] {
+        for status in [503, 504] {
+            for connect in [false, true] {
+                let body=if connect { json!({"code":if status==503 {"unavailable"} else {"deadline_exceeded"},"message":name}) } else {json!({"code":name,"detail":"read back first"})}.to_string();
+                let http =
+                    MockHttpServer::spawn(move |_| json_body(status, "application/json", &body))
+                        .await;
+                let err = api_key_client(&http)
+                    .auth
+                    .me()
+                    .await
+                    .expect_err("unknown outcome");
+                let expected = if name == "ORDER_CREATE_OUTCOME_UNKNOWN" {
+                    "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN"
+                } else {
+                    name
+                };
+                assert!(
+                    matches!(&err, Error::Api {code, ..} if code == expected),
+                    "{name}/{status}/{connect}: {err:?}"
+                );
+                assert!(!err.is_retryable(), "{name}/{status}/{connect}: {err:?}");
+                assert!(err.mutation_outcome_unknown(), "{err:?}");
+                if !connect {
+                    assert_eq!(err.http_problem().unwrap().code, name);
+                }
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn l2_rest_admission_keeps_retry_delay() {
+    let http = MockHttpServer::spawn(move |_| {
+        let mut response = json_body(
+            429,
+            "application/problem+json",
+            r#"{"code":"SYSTEM_RATE_LIMITED"}"#,
+        );
+        if let hardening_support::HttpScript::Raw { headers, .. } = &mut response {
+            headers.push(("Retry-After".into(), "1.25".into()));
+        }
+        response
+    })
+    .await;
+    let error = api_key_client(&http)
+        .auth
+        .me()
+        .await
+        .expect_err("rate limited");
+    assert_eq!(error.retry_after(), Some(1.25), "{error:?}");
+}
+
+#[tokio::test]
+async fn l2_snapshot_refresh_retries_gateway_504() {
+    use polyester::proto::orders::v1::BatchReplacePhase;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    let http = MockHttpServer::spawn(move |_| {
+        if counter.fetch_add(1, Ordering::SeqCst) == 0 {
+            json_body(504, "text/html", "Gateway Timeout")
+        } else {
+            batch_status(BatchReplacePhase::Rejected, "POST_ONLY_CROSS")
+        }
+    })
+    .await;
+    let client = Arc::new(api_key_client(&http));
+    let stream = SnapshotThenStream::new(SnapshotThenStreamConfig {
+        client: RealtimeClient::new("ws://example.invalid", "", None, None),
+        channel: "public:test".into(),
+        decode: Arc::new(|_b| Ok(1u8)),
+        fetch_snapshot: Arc::new(move || {
+            let client = client.clone();
+            async move { client.orders.get_batch_replace_status("4242", None).await }.boxed()
+        }),
+        read_publication: Arc::new(|p| vec![p]),
+        apply_snapshot: Arc::new(|_s, _p| {}),
+        apply_live_publications: Arc::new(|_p| {}),
+        max_buffered: 8,
+        on_reconnect: None,
+        on_snapshot_refresh: None,
+        on_error: None,
+    });
+    stream.request_refresh();
+    wait_until(
+        || stream.is_ready() || stream.is_disposed(),
+        Duration::from_secs(2),
+    )
+    .await;
+    assert!(stream.is_ready(), "{:?}", stream.err());
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    stream.close();
 }
