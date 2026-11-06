@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
+
+Package version: `0.8.0`. Git tag: `v0.8.0`. Released 2026-11-06. Built on public contract `748066a`.
 
 - Create results carry the destination pair's catalog scale for resolved base
   quantities, so a raw quantity of 16000 at scale 8 formats as 0.00016.
