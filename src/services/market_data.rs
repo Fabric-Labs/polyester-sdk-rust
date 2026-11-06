@@ -852,6 +852,7 @@ impl OrderbookService {
             last_view_unavailable: false,
             recheck_pending: false,
             recheck_delay: UNAVAILABLE_SNAPSHOT_INITIAL_DELAY,
+            recheck_generation: 0,
         }));
         let closed = Arc::new(AtomicBool::new(false));
         let last_error: Arc<Mutex<Option<crate::Error>>> = Arc::new(Mutex::new(None));
@@ -963,7 +964,10 @@ impl OrderbookService {
             Arc::new(move |available: bool| {
                 let mut s = crate::realtime::lock_unpoisoned(&state);
                 if available {
+                    // A pending request for the older unavailable snapshot is obsolete.
                     s.recheck_delay = UNAVAILABLE_SNAPSHOT_INITIAL_DELAY;
+                    s.recheck_pending = false;
+                    s.recheck_generation = s.recheck_generation.wrapping_add(1);
                     return;
                 }
                 if s.recheck_pending {
@@ -978,10 +982,16 @@ impl OrderbookService {
                 s.recheck_pending = true;
                 let delay = s.recheck_delay;
                 s.recheck_delay = delay.saturating_mul(2).min(UNAVAILABLE_SNAPSHOT_MAX_DELAY);
+                let generation = s.recheck_generation;
                 drop(s);
                 let state = state.clone();
                 stream.request_refresh_after(delay, move || {
-                    crate::realtime::lock_unpoisoned(&state).recheck_pending = false;
+                    let mut s = crate::realtime::lock_unpoisoned(&state);
+                    if s.recheck_generation != generation {
+                        return false;
+                    }
+                    s.recheck_pending = false;
+                    true
                 });
             }) as Arc<dyn Fn(bool) + Send + Sync>
         };
@@ -1092,6 +1102,8 @@ struct BookState {
     recheck_pending: bool,
     /// Delay before the next request for an unavailable snapshot.
     recheck_delay: std::time::Duration,
+    /// Invalidates a scheduled request once a newer snapshot is available.
+    recheck_generation: u64,
 }
 
 /// A snapshot that came back unavailable is requested again after these delays:

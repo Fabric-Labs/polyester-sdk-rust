@@ -266,6 +266,14 @@ impl SubaccountAccess {
                     ));
                 }
                 Err(err) => attempt.last = Some(err),
+                // A removal that arrived during the read is newer than its answer.
+                Ok(_) if self.seen_removed(id) => {
+                    return Some(attempt.ended.stop(
+                        channel,
+                        SubscriptionEndReason::AccessRemoved,
+                        None,
+                    ));
+                }
                 Ok(listed) if !listed.contains(&id) => {
                     return Some(attempt.ended.stop(
                         channel,
@@ -275,7 +283,13 @@ impl SubaccountAccess {
                 }
                 Ok(_) => {
                     let wait = self.reserve_attempt();
-                    let _ = sleep_or_stop(wait, stop).await;
+                    if sleep_or_stop(wait, stop).await && self.seen_removed(id) {
+                        return Some(attempt.ended.stop(
+                            channel,
+                            SubscriptionEndReason::AccessRemoved,
+                            None,
+                        ));
+                    }
                     return None;
                 }
             }
@@ -907,6 +921,126 @@ mod tests {
         assert!(second.is_ok(), "{second:?}");
         assert!(first.await.unwrap().is_ok());
         assert_eq!(api.count(LIST), 2, "a later decision needs its own read");
+    }
+
+    /// A removal during the list or the pacing wait must win over the older
+    /// answer. The removed false controls prove the same barriers still resume.
+    async fn removal_while_deciding(pacing: bool, removed: bool) {
+        let ws = Centrifugo::spawn().await;
+        let ok = respond(vec![SUB_ID]);
+        let gate = Arc::new((Mutex::new(!pacing), std::sync::Condvar::new()));
+        let held = gate.clone();
+        let api = ApiMock::spawn(move |path| {
+            if path == LIST {
+                let (closed, opened) = &*held;
+                let mut closed = closed.lock().unwrap();
+                while *closed {
+                    closed = opened.wait(closed).unwrap();
+                }
+            }
+            ok(path)
+        })
+        .await;
+        let open_gate = || {
+            *gate.0.lock().unwrap() = false;
+            gate.1.notify_all();
+        };
+        let timing = if pacing {
+            ResubscribeTiming {
+                attempt_spacing: Duration::from_millis(400),
+                ..FAST
+            }
+        } else {
+            FAST
+        };
+        let client = client(&ws, &api, timing);
+        let updates = "private:auth:subaccounts:root:proto".to_owned();
+        let mut stream = client.subscribe_raw(&updates).await.unwrap();
+        ws.await_subscribed(&updates).await;
+        let channel = channel(SUB_ID);
+        let mut sub = client.subscribe_raw(&channel).await.unwrap();
+        ws.await_subscribed(&channel).await;
+        let tokens = api.count(SUBSCRIBE);
+        // Occupy the slot so the resume must wait for the next one.
+        let occupied = pacing.then(|| {
+            client.access.reserve_attempt();
+            lock_unpoisoned(&client.access.state).next_attempt_at
+        });
+
+        end(&ws, &channel);
+        tokio::time::timeout(WAIT, async {
+            loop {
+                let at_barrier = match occupied {
+                    Some(occupied) => {
+                        lock_unpoisoned(&client.access.state).next_attempt_at > occupied
+                    }
+                    None => api.count(LIST) == 1,
+                };
+                if at_barrier {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("the resume reaches its barrier");
+        assert_eq!(
+            api.count(SUBSCRIBE),
+            tokens,
+            "no token before the barrier opens"
+        );
+
+        let update = if removed {
+            Subaccount {
+                id: SUB_ID,
+                removed: true,
+                ..Default::default()
+            }
+        } else {
+            Subaccount {
+                id: SUB_ID,
+                role: SubaccountRole::VIEWER.into(),
+                ..Default::default()
+            }
+        };
+        ws.push(&updates, centrifugo_publication(&update.encode_to_vec()));
+        tokio::time::timeout(WAIT, stream.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        open_gate();
+
+        if removed {
+            assert_eq!(
+                reason_of(&ended(&mut sub).await),
+                SubscriptionEndReason::AccessRemoved
+            );
+            assert_eq!(api.count(SUBSCRIBE), tokens, "no token after the removal");
+        } else {
+            ws.await_subscribed(&channel).await;
+            assert_eq!(api.count(SUBSCRIBE), tokens + 1);
+            assert!(sub.err().is_none(), "{:?}", sub.err());
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn removal_during_the_list_stops_before_any_token() {
+        removal_while_deciding(false, true).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn still_granted_during_the_list_resumes() {
+        removal_while_deciding(false, false).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn removal_during_pacing_stops_before_any_token() {
+        removal_while_deciding(true, true).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn still_granted_during_pacing_resumes() {
+        removal_while_deciding(true, false).await;
     }
 
     /// Keeps a connection alive with protocol pings. Confirms connect and

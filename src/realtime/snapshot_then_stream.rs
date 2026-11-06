@@ -248,11 +248,11 @@ where
         self.inner.fail_closed(err);
     }
 
-    /// Request a snapshot refresh after `delay`, unless the stream stops first.
-    /// `before` runs right before the request.
-    pub(crate) fn request_refresh_after<F>(&self, delay: Duration, before: F)
+    /// Request a snapshot refresh after `delay`, unless the stream stops first
+    /// or `still_wanted`, asked when the delay ends, says it became obsolete.
+    pub(crate) fn request_refresh_after<F>(&self, delay: Duration, still_wanted: F)
     where
-        F: FnOnce() + Send + 'static,
+        F: FnOnce() -> bool + Send + 'static,
     {
         let inner = self.inner.clone();
         let mut stop_rx = inner.stop_tx.subscribe();
@@ -261,8 +261,7 @@ where
                 changed = stop_rx.changed() => changed.is_err() || *stop_rx.borrow(),
                 _ = tokio::time::sleep(delay) => false,
             };
-            if !stopped && !*stop_rx.borrow() {
-                before();
+            if !stopped && !*stop_rx.borrow() && still_wanted() {
                 inner.request_refresh();
             }
         });

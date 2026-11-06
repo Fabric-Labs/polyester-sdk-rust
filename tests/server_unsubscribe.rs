@@ -251,6 +251,69 @@ async fn available_snapshot_is_not_requested_again() {
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
+/// A newer available snapshot makes the pending request obsolete: it must not
+/// fire, or a failure there could end a healthy stream.
+#[tokio::test]
+async fn available_snapshot_cancels_pending_request() {
+    let ws = Centrifugo::spawn().await;
+    let (http, calls) = book_api(|call| {
+        if call == 1 {
+            unavailable_book()
+        } else {
+            available_book(10)
+        }
+    })
+    .await;
+    let client = test_client(http.base_url(), ws.url.clone());
+    let mut sub = create_book(&client).await;
+    assert!(!sub.updates().recv().await.unwrap().available);
+    sub.refresh_snapshot().await.unwrap();
+    let view = tokio::time::timeout(WAIT, sub.updates().recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(view.available);
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        2,
+        "before the old timer is due"
+    );
+    // Past the 1 s delay the unavailable snapshot scheduled.
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    assert_eq!(calls.load(Ordering::SeqCst), 2, "an obsolete request fired");
+    assert!(sub.err().is_none(), "{:?}", sub.err());
+}
+
+#[tokio::test]
+async fn reconnect_with_an_available_snapshot_cancels_pending_request() {
+    let ws = Centrifugo::spawn().await;
+    let (http, calls) = book_api(|call| {
+        if call == 1 {
+            unavailable_book()
+        } else {
+            available_book(10)
+        }
+    })
+    .await;
+    let client = test_client(http.base_url(), ws.url.clone());
+    let mut sub = create_book(&client).await;
+    ws.await_subscribed(BOOK_CHANNEL).await;
+    assert!(!sub.updates().recv().await.unwrap().available);
+    ws.drop_connection(BOOK_CHANNEL);
+    let view = tokio::time::timeout(WAIT, sub.updates().recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(view.available);
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        2,
+        "before the old timer is due"
+    );
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    assert_eq!(calls.load(Ordering::SeqCst), 2, "an obsolete request fired");
+}
+
 #[tokio::test]
 async fn close_stops_requests_for_an_unavailable_book() {
     let ws = Centrifugo::spawn().await;
