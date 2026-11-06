@@ -16,6 +16,7 @@
   read the next market-overview page.
 - Heatmap history now offers `get_with_options` for explicit time bounds and
   opaque continuation tokens. A continuation omits a new default time window.
+- **Breaking:** Trigger creation now rejects options that do not apply to the selected strategy or child execution before sending. Migration: remove incompatible options, or select the trigger type and execution that support them (use `trailing_stop` for trailing distances and activation price).
 
 ## 0.7.2
 
