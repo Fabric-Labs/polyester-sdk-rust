@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.8.1
+
+Package version: `0.8.1`. Git tag: `v0.8.1`. Released 2026-11-06. Built on public contract `748066a`.
 
 - Order books detect gaps after a sequence-zero snapshot and refetch before applying later deltas.
 - Setup queue overflow keeps its typed error, and unknown market selectors explain how to hydrate catalogs.
