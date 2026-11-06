@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Breaking:** `canonical_signing_string` returns the decoded URL path and a validation error when that path is not valid UTF-8. Migrate by signing with `Credentials::sign_request`, which signs those bytes as they are.
+- **Breaking:** A ledger refusal carrying `ledger.read.v1.ErrorDetail` now reports `Error::Api` with its specific code, such as `ERROR_CODE_INVALID_SUBACCOUNT_ID` (11), instead of code `InvalidArgument`. Migrate by branching on the specific code.
+- Trigger reads return a 503 `ACCOUNT_ROUTING_INVALID` on the first request with its code, instead of retrying it for two seconds. Real unavailability keeps its bounded retry.
+- `sign_request` and `sign_request_async` sign the decoded URL path, as the server verifies it, including percent-escapes that are not UTF-8. A path with percent-escapes no longer gets `401 SIGNATURE_INVALID`. The shared signing vectors now cover escaped paths.
 - **Breaking:** Bare REST `UNAVAILABLE` cannot establish an orders-service refusal: report outcome unknown and non-retryable. Only a typed `orders.v1.ErrorDetail` carrying `UNAVAILABLE` establishes a known, retryable refusal. Migration: read back after an unknown outcome; retry reads explicitly.
 - **Breaking:** The additional retry-later resource codes `CLIENT_ORDER_IDS_EXHAUSTED`, `CLIENT_ORDER_ID_CAPACITY_REACHED`, `MARKET_LADDER_LIMIT_EXCEEDED`, `MARKET_TRIGGER_LIMIT_EXCEEDED`, `MARKET_TWAP_LIMIT_EXCEEDED`, `NEW_ACCOUNT_CAPACITY_REACHED`, `REQUEST_RECEIPTS_EXHAUSTED`, `RESERVATION_CAPACITY_REACHED`, `TRIGGER_CAPACITY_REACHED`, `TRIGGER_CONTROL_SHARE_EXHAUSTED`, `TWAP_CAPACITY_REACHED` report outcome known and retryable, preserving any server retry delay.
 - **Breaking:** Unknown mutation outcomes are never retryable, including bare Connect unavailable/internal/deadline failures, gateway 502/503 responses, bare or HTML 429 responses and client timeouts. Migration: read back after an unknown outcome; retry reads explicitly. Bounded trigger reads, status waits and snapshot recovery use read context; creates are never automatically resent.

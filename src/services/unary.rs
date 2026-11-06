@@ -1,6 +1,6 @@
 //! Thin helpers around Connect unary calls.
 
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 use crate::transport::Factory;
 use buffa::Message;
 use connectrpc::client::{CallOptions, UnaryResponse};
@@ -104,6 +104,20 @@ where
     Ok(tolerant_json(call(request, opts)).await)
 }
 
+/// Whether a read may retry, by what the error means and not only its code: a
+/// typed refusal at HTTP 503, such as `ACCOUNT_ROUTING_INVALID`, is final.
+fn is_real_unavailability(err: &ConnectError) -> bool {
+    if !matches!(
+        err.code,
+        ErrorCode::Unavailable | ErrorCode::DeadlineExceeded
+    ) {
+        return false;
+    }
+    let mapped = Factory::map_error(err.clone());
+    mapped.mutation_outcome_unknown()
+        || !matches!(mapped, Error::Api { .. } | Error::RateLimit { .. })
+}
+
 /// [`await_auth`] for a read without side effects: Connect `unavailable` or deadlines
 /// are retried with the same request, signed again, under
 /// `policy`. Other errors, and `unavailable` once the budget is spent,
@@ -125,10 +139,7 @@ where
         match try_auth(factory, procedure, request.clone(), &call).await? {
             Ok(resp) => return Ok(resp),
             Err(err)
-                if matches!(
-                    err.code,
-                    ErrorCode::Unavailable | ErrorCode::DeadlineExceeded
-                ) && start.elapsed() + delay <= policy.budget =>
+                if is_real_unavailability(&err) && start.elapsed() + delay <= policy.budget =>
             {
                 tokio::time::sleep(delay).await;
                 delay = policy.next_delay(delay);

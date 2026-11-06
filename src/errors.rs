@@ -11,6 +11,7 @@ use crate::proto::auth::v1::{AuthErrorCode, AuthErrorDetail};
 use crate::proto::chain::withdraw::v1::{
     ErrorCode as WithdrawErrorCode, ErrorDetail as WithdrawErrorDetail,
 };
+use crate::proto::ledger::read::v1::ErrorDetail as LedgerErrorDetail;
 use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail};
 use crate::proto::polyester::ratelimit::v1::RateLimitDetail as ProtoRateLimitDetail;
 use crate::proto::transfer::v1::{
@@ -569,6 +570,13 @@ fn decode_transfer_error_detail(detail: &ErrorDetail) -> Option<TransferErrorDet
     TransferErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
+fn decode_ledger_error_detail(detail: &ErrorDetail) -> Option<LedgerErrorDetail> {
+    if !detail.type_url.ends_with("ledger.read.v1.ErrorDetail") {
+        return None;
+    }
+    LedgerErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
+}
+
 fn is_auth_like_error_code(code: &str) -> bool {
     code.contains("UNAUTHENTICATED")
         || code.contains("PERMISSION")
@@ -926,6 +934,24 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             ) {
                 return rate_limit_error(fallback_message.clone(), None, header_retry, Some(code));
             }
+            if err.code == ErrorCode::Unavailable {
+                return Error::Server(fallback_message.clone());
+            }
+            if is_auth_like_error_code(&code) {
+                return Error::Auth(fallback_message.clone());
+            }
+            return Error::Api {
+                message: fallback_message.clone(),
+                code,
+                metadata: Vec::new(),
+                violations: Vec::new(),
+            };
+        }
+        if let Some(ledger_detail) = decode_ledger_error_detail(detail) {
+            let code = known_or_unknown_code(
+                ledger_detail.code.as_known().map(|c| c.proto_name()),
+                ledger_detail.code.to_i32(),
+            );
             if err.code == ErrorCode::Unavailable {
                 return Error::Server(fallback_message.clone());
             }
