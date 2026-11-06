@@ -277,7 +277,7 @@ pub fn encode_query_component(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, QUERY_COMPONENT_ASCII_SET).to_string()
 }
 
-/// Sort and percent-encode query parameters (Python `quote(safe="")` parity).
+/// Sort decoded query keys and values before RFC 3986 encoding, as the server does.
 fn canonical_query_from_url(parsed: &url::Url) -> String {
     let mut pairs: Vec<(String, String)> = parsed
         .query_pairs()
@@ -353,6 +353,45 @@ pub fn generate_ed25519_keypair() -> (String, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Identical fixtures live in Go, Python and Rust. Expected queries follow
+    // server shared/pkg/auth/apikeys.go: decoded key/value sort, then RFC 3986 escape.
+    // Golden signatures use the public test seed 00..1f, timestamp 123, GET, no body.
+    #[tokio::test]
+    async fn server_query_signing_vectors() {
+        #[derive(serde::Deserialize)]
+        struct Vector {
+            name: String,
+            url: String,
+            canonical_query: String,
+            signature_hex: String,
+        }
+        let cases: Vec<Vector> =
+            serde_json::from_str(include_str!("../testdata/signing_query_vectors.json")).unwrap();
+        let seed: Vec<u8> = (0..32).collect();
+        let credentials = Credentials::new("test-key", &hex::encode(seed)).unwrap();
+        for case in cases {
+            assert_eq!(
+                canonical_query(&case.url).unwrap(),
+                case.canonical_query,
+                "{}",
+                case.name
+            );
+            let headers = credentials
+                .sign_request("GET", &case.url, b"", Some("123"))
+                .unwrap();
+            assert_eq!(
+                headers[HEADER_SIGNATURE], case.signature_hex,
+                "{}",
+                case.name
+            );
+            let async_headers = credentials
+                .sign_request_async("GET", &case.url, b"", Some("123"))
+                .await
+                .unwrap();
+            assert_eq!(headers, async_headers, "{}", case.name);
+        }
+    }
 
     #[test]
     fn canonical_query_sorts_and_encodes_values() {

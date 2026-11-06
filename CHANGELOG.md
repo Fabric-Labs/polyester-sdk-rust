@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added shared API-key signing regression vectors for repeated parameters, prefix keys, escaped values, and empty queries. Rust already matches the server and its signing behavior is unchanged.
+
 - **Breaking:** transfer history now returns the opaque `next_page_token` string
   instead of an integer `next_cursor`. Copy it into the next `ListTransfersRequest`
   with the same scope, filters and direction. An empty string ends pagination.

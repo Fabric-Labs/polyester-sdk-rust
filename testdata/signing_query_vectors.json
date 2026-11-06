@@ -1,0 +1,86 @@
+[
+  {
+    "name": "empty",
+    "url": "https://api.example.test/x",
+    "canonical_query": "",
+    "signature_hex": "ff60901e43e31610bec379c7db782c45cb1ae4ed4c6461c5de4cb3c887cf9db4b4e6d7f3ce3480234ced896f5c61da3f1614312a274e95e59219da119ba50302"
+  },
+  {
+    "name": "empty-marker",
+    "url": "https://api.example.test/x?",
+    "canonical_query": "",
+    "signature_hex": "ff60901e43e31610bec379c7db782c45cb1ae4ed4c6461c5de4cb3c887cf9db4b4e6d7f3ce3480234ced896f5c61da3f1614312a274e95e59219da119ba50302"
+  },
+  {
+    "name": "ordinary",
+    "url": "https://api.example.test/x?a=1&b=2",
+    "canonical_query": "a=1&b=2",
+    "signature_hex": "0ff9bcb377696e93c143081c79c0e9b5784512678cc0abbf6247fa6fb681779a14b07fb0de1aa245a6ef877a154f74b0d9432aa3c89354f2f9125a02610f0305"
+  },
+  {
+    "name": "ordinary-reversed",
+    "url": "https://api.example.test/x?b=2&a=1",
+    "canonical_query": "a=1&b=2",
+    "signature_hex": "0ff9bcb377696e93c143081c79c0e9b5784512678cc0abbf6247fa6fb681779a14b07fb0de1aa245a6ef877a154f74b0d9432aa3c89354f2f9125a02610f0305"
+  },
+  {
+    "name": "duplicate-values",
+    "url": "https://api.example.test/x?a=2&a=1",
+    "canonical_query": "a=1&a=2",
+    "signature_hex": "592865254cf4e59a27d36011babff28e37135d6c203caeda662bc2fca5741b79c013b4b82e802616fb9e5044fb64000da4e3f3154ac3f7d4c05e10ba37881605"
+  },
+  {
+    "name": "duplicate-values-sorted",
+    "url": "https://api.example.test/x?a=1&a=2",
+    "canonical_query": "a=1&a=2",
+    "signature_hex": "592865254cf4e59a27d36011babff28e37135d6c203caeda662bc2fca5741b79c013b4b82e802616fb9e5044fb64000da4e3f3154ac3f7d4c05e10ba37881605"
+  },
+  {
+    "name": "repeated-pairs-and-blanks",
+    "url": "https://api.example.test/x?a=2&a=&a=1&a=1&b",
+    "canonical_query": "a=&a=1&a=1&a=2&b=",
+    "signature_hex": "c27bd8203b4c5c18f41dafbec8cdc69c6967bb61287d0f853fe9c7f2a8333f1bd2f5a289525cec197d3b3563fab9e79154d8a39f252f09ee1b16a3073630bf02"
+  },
+  {
+    "name": "prefix-keys",
+    "url": "https://api.example.test/x?a1=x&a=y",
+    "canonical_query": "a=y&a1=x",
+    "signature_hex": "0940b4b1d26ddc850e8ac82de3dc323f96dd7b7b58a40351947a94ffc5d98f70e22beb305359827dd2a28fcdf6e924417fb221fec7b4b1ecbe4e29caf1dd5503"
+  },
+  {
+    "name": "encoded-values",
+    "url": "https://api.example.test/x?v=0&v=%3A",
+    "canonical_query": "v=0&v=%3A",
+    "signature_hex": "dd3862234f98925c130f49bafee69d21cc3012a826be13f93d41a61b98c37fcc847f28e32160bc728e186a0f7270d7a427d862b08c131a37952a4161c16ac901"
+  },
+  {
+    "name": "encoded-values-reversed",
+    "url": "https://api.example.test/x?v=%3a&v=0",
+    "canonical_query": "v=0&v=%3A",
+    "signature_hex": "dd3862234f98925c130f49bafee69d21cc3012a826be13f93d41a61b98c37fcc847f28e32160bc728e186a0f7270d7a427d862b08c131a37952a4161c16ac901"
+  },
+  {
+    "name": "encoded-keys",
+    "url": "https://api.example.test/x?%3A=x&0=y",
+    "canonical_query": "0=y&%3A=x",
+    "signature_hex": "505cb833d5a989b1497fec0330fe590c335f191f0b320e5916bb120f3cf1deda6e08389718e6d702ac47938e6d174179b506ac944ad9607df403f3ab6d2b3104"
+  },
+  {
+    "name": "spaces-and-plus",
+    "url": "https://api.example.test/x?v=%2B&v=+&v=%20",
+    "canonical_query": "v=%20&v=%20&v=%2B",
+    "signature_hex": "5f13a0c896160535094b8ac1462a0942b83ca1e429e0015ff868be9795badbe6bafc64805e7345b3b9ac6e305db5cd287c58b004ef3c1c7a584ee1f4cd6e9500"
+  },
+  {
+    "name": "unreserved",
+    "url": "https://api.example.test/x?path=foo%2Fbar&name=a_b.c~d-e",
+    "canonical_query": "name=a_b.c~d-e&path=foo%2Fbar",
+    "signature_hex": "f4b899524e34922522e98ed5eb492bcb6c59f70e91175d537a9c20fd45e3d3121479cb505225b410205c453f9327a88200024a07e80bae68be4f4e6eb8fec404"
+  },
+  {
+    "name": "unicode",
+    "url": "https://api.example.test/x?v=%E2%9C%93&v=z",
+    "canonical_query": "v=z&v=%E2%9C%93",
+    "signature_hex": "a55ff3ab6223fe479f0c5834963184e08aed08ae2fa2cf210a2138851068dbef722602dfadde4c3c37cfd2276877311320948081a466b599d95b0acfc89bf701"
+  }
+]
