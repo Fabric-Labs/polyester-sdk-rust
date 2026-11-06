@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** transfer history now returns the opaque `next_page_token` string
+  instead of an integer `next_cursor`. Copy it into the next `ListTransfersRequest`
+  with the same scope, filters and direction. An empty string ends pagination.
+- **Breaking:** `EquityHistory` gains a `btc_prices_q` field, so struct literals
+  must initialize it. It preserves the returned BTC-USDT closes as integers
+  scaled by 1e9, in timestamp order. An omitted series is an empty vector.
+
 ## 0.7.2
 
 Package version: `0.7.2`. Git tag: `v0.7.2`. Released 2026-11-06.

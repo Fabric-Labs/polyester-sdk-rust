@@ -5476,3 +5476,147 @@ async fn l2_order_create_never_resends_unknown_outcome() {
         }
     }
 }
+
+#[tokio::test]
+async fn l2_transfer_paging_preserves_opaque_token_scope_and_equal_timestamps() {
+    use polyester::proto::ledger::read::v1::{
+        ListTransfersRequest, ListTransfersResponse, TransferRow,
+    };
+    use polyester::transport::WireFormat;
+    use std::sync::Mutex;
+    for json_wire in [false, true] {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let observed = seen.clone();
+        let server = MockHttpServer::spawn(move |req| {
+            assert!(req.path.ends_with("/ListTransfers"));
+            let request: ListTransfersRequest = if json_wire {
+                serde_json::from_slice(&req.body).unwrap()
+            } else {
+                ListTransfersRequest::decode_from_slice(&req.body).unwrap()
+            };
+            let mut seen = observed.lock().unwrap();
+            seen.push(request);
+            let index = seen.len();
+            let response = ListTransfersResponse {
+                transfers: vec![TransferRow {
+                    ts_us: 999,
+                    transfer_id: index.to_string(),
+                    ..Default::default()
+                }],
+                next_page_token: if index == 1 {
+                    "eyJ2IjoxfQ==".into()
+                } else {
+                    String::new()
+                },
+                ..Default::default()
+            };
+            if json_wire {
+                hardening_support::HttpScript::Json {
+                    status: 200,
+                    body: serde_json::to_vec(&response).unwrap(),
+                }
+            } else {
+                connect_proto_ok(&response)
+            }
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: server.base_url(),
+            api_key_id: Some("scope-test".into()),
+            api_private_key: Some(TEST_KEY.into()),
+            hydrate_catalogs: false,
+            wire_format: if json_wire {
+                WireFormat::Json
+            } else {
+                WireFormat::Binary
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        let mut request = ListTransfersRequest {
+            limit: 1,
+            reversed: true,
+            subaccount_id: Some(42),
+            ts_min_us: 100,
+            ..Default::default()
+        };
+        let first = client.transfers.list(request.clone()).await.unwrap();
+        assert_eq!(first.next_page_token, "eyJ2IjoxfQ==");
+        request.page_token = first.next_page_token;
+        // The balances facade shares this decoder and accepts the same wire request.
+        let second = client.balances.list_transfers(request).await.unwrap();
+        assert!(second.next_page_token.is_empty());
+        assert_eq!(first.transfers[0].timestamp, 999);
+        assert_eq!(second.transfers[0].timestamp, 999);
+        assert_ne!(
+            first.transfers[0].transfer_id,
+            second.transfers[0].transfer_id
+        );
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[0].page_token, "");
+        assert_eq!(seen[1].page_token, "eyJ2IjoxfQ==");
+        let mut next = seen[1].clone();
+        next.page_token.clear();
+        assert_eq!(seen[0], next);
+    }
+}
+
+#[tokio::test]
+async fn l2_equity_history_keeps_wire_btc_closes_in_both_codecs() {
+    use polyester::proto::ledger::read::v1::{
+        EquitySeries, GetEquityHistorySeriesRequest, GetEquityHistorySeriesResponse,
+    };
+    use polyester::transport::WireFormat;
+    for json_wire in [false, true] {
+        let server = MockHttpServer::spawn(move |req| {
+            assert!(req.path.ends_with("/GetEquityHistorySeries"));
+            let response = GetEquityHistorySeriesResponse {
+                points: 2,
+                start_ts_sec: 100,
+                end_ts_sec: 400,
+                bucket: "5m".into(),
+                btc_prices_q: vec![60000000000001, 61000000000009],
+                series: vec![EquitySeries {
+                    equity_q: vec![12345, -6789],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            if json_wire {
+                hardening_support::HttpScript::Json {
+                    status: 200,
+                    body: serde_json::to_vec(&response).unwrap(),
+                }
+            } else {
+                connect_proto_ok(&response)
+            }
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: server.base_url(),
+            api_key_id: Some("read-test".into()),
+            api_private_key: Some(TEST_KEY.into()),
+            hydrate_catalogs: false,
+            wire_format: if json_wire {
+                WireFormat::Json
+            } else {
+                WireFormat::Binary
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        let result = client
+            .balances
+            .get_equity_history(GetEquityHistorySeriesRequest::default())
+            .await
+            .unwrap();
+        assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+        assert_eq!(result.btc_prices_q, vec![60000000000001, 61000000000009]);
+        assert_eq!(result.series[0].equity_q, vec![12345, -6789]);
+        assert_eq!(
+            (result.start_ts_sec, result.end_ts_sec, result.points),
+            (100, 400, 2)
+        );
+    }
+}
