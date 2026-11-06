@@ -190,8 +190,8 @@ impl Credentials {
             Some(value) => value.to_owned(),
             None => self.timestamp_allocator.next()?.to_string(),
         };
-        let canonical = canonical_signing_string(&ts, method, raw_url, body)?;
-        let sig = self.signing_key.sign(canonical.as_bytes());
+        let canonical = canonical_signing_bytes(&ts, method, raw_url, body)?;
+        let sig = self.signing_key.sign(&canonical);
         let mut headers = BTreeMap::new();
         headers.insert(HEADER_KEY_ID.to_owned(), self.key_id.clone());
         headers.insert(HEADER_TIMESTAMP.to_owned(), ts);
@@ -224,8 +224,8 @@ impl Credentials {
             Some(value) => value.to_owned(),
             None => self.timestamp_allocator.next_async().await?.to_string(),
         };
-        let canonical = canonical_signing_string(&ts, method, raw_url, body)?;
-        let sig = self.signing_key.sign(canonical.as_bytes());
+        let canonical = canonical_signing_bytes(&ts, method, raw_url, body)?;
+        let sig = self.signing_key.sign(&canonical);
         let mut headers = BTreeMap::new();
         headers.insert(HEADER_KEY_ID.to_owned(), self.key_id.clone());
         headers.insert(HEADER_TIMESTAMP.to_owned(), ts);
@@ -315,31 +315,47 @@ pub fn canonical_query(raw_url: &str) -> Result<String> {
     Ok(canonical_query_from_url(&parsed))
 }
 
+/// The signing payload as text, for inspection.
+///
+/// A path whose percent-escapes decode to bytes that are not UTF-8 has no text
+/// form and returns a validation error; [`Credentials::sign_request`] signs
+/// those bytes as they are.
 pub fn canonical_signing_string(
     timestamp_ms: &str,
     method: &str,
     raw_url: &str,
     body: &[u8],
 ) -> Result<String> {
+    String::from_utf8(canonical_signing_bytes(
+        timestamp_ms,
+        method,
+        raw_url,
+        body,
+    )?)
+    .map_err(|_| Error::validation("signing URL path is not valid UTF-8 once decoded"))
+}
+
+/// The bytes the server verifies: its path is the decoded URL path, so a
+/// percent-escaped path signs the same as its plain form.
+fn canonical_signing_bytes(
+    timestamp_ms: &str,
+    method: &str,
+    raw_url: &str,
+    body: &[u8],
+) -> Result<Vec<u8>> {
     let parsed = url::Url::parse(raw_url)
         .map_err(|err| Error::validation(format!("invalid signing URL: {err}")))?;
-    let pathname = {
-        let path = parsed.path();
-        if path.is_empty() {
-            "/".to_owned()
-        } else {
-            path.to_owned()
-        }
-    };
+    let path: Vec<u8> = percent_encoding::percent_decode_str(parsed.path()).collect();
+    let pathname: &[u8] = if path.is_empty() { b"/" } else { &path };
     let sum = Sha256::digest(body);
     Ok([
-        timestamp_ms,
-        &method.to_uppercase(),
-        &pathname,
-        &canonical_query_from_url(&parsed),
-        &hex::encode(sum),
+        timestamp_ms.as_bytes(),
+        method.to_uppercase().as_bytes(),
+        pathname,
+        canonical_query_from_url(&parsed).as_bytes(),
+        hex::encode(sum).as_bytes(),
     ]
-    .join("\n"))
+    .join(&b'\n'))
 }
 
 pub fn request_url(api_base: &str, procedure: &str) -> String {
@@ -368,6 +384,7 @@ mod tests {
 
     // Identical fixtures live in Go, Python and Rust. Expected queries follow
     // the server's canonicalization: decoded key/value bytes sorted, then RFC 3986 escaped.
+    // The signed path is the decoded path: canonical_path names it where it is valid UTF-8.
     // Golden signatures use the public test seed 00..1f, timestamp 123, GET, no body.
     #[tokio::test]
     async fn server_query_signing_vectors() {
@@ -376,10 +393,19 @@ mod tests {
             name: String,
             url: String,
             canonical_query: String,
+            canonical_path: Option<String>,
             signature_hex: String,
         }
         let cases: Vec<Vector> =
             serde_json::from_str(include_str!("../testdata/signing_query_vectors.json")).unwrap();
+        assert!(
+            cases
+                .iter()
+                .filter(|case| case.name.starts_with("path-"))
+                .count()
+                >= 10,
+            "the shared path vectors must be present"
+        );
         let seed: Vec<u8> = (0..32).collect();
         let credentials = Credentials::new("test-key", &hex::encode(seed)).unwrap();
         for case in cases {
@@ -389,6 +415,24 @@ mod tests {
                 "{}",
                 case.name
             );
+            let signed = canonical_signing_string("123", "GET", &case.url, b"");
+            match &case.canonical_path {
+                Some(path) => {
+                    let signed = signed.unwrap();
+                    assert_eq!(
+                        signed.split('\n').nth(2),
+                        Some(path.as_str()),
+                        "{}",
+                        case.name
+                    );
+                }
+                // Decoded bytes that are not UTF-8 have no text form, and the
+                // golden signature below still has to match.
+                None if case.name.starts_with("path-") => assert!(signed.is_err(), "{}", case.name),
+                None => {
+                    signed.unwrap();
+                }
+            }
             let headers = credentials
                 .sign_request("GET", &case.url, b"", Some("123"))
                 .unwrap();

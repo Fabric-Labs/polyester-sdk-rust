@@ -280,6 +280,11 @@ pub struct TriggerEvent {
     pub subaccount_id: String,
     pub symbol_id: u32,
     pub trigger_type: String,
+    /// `fired`, `canceled`, `updated`, `failed`, `activated` (a trailing stop
+    /// started tracking), `armed` (an attached take-profit, stop-loss or
+    /// trailing stop started protecting its parent's filled quantity, once) or
+    /// `fire_refused`. A ladder has no event types of its own: read its
+    /// status, `completed`, `cancelled` or `failed`.
     pub event_type: String,
     pub ts_ns: String,
     /// The fire attempt the event names. A `fire_refused` event uses a

@@ -741,6 +741,20 @@ that ends the trigger is still `failed` with `failure_reason`. A ladder whose
 levels were all canceled before any filled ends `cancelled` with
 `user_request`.
 
+`TriggerEvent.event_type` is `fired`, `canceled`, `updated`, `failed`,
+`activated` (a trailing stop started tracking), `armed` (an attached
+take-profit, stop-loss or trailing stop started protecting its parent's filled
+quantity, once) or `fire_refused`. A ladder has no event types of its own: read
+its status, `completed`, `cancelled` or `failed`. A completed ladder may not
+have filled: read its executed quantity and levels.
+
+A trigger change that names a listed pair other than the trigger's own is
+refused with `ERROR_CODE_TRIGGER_SYMBOL_MISMATCH` (305). Nothing changed: name
+the trigger's own pair or omit the symbol. A pair that is not listed is
+`ERROR_CODE_UNKNOWN_SYMBOL`. A balance or other ledger read given a zero or
+malformed sub-account ID is refused with the ledger code
+`ERROR_CODE_INVALID_SUBACCOUNT_ID` (11), read from `Error::Api`'s `code`.
+
 To stop all automated trading, call `client.stop_all_trading(scope)`. Cancel-all
 and the dead-man switch cancel open orders, never triggers: an unfired stop
 stays armed, a TWAP keeps running. `stop_all_trading` pages through the live

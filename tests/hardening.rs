@@ -4774,6 +4774,150 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
     assert_eq!(http.requests.load(Ordering::SeqCst), 1);
 }
 
+// A definite REST refusal returns at once with its typed reason. Real
+// unavailability still retries: l2_trigger_reads_retry_unavailable_* cover it.
+#[tokio::test]
+async fn l2_trigger_reads_return_definite_rest_refusals_at_once() {
+    use polyester::proto::triggers::v1::GetTriggerRequest;
+    const PROBLEM: &str = "application/problem+json";
+    for (status, body, code) in [
+        (
+            401,
+            r#"{"code":"IP_NOT_ALLOWED","detail":"x"}"#,
+            "IP_NOT_ALLOWED",
+        ),
+        (
+            403,
+            r#"{"code":"PERMISSION_DENIED","detail":"x"}"#,
+            "PERMISSION_DENIED",
+        ),
+        (
+            400,
+            r#"{"code":"BAD_PRICE","detail":"x"}"#,
+            "ERROR_CODE_BAD_PRICE",
+        ),
+        (
+            429,
+            r#"{"code":"RATE_LIMIT_EXCEEDED","detail":"x"}"#,
+            "ERROR_CODE_RATE_LIMIT_EXCEEDED",
+        ),
+        (
+            503,
+            r#"{"code":"ACCOUNT_ROUTING_INVALID","detail":"x"}"#,
+            "ERROR_CODE_ACCOUNT_ROUTING_INVALID",
+        ),
+    ] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let counted = calls.clone();
+        let http = MockHttpServer::spawn(move |request| {
+            if request.path == "/triggers.v1.TriggersService/GetTrigger" {
+                counted.fetch_add(1, Ordering::SeqCst);
+                json_body(status, PROBLEM, body)
+            } else {
+                hardening_support::HttpScript::NotFound
+            }
+        })
+        .await;
+        let err = api_key_client(&http)
+            .triggers
+            .get(GetTriggerRequest {
+                trigger_id: 9,
+                ..Default::default()
+            })
+            .await
+            .expect_err("refused");
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "{status} {body}: {err:?}");
+        assert!(format!("{err:?}").contains(code), "{err:?}");
+    }
+}
+
+// A network failure across the whole window reports like any wait that proves
+// nothing: reconcile through the orders, and don't treat the batch as refused.
+#[tokio::test]
+async fn l2_wait_batch_replace_reports_a_transport_failure_during_its_window() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    drop(listener);
+    let client = Client::new(Config {
+        api_url: format!("http://127.0.0.1:{port}"),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .expect("client");
+
+    // One read shows the failure really is the network, not an answer.
+    let direct = client
+        .orders
+        .get_batch_replace_status("1", None)
+        .await
+        .expect_err("nothing listens");
+    assert!(
+        matches!(&direct, Error::Server(message) if message.contains("HTTP request failed")),
+        "{direct:?}"
+    );
+
+    let started = Instant::now();
+    let err = client
+        .orders
+        .wait_batch_replace("1", None, Some(Duration::from_millis(300)))
+        .await
+        .expect_err("nothing listens");
+    assert!(
+        matches!(&err, Error::Transport(message) if message.contains("reconcile")),
+        "{err:?}"
+    );
+    assert!(err.mutation_outcome_unknown(), "{err:?}");
+    assert!(!err.is_retryable(), "{err:?}");
+    // It polled through the failure rather than returning on the first one.
+    assert!(started.elapsed() >= Duration::from_millis(100), "{err:?}");
+}
+
+// A ledger refusal keeps its stable code, known and final.
+#[tokio::test]
+async fn l2_balances_read_reports_the_ledger_error_code() {
+    use base64::Engine as _;
+    use polyester::proto::ledger::read::v1::{ErrorCode, ErrorDetail};
+    let detail = ErrorDetail {
+        code: ErrorCode::InvalidSubaccountId.into(),
+        ..Default::default()
+    };
+    let value = base64::engine::general_purpose::STANDARD_NO_PAD.encode(detail.encode_to_bytes());
+    let body = json!({
+        "code": "invalid_argument",
+        "message": "subaccount_id is not valid",
+        "details": [{"type": "ledger.read.v1.ErrorDetail", "value": value}],
+    })
+    .to_string();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counted = calls.clone();
+    let http = MockHttpServer::spawn(move |request| {
+        if request
+            .path
+            .starts_with("/ledger.read.v1.LedgerReadService/")
+        {
+            counted.fetch_add(1, Ordering::SeqCst);
+            json_body(400, "application/json", &body)
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let err = api_key_client(&http)
+        .balances
+        .list(Default::default())
+        .await
+        .expect_err("refused");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert!(
+        matches!(&err, Error::Api { code, .. } if code == "ERROR_CODE_INVALID_SUBACCOUNT_ID"),
+        "{err:?}"
+    );
+    assert!(!err.is_retryable(), "{err:?}");
+    assert!(!err.mutation_outcome_unknown(), "{err:?}");
+}
+
 fn connect_auth_error(
     connect_code: &str,
     code: polyester::proto::auth::v1::AuthErrorCode,

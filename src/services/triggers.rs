@@ -1261,6 +1261,11 @@ mod tests {
         twap.trigger_price_source = Some("index".into());
         let err = client.triggers.encode_create_params(&twap).unwrap_err();
         assert!(err.to_string().contains("trigger_price_source"), "{err}");
+        let mut ladder = twap;
+        ladder.trigger_type = CreateTriggerType::Ladder;
+        ladder.limit_price = None;
+        let err = client.triggers.encode_create_params(&ladder).unwrap_err();
+        assert!(err.to_string().contains("trigger_price_source"), "{err}");
     }
 
     #[test]
