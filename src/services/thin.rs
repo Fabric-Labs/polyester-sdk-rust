@@ -739,6 +739,8 @@ impl AddressBookService {
         }
     }
 
+    /// Sends `req` as built: set its subaccount field to choose the subaccount.
+    /// The configured default subaccount is not applied.
     pub async fn create_entry(
         &self,
         req: crate::proto::auth::v1::CreateAddressBookEntryRequest,
@@ -797,6 +799,8 @@ impl AddressBookService {
         Ok(())
     }
 
+    /// Sends `req` as built: set its subaccount field to choose the subaccount.
+    /// The configured default subaccount is not applied.
     pub async fn copy_entry(
         &self,
         req: crate::proto::auth::v1::CopyAddressBookEntryRequest,
@@ -817,6 +821,8 @@ impl AddressBookService {
         entry_from_copy_proto(&resp)
     }
 
+    /// Sends `req` as built: set its subaccount field to choose the subaccount.
+    /// The configured default subaccount is not applied.
     pub async fn create_tag(
         &self,
         req: crate::proto::auth::v1::CreateAddressBookTagRequest,
@@ -1165,6 +1171,8 @@ impl GuardSignerService {
         Ok(status_from_proto(&resp))
     }
 
+    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
+    /// The configured default subaccount is not applied.
     pub async fn create_wallet(
         &self,
         req: crate::proto::chain::guard::v1::CreateGuardSignerWalletRequest,
@@ -1185,6 +1193,8 @@ impl GuardSignerService {
         Ok(create_wallet_from_proto(&resp))
     }
 
+    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
+    /// The configured default subaccount is not applied.
     pub async fn sign_protected_action(
         &self,
         req: crate::proto::chain::guard::v1::SignProtectedActionRequest,
@@ -1205,6 +1215,8 @@ impl GuardSignerService {
         Ok(sign_protected_action_from_proto(&resp))
     }
 
+    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
+    /// The configured default subaccount is not applied.
     pub async fn batch_sign_protected_actions(
         &self,
         req: crate::proto::chain::guard::v1::BatchSignProtectedActionsRequest,
@@ -1225,6 +1237,8 @@ impl GuardSignerService {
         Ok(batch_sign_from_proto(&resp))
     }
 
+    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
+    /// The configured default subaccount is not applied.
     pub async fn rotate_wallet(
         &self,
         req: crate::proto::chain::guard::v1::RotateGuardSignerWalletRequest,
@@ -1245,6 +1259,8 @@ impl GuardSignerService {
         Ok(rotate_wallet_from_proto(&resp))
     }
 
+    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
+    /// The configured default subaccount is not applied.
     pub async fn export_wallet(
         &self,
         req: crate::proto::chain::guard::v1::ExportGuardSignerWalletRequest,

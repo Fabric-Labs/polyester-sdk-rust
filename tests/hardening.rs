@@ -7825,3 +7825,502 @@ async fn batch_create_refuses_item_subaccount_instead_of_using_default() {
         }
     }
 }
+
+// Each public order and trigger write, captured on the wire: the subaccount it
+// was asked for, the configured default when it was asked for none, and no
+// subaccount at all when neither exists.
+type CapturedScopes = Arc<std::sync::Mutex<Vec<(String, Option<u64>)>>>;
+
+fn plain(subaccount_id: u64) -> Option<u64> {
+    (subaccount_id != 0).then_some(subaccount_id)
+}
+
+async fn scope_capture_client(default: Option<u64>) -> (MockHttpServer, Client, CapturedScopes) {
+    use polyester::proto::auth::v1 as book;
+    use polyester::proto::chain::deposit::v1 as deposit;
+    use polyester::proto::chain::guard::v1 as guard;
+    use polyester::proto::orders::v1 as orders;
+    use polyester::proto::triggers::v1 as triggers;
+
+    let seen = CapturedScopes::default();
+    let captured = seen.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        let body = &request.body;
+        macro_rules! scope {
+            ($request:ty) => {
+                <$request>::decode_from_slice(body).unwrap().subaccount_id
+            };
+        }
+        let rpc = request.path.rsplit('/').next().unwrap().to_owned();
+        let subaccount_id = match rpc.as_str() {
+            "CreateOrder" => scope!(orders::CreateOrderRequest),
+            "PreviewOrder" => scope!(orders::PreviewOrderRequest),
+            "ModifyOrder" => scope!(orders::ModifyOrderRequest),
+            "CancelOrder" => scope!(orders::CancelOrderRequest),
+            "CancelAllOrders" => scope!(orders::CancelAllOrdersRequest),
+            "CancelAllAfter" => scope!(orders::CancelAllAfterRequest),
+            "BatchCreateOrders" => scope!(orders::BatchCreateOrdersRequest),
+            "BatchCancelOrders" => scope!(orders::BatchCancelOrdersRequest),
+            "BatchReplaceOrders" => scope!(orders::BatchReplaceOrdersRequest),
+            "CreateTrigger" => scope!(triggers::CreateTriggerRequest),
+            "ModifyTrigger" => scope!(triggers::ModifyTriggerRequest),
+            "CancelTrigger" => scope!(triggers::CancelTriggerRequest),
+            "PauseTrigger" => scope!(triggers::PauseTriggerRequest),
+            "ResumeTrigger" => scope!(triggers::ResumeTriggerRequest),
+            "GetTrigger" => scope!(triggers::GetTriggerRequest),
+            "ListTriggers" => scope!(triggers::ListTriggersRequest),
+            // Plain `u64` fields: zero is what an unset field sends.
+            "CreateDepositAddress" => plain(
+                deposit::CreateDepositAddressRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "CreateAddressBookEntry" => plain(
+                book::CreateAddressBookEntryRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "CreateAddressBookTag" => plain(
+                book::CreateAddressBookTagRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "CopyAddressBookEntry" => plain(
+                book::CopyAddressBookEntryRequest::decode_from_slice(body)
+                    .unwrap()
+                    .target_subaccount_id,
+            ),
+            "CreateGuardSignerWallet" => plain(
+                guard::CreateGuardSignerWalletRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "SignProtectedAction" => plain(
+                guard::SignProtectedActionRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "BatchSignProtectedActions" => plain(
+                guard::BatchSignProtectedActionsRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "RotateGuardSignerWallet" => plain(
+                guard::RotateGuardSignerWalletRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "ExportGuardSignerWallet" => plain(
+                guard::ExportGuardSignerWalletRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            _ => return hardening_support::HttpScript::NotFound,
+        };
+        captured.lock().unwrap().push((rpc.clone(), subaccount_id));
+        if rpc == "ListTriggers" {
+            return connect_proto_ok(&triggers::ListTriggersResponse {
+                triggers: vec![triggers::Trigger {
+                    trigger_id: 9,
+                    status: triggers::TriggerStatus::STATUS_ARMED.into(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            });
+        }
+        // The capture is the assertion; a refusal stops response decoding from masking it.
+        json_body(
+            400,
+            "application/json",
+            r#"{"code":"failed_precondition","message":"capture complete"}"#,
+        )
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("scope-test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        default_sub_account_id: default.map(polyester::codecs::scalars::format_id),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({"pairs": [{
+            "symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8
+        }]}))
+        .unwrap();
+    (server, client, seen)
+}
+
+fn scope_quantity() -> Quantity {
+    Quantity::from_scaled(
+        1,
+        Some(8),
+        QuantityDomain::OrderBase,
+        Some("BTC-USDT".into()),
+        Some(1),
+    )
+    .unwrap()
+}
+
+fn scope_price() -> polyester::Price {
+    polyester::Price::from_ticks(1, Some("BTC-USDT".into())).unwrap()
+}
+
+fn scope_order(subaccount_id: Option<u64>) -> polyester::models::CreateOrderParams {
+    use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide};
+    let mut params = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+    params.quantity = Some(scope_quantity());
+    params.price = Some(scope_price());
+    params.subaccount_id = subaccount_id;
+    params
+}
+
+#[tokio::test]
+async fn order_and_trigger_writes_send_the_resolved_subaccount() {
+    use polyester::models::{
+        BatchCancelItem, BatchReplaceItem, CancelAllOpts, CancelOrderParams, CreateOrderType,
+        CreateSide, CreateTriggerParams, CreateTriggerType, ModifyOrderParams, ModifyTriggerParams,
+        OrderKey, PreviewOrderParams, ResumeTriggerParams, StopAllTradingScope,
+    };
+
+    for (default, sub, want) in [
+        (Some(42), None, Some(42)),
+        (Some(43), None, Some(43)),
+        (Some(42), Some(44), Some(44)),
+        (Some(42), Some(42), Some(42)),
+        (None, Some(44), Some(44)),
+        (None, None, None),
+    ] {
+        let (_server, client, seen) = scope_capture_client(default).await;
+        macro_rules! captures {
+            ($label:literal, $rpcs:expr, $call:expr) => {{
+                let _ = $call.await;
+                let got = std::mem::take(&mut *seen.lock().unwrap());
+                let expected: Vec<(String, Option<u64>)> = $rpcs
+                    .iter()
+                    .map(|rpc: &&str| (rpc.to_string(), want))
+                    .collect();
+                assert_eq!(got, expected, "{} default={default:?} sub={sub:?}", $label);
+            }};
+        }
+        let id = || OrderKey::OrderId("9".into());
+
+        captures!(
+            "orders.create",
+            ["CreateOrder"],
+            client.orders.create(scope_order(sub))
+        );
+        captures!(
+            "orders.preview",
+            ["PreviewOrder"],
+            client.orders.preview({
+                let mut params =
+                    PreviewOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+                params.quantity = Some(scope_quantity());
+                params.price = Some(scope_price());
+                params.subaccount_id = sub;
+                params
+            })
+        );
+        captures!(
+            "orders.batch_create",
+            ["BatchCreateOrders"],
+            client
+                .orders
+                .batch_create(vec![scope_order(None)], sub, None)
+        );
+        captures!(
+            "orders.batch_cancel",
+            ["BatchCancelOrders"],
+            client.orders.batch_cancel(
+                vec![BatchCancelItem {
+                    key: id(),
+                    symbol_id: None
+                }],
+                sub,
+                None
+            )
+        );
+        captures!(
+            "orders.batch_replace",
+            ["BatchReplaceOrders"],
+            client.orders.batch_replace(
+                vec![BatchReplaceItem {
+                    key: id(),
+                    new_price: Some(scope_price()),
+                    new_qty: None,
+                    new_attached_risk: None,
+                    new_client_order_id: None,
+                }],
+                "BTC-USDT",
+                sub,
+                None
+            )
+        );
+        captures!(
+            "orders.modify",
+            ["ModifyOrder"],
+            client.orders.modify(ModifyOrderParams {
+                symbol: "BTC-USDT".into(),
+                key: id(),
+                subaccount_id: sub,
+                request_id: None,
+                new_price: Some(scope_price()),
+                new_qty: None,
+                new_attached_risk: None,
+                behavior: None,
+                new_client_order_id: None,
+            })
+        );
+        captures!(
+            "orders.cancel_with",
+            ["CancelOrder"],
+            client.orders.cancel_with(CancelOrderParams {
+                key: id(),
+                symbol: None,
+                symbol_id: None,
+                subaccount_id: sub
+            })
+        );
+        captures!(
+            "orders.cancel_by_order_id",
+            ["CancelOrder"],
+            client.orders.cancel_by_order_id("9", sub)
+        );
+        captures!(
+            "orders.cancel_by_client_order_id",
+            ["CancelOrder"],
+            client
+                .orders
+                .cancel_by_client_order_id("client-9", None, sub)
+        );
+        captures!(
+            "orders.cancel_all",
+            ["CancelAllOrders"],
+            client.orders.cancel_all(None, false, sub)
+        );
+        captures!(
+            "orders.cancel_all_with",
+            ["CancelAllOrders"],
+            client.orders.cancel_all_with(CancelAllOpts {
+                subaccount_id: sub,
+                ..Default::default()
+            })
+        );
+        captures!(
+            "orders.cancel_all_after",
+            ["CancelAllAfter"],
+            client.orders.cancel_all_after(15, None, sub, None)
+        );
+        captures!(
+            "triggers.create",
+            ["CreateTrigger"],
+            client.triggers.create({
+                let mut params = CreateTriggerParams::new(
+                    "BTC-USDT",
+                    CreateTriggerType::StopLoss,
+                    CreateSide::Sell,
+                    CreateOrderType::Market,
+                    scope_quantity(),
+                );
+                params.trigger_price = Some(scope_price());
+                params.subaccount_id = sub;
+                params.client_trigger_id = "scope-trigger".into();
+                params
+            })
+        );
+        captures!(
+            "triggers.modify",
+            ["ModifyTrigger"],
+            client.triggers.modify(ModifyTriggerParams {
+                trigger_id: "9".into(),
+                subaccount_id: sub,
+                symbol: None,
+                symbol_id: None,
+                trigger_price: None,
+                activation_price: None,
+                trailing_distance_ticks: None,
+                trailing_distance_bps: None,
+                max_slippage_ticks: None,
+                max_slippage_bps: Some(100),
+            })
+        );
+        captures!(
+            "triggers.cancel_by_id",
+            ["CancelTrigger"],
+            client.triggers.cancel_by_id("9", sub)
+        );
+        captures!(
+            "triggers.pause_by_id",
+            ["PauseTrigger"],
+            client.triggers.pause_by_id("9", sub)
+        );
+        captures!(
+            "triggers.resume_by_id",
+            ["ResumeTrigger"],
+            client.triggers.resume_by_id("9", None, sub)
+        );
+        captures!(
+            "triggers.resume_with",
+            ["ResumeTrigger"],
+            client.triggers.resume_with(ResumeTriggerParams {
+                trigger_id: "9".into(),
+                subaccount_id: sub,
+                symbol: None,
+                symbol_id: None,
+            })
+        );
+        captures!(
+            "triggers.get_by_id",
+            ["GetTrigger"],
+            client.triggers.get_by_id("9", sub)
+        );
+        captures!(
+            "stop_all_trading",
+            ["ListTriggers", "CancelTrigger", "CancelAllOrders"],
+            client.stop_all_trading(StopAllTradingScope {
+                subaccount_id: sub,
+                ..Default::default()
+            })
+        );
+    }
+}
+
+// Raw-request methods belong to the caller who built the request: a configured
+// default is never applied, and nothing the caller set is replaced.
+#[tokio::test]
+async fn raw_write_requests_are_sent_as_built() {
+    use polyester::proto::auth::v1::{
+        CopyAddressBookEntryRequest, CreateAddressBookEntryRequest, CreateAddressBookTagRequest,
+    };
+    use polyester::proto::chain::deposit::v1::CreateDepositAddressRequest;
+    use polyester::proto::chain::guard::v1::{
+        BatchSignProtectedActionsRequest, CreateGuardSignerWalletRequest,
+        ExportGuardSignerWalletRequest, RotateGuardSignerWalletRequest, SignProtectedActionRequest,
+    };
+    use polyester::proto::orders::v1::CancelOrderRequest;
+    use polyester::proto::triggers::v1::{
+        CancelTriggerRequest, PauseTriggerRequest, ResumeTriggerRequest,
+    };
+
+    let (_server, client, seen) = scope_capture_client(Some(42)).await;
+    for subaccount_id in [None, Some(44), Some(42)] {
+        let _ = client
+            .orders
+            .cancel(CancelOrderRequest {
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .triggers
+            .cancel(CancelTriggerRequest {
+                trigger_id: 9,
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .triggers
+            .pause(PauseTriggerRequest {
+                trigger_id: 9,
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .triggers
+            .resume(ResumeTriggerRequest {
+                trigger_id: 9,
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let plain_id = subaccount_id.unwrap_or(0);
+        let _ = client
+            .deposit
+            .create_address(CreateDepositAddressRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .address_book
+            .create_entry(CreateAddressBookEntryRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .address_book
+            .create_tag(CreateAddressBookTagRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .address_book
+            .copy_entry(CopyAddressBookEntryRequest {
+                target_subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .guard_signer
+            .create_wallet(CreateGuardSignerWalletRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .guard_signer
+            .sign_protected_action(SignProtectedActionRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .guard_signer
+            .batch_sign_protected_actions(BatchSignProtectedActionsRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .guard_signer
+            .rotate_wallet(RotateGuardSignerWalletRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .guard_signer
+            .export_wallet(ExportGuardSignerWalletRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let got = std::mem::take(&mut *seen.lock().unwrap());
+        let expected: Vec<(String, Option<u64>)> = [
+            "CancelOrder",
+            "CancelTrigger",
+            "PauseTrigger",
+            "ResumeTrigger",
+            "CreateDepositAddress",
+            "CreateAddressBookEntry",
+            "CreateAddressBookTag",
+            "CopyAddressBookEntry",
+            "CreateGuardSignerWallet",
+            "SignProtectedAction",
+            "BatchSignProtectedActions",
+            "RotateGuardSignerWallet",
+            "ExportGuardSignerWallet",
+        ]
+        .map(|rpc| (rpc.to_owned(), subaccount_id))
+        .to_vec();
+        assert_eq!(got, expected);
+    }
+}

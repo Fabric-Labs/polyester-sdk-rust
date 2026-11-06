@@ -1395,6 +1395,9 @@ impl OrdersService {
     /// least a minute after the order ends, then reads
     /// `ERROR_CODE_ORDER_UNKNOWN`. Every cancel counts against the cancel
     /// rate limit, repeats included.
+    ///
+    /// Sends `req` as built: the configured default subaccount is not applied.
+    /// Use [`Self::cancel_with`] to apply it.
     pub async fn cancel(&self, req: CancelOrderRequest) -> Result<OrderMutationResult> {
         let client = self.write_client();
         let resp = unary::await_auth(
