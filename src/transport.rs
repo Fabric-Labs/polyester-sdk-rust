@@ -229,7 +229,8 @@ impl ClientTransport for GatewayTransport {
                     )
                     .unwrap_or_default(),
             };
-            if let Some(err) = classify_failed_response(parts.status, is_json, &decoded) {
+            if let Some(mut err) = classify_failed_response(parts.status, is_json, &decoded) {
+                err.set_response_headers(parts.headers.clone());
                 return Err(err);
             }
             // Hand Connect the response exactly as received, encoding included.
@@ -254,7 +255,10 @@ fn inspected_failure<B>(response: &Response<B>) -> Option<bool> {
         .is_some_and(|value| {
             value.starts_with("application/json") || value.starts_with("application/problem+json")
         });
-    (is_json || status == StatusCode::NOT_FOUND || status == StatusCode::NOT_IMPLEMENTED)
+    (is_json
+        || status == StatusCode::NOT_FOUND
+        || status == StatusCode::NOT_IMPLEMENTED
+        || status == StatusCode::GATEWAY_TIMEOUT)
         .then_some(is_json)
 }
 
@@ -330,6 +334,40 @@ fn classify_failed_response_inner(
                 );
             }
         }
+        if order_name.ends_with("_OUTCOME_UNKNOWN") {
+            let message = parsed
+                .and_then(|body| body.detail.or(body.title))
+                .filter(|m| !m.is_empty())
+                .unwrap_or_else(|| code.clone());
+            return Some(
+                ConnectError::new(ErrorCode::DeadlineExceeded, message).with_http_status(status),
+            );
+        }
+        if matches!(
+            order_name.as_str(),
+            "ERROR_CODE_OVERLOADED"
+                | "ERROR_CODE_SYSTEM_RATE_LIMITED"
+                | "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED"
+        ) {
+            use crate::proto::orders::v1::{
+                ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail,
+            };
+            let message = parsed
+                .and_then(|body| body.detail.or(body.title))
+                .filter(|m| !m.is_empty())
+                .unwrap_or_else(|| code.clone());
+            return Some(
+                ConnectError::new(ErrorCode::ResourceExhausted, message)
+                    .with_http_status(status)
+                    .with_detail(ErrorDetail::from_message(
+                        "orders.v1.ErrorDetail",
+                        &OrderErrorDetail {
+                            code: OrderErrorCode::from_proto_name(&order_name)?.into(),
+                            ..Default::default()
+                        },
+                    )),
+            );
+        }
         if let Some((connect_code, auth_code)) = rest_auth_problem(&code) {
             let message = parsed
                 .and_then(|body| body.detail.or(body.title))
@@ -341,7 +379,10 @@ fn classify_failed_response_inner(
             return Some(err);
         }
     }
-    if status != StatusCode::NOT_FOUND && status != StatusCode::NOT_IMPLEMENTED {
+    if status != StatusCode::NOT_FOUND
+        && status != StatusCode::NOT_IMPLEMENTED
+        && status != StatusCode::GATEWAY_TIMEOUT
+    {
         return None;
     }
     let text = String::from_utf8_lossy(body);
@@ -356,7 +397,11 @@ fn classify_failed_response_inner(
         format!("HTTP {}: {excerpt}", status.as_u16())
     };
     Some(sdk_marked_error(
-        ErrorCode::Unimplemented,
+        if status == StatusCode::GATEWAY_TIMEOUT {
+            ErrorCode::Unavailable
+        } else {
+            ErrorCode::Unimplemented
+        },
         message,
         status,
         BARE_HTTP_ERROR_TYPE,

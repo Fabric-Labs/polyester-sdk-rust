@@ -57,6 +57,13 @@ pub enum Error {
     },
     #[error("{0}")]
     Server(String),
+    /// A REST gateway timeout without a recognized mutation outcome code.
+    /// The write may have applied; reconcile before retrying. Safe reads may retry.
+    #[error("{message}")]
+    GatewayTimeout {
+        message: String,
+        problem: Option<Box<crate::problem::HttpProblem>>,
+    },
     #[error("{message}")]
     Api {
         message: String,
@@ -281,7 +288,7 @@ pub(crate) fn gateway_rejection_error(status: u16, code: &str) -> Error {
 }
 
 fn is_outcome_unknown_code(code: &str) -> bool {
-    order_codes::OUTCOME_UNKNOWN.contains(&code)
+    code.ends_with("_OUTCOME_UNKNOWN")
 }
 
 impl Error {
@@ -289,7 +296,8 @@ impl Error {
     /// For `Error::Api`, this decodes the synthetic JSON `http_problem` metadata entry.
     pub fn http_problem(&self) -> Option<crate::problem::HttpProblem> {
         match self {
-            Self::ApiKeyRejected { problem, .. }
+            Self::GatewayTimeout { problem, .. }
+            | Self::ApiKeyRejected { problem, .. }
             | Self::PermissionDenied { problem, .. }
             | Self::TimestampSkew { problem, .. }
             | Self::SessionRequired { problem, .. } => problem.as_deref().cloned(),
@@ -303,7 +311,8 @@ impl Error {
 
     pub(crate) fn with_http_problem(mut self, value: crate::problem::HttpProblem) -> Self {
         match &mut self {
-            Self::ApiKeyRejected { problem, .. }
+            Self::GatewayTimeout { problem, .. }
+            | Self::ApiKeyRejected { problem, .. }
             | Self::PermissionDenied { problem, .. }
             | Self::TimestampSkew { problem, .. }
             | Self::SessionRequired { problem, .. } => *problem = Some(Box::new(value)),
@@ -356,6 +365,11 @@ impl Error {
     /// retry can place a second order. Read the order or trigger back and
     /// reuse the original idempotency key instead.
     ///
+    /// A plain REST gateway 504 is [`Self::GatewayTimeout`], non-retryable
+    /// with outcome unknown. This classifier has no operation context: safe
+    /// reads may explicitly retry it; writes must read back first. A client
+    /// order ID enables reconciliation, not exact replay of a single create.
+    ///
     /// This is not a guarantee that a mutation was not applied. A transport
     /// or server error is retryable and its outcome is also unknown: when
     /// [`Self::mutation_outcome_unknown`] is true, reconcile server state and
@@ -386,7 +400,10 @@ impl Error {
     /// is necessary.
     pub fn mutation_outcome_unknown(&self) -> bool {
         match self {
-            Self::Transport(_) | Self::ResponseContract { .. } | Self::Server(_) => true,
+            Self::Transport(_)
+            | Self::ResponseContract { .. }
+            | Self::Server(_)
+            | Self::GatewayTimeout { .. } => true,
             Self::Api { code, .. } => is_outcome_unknown_code(code),
             _ => false,
         }
@@ -665,6 +682,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             Error::RouteNotFound {
                 procedure: String::new(),
             }
+        } else if status == 504 {
+            Error::GatewayTimeout {
+                message: fallback_message,
+                problem: None,
+            }
         } else {
             Error::NotImplemented {
                 message: fallback_message,
@@ -732,7 +754,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             let is_rate_limit = order_detail.rate_limit.is_set()
                 || matches!(
                     order_detail.code.as_known(),
-                    Some(OrderErrorCode::RateLimitExceeded)
+                    Some(
+                        OrderErrorCode::RateLimitExceeded
+                            | OrderErrorCode::Overloaded
+                            | OrderErrorCode::SystemRateLimited
+                    )
                 );
             if is_rate_limit {
                 let detail = order_detail
@@ -826,6 +852,25 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 violations: Vec::new(),
             };
         }
+    }
+    let named_code = err
+        .details
+        .iter()
+        .find(|d| d.type_url == crate::transport::HTTP_PROBLEM_TYPE)
+        .and_then(|d| d.debug.as_ref())
+        .and_then(|d| d.get("code"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(raw_message);
+    if is_outcome_unknown_code(named_code)
+        || (err.code == ErrorCode::ResourceExhausted
+            && named_code.trim_start_matches("ERROR_CODE_") == "ORDER_SEQUENCE_EXHAUSTED")
+    {
+        return Error::Api {
+            message: fallback_message,
+            code: named_code.to_owned(),
+            metadata: Vec::new(),
+            violations: Vec::new(),
+        };
     }
     let code = err.code;
     let message = fallback_message;
