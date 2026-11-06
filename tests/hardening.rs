@@ -6360,6 +6360,7 @@ async fn create_quantity_uses_catalog_scale_on_wire_and_result() {
 // Ticket regressions use explicit protocol messages and channels as barriers.
 async fn ticket_ws(
     setup_frames: Vec<Vec<u8>>,
+    expected_symbol_id: Option<u32>,
 ) -> (
     String,
     tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
@@ -6388,7 +6389,17 @@ async fn ticket_ws(
         ws.send(WsMessage::Binary(centrifugo_ok_reply(1).into()))
             .await
             .unwrap();
-        ws.next().await.unwrap().unwrap();
+        let subscribe = ws.next().await.unwrap().unwrap();
+        if let Some(id) = expected_symbol_id {
+            let expected = format!("public:spot:orderbook:deltas:depth:50:{id}:proto");
+            let command = subscribe.into_data();
+            assert!(
+                command
+                    .windows(expected.len())
+                    .any(|bytes| bytes == expected.as_bytes()),
+                "subscription channel identity mismatch"
+            );
+        }
         for frame in setup_frames {
             ws.send(WsMessage::Binary(frame.into())).await.unwrap();
         }
@@ -6426,7 +6437,7 @@ async fn ticket_8475_setup_preserves_publication_order() {
         let multiple = frames[0].len() > ack.len() + first.len();
         let mut frames = frames;
         frames.push(publication(b"control"));
-        let (url, _tx, task) = ticket_ws(frames).await;
+        let (url, _tx, task) = ticket_ws(frames, None).await;
         let rt = RealtimeClient::new(url, "", None, None);
         let mut sub = rt.subscribe_raw(PUBLIC_CHANNEL).await.unwrap();
         let mut received = Vec::new();
@@ -6484,7 +6495,7 @@ async fn ticket_8510_zero_sequence_and_availability_are_independent() {
                 })
             })
             .await;
-            let (url, _tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)]).await;
+            let (url, _tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], None).await;
             let client = ticket_book_client(http.base_url(), url);
             let unary = client.orderbook.get("BTC-USDT", Some(50)).await.unwrap();
             assert_eq!(unary.book_seq, seq.to_string());
@@ -6558,7 +6569,7 @@ async fn ticket_8512_selector_controls_keep_reset_identity_and_scale() {
             })
         })
         .await;
-        let (url, tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)]).await;
+        let (url, tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], Some(id)).await;
         let client = ticket_book_client(http.base_url(), url);
         let mut sub = client
             .orderbook
@@ -6623,7 +6634,7 @@ async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
         }
     })
     .await;
-    let (url, tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)]).await;
+    let (url, tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], None).await;
     let client = ticket_book_client(http.base_url(), url);
     let mut sub = client
         .orderbook

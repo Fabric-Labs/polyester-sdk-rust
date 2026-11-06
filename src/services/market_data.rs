@@ -1263,12 +1263,34 @@ mod tests {
             Arc::new(Mutex::new(0)),
             Arc::new(|| {}),
             last_error,
-            tx_slot,
+            tx_slot.clone(),
         );
         let errors = Arc::new(Mutex::new(Vec::new()));
         let reported = errors.clone();
         sub.set_on_error(move |error| reported.lock().unwrap().push(error));
+        tx_slot
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .try_send(crate::models::OrderbookData {
+                symbol: "BTC-USDT".into(),
+                depth: 1,
+                book_seq: "1".into(),
+                bids: vec![],
+                asks: vec![],
+                available: true,
+            })
+            .unwrap();
         stream.fail(Error::transport("terminal transport failure"));
+        assert_eq!(
+            sub.updates()
+                .recv()
+                .await
+                .expect("queued view must drain")
+                .book_seq,
+            "1"
+        );
         let finished =
             tokio::time::timeout(std::time::Duration::from_secs(1), sub.updates().recv())
                 .await
