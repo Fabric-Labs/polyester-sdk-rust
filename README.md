@@ -751,8 +751,8 @@ canceled. Triggers it could not cancel are listed in `trigger_failures`.
 `triggers.get` / `get_by_id` and `triggers.list` / `list_with` read your own
 writes: once a create, modify, pause or resume has answered, they return the
 trigger as changed. Until the change is readable the server answers
-`unavailable` (HTTP 503), and these reads retry it with the same request: 25 ms,
-doubling, at most 500 ms, giving up after about 2 s with `Error::Server`. Read a
+`unavailable` (HTTP 503). These reads retry it and `deadline_exceeded` with the same request: 25 ms,
+doubling, at most 500 ms, giving up after about 2 s with the final read error. Read a
 trigger back after a change with them; don't fall back to a cached copy.
 
 `ListOpenOrdersOpts.trigger_id` / `ListOrderHistoryOpts.trigger_id` filter
@@ -907,6 +907,48 @@ still apply, so `mutation_outcome_unknown()` is true and `is_retryable()` is fal
 can place a second order. Read the order or trigger back, and reuse the same idempotency key if you
 send it again. `AUTH_TEMPORARILY_UNAVAILABLE` and `ERROR_CODE_ACCOUNT_REPAIRING` are retryable and
 changed nothing, so `mutation_outcome_unknown()` is false for them.
+
+
+The retry flag is always false when the mutation outcome is unknown. This includes
+bare Connect `unavailable`, `internal` and `deadline_exceeded`, gateway 502/503
+bodies, bare or HTML 429 responses and client timeouts. Read back after an unknown outcome; retry reads explicitly. Automatic
+trigger reads, status waits and snapshot refresh use read context and can retry these
+failures within their existing budgets. Creates are never automatically resent.
+
+A typed `orders.v1.ErrorDetail` carrying `UNAVAILABLE` proves a known, retryable
+orders refusal. A bare REST `UNAVAILABLE` or a Connect message with only that
+name does not establish its source: outcome unknown and non-retryable. Specific
+refusals such as `FEE_SCHEDULE_UNAVAILABLE`, `POLICY_UNAVAILABLE` and
+`RATE_LIMIT_POLICY_UNAVAILABLE` are known and retryable on typed Connect,
+code-only Connect messages and recognized REST 503 problems. A REST 502 cannot
+establish these refusals. `QUICKSWAP_ACCOUNT_OWNER_UNKNOWN` means no order was
+placed and may retry; `ACCOUNT_ROUTING_INVALID` means the trigger was not admitted
+and requires the caller to correct its routing.
+
+`RATE_LIMIT_EXCEEDED`, `PRICE_LEVELS_EXHAUSTED` and retry-later capacity codes
+are known, retryable admission refusals; preserve and respect any server delay.
+The additional retry-later codes are:
+
+- `CLIENT_ORDER_IDS_EXHAUSTED`
+- `CLIENT_ORDER_ID_CAPACITY_REACHED`
+- `MARKET_LADDER_LIMIT_EXCEEDED`
+- `MARKET_TRIGGER_LIMIT_EXCEEDED`
+- `MARKET_TWAP_LIMIT_EXCEEDED`
+- `NEW_ACCOUNT_CAPACITY_REACHED`
+- `REQUEST_RECEIPTS_EXHAUSTED`
+- `RESERVATION_CAPACITY_REACHED`
+- `TRIGGER_CAPACITY_REACHED`
+- `TRIGGER_CONTROL_SHARE_EXHAUSTED`
+- `TWAP_CAPACITY_REACHED`
+
+These behave the same on REST, typed Connect and code-only Connect messages.
+The resource codes without retry guidance are `ORDER_SEQUENCE_EXHAUSTED`,
+`TRIGGER_FIRE_LIMIT_REACHED`, `QUICKSWAP_CAPACITY_REACHED`,
+`ACCOUNT_RESERVATION_LIMIT_REACHED` and `TRIGGER_LIMIT_EXCEEDED`: outcome known,
+non-retryable, including message-only responses.
+
+Recognized temporary order admission refusals return `Error::AdmissionUnavailable`,
+including their canonical service code and REST problem when present.
 
 A plain REST gateway 504 returns `Error::GatewayTimeout`: `is_retryable()` is
 false and `mutation_outcome_unknown()` is true. The classifier has no operation

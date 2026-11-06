@@ -104,8 +104,8 @@ where
     Ok(tolerant_json(call(request, opts)).await)
 }
 
-/// [`await_auth`] for a read without side effects: Connect `unavailable`
-/// (HTTP 503) is retried with the same request, signed again, under
+/// [`await_auth`] for a read without side effects: Connect `unavailable` or deadlines
+/// are retried with the same request, signed again, under
 /// `policy`. Other errors, and `unavailable` once the budget is spent,
 /// return as usual.
 pub(crate) async fn await_auth_retrying_unavailable<M, R, Fut>(
@@ -125,8 +125,10 @@ where
         match try_auth(factory, procedure, request.clone(), &call).await? {
             Ok(resp) => return Ok(resp),
             Err(err)
-                if err.code == ErrorCode::Unavailable
-                    && start.elapsed() + delay <= policy.budget =>
+                if matches!(
+                    err.code,
+                    ErrorCode::Unavailable | ErrorCode::DeadlineExceeded
+                ) && start.elapsed() + delay <= policy.budget =>
             {
                 tokio::time::sleep(delay).await;
                 delay = policy.next_delay(delay);

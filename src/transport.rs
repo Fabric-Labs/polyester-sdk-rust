@@ -343,12 +343,9 @@ fn classify_failed_response_inner(
                 ConnectError::new(ErrorCode::DeadlineExceeded, message).with_http_status(status),
             );
         }
-        if matches!(
-            order_name.as_str(),
-            "ERROR_CODE_OVERLOADED"
-                | "ERROR_CODE_SYSTEM_RATE_LIMITED"
-                | "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED"
-        ) {
+        if crate::errors::retryable_resource_code(&order_name)
+            || order_name == "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED"
+        {
             use crate::proto::orders::v1::{
                 ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail,
             };
@@ -375,9 +372,38 @@ fn classify_failed_response_inner(
                 .unwrap_or_else(|| code.clone());
             return Some(auth_problem(status, connect_code, auth_code, message));
         }
-        if let Some(err) = gateway_rejection(status, code) {
+        if let Some(err) = gateway_rejection(status, code.clone()) {
             return Some(err);
         }
+        let message = parsed
+            .and_then(|body| body.detail.or(body.title))
+            .filter(|m| !m.is_empty())
+            .unwrap_or(code.clone());
+        if status == StatusCode::GATEWAY_TIMEOUT {
+            return Some(sdk_marked_error(
+                ErrorCode::Unavailable,
+                message,
+                status,
+                BARE_HTTP_ERROR_TYPE,
+            ));
+        }
+        let connect_code = match status.as_u16() {
+            400 | 422 => ErrorCode::InvalidArgument,
+            409 => ErrorCode::AlreadyExists,
+            412 => ErrorCode::FailedPrecondition,
+            429 => ErrorCode::ResourceExhausted,
+            502 | 503 => ErrorCode::Unavailable,
+            _ if status == StatusCode::NOT_FOUND || status == StatusCode::NOT_IMPLEMENTED => {
+                return Some(sdk_marked_error(
+                    ErrorCode::Unimplemented,
+                    message,
+                    status,
+                    BARE_HTTP_ERROR_TYPE,
+                ));
+            }
+            _ => return None,
+        };
+        return Some(ConnectError::new(connect_code, message).with_http_status(status));
     }
     if status != StatusCode::NOT_FOUND
         && status != StatusCode::NOT_IMPLEMENTED
@@ -644,7 +670,13 @@ mod tests {
         assert!(classify(404, true, r#"{"code":"not_found","message":"x"}"#).is_none());
         // Other failures Connect maps correctly by status are left alone.
         assert!(classify(500, true, "{}").is_none());
-        assert!(classify(503, true, r#"{"code":"MAINTENANCE"}"#).is_none());
+        assert!(classify(500, true, r#"{"code":"INTERNAL_ERROR"}"#).is_none());
+        assert_eq!(
+            classify(503, true, r#"{"code":"MAINTENANCE"}"#)
+                .unwrap()
+                .code,
+            ErrorCode::Unavailable
+        );
 
         for (status, is_json, body, message) in [
             (404, false, "", "HTTP 404"),

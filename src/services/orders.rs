@@ -1325,7 +1325,9 @@ impl OrdersService {
                 Err(err)
                     if matches!(
                         err.code,
-                        connectrpc::ErrorCode::Unavailable | connectrpc::ErrorCode::NotFound
+                        connectrpc::ErrorCode::Unavailable
+                            | connectrpc::ErrorCode::DeadlineExceeded
+                            | connectrpc::ErrorCode::NotFound
                     ) => {}
                 Err(err) => return Err(crate::transport::Factory::map_error(err)),
             }
