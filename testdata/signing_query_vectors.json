@@ -82,5 +82,41 @@
     "url": "https://api.example.test/x?v=%E2%9C%93&v=z",
     "canonical_query": "v=z&v=%E2%9C%93",
     "signature_hex": "a55ff3ab6223fe479f0c5834963184e08aed08ae2fa2cf210a2138851068dbef722602dfadde4c3c37cfd2276877311320948081a466b599d95b0acfc89bf701"
+  },
+  {
+    "name": "non-utf8-value",
+    "url": "https://api.example.test/x?a=%FF",
+    "canonical_query": "a=%FF",
+    "signature_hex": "d41192c4576cd1b2d20f16e777b965e8f3efb7b673ff986b92500b189c09355b0f14f1b74eb5498f33864f9d388005e46f67ef5a69e3840d5af97b4cbb81700e"
+  },
+  {
+    "name": "non-utf8-key",
+    "url": "https://api.example.test/x?%FF=1",
+    "canonical_query": "%FF=1",
+    "signature_hex": "cda43e08b7da2b714f567f0cb526c1a428a63108db921382fa72fc92412e19fc26e16f46a6ed6f8f8409e3187131ee39ae1f8665349945b743a155a1f7501808"
+  },
+  {
+    "name": "non-utf8-values",
+    "url": "https://api.example.test/x?v=%FF&v=%FE",
+    "canonical_query": "v=%FE&v=%FF",
+    "signature_hex": "bbd12abfebfc70da584170f72422087e17ae3c14ef9a891c2d9377878fe5211e285783620319a1ecf139e7d16db228883f347c53e4076690a5197c1d8d994407"
+  },
+  {
+    "name": "mixed-utf8-values",
+    "url": "https://api.example.test/x?v=%FF&v=%C3%A9",
+    "canonical_query": "v=%C3%A9&v=%FF",
+    "signature_hex": "7099e4ab205735c0c6fa0d16182ae5220bba8db2d73b543e12c965870ca11e2386174f88fe29d7290c882463bf9308665023e3757ed669c0cd9cc912d0212406"
+  },
+  {
+    "name": "mixed-four-byte-values",
+    "url": "https://api.example.test/x?v=%FF&v=%F0%9F%98%80",
+    "canonical_query": "v=%F0%9F%98%80&v=%FF",
+    "signature_hex": "c3a06a9bc3c3f4267cd8d44e7a4b8959f2557eaf487f04417e0c8b649f9c42ad922f841f664b7abbf3c685277efe85fb2ba5fbf2664ac7fdc615bb83ebc5500f"
+  },
+  {
+    "name": "mixed-four-byte-keys",
+    "url": "https://api.example.test/x?%FF=z&%F0%9F%98%80=a",
+    "canonical_query": "%F0%9F%98%80=a&%FF=z",
+    "signature_hex": "1097e47d3e1756e3f291a83ac8f13ac184d85a2d914d706ced2e4aa3388799f20f569ebf6a0dc64a2d24367bd592f2dc4c85dd33f212dae2789b685072830f0b"
   }
 ]

@@ -277,20 +277,31 @@ pub fn encode_query_component(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, QUERY_COMPONENT_ASCII_SET).to_string()
 }
 
-/// Sort decoded query keys and values before RFC 3986 encoding, as the server does.
+/// Sort decoded query key/value bytes before RFC 3986 encoding, as the server does.
 fn canonical_query_from_url(parsed: &url::Url) -> String {
-    let mut pairs: Vec<(String, String)> = parsed
-        .query_pairs()
-        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+    // URL form decoding must preserve arbitrary percent-escaped bytes rather
+    // than replacing invalid UTF-8 with U+FFFD.
+    let decode = |component: &str| -> Vec<u8> {
+        percent_encoding::percent_decode_str(&component.replace('+', " ")).collect()
+    };
+    let mut pairs: Vec<(Vec<u8>, Vec<u8>)> = parsed
+        .query()
+        .unwrap_or_default()
+        .split('&')
+        .filter(|pair| !pair.is_empty())
+        .map(|pair| {
+            let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+            (decode(key), decode(value))
+        })
         .collect();
-    pairs.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+    pairs.sort();
     pairs
         .into_iter()
         .map(|(k, v)| {
             format!(
                 "{}={}",
-                encode_query_component(&k),
-                encode_query_component(&v)
+                percent_encoding::percent_encode(&k, QUERY_COMPONENT_ASCII_SET),
+                percent_encoding::percent_encode(&v, QUERY_COMPONENT_ASCII_SET)
             )
         })
         .collect::<Vec<_>>()
@@ -355,7 +366,7 @@ mod tests {
     use super::*;
 
     // Identical fixtures live in Go, Python and Rust. Expected queries follow
-    // server shared/pkg/auth/apikeys.go: decoded key/value sort, then RFC 3986 escape.
+    // the server's canonicalization: decoded key/value bytes sorted, then RFC 3986 escaped.
     // Golden signatures use the public test seed 00..1f, timestamp 123, GET, no body.
     #[tokio::test]
     async fn server_query_signing_vectors() {
