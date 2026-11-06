@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed API-key request signing to preserve percent-encoded query bytes outside valid UTF-8 text and sort decoded bytes before encoding, matching the server. Added shared regression vectors for repeated parameters, prefix keys, escaped values and empty queries.
+
 - **Breaking:** transfer history now returns the opaque `next_page_token` string
   instead of an integer `next_cursor`. Copy it into the next `ListTransfersRequest`
   with the same scope, filters and direction. An empty string ends pagination.

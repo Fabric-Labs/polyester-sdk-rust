@@ -277,20 +277,31 @@ pub fn encode_query_component(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, QUERY_COMPONENT_ASCII_SET).to_string()
 }
 
-/// Sort and percent-encode query parameters (Python `quote(safe="")` parity).
+/// Sort decoded query key/value bytes before RFC 3986 encoding, as the server does.
 fn canonical_query_from_url(parsed: &url::Url) -> String {
-    let mut pairs: Vec<(String, String)> = parsed
-        .query_pairs()
-        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+    // URL form decoding must preserve arbitrary percent-escaped bytes rather
+    // than replacing invalid UTF-8 with U+FFFD.
+    let decode = |component: &str| -> Vec<u8> {
+        percent_encoding::percent_decode_str(&component.replace('+', " ")).collect()
+    };
+    let mut pairs: Vec<(Vec<u8>, Vec<u8>)> = parsed
+        .query()
+        .unwrap_or_default()
+        .split('&')
+        .filter(|pair| !pair.is_empty())
+        .map(|pair| {
+            let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+            (decode(key), decode(value))
+        })
         .collect();
-    pairs.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+    pairs.sort();
     pairs
         .into_iter()
         .map(|(k, v)| {
             format!(
                 "{}={}",
-                encode_query_component(&k),
-                encode_query_component(&v)
+                percent_encoding::percent_encode(&k, QUERY_COMPONENT_ASCII_SET),
+                percent_encoding::percent_encode(&v, QUERY_COMPONENT_ASCII_SET)
             )
         })
         .collect::<Vec<_>>()
@@ -353,6 +364,45 @@ pub fn generate_ed25519_keypair() -> (String, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Identical fixtures live in Go, Python and Rust. Expected queries follow
+    // the server's canonicalization: decoded key/value bytes sorted, then RFC 3986 escaped.
+    // Golden signatures use the public test seed 00..1f, timestamp 123, GET, no body.
+    #[tokio::test]
+    async fn server_query_signing_vectors() {
+        #[derive(serde::Deserialize)]
+        struct Vector {
+            name: String,
+            url: String,
+            canonical_query: String,
+            signature_hex: String,
+        }
+        let cases: Vec<Vector> =
+            serde_json::from_str(include_str!("../testdata/signing_query_vectors.json")).unwrap();
+        let seed: Vec<u8> = (0..32).collect();
+        let credentials = Credentials::new("test-key", &hex::encode(seed)).unwrap();
+        for case in cases {
+            assert_eq!(
+                canonical_query(&case.url).unwrap(),
+                case.canonical_query,
+                "{}",
+                case.name
+            );
+            let headers = credentials
+                .sign_request("GET", &case.url, b"", Some("123"))
+                .unwrap();
+            assert_eq!(
+                headers[HEADER_SIGNATURE], case.signature_hex,
+                "{}",
+                case.name
+            );
+            let async_headers = credentials
+                .sign_request_async("GET", &case.url, b"", Some("123"))
+                .await
+                .unwrap();
+            assert_eq!(headers, async_headers, "{}", case.name);
+        }
+    }
 
     #[test]
     fn canonical_query_sorts_and_encodes_values() {
