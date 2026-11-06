@@ -81,6 +81,7 @@ pub fn equity_history_from_proto(
         end_ts_sec: msg.end_ts_sec as i64,
         quote_asset: msg.quote_asset.clone(),
         points: msg.points,
+        btc_prices_q: msg.btc_prices_q.clone(),
         series: msg
             .series
             .iter()
@@ -163,14 +164,9 @@ pub fn transfer_row_from_proto(msg: &TransferRow) -> LedgerTransfer {
 }
 
 pub fn transfers_list_from_proto(msg: &ListTransfersResponse) -> TransfersList {
-    let next_cursor = if msg.next_page_token.is_empty() {
-        None
-    } else {
-        msg.next_page_token.parse::<i64>().ok().filter(|v| *v != 0)
-    };
     TransfersList {
         transfers: msg.transfers.iter().map(transfer_row_from_proto).collect(),
-        next_cursor,
+        next_page_token: msg.next_page_token.clone(),
     }
 }
 
@@ -414,6 +410,6 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(list.transfers.len(), 1);
-        assert_eq!(list.next_cursor, Some(12345));
+        assert_eq!(list.next_page_token, "12345");
     }
 }

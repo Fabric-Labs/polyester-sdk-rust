@@ -60,6 +60,8 @@ pub struct EquityHistory {
     pub quote_asset: String,
     pub points: u32,
     pub series: Vec<EquityHistorySeries>,
+    /// Raw BTC-USDT closes scaled by 1e9, aligned to the implicit timestamps.
+    pub btc_prices_q: Vec<i64>,
 }
 
 /// One display side of a ledger transfer.
@@ -96,5 +98,6 @@ pub struct LedgerTransfer {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransfersList {
     pub transfers: Vec<LedgerTransfer>,
-    pub next_cursor: Option<i64>,
+    /// Opaque continuation token; empty means the terminal page.
+    pub next_page_token: String,
 }

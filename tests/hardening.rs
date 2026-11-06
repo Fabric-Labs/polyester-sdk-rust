@@ -5476,3 +5476,375 @@ async fn l2_order_create_never_resends_unknown_outcome() {
         }
     }
 }
+
+#[tokio::test]
+async fn l2_transfer_paging_preserves_opaque_token_scope_and_equal_timestamps() {
+    use polyester::proto::ledger::read::v1::{
+        ListTransfersRequest, ListTransfersResponse, TransferRow,
+    };
+    use polyester::transport::WireFormat;
+    use std::sync::Mutex;
+    for json_wire in [false, true] {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let observed = seen.clone();
+        let server = MockHttpServer::spawn(move |req| {
+            assert!(req.path.ends_with("/ListTransfers"));
+            let request: ListTransfersRequest = if json_wire {
+                serde_json::from_slice(&req.body).unwrap()
+            } else {
+                ListTransfersRequest::decode_from_slice(&req.body).unwrap()
+            };
+            let mut seen = observed.lock().unwrap();
+            seen.push(request);
+            let index = seen.len();
+            let response = ListTransfersResponse {
+                transfers: vec![TransferRow {
+                    ts_us: 999,
+                    transfer_id: index.to_string(),
+                    ..Default::default()
+                }],
+                next_page_token: if index == 1 {
+                    "eyJ2IjoxfQ==".into()
+                } else {
+                    String::new()
+                },
+                ..Default::default()
+            };
+            if json_wire {
+                hardening_support::HttpScript::Json {
+                    status: 200,
+                    body: serde_json::to_vec(&response).unwrap(),
+                }
+            } else {
+                connect_proto_ok(&response)
+            }
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: server.base_url(),
+            api_key_id: Some("scope-test".into()),
+            api_private_key: Some(TEST_KEY.into()),
+            hydrate_catalogs: false,
+            wire_format: if json_wire {
+                WireFormat::Json
+            } else {
+                WireFormat::Binary
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        let mut request = ListTransfersRequest {
+            limit: 1,
+            reversed: true,
+            subaccount_id: Some(42),
+            ts_min_us: 100,
+            ..Default::default()
+        };
+        let first = client.transfers.list(request.clone()).await.unwrap();
+        assert_eq!(first.next_page_token, "eyJ2IjoxfQ==");
+        request.page_token = first.next_page_token;
+        // The balances facade shares this decoder and accepts the same wire request.
+        let second = client.balances.list_transfers(request).await.unwrap();
+        assert!(second.next_page_token.is_empty());
+        assert_eq!(first.transfers[0].timestamp, 999);
+        assert_eq!(second.transfers[0].timestamp, 999);
+        assert_ne!(
+            first.transfers[0].transfer_id,
+            second.transfers[0].transfer_id
+        );
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[0].page_token, "");
+        assert_eq!(seen[1].page_token, "eyJ2IjoxfQ==");
+        let mut next = seen[1].clone();
+        next.page_token.clear();
+        assert_eq!(seen[0], next);
+    }
+}
+
+#[tokio::test]
+async fn l2_equity_history_keeps_wire_btc_closes_in_both_codecs() {
+    use polyester::proto::ledger::read::v1::{
+        EquitySeries, GetEquityHistorySeriesRequest, GetEquityHistorySeriesResponse,
+    };
+    use polyester::transport::WireFormat;
+    for json_wire in [false, true] {
+        let server = MockHttpServer::spawn(move |req| {
+            assert!(req.path.ends_with("/GetEquityHistorySeries"));
+            let response = GetEquityHistorySeriesResponse {
+                points: 2,
+                start_ts_sec: 100,
+                end_ts_sec: 400,
+                bucket: "5m".into(),
+                btc_prices_q: vec![60000000000001, 61000000000009],
+                series: vec![EquitySeries {
+                    equity_q: vec![12345, -6789],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            if json_wire {
+                hardening_support::HttpScript::Json {
+                    status: 200,
+                    body: serde_json::to_vec(&response).unwrap(),
+                }
+            } else {
+                connect_proto_ok(&response)
+            }
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: server.base_url(),
+            api_key_id: Some("read-test".into()),
+            api_private_key: Some(TEST_KEY.into()),
+            hydrate_catalogs: false,
+            wire_format: if json_wire {
+                WireFormat::Json
+            } else {
+                WireFormat::Binary
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        let result = client
+            .balances
+            .get_equity_history(GetEquityHistorySeriesRequest::default())
+            .await
+            .unwrap();
+        assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+        assert_eq!(result.btc_prices_q, vec![60000000000001, 61000000000009]);
+        assert_eq!(result.series[0].equity_q, vec![12345, -6789]);
+        assert_eq!(
+            (result.start_ts_sec, result.end_ts_sec, result.points),
+            (100, 400, 2)
+        );
+    }
+}
+
+#[tokio::test]
+async fn l2_heatmap_paging_keeps_filters_without_a_new_window() {
+    use buffa_types::google::protobuf::Timestamp;
+    use polyester::proto::marketdata::v1::{
+        GetOrderbookHeatmapRequest, GetOrderbookHeatmapResponse, HeatmapTimeRange,
+    };
+    use polyester::services::GetHeatmapOptions;
+    use polyester::transport::WireFormat;
+    use std::sync::Mutex;
+    for json_wire in [false, true] {
+        for explicit in [false, true] {
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let observed = seen.clone();
+            let server = MockHttpServer::spawn(move |req| {
+                assert!(req.path.ends_with("/GetOrderbookHeatmap"));
+                let request: GetOrderbookHeatmapRequest = if json_wire {
+                    serde_json::from_slice(&req.body).unwrap()
+                } else {
+                    GetOrderbookHeatmapRequest::decode_from_slice(&req.body).unwrap()
+                };
+                let mut seen = observed.lock().unwrap();
+                seen.push(request);
+                let response = GetOrderbookHeatmapResponse {
+                    symbol_id: 1,
+                    last_persisted_ts_sec: 100,
+                    next_page_token: if seen.len() == 1 {
+                        "eyJoZWF0bWFwIjoxfQ==".into()
+                    } else {
+                        String::new()
+                    },
+                    ..Default::default()
+                };
+                if json_wire {
+                    hardening_support::HttpScript::Json {
+                        status: 200,
+                        body: serde_json::to_vec(&response).unwrap(),
+                    }
+                } else {
+                    connect_proto_ok(&response)
+                }
+            })
+            .await;
+            let client = Client::new(Config {
+                api_url: server.base_url(),
+                hydrate_catalogs: false,
+                wire_format: if json_wire {
+                    WireFormat::Json
+                } else {
+                    WireFormat::Binary
+                },
+                ..Default::default()
+            })
+            .unwrap();
+            client
+                .catalogs
+                .hydrate_spot_config_json(
+                    json!({"pairs":[{"symbol":"BTC-USDT","symbol_id":1,"base_quantity_scale":8}]}),
+                )
+                .unwrap();
+            let range = explicit.then(|| HeatmapTimeRange {
+                start_time: Timestamp {
+                    seconds: 100,
+                    ..Default::default()
+                }
+                .into(),
+                end_time: Timestamp {
+                    seconds: 400,
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            });
+            let first = if explicit {
+                client
+                    .heatmap
+                    .get_with_options(
+                        "BTC-USDT",
+                        "1m",
+                        50,
+                        1,
+                        "peak",
+                        GetHeatmapOptions {
+                            time_range: range.clone(),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .unwrap()
+            } else {
+                client
+                    .heatmap
+                    .get("BTC-USDT", "1m", 50, 1, "peak")
+                    .await
+                    .unwrap()
+            };
+            let token = first.raw["nextPageToken"]
+                .as_str()
+                .expect("nonempty token returned")
+                .to_owned();
+            assert_eq!(token, "eyJoZWF0bWFwIjoxfQ==");
+            let second = client
+                .heatmap
+                .get_with_options(
+                    "BTC-USDT",
+                    "1m",
+                    50,
+                    1,
+                    "peak",
+                    GetHeatmapOptions {
+                        time_range: range,
+                        page_token: Some(token.clone()),
+                    },
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                second
+                    .raw
+                    .get("nextPageToken")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default(),
+                ""
+            );
+            let seen = seen.lock().unwrap();
+            assert_eq!(seen.len(), 2);
+            let (mut a, mut b) = (seen[0].clone(), seen[1].clone());
+            assert_eq!(a.page_token, "");
+            assert_eq!(b.page_token, token);
+            assert!(a.time_range.is_set());
+            if explicit {
+                assert_eq!(a.time_range, b.time_range)
+            } else {
+                assert!(!b.time_range.is_set(), "continuation invented a window")
+            }
+            a.time_range = Default::default();
+            b.time_range = Default::default();
+            b.page_token.clear();
+            assert_eq!(a, b);
+            assert_eq!(a.symbol_id, 1);
+            assert_eq!(a.limit, 1);
+        }
+    }
+}
+
+#[tokio::test]
+async fn l2_market_overview_follows_token_with_unchanged_filters() {
+    use polyester::proto::marketoverview::v1::{
+        ListMarketOverviewRequest, ListMarketOverviewResponse, MarketOverview,
+    };
+    use polyester::services::ListMarketOverviewOptions;
+    use polyester::transport::WireFormat;
+    use std::sync::Mutex;
+    for json_wire in [false, true] {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let observed = seen.clone();
+        let server = MockHttpServer::spawn(move |req| {
+            assert!(req.path.ends_with("/ListMarketOverview"));
+            let request: ListMarketOverviewRequest = if json_wire {
+                serde_json::from_slice(&req.body).unwrap()
+            } else {
+                ListMarketOverviewRequest::decode_from_slice(&req.body).unwrap()
+            };
+            let mut seen = observed.lock().unwrap();
+            seen.push(request);
+            let response = ListMarketOverviewResponse {
+                markets: vec![MarketOverview {
+                    symbol_id: seen.len() as u32,
+                    ..Default::default()
+                }],
+                next_page_token: if seen.len() == 1 {
+                    "opaque-overview".into()
+                } else {
+                    String::new()
+                },
+                ..Default::default()
+            };
+            if json_wire {
+                hardening_support::HttpScript::Json {
+                    status: 200,
+                    body: serde_json::to_vec(&response).unwrap(),
+                }
+            } else {
+                connect_proto_ok(&response)
+            }
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: server.base_url(),
+            hydrate_catalogs: false,
+            wire_format: if json_wire {
+                WireFormat::Json
+            } else {
+                WireFormat::Binary
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        client
+            .catalogs
+            .hydrate_spot_config_json(
+                json!({"pairs":[{"symbol":"BTC-USDT","symbol_id":1,"base_quantity_scale":8}]}),
+            )
+            .unwrap();
+        let mut opts = ListMarketOverviewOptions {
+            symbols: Some(vec!["BTC-USDT".into()]),
+            limit: Some(1),
+            include_sparklines: true,
+            ..Default::default()
+        };
+        let first = client.market_overview.list(opts.clone()).await.unwrap();
+        assert_eq!(first.markets.len(), 1);
+        assert_eq!(first.next_page_token, "opaque-overview");
+        opts.page_token = Some(first.next_page_token);
+        let second = client.market_overview.list(opts).await.unwrap();
+        assert_eq!(second.markets.len(), 1);
+        assert!(second.next_page_token.is_empty());
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[0].page_token, "");
+        assert_eq!(seen[1].page_token, "opaque-overview");
+        let mut next = seen[1].clone();
+        next.page_token.clear();
+        assert_eq!(seen[0], next);
+        assert_eq!(next.symbol_id, vec![1]);
+        assert!(next.include_sparklines);
+    }
+}
