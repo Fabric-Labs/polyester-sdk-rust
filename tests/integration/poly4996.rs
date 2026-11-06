@@ -308,7 +308,6 @@ async fn create_ladder_decodes_executed_fields() {
             CreateOrderType::Limit,
             total_qty,
         );
-        p.limit_price = Some(max_price.clone());
         p.client_trigger_id = unique_client_order_id("trg-ladder-exec");
         p.ladder_price_min = Some(min_price);
         p.ladder_price_max = Some(max_price);

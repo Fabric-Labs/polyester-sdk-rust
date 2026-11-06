@@ -137,7 +137,8 @@ fn validate_create_option_applicability(p: &CreateTriggerParams) -> Result<()> {
             "max_slippage_ticks and max_slippage_bps apply only to market children or trailing_stop",
         ));
     }
-    // None/Gtc are helper defaults; fixed IOC executions also accept Ioc.
+    // None leaves execution unspecified. Retain explicit Gtc for compatibility;
+    // fixed IOC executions also accept Ioc.
     if p.trigger_type == Ladder
         || (p.trigger_type == Twap && p.order_type == CreateOrderType::Limit)
     {

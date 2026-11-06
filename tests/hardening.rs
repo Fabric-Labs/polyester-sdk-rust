@@ -6232,3 +6232,69 @@ async fn poly_8539_trigger_execution_applicability() {
     assert_eq!(executed, 45);
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+#[tokio::test]
+async fn poly_8539_trailing_side_execution_and_buy_maximum() {
+    use polyester::Price;
+    use polyester::models::{CreateOrderType, CreateSide, CreateTriggerType};
+    use polyester::proto::triggers::v1::{
+        CreateTriggerRequest, CreateTriggerResponse, trigger_intent,
+    };
+    use std::sync::Mutex;
+
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let capture = Arc::clone(&captured);
+    let http = MockHttpServer::spawn(move |request| {
+        capture
+            .lock()
+            .unwrap()
+            .push(CreateTriggerRequest::decode_from_slice(&request.body).unwrap());
+        connect_proto_ok(&CreateTriggerResponse {
+            trigger_id: 1,
+            client_trigger_id: "capture-execution".into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = api_key_client(&http);
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{"symbol":"BTC-USDT", "symbol_id":1, "base_quantity_scale":8}]
+        }))
+        .unwrap();
+    let mut executed = 0;
+    for (side, order_type) in [
+        (CreateSide::Sell, CreateOrderType::Limit),
+        (CreateSide::Buy, CreateOrderType::Limit),
+        (CreateSide::Buy, CreateOrderType::Market),
+    ] {
+        let mut p = poly_8539_params(CreateTriggerType::TrailingStop, order_type);
+        p.side = side;
+        if side == CreateSide::Buy {
+            p.limit_price =
+                Some(Price::from_ticks(100_000_000_000, Some("BTC-USDT".into())).unwrap());
+        }
+        captured.lock().unwrap().clear();
+        let result = client.triggers.create(p).await;
+        let requests = captured.lock().unwrap();
+        executed += 1;
+        if side == CreateSide::Sell {
+            assert!(
+                matches!(result, Err(Error::Validation(ref message)) if message.contains("order_type=limit")),
+                "{result:?}"
+            );
+            assert_eq!(requests.len(), 0);
+        } else {
+            assert!(result.is_ok(), "{result:?}");
+            assert_eq!(requests.len(), 1);
+            let Some(trigger_intent::Strategy::TrailingStop(trailing)) =
+                &requests[0].trigger.strategy
+            else {
+                panic!("missing trailing strategy");
+            };
+            assert_eq!(trailing.limit_price_ticks, 100_000_000_000);
+        }
+    }
+    assert_eq!(executed, 3);
+}
