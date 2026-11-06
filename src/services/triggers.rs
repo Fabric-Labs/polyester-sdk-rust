@@ -269,7 +269,7 @@ impl TriggersService {
     ) -> Result<Option<Trigger>> {
         self.get(GetTriggerRequest {
             trigger_id: id_to_u64(trigger_id, "trigger_id")?,
-            subaccount_id,
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
             ..Default::default()
         })
         .await
@@ -757,6 +757,8 @@ impl TriggersService {
         trigger_mutation_from_create(&resp)
     }
 
+    /// Sends `req` as built: the configured default subaccount is not applied.
+    /// Use [`Self::cancel_by_id`] to apply it.
     pub async fn cancel(&self, req: CancelTriggerRequest) -> Result<TriggerMutationResult> {
         let client = self.client();
         let resp = unary::await_auth(
@@ -778,12 +780,14 @@ impl TriggersService {
     ) -> Result<TriggerMutationResult> {
         self.cancel(CancelTriggerRequest {
             trigger_id: id_to_u64(trigger_id, "trigger_id")?,
-            subaccount_id,
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
             ..Default::default()
         })
         .await
     }
 
+    /// Sends `req` as built: the configured default subaccount is not applied.
+    /// Use [`Self::pause_by_id`] to apply it.
     pub async fn pause(&self, req: PauseTriggerRequest) -> Result<TriggerMutationResult> {
         let client = self.client();
         let resp = unary::await_auth(
@@ -805,12 +809,14 @@ impl TriggersService {
     ) -> Result<TriggerMutationResult> {
         self.pause(PauseTriggerRequest {
             trigger_id: id_to_u64(trigger_id, "trigger_id")?,
-            subaccount_id,
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
             ..Default::default()
         })
         .await
     }
 
+    /// Sends `req` as built: the configured default subaccount is not applied.
+    /// Use [`Self::resume_with`] to apply it.
     pub async fn resume(&self, req: ResumeTriggerRequest) -> Result<TriggerMutationResult> {
         let client = self.client();
         let resp = unary::await_auth(

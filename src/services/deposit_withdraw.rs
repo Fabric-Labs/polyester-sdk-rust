@@ -153,6 +153,8 @@ impl DepositService {
         Ok(deposit_addresses_list_from_proto(&resp))
     }
 
+    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
+    /// The configured default subaccount is not applied.
     pub async fn create_address(&self, req: CreateDepositAddressRequest) -> Result<DepositAddress> {
         let client = DepositAddressServiceClient::new(
             self.ctx.factory.transport(),
