@@ -225,64 +225,157 @@ async fn l2_all_publication_decode_errors_surface_through_the_public_websocket_a
     .await;
 }
 
+#[tokio::test]
+async fn mock_http_server_hides_only_a_port_probe() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let seen = Arc::new(std::sync::Mutex::new(Vec::<(String, String)>::new()));
+    let log = seen.clone();
+    let http = MockHttpServer::spawn(move |request| {
+        log.lock().unwrap().push((request.method, request.path));
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let address = http.base_url().replace("http://", "");
+    for request_line in [
+        "HEAD / HTTP/1.1",
+        "HEAD /v1/rt/token HTTP/1.1",
+        "GET / HTTP/1.1",
+    ] {
+        let mut stream = tokio::net::TcpStream::connect(&address).await.unwrap();
+        let request = format!("{request_line}\r\nConnection: close\r\n\r\n");
+        stream.write_all(request.as_bytes()).await.unwrap();
+        let mut response = Vec::new();
+        stream.read_to_end(&mut response).await.unwrap();
+        assert!(response.starts_with(b"HTTP/1.1 404"), "{request_line}");
+    }
+    assert_eq!(http.requests.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        *seen.lock().unwrap(),
+        [
+            ("HEAD".to_owned(), "/v1/rt/token".to_owned()),
+            ("GET".to_owned(), "/".to_owned()),
+        ]
+    );
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn l2_auth_10k_identical_requests_are_unique_future_bounded_and_runtime_safe() {
     use polyester::auth::{HEADER_SIGNATURE, HEADER_TIMESTAMP, MAX_SIGNING_FUTURE_SKEW_MS};
-    use std::collections::HashSet;
+    use std::collections::{BTreeMap, HashSet};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    let credentials = test_credentials("ak_test", TEST_KEY);
-    let ticker = tokio::spawn(async {
-        let mut previous = tokio::time::Instant::now();
-        let mut largest_gap = Duration::ZERO;
-        for _ in 0..100 {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-            let now = tokio::time::Instant::now();
-            largest_gap = largest_gap.max(now.duration_since(previous));
-            previous = now;
-        }
-        largest_gap
-    });
-    // Let the ticker arm its first timer before creating 10k runnable tasks so
-    // task-spawn overhead is not misclassified as signing backpressure.
-    tokio::task::yield_now().await;
-    let handles = (0..10_000)
+    const FROM_THREADS: usize = 7_000;
+    const FROM_RUNTIME: usize = 3_000;
+    const URL: &str = "https://api.example.test/orders.v1.OrdersService/CreateOrder";
+    const BODY: &[u8] = b"identical-order-body";
+
+    fn signed_tuple(headers: BTreeMap<String, String>) -> (u64, String, u64) {
+        (
+            headers[HEADER_TIMESTAMP].parse::<u64>().unwrap(),
+            headers[HEADER_SIGNATURE].clone(),
+            u64::try_from(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis(),
+            )
+            .unwrap(),
+        )
+    }
+
+    // Credentials with one key id share a process-wide timestamp allocator. This
+    // burst holds it at its ceiling for seconds, so it needs a key of its own or
+    // every other test signing with that id waits behind it.
+    let credentials = test_credentials("ak_signing_burst", TEST_KEY);
+
+    // Several threads bring the allocator to its ceiling however slow one
+    // signature is on this host, so the runtime's signers below have to wait.
+    let claimed = Arc::new(AtomicUsize::new(0));
+    let threads = (0..8)
         .map(|_| {
             let credentials = credentials.clone();
-            tokio::spawn(async move {
-                let headers = credentials
-                    .sign_request_async(
-                        "POST",
-                        "https://api.example.test/orders.v1.OrdersService/CreateOrder",
-                        b"identical-order-body",
-                        None,
-                    )
-                    .await
-                    .unwrap();
-                (
-                    headers[HEADER_TIMESTAMP].parse::<u64>().unwrap(),
-                    headers[HEADER_SIGNATURE].clone(),
-                    u64::try_from(
-                        SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap()
-                            .as_millis(),
-                    )
-                    .unwrap(),
-                )
+            let claimed = claimed.clone();
+            std::thread::spawn(move || {
+                let mut tuples = Vec::new();
+                while claimed.fetch_add(1, Ordering::SeqCst) < FROM_THREADS {
+                    loop {
+                        match credentials.sign_request("POST", URL, BODY, None) {
+                            Ok(headers) => {
+                                tuples.push(signed_tuple(headers));
+                                break;
+                            }
+                            Err(Error::RateLimit { .. }) => {
+                                std::thread::sleep(Duration::from_millis(1));
+                            }
+                            Err(other) => panic!("{other:?}"),
+                        }
+                    }
+                }
+                tuples
             })
         })
         .collect::<Vec<_>>();
-    let mut tuples = Vec::with_capacity(handles.len());
-    for handle in handles {
-        tuples.push(handle.await.unwrap());
+    let mut tuples = Vec::with_capacity(FROM_THREADS + FROM_RUNTIME);
+    for thread in threads {
+        tuples.extend(thread.join().unwrap());
     }
-    let largest_timer_gap = ticker.await.unwrap();
-    assert_eq!(tuples.len(), 10_000);
+
+    // The ticker only runs while signing yields the runtime. A wait that blocked
+    // the thread would leave it almost no ticks, however busy the host.
+    let signed = Arc::new(AtomicUsize::new(0));
+    let ticker = tokio::spawn({
+        let signed = signed.clone();
+        async move {
+            let mut ticks = 0usize;
+            while signed.load(Ordering::SeqCst) < FROM_RUNTIME {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                ticks += 1;
+            }
+            ticks
+        }
+    });
+    // Let the ticker arm its first timer before creating runnable tasks so
+    // task-spawn overhead is not misclassified as signing backpressure.
+    tokio::task::yield_now().await;
+    let handles = (0..FROM_RUNTIME)
+        .map(|_| {
+            let credentials = credentials.clone();
+            let signed = signed.clone();
+            tokio::spawn(async move {
+                let headers = credentials
+                    .sign_request_async("POST", URL, BODY, None)
+                    .await
+                    .unwrap();
+                signed.fetch_add(1, Ordering::SeqCst);
+                signed_tuple(headers)
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut from_runtime = Vec::with_capacity(handles.len());
+    for handle in handles {
+        from_runtime.push(handle.await.unwrap());
+    }
+    let ticks = ticker.await.unwrap();
+
+    // A signature allocated at the ceiling waited at least a millisecond first.
+    let at_ceiling = from_runtime
+        .iter()
+        .filter(|(timestamp, _, observed_at_ms)| {
+            *timestamp + 100 >= *observed_at_ms + MAX_SIGNING_FUTURE_SKEW_MS
+        })
+        .count();
     assert!(
-        largest_timer_gap < Duration::from_secs(2),
-        "signing backpressure stalled current-thread Tokio for {largest_timer_gap:?}"
+        at_ceiling > 0,
+        "the burst never reached the signing ceiling"
     );
+    assert!(
+        ticks >= at_ceiling / 100,
+        "signing backpressure stalled current-thread Tokio: {ticks} timer ticks across {at_ceiling} signatures at the ceiling"
+    );
+
+    tuples.extend(from_runtime);
+    assert_eq!(tuples.len(), 10_000);
     let timestamps = tuples.iter().map(|item| item.0).collect::<HashSet<_>>();
     let signatures = tuples.iter().map(|item| &item.1).collect::<HashSet<_>>();
     assert_eq!(timestamps.len(), 10_000, "duplicate signing timestamp");
@@ -1474,6 +1567,9 @@ async fn l2_jsonrpc_25_concurrent_reordered_responses_succeed() {
                     Ok(n) => n,
                     Err(_) => return,
                 };
+                if hardening_support::is_port_probe(&buf[..n]) {
+                    return;
+                }
                 let raw = String::from_utf8_lossy(&buf[..n]);
                 let body = raw.split("\r\n\r\n").nth(1).unwrap_or("{}");
                 let v: serde_json::Value = serde_json::from_str(body).unwrap_or(json!({}));
@@ -3296,6 +3392,9 @@ async fn l2_orders_subscribe_streams_over_the_private_websocket() {
             tokio::spawn(async move {
                 let mut head = [0u8; 32];
                 let n = stream.peek(&mut head).await.unwrap();
+                if hardening_support::is_port_probe(&head[..n]) {
+                    return;
+                }
                 if !head[..n].starts_with(b"GET /v1/ws/private") {
                     // A realtime token request.
                     let mut request = Vec::new();
@@ -6414,7 +6513,7 @@ async fn ticket_ws(
     let url = format!("ws://{}", listener.local_addr().unwrap());
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
     let task = tokio::spawn(async move {
-        let (socket, _) = listener.accept().await.unwrap();
+        let socket = hardening_support::accept_skipping_port_probes(&listener).await;
         let mut ws = tokio_tungstenite::accept_hdr_async(
             socket,
             |_: &_, mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
@@ -6853,7 +6952,7 @@ async fn ticket_8511_zero_sequence_disconnect_then_503_releases_receiver() {
     let task = tokio::spawn(async move {
         let mut disconnected = Some(disconnected);
         for connection in 0..2 {
-            let (socket, _) = listener.accept().await.unwrap();
+            let socket = hardening_support::accept_skipping_port_probes(&listener).await;
             let mut ws = tokio_tungstenite::accept_hdr_async(socket,
                 |_: &_, mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
                     response.headers_mut().insert("sec-websocket-protocol", "centrifuge-protobuf".parse().unwrap());
@@ -7325,40 +7424,57 @@ async fn l2_retry_contract_read_recovery() {
 
 #[tokio::test]
 async fn l2_retry_contract_client_timeout() {
-    let http = MockHttpServer::spawn(|_| hardening_support::HttpScript::NeverRespond {
-        stall: Duration::from_secs(1),
-    })
-    .await;
-    let client = Client::new(Config {
-        api_url: http.base_url(),
-        api_key_id: Some("ak_test".into()),
-        api_private_key: Some(TEST_KEY.into()),
-        hydrate_catalogs: false,
-        timeout: Duration::from_millis(50),
-        ..Default::default()
-    })
-    .unwrap();
     use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide};
-    client
-        .catalogs
-        .hydrate_spot_config_json(
-            json!({"pairs":[{"symbol":"BTC-USDT","symbol_id":1,"base_quantity_scale":8}]}),
-        )
+    // The scenario needs the request on the wire before the client gives up. A
+    // slow host can time out first, so try again with longer, and fail if the
+    // request never arrives. A resend would make the count 2.
+    let mut timeout = Duration::from_millis(50);
+    for _ in 0..5 {
+        let http = MockHttpServer::spawn(|_| hardening_support::HttpScript::NeverRespond {
+            stall: Duration::from_secs(1),
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: http.base_url(),
+            api_key_id: Some("ak_test".into()),
+            api_private_key: Some(TEST_KEY.into()),
+            hydrate_catalogs: false,
+            timeout,
+            ..Default::default()
+        })
         .unwrap();
-    let mut params = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Market);
-    params.quantity = Some(
-        Quantity::from_scaled(
-            1,
-            Some(8),
-            QuantityDomain::OrderBase,
-            Some("BTC-USDT".into()),
-            Some(1),
+        client
+            .catalogs
+            .hydrate_spot_config_json(
+                json!({"pairs":[{"symbol":"BTC-USDT","symbol_id":1,"base_quantity_scale":8}]}),
+            )
+            .unwrap();
+        let mut params =
+            CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Market);
+        params.quantity = Some(
+            Quantity::from_scaled(
+                1,
+                Some(8),
+                QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(1),
+            )
+            .unwrap(),
+        );
+        let e = client.orders.create(params).await.unwrap_err();
+        assert!(e.mutation_outcome_unknown() && !e.is_retryable(), "{e:?}");
+        let arrived = hardening_support::eventually(
+            || http.requests.load(Ordering::SeqCst) >= 1,
+            Duration::from_secs(1),
         )
-        .unwrap(),
-    );
-    let e = client.orders.create(params).await.unwrap_err();
-    assert!(e.mutation_outcome_unknown() && !e.is_retryable(), "{e:?}");
-    assert_eq!(http.requests.load(Ordering::SeqCst), 1);
+        .await;
+        if arrived {
+            assert_eq!(http.requests.load(Ordering::SeqCst), 1);
+            return;
+        }
+        timeout *= 2;
+    }
+    panic!("the request never reached the mock before the client timed out");
 }
 
 #[tokio::test]
