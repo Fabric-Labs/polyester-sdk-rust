@@ -90,6 +90,15 @@ thin_service!(
     crate::connect::ratelimit::v1::RateLimitServiceClient<crate::transport::SharedTransport>
 );
 
+/// Pagination and time bounds for historical heatmap reads.
+#[derive(Debug, Clone, Default)]
+pub struct GetHeatmapOptions {
+    /// Repeat the original range when explicitly supplying bounds on a continuation.
+    pub time_range: Option<crate::proto::marketdata::v1::HeatmapTimeRange>,
+    /// Opaque token from the previous response; reuse the same request filters.
+    pub page_token: Option<String>,
+}
+
 impl HeatmapService {
     /// Historical orderbook heatmap (Go `HeatmapService.Get` → `ApiData`).
     pub async fn get(
@@ -99,6 +108,28 @@ impl HeatmapService {
         depth: u32,
         limit: u32,
         quantity_mode: &str,
+    ) -> crate::errors::Result<crate::models::ApiData> {
+        self.get_with_options(
+            symbol,
+            interval,
+            depth,
+            limit,
+            quantity_mode,
+            GetHeatmapOptions::default(),
+        )
+        .await
+    }
+
+    /// Read a heatmap page with explicit time bounds or an opaque continuation token.
+    /// A token without a supplied range omits the default time window.
+    pub async fn get_with_options(
+        &self,
+        symbol: &str,
+        interval: &str,
+        depth: u32,
+        limit: u32,
+        quantity_mode: &str,
+        opts: GetHeatmapOptions,
     ) -> crate::errors::Result<crate::models::ApiData> {
         use crate::codecs::decode::api_data_from_proto;
         use crate::codecs::heatmap::{
@@ -120,29 +151,36 @@ impl HeatmapService {
             })?;
         let interval_enum = resolve_heatmap_interval(interval)?;
         let qty_mode = resolve_heatmap_quantity_mode(quantity_mode)?;
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default();
-        let end = Timestamp {
-            seconds: now.as_secs() as i64,
-            nanos: now.subsec_nanos() as i32,
-            ..Default::default()
-        };
-        let start = Timestamp {
-            seconds: end.seconds.saturating_sub(300),
-            nanos: end.nanos,
-            ..Default::default()
-        };
+        let page_token = opts.page_token.unwrap_or_default();
+        let time_range = opts.time_range.or_else(|| {
+            if !page_token.is_empty() {
+                return None;
+            }
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default();
+            let end = Timestamp {
+                seconds: now.as_secs() as i64,
+                nanos: now.subsec_nanos() as i32,
+                ..Default::default()
+            };
+            let start = Timestamp {
+                seconds: end.seconds.saturating_sub(300),
+                nanos: end.nanos,
+                ..Default::default()
+            };
+            Some(HeatmapTimeRange {
+                start_time: start.into(),
+                end_time: end.into(),
+                ..Default::default()
+            })
+        });
         let req = GetOrderbookHeatmapRequest {
             symbol_id,
             interval: interval_enum.into(),
             depth: heatmap_depth_for_levels(depth).into(),
-            time_range: HeatmapTimeRange {
-                start_time: start.into(),
-                end_time: end.into(),
-                ..Default::default()
-            }
-            .into(),
+            time_range: time_range.map_or_else(Default::default, Into::into),
+            page_token,
             limit: if limit == 0 { 100 } else { limit },
             quantity_mode: qty_mode.into(),
             ..Default::default()

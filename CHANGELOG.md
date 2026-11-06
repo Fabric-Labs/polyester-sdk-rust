@@ -9,6 +9,12 @@
   must initialize it. It preserves the returned BTC-USDT closes as integers
   scaled by 1e9, in timestamp order. An omitted series is an empty vector.
 
+- **Breaking:** `ListMarketOverviewOptions` gains `page_token`, so exhaustive
+  struct literals must initialize it. Reuse the returned token and filters to
+  read the next market-overview page.
+- Heatmap history now offers `get_with_options` for explicit time bounds and
+  opaque continuation tokens. A continuation omits a new default time window.
+
 ## 0.7.2
 
 Package version: `0.7.2`. Git tag: `v0.7.2`. Released 2026-11-06.

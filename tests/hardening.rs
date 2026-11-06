@@ -5620,3 +5620,231 @@ async fn l2_equity_history_keeps_wire_btc_closes_in_both_codecs() {
         );
     }
 }
+
+#[tokio::test]
+async fn l2_heatmap_paging_keeps_filters_without_a_new_window() {
+    use buffa_types::google::protobuf::Timestamp;
+    use polyester::proto::marketdata::v1::{
+        GetOrderbookHeatmapRequest, GetOrderbookHeatmapResponse, HeatmapTimeRange,
+    };
+    use polyester::services::GetHeatmapOptions;
+    use polyester::transport::WireFormat;
+    use std::sync::Mutex;
+    for json_wire in [false, true] {
+        for explicit in [false, true] {
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let observed = seen.clone();
+            let server = MockHttpServer::spawn(move |req| {
+                assert!(req.path.ends_with("/GetOrderbookHeatmap"));
+                let request: GetOrderbookHeatmapRequest = if json_wire {
+                    serde_json::from_slice(&req.body).unwrap()
+                } else {
+                    GetOrderbookHeatmapRequest::decode_from_slice(&req.body).unwrap()
+                };
+                let mut seen = observed.lock().unwrap();
+                seen.push(request);
+                let response = GetOrderbookHeatmapResponse {
+                    symbol_id: 1,
+                    last_persisted_ts_sec: 100,
+                    next_page_token: if seen.len() == 1 {
+                        "eyJoZWF0bWFwIjoxfQ==".into()
+                    } else {
+                        String::new()
+                    },
+                    ..Default::default()
+                };
+                if json_wire {
+                    hardening_support::HttpScript::Json {
+                        status: 200,
+                        body: serde_json::to_vec(&response).unwrap(),
+                    }
+                } else {
+                    connect_proto_ok(&response)
+                }
+            })
+            .await;
+            let client = Client::new(Config {
+                api_url: server.base_url(),
+                hydrate_catalogs: false,
+                wire_format: if json_wire {
+                    WireFormat::Json
+                } else {
+                    WireFormat::Binary
+                },
+                ..Default::default()
+            })
+            .unwrap();
+            client
+                .catalogs
+                .hydrate_spot_config_json(
+                    json!({"pairs":[{"symbol":"BTC-USDT","symbol_id":1,"base_quantity_scale":8}]}),
+                )
+                .unwrap();
+            let range = explicit.then(|| HeatmapTimeRange {
+                start_time: Timestamp {
+                    seconds: 100,
+                    ..Default::default()
+                }
+                .into(),
+                end_time: Timestamp {
+                    seconds: 400,
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            });
+            let first = if explicit {
+                client
+                    .heatmap
+                    .get_with_options(
+                        "BTC-USDT",
+                        "1m",
+                        50,
+                        1,
+                        "peak",
+                        GetHeatmapOptions {
+                            time_range: range.clone(),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .unwrap()
+            } else {
+                client
+                    .heatmap
+                    .get("BTC-USDT", "1m", 50, 1, "peak")
+                    .await
+                    .unwrap()
+            };
+            let token = first.raw["nextPageToken"]
+                .as_str()
+                .expect("nonempty token returned")
+                .to_owned();
+            assert_eq!(token, "eyJoZWF0bWFwIjoxfQ==");
+            let second = client
+                .heatmap
+                .get_with_options(
+                    "BTC-USDT",
+                    "1m",
+                    50,
+                    1,
+                    "peak",
+                    GetHeatmapOptions {
+                        time_range: range,
+                        page_token: Some(token.clone()),
+                    },
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                second
+                    .raw
+                    .get("nextPageToken")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default(),
+                ""
+            );
+            let seen = seen.lock().unwrap();
+            assert_eq!(seen.len(), 2);
+            let (mut a, mut b) = (seen[0].clone(), seen[1].clone());
+            assert_eq!(a.page_token, "");
+            assert_eq!(b.page_token, token);
+            assert!(a.time_range.is_set());
+            if explicit {
+                assert_eq!(a.time_range, b.time_range)
+            } else {
+                assert!(!b.time_range.is_set(), "continuation invented a window")
+            }
+            a.time_range = Default::default();
+            b.time_range = Default::default();
+            b.page_token.clear();
+            assert_eq!(a, b);
+            assert_eq!(a.symbol_id, 1);
+            assert_eq!(a.limit, 1);
+        }
+    }
+}
+
+#[tokio::test]
+async fn l2_market_overview_follows_token_with_unchanged_filters() {
+    use polyester::proto::marketoverview::v1::{
+        ListMarketOverviewRequest, ListMarketOverviewResponse, MarketOverview,
+    };
+    use polyester::services::ListMarketOverviewOptions;
+    use polyester::transport::WireFormat;
+    use std::sync::Mutex;
+    for json_wire in [false, true] {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let observed = seen.clone();
+        let server = MockHttpServer::spawn(move |req| {
+            assert!(req.path.ends_with("/ListMarketOverview"));
+            let request: ListMarketOverviewRequest = if json_wire {
+                serde_json::from_slice(&req.body).unwrap()
+            } else {
+                ListMarketOverviewRequest::decode_from_slice(&req.body).unwrap()
+            };
+            let mut seen = observed.lock().unwrap();
+            seen.push(request);
+            let response = ListMarketOverviewResponse {
+                markets: vec![MarketOverview {
+                    symbol_id: seen.len() as u32,
+                    ..Default::default()
+                }],
+                next_page_token: if seen.len() == 1 {
+                    "opaque-overview".into()
+                } else {
+                    String::new()
+                },
+                ..Default::default()
+            };
+            if json_wire {
+                hardening_support::HttpScript::Json {
+                    status: 200,
+                    body: serde_json::to_vec(&response).unwrap(),
+                }
+            } else {
+                connect_proto_ok(&response)
+            }
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: server.base_url(),
+            hydrate_catalogs: false,
+            wire_format: if json_wire {
+                WireFormat::Json
+            } else {
+                WireFormat::Binary
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        client
+            .catalogs
+            .hydrate_spot_config_json(
+                json!({"pairs":[{"symbol":"BTC-USDT","symbol_id":1,"base_quantity_scale":8}]}),
+            )
+            .unwrap();
+        let mut opts = ListMarketOverviewOptions {
+            symbols: Some(vec!["BTC-USDT".into()]),
+            limit: Some(1),
+            include_sparklines: true,
+            ..Default::default()
+        };
+        let first = client.market_overview.list(opts.clone()).await.unwrap();
+        assert_eq!(first.markets.len(), 1);
+        assert_eq!(first.next_page_token, "opaque-overview");
+        opts.page_token = Some(first.next_page_token);
+        let second = client.market_overview.list(opts).await.unwrap();
+        assert_eq!(second.markets.len(), 1);
+        assert!(second.next_page_token.is_empty());
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(seen[0].page_token, "");
+        assert_eq!(seen[1].page_token, "opaque-overview");
+        let mut next = seen[1].clone();
+        next.page_token.clear();
+        assert_eq!(seen[0], next);
+        assert_eq!(next.symbol_id, vec![1]);
+        assert!(next.include_sparklines);
+    }
+}

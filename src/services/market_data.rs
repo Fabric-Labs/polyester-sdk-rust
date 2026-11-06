@@ -376,6 +376,8 @@ fn newest_candle(result: CandlesResult) -> Option<Candle> {
 pub struct ListMarketOverviewOptions {
     pub symbols: Option<Vec<String>>,
     pub limit: Option<u32>,
+    /// Opaque token from the previous page; reuse the same filters.
+    pub page_token: Option<String>,
     pub include_sparklines: bool,
 }
 
@@ -419,6 +421,7 @@ impl MarketOverviewService {
                 .resolve_symbol_ids(opts.symbols.as_deref())?,
             // Proto u32: 0 means omit / server default (typically 50).
             limit: opts.limit.unwrap_or_default(),
+            page_token: opts.page_token.unwrap_or_default(),
             include_sparklines: opts.include_sparklines,
             ..Default::default()
         };
@@ -673,6 +676,7 @@ impl MarketOverviewService {
                         symbols,
                         limit: Some(limit),
                         include_sparklines,
+                        ..Default::default()
                     })
                     .await
                 })
