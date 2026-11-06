@@ -7,10 +7,29 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::http::{Request as WsRequest, Response as WsResponse};
 use tokio_tungstenite::{WebSocketStream, accept_hdr_async};
+
+/// A tool on the host can discover a listening port and send it `HEAD /`.
+/// The SDK never sends that, so a mock does not count it or show it to a test.
+pub fn is_port_probe(request: &[u8]) -> bool {
+    request.starts_with(b"HEAD / ")
+}
+
+/// The next connection that is not a port probe, for mocks that accept a fixed
+/// number of connections.
+pub async fn accept_skipping_port_probes(listener: &TcpListener) -> TcpStream {
+    loop {
+        let (stream, _) = listener.accept().await.expect("accept");
+        let mut head = [0u8; 7];
+        match stream.peek(&mut head).await {
+            Ok(n) if n > 0 && !is_port_probe(&head[..n]) => return stream,
+            _ => {}
+        }
+    }
+}
 
 pub struct ParsedRequest {
     #[allow(dead_code)]
@@ -87,13 +106,19 @@ impl MockHttpServer {
                 let requests = requests_task.clone();
                 let in_flight = in_flight_task.clone();
                 tokio::spawn(async move {
-                    in_flight.fetch_add(1, Ordering::SeqCst);
-                    let _guard = ConnGuard(in_flight);
                     let mut buf = vec![0u8; 16 * 1024];
                     let n = match stream.read(&mut buf).await {
                         Ok(0) | Err(_) => return,
                         Ok(n) => n,
                     };
+                    if is_port_probe(&buf[..n]) {
+                        let _ = stream
+                            .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                            .await;
+                        return;
+                    }
+                    in_flight.fetch_add(1, Ordering::SeqCst);
+                    let _guard = ConnGuard(in_flight);
                     requests.fetch_add(1, Ordering::SeqCst);
                     let raw = String::from_utf8_lossy(&buf[..n]);
                     let mut lines = raw.split("\r\n");
@@ -705,12 +730,20 @@ pub const GET_ORDER_PATH: &str = "/orders.v1.OrdersReadService/GetOrder";
 pub const GET_BALANCES_PATH: &str = "/ledger.read.v1.LedgerReadService/GetBalances";
 pub const GET_TRADES_PATH: &str = "/marketdata.v1.MarketDataService/GetTrades";
 
-pub async fn wait_until(mut pred: impl FnMut() -> bool, timeout: Duration) {
+pub async fn wait_until(pred: impl FnMut() -> bool, timeout: Duration) {
+    if !eventually(pred, timeout).await {
+        panic!("condition not met within {timeout:?}");
+    }
+}
+
+/// Polls `pred` until it holds; false once `timeout` passes without it.
+pub async fn eventually(mut pred: impl FnMut() -> bool, timeout: Duration) -> bool {
     let start = std::time::Instant::now();
     while !pred() {
         if start.elapsed() > timeout {
-            panic!("condition not met within {timeout:?}");
+            return false;
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
+    true
 }
